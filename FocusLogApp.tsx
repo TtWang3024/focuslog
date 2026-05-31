@@ -415,7 +415,7 @@ export default function FocusLogApp({ api }: any) {
         {view === "today" && (
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={{ color: C.muted, fontSize: 12 }}>{tasks.length} tasks \u00B7 {countToday} {"\u{1F345}"} today</span>
+              <span style={{ color: C.muted, fontSize: 12 }}>{tasks.length} tasks {"\u00B7"} {countToday} {"\u{1F345}"} today</span>
               <button onClick={doSync} style={btn(C.ink, true)} disabled={sync === "loading"}>{sync === "loading" ? "syncing\u2026" : "sync from Notion"}</button>
             </div>
             {tasks.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No tasks yet. Set your Notion token in settings, then press sync.</p>}
@@ -431,7 +431,7 @@ export default function FocusLogApp({ api }: any) {
                   <div key={key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${C.line}` }}>
                     <span style={{ width: 14, height: 14, borderRadius: 4, background: LOAD_COLOR[t.load] || C.neutral, flexShrink: 0 }} title={LOAD_LABEL[t.load]} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.task}</div>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}>{t.task}</div>
                       {hier && <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hier}</div>}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
@@ -450,16 +450,16 @@ export default function FocusLogApp({ api }: any) {
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <button onClick={() => setWeekOff((w) => w - 1)} style={btn(C.muted, true)}>{"\u2190"}</button>
-              <span style={{ fontFamily: "var(--fl-mono)", fontSize: 13 }}>{fmtDate(weekStart)} \u2013 {fmtDate(new Date(+weekEnd - DAY))}</span>
+              <span style={{ fontFamily: "var(--fl-mono)", fontSize: 13 }}>{fmtDate(weekStart)} {"\u2013"} {fmtDate(new Date(+weekEnd - DAY))}</span>
               <button onClick={() => setWeekOff((w) => Math.min(0, w + 1))} style={btn(C.muted, true)}>{"\u2192"}</button>
             </div>
             {weekGroups.length === 0 ? <p style={{ color: C.muted, textAlign: "center", padding: "40px 0" }}>No pomodoros this week.</p> :
               weekGroups.map((g) => (<GroupChart key={g} group={g} sessions={weekSessions.filter((x) => (x.group || x.task) === g)} settings={settings} />))}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted }}>
-              <span><span style={{ color: settings.beginColor }}>\u25CF</span> expected</span>
-              <span><span style={{ color: settings.endColor }}>\u25CF</span> actual</span>
-              <span><span style={{ color: C.better }}>\u2014</span> better than expected</span>
-              <span><span style={{ color: C.worse }}>\u2014</span> worse than expected</span>
+              <span><span style={{ color: settings.beginColor }}>{"\u25CF"}</span> expected</span>
+              <span><span style={{ color: settings.endColor }}>{"\u25CF"}</span> actual</span>
+              <span><span style={{ color: C.better }}>{"\u2014"}</span> better than expected</span>
+              <span><span style={{ color: C.worse }}>{"\u2014"}</span> worse than expected</span>
             </div>
           </div>
         )}
