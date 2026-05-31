@@ -1,4 +1,4 @@
-import { App, ItemView, Notice, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, requestUrl } from "obsidian";
+import { App, ItemView, Modal, Notice, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, requestUrl } from "obsidian";
 import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
 import FocusLogApp from "./FocusLogApp";
@@ -45,23 +45,21 @@ function numberProp(page: any, name: string): number {
   const n = page?.properties?.[name]?.number;
   return typeof n === "number" ? n : 0;
 }
-function tomatoValue(optName: string): number {
-  if (!optName) return 0;
-  if (optName.includes("\u{1F4E6}\u{1F4E6}")) return 6; // box box
-  if (optName.includes("\u{1F4E6}")) return 4; // box
-  if (optName.includes("\u{1F3D4}")) return 1; // mountain (unknown size)
-  const m = optName.match(/\u{1F345}/gu); // tomatoes
-  return m ? m.length : 0;
+// box = 4 pomodoros, tomato = 1, mountain = 1. An Est field may hold several options.
+function optValue(name: string): number {
+  if (!name) return 0;
+  const boxes = (name.match(/\u{1F4E6}/gu) || []).length;
+  const toms = (name.match(/\u{1F345}/gu) || []).length;
+  const mts = (name.match(/\u{1F3D4}/gu) || []).length;
+  return boxes * 4 + toms + mts;
 }
-function parsePomodoros(page: any): number {
-  for (const field of ["3 Est_T", "2 Est_T", "1 Est_T"]) {
-    const ms = page?.properties?.[field]?.multi_select || [];
-    if (ms.length) {
-      const best = Math.max(...ms.map((o: any) => tomatoValue(o.name)));
-      return best > 0 ? best : 1;
-    }
-  }
-  return 1;
+function fieldValue(page: any, field: string): number {
+  const ms = page?.properties?.[field]?.multi_select || [];
+  return ms.reduce((a: number, o: any) => a + optValue(o.name), 0);
+}
+// Total estimate = sum of all three Est fields.
+function estTotalOf(page: any): number {
+  return fieldValue(page, "1 Est_T") + fieldValue(page, "2 Est_T") + fieldValue(page, "3 Est_T");
 }
 function mapLoad(name: string | null): string {
   if (!name) return "B";
@@ -134,7 +132,6 @@ export default class FocusLogPlugin extends Plugin {
       or: [
         { property: "Status", select: { equals: "\u{1F33B} Today" } },
         { property: "Status", select: { equals: "1\uFE0F\u20E3 King" } },
-        { property: "Status", select: { equals: "\u{1F3AF} This week" } },
         {
           and: [
             { property: "Status", select: { equals: "\u{1F331} Daily" } },
@@ -153,14 +150,17 @@ export default class FocusLogPlugin extends Plugin {
     for (const p of pages) {
       const task = plainTitle(p);
       if (!task) continue;
+      const h = await this.resolveHierarchy(p, cache);
       tasks.push({
         task,
         load: mapLoad(selectName(p, "CognitiveLoad")),
-        pomodoros: parsePomodoros(p),
+        pomodoros: estTotalOf(p),
         act: numberProp(p, "Act"),
         url: p.url,
         id: p.id,
-        group: await this.resolveTopGroup(p, cache),
+        parent: h.parent,
+        ancestor: h.ancestor,
+        group: h.ancestor || task,
       });
     }
     this.data.tasks = tasks;
@@ -168,10 +168,13 @@ export default class FocusLogPlugin extends Plugin {
     return tasks;
   }
 
-  // Walk Parent item up to the top-level ancestor; group = that title (else own title).
-  private async resolveTopGroup(page: any, cache: Record<string, any>): Promise<string> {
+  // Walk Parent item up: immediate parent title and top-level ancestor title (else null).
+  private async resolveHierarchy(page: any, cache: Record<string, any>): Promise<{ parent: string | null; ancestor: string | null }> {
+    const rel0 = page?.properties?.["Parent item"]?.relation;
+    if (!rel0 || !rel0.length) return { parent: null, ancestor: null };
     let cur = page;
-    let top = plainTitle(cur);
+    let top = plainTitle(page);
+    let immediate: string | null = null;
     let guard = 0;
     while (guard < 6) {
       const rel = cur?.properties?.["Parent item"]?.relation;
@@ -183,11 +186,12 @@ export default class FocusLogPlugin extends Plugin {
         cache[pid] = parent;
       }
       const pt = plainTitle(parent);
+      if (guard === 0) immediate = pt || null;
       if (pt) top = pt;
       cur = parent;
       guard++;
     }
-    return top;
+    return { parent: immediate, ancestor: top };
   }
 
   // Read current Act, then PATCH only that one property (+1).
@@ -214,8 +218,33 @@ export default class FocusLogPlugin extends Plugin {
       saveSettings: async (s: FocusLogSettings) => { self.data.settings = Object.assign({}, self.data.settings, s); await self.persist(); },
       sync: () => self.queryToday(),
       writeAct: (pageId: string) => self.incrementAct(pageId),
-      notify: (msg: string) => new Notice(msg),
+      notify: (msg: string, duration?: number) => new Notice(msg, duration),
+      celebrate: () => new CelebrateModal(self.app).open(),
     };
+  }
+}
+
+class CelebrateModal extends Modal {
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("focuslog-celebrate");
+    contentEl.createEl("div", { text: "\u{1F389}", cls: "fl-popper" });
+    contentEl.createEl("h2", { text: "Pomodoro complete" });
+    contentEl.createEl("p", { text: "One block done. Log how enjoyable it actually was." });
+    const confetti = contentEl.createDiv({ cls: "fl-confetti" });
+    const colors = ["#d98324", "#2f6f8f", "#5b8c5a", "#b4533a", "#c9a227"];
+    for (let i = 0; i < 28; i++) {
+      const piece = confetti.createSpan({ cls: "fl-piece" });
+      piece.style.left = Math.random() * 100 + "%";
+      piece.style.background = colors[i % colors.length];
+      piece.style.animationDelay = (Math.random() * 0.4).toFixed(2) + "s";
+    }
+    const ok = contentEl.createEl("button", { text: "Nice", cls: "mod-cta" });
+    ok.style.marginTop = "12px";
+    ok.onclick = () => this.close();
+  }
+  onClose() {
+    this.contentEl.empty();
   }
 }
 

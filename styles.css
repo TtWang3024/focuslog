@@ -4,3 +4,12 @@
   padding: 0;
   overflow: auto;
 }
+
+/* Celebration modal */
+.focuslog-celebrate { text-align: center; position: relative; overflow: hidden; }
+.focuslog-celebrate .fl-popper { font-size: 56px; animation: fl-pop 0.5s cubic-bezier(.2,1.4,.4,1) both; }
+.focuslog-celebrate h2 { margin: 6px 0 2px; }
+.focuslog-celebrate .fl-confetti { position: absolute; inset: 0; pointer-events: none; }
+.focuslog-celebrate .fl-piece { position: absolute; top: -12px; width: 8px; height: 14px; border-radius: 2px; opacity: 0; animation: fl-fall 1.1s ease-in forwards; }
+@keyframes fl-pop { from { transform: scale(0.2) rotate(-20deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes fl-fall { 0% { transform: translateY(0) rotate(0); opacity: 1; } 100% { transform: translateY(240px) rotate(460deg); opacity: 0; } }

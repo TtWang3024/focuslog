@@ -1,15 +1,11 @@
 import * as React from "react";
 const { useState, useEffect, useRef, useCallback } = React;
 
-// Focus Log UI. Receives an `api` bridge from the plugin:
-//   settings, getInitial(), saveSessions, savePending, saveTasks, saveSettings, sync, writeAct, notify
-// Sessions store a Notion pageId so a log can PATCH +1 to that page's Act property.
+// Focus Log UI. `api` bridge from the plugin:
+//   settings, getInitial(), saveSessions, savePending, saveTasks, sync, writeAct, notify(msg,ms), celebrate()
+// Scoring is enjoyment-based: expected enjoyment BEFORE, actual enjoyment AFTER.
+// A higher actual is the good outcome (green); a lower actual is worse (red).
 
-const FEELINGS = [
-  { key: "drained", glyph: "\u{1F623}", label: "drained" },
-  { key: "neutral", glyph: "\u{1F610}", label: "neutral" },
-  { key: "satisfied", glyph: "\u{1F642}", label: "satisfied" },
-];
 const LOAD_COLOR: any = { A: "#c0772e", B: "#4e7d9c", C: "#6f9461" };
 const LOAD_LABEL: any = { A: "A high", B: "B medium", C: "C low" };
 
@@ -27,7 +23,7 @@ const BAND_NAME = ["morning", "afternoon", "evening"];
 
 const C: any = {
   paper: "#f5f1e8", card: "#fbf8f1", ink: "#2b2723", muted: "#8a8175",
-  faint: "#cfc7b8", line: "#e4ddcf", harder: "#b4533a", relief: "#5b8c5a", neutral: "#a59c8c",
+  faint: "#cfc7b8", line: "#e4ddcf", better: "#5b8c5a", worse: "#b4533a", neutral: "#a59c8c",
 };
 
 const DAY = 86400000;
@@ -50,44 +46,55 @@ const weekdayInk = (wd: number) => { const w = WEEKDAY[wd]; return `hsl(${w.h} $
 const sameLogicalDay = (a: any, b: any, s: any) => logicalDay(a, s).getTime() === logicalDay(b, s).getTime();
 const fmtDate = (d: any) => new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const fmtTime = (d: any) => new Date(d).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-const groupOf = (t: any) => t.group || t.task;
+// enjoyment: higher actual than expected is better (green)
 function gapColor(expected: number, actual: number) {
-  if (actual < expected) return C.relief;
-  if (actual > expected) return C.harder;
+  if (actual > expected) return C.better;
+  if (actual < expected) return C.worse;
   return C.neutral;
 }
+function verdictOf(expected: number, actual: number) {
+  if (actual > expected) return "better than expected";
+  if (actual < expected) return "worse than expected";
+  return "as expected";
+}
+const hierarchyText = (t: any) => {
+  if (!t.ancestor) return "";
+  if (t.parent && t.ancestor && t.parent !== t.ancestor) return `${t.ancestor} \u00B7 ${t.parent}`;
+  return t.ancestor || t.parent || "";
+};
 
 function seedSessions() {
   const out: any[] = [];
   const ws = mondayOf(new Date());
   let id = 1;
-  const push = (task: string, group: string, load: string, off: number, hour: number, exp: number, act: number, feel: string, note: string) => {
+  const push = (task: string, group: string, load: string, off: number, hour: number, exp: number, act: number, note: string) => {
     const t = new Date(ws); t.setDate(t.getDate() + off); t.setHours(hour, 0, 0, 0);
-    out.push({ id: id++, task, group, load, pageId: null, url: null, ts: t.toISOString(), expected: exp, actual: act, feeling: feel, note, minutes: 25 });
+    out.push({ id: id++, task, group, load, pageId: null, url: null, ts: t.toISOString(), expected: exp, actual: act, note, minutes: 25 });
   };
   const P = "[Pro] mol-CSPy pipeline";
-  push("[Pro] 1.1 review script", P, "B", 0, 10, 5, 3, "satisfied", "feared it, fine once started");
-  push("[Pro] 1.1 review script", P, "B", 1, 11, 4, 3, "neutral", "");
-  push("[Me] Pause Lab", "[Me] Pause Lab", "B", 1, 21, 3, 2, "satisfied", "");
-  push("[Pro] 1.2 array job", P, "B", 2, 9, 4, 2, "satisfied", "");
-  push("[G] stand up on Slack", "[G] stand up on Slack", "A", 2, 9, 4, 4, "neutral", "hard today");
-  push("[Pro] 1.3 ovito analysis", P, "B", 3, 20, 3, 2, "satisfied", "less dread");
-  push("[Pro] 1.1 review script", P, "B", 4, 11, 2, 2, "neutral", "smaller resistance");
+  push("[Pro] 1.1 review script", P, "B", 0, 10, 2, 4, "more fun than I thought");
+  push("[Pro] 1.1 review script", P, "B", 1, 11, 3, 3, "");
+  push("[Me] Pause Lab", "[Me] Pause Lab", "B", 1, 21, 2, 3, "");
+  push("[Pro] 1.2 array job", P, "B", 2, 9, 3, 4, "");
+  push("[G] stand up on Slack", "[G] stand up on Slack", "A", 2, 9, 4, 2, "draining today");
+  push("[Pro] 1.3 ovito analysis", P, "B", 3, 20, 3, 4, "satisfying");
+  push("[Pro] 1.1 review script", P, "B", 4, 11, 4, 4, "");
   return out;
 }
 
 function Stat({ label, value, color, big }: any) {
   return (
-    <div className="flex flex-col items-center" style={{ padding: "8px 12px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+    <div style={{ padding: "8px 12px", display: "flex", flexDirection: "column", alignItems: "center" }}>
       <span style={{ fontFamily: "var(--fl-mono)", fontSize: big ? 34 : 20, color: color || C.ink }}>{value}</span>
       <span style={{ color: C.muted, fontSize: 11, letterSpacing: 0.4 }}>{label}</span>
     </div>
   );
 }
-function Pips({ done, total }: any) {
-  const t = Math.max(total, done);
-  const items = [];
-  for (let i = 0; i < t; i++) items.push(<span key={i} style={{ fontSize: 13, opacity: i < done ? 1 : 0.28 }}>{"\u{1F345}"}</span>);
+function TomatoPips({ vivid, grey }: any) {
+  const items: any[] = [];
+  for (let i = 0; i < vivid; i++) items.push(<span key={"v" + i} style={{ fontSize: 13 }}>{"\u{1F345}"}</span>);
+  for (let i = 0; i < grey; i++) items.push(<span key={"g" + i} style={{ fontSize: 13, opacity: 0.28 }}>{"\u{1F345}"}</span>);
+  if (!items.length) return <span style={{ fontSize: 11, color: C.muted }}>{"\u2014"}</span>;
   return <span style={{ letterSpacing: 1 }}>{items}</span>;
 }
 const btn = (color: string, ghost?: boolean): any => ({
@@ -129,58 +136,56 @@ function GroupChart({ group, sessions, settings }: any) {
         <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{n} {"\u{1F345}"}</span>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", borderBottom: `1px solid ${C.line}` }}>
-        <Stat label="avg dread" value={avg("expected").toFixed(1)} color={settings.beginColor} />
+        <Stat label="avg expected" value={avg("expected").toFixed(1)} color={settings.beginColor} />
         <Stat label="avg actual" value={avg("actual").toFixed(1)} color={settings.endColor} />
-        <Stat label="avg gap" value={(avgGap >= 0 ? "+" : "") + avgGap.toFixed(1)} color={avgGap < 0 ? C.relief : avgGap > 0 ? C.harder : C.neutral} />
+        <Stat label="avg gap" value={(avgGap >= 0 ? "+" : "") + avgGap.toFixed(1)} color={avgGap > 0 ? C.better : avgGap < 0 ? C.worse : C.neutral} />
       </div>
       <div style={{ overflowX: "auto" }}>
         <div style={{ position: "relative", width: Math.max(W, 220) }}>
-        <svg width={W} height={H} style={{ display: "block" }}>
-          {[1, 2, 3, 4, 5].map((s) => (
-            <g key={s}>
-              <line x1={padL} y1={yOf(s)} x2={W - padR} y2={yOf(s)} stroke={C.line} />
-              <text x={6} y={yOf(s) + 4} fontSize={11} fill={C.muted} fontFamily="var(--fl-mono)">{s}</text>
-            </g>
-          ))}
-          {trend && <line x1={trend.x1} y1={trend.y1} x2={trend.x2} y2={trend.y2} stroke={settings.beginColor} strokeWidth={1.5} strokeDasharray="2 4" opacity={0.55} />}
-          {ordered.map((d: any, i: number) => {
-            const x = xOf(i), yE = yOf(d.expected), yA = yOf(d.actual), on = active === d.id;
-            return (
-              <g key={d.id} onMouseEnter={() => setActive(d.id)} onMouseLeave={() => setActive((a: any) => (a === d.id ? null : a))} onClick={() => setActive((a: any) => (a === d.id ? null : d.id))} style={{ cursor: "pointer" }}>
-                <rect x={x - step / 2} y={plotT} width={step} height={plotB - plotT} fill="transparent" />
-                <line x1={x} y1={yE} x2={x} y2={yA} stroke={gapColor(d.expected, d.actual)} strokeWidth={on ? 4 : 2.5} />
-                <circle cx={x} cy={yE} r={on ? 6 : 4.5} fill={settings.beginColor} />
-                <circle cx={x} cy={yA} r={on ? 6 : 4.5} fill={settings.endColor} />
-                {dotMode ? (
-                  <circle cx={x} cy={plotB + 18} r={6} fill={timeColor(d.ts, settings)} />
-                ) : (
-                  <text x={x} y={plotB + 16} fontSize={9.5} fill={C.muted} textAnchor="end" fontFamily="var(--fl-mono)" transform={`rotate(-42 ${x} ${plotB + 16})`}>{fmtDate(d.ts)} {fmtTime(d.ts)}</text>
-                )}
+          <svg width={W} height={H} style={{ display: "block" }}>
+            {[1, 2, 3, 4, 5].map((s) => (
+              <g key={s}>
+                <line x1={padL} y1={yOf(s)} x2={W - padR} y2={yOf(s)} stroke={C.line} />
+                <text x={6} y={yOf(s) + 4} fontSize={11} fill={C.muted} fontFamily="var(--fl-mono)">{s}</text>
               </g>
-            );
-          })}
-        </svg>
-        {active && (() => {
-          const d = ordered.find((s: any) => s.id === active);
-          if (!d) return null;
-          const i = ordered.indexOf(d), x = xOf(i), tipW = 200, wrapW = Math.max(W, 220);
-          const left = Math.max(4, Math.min(x - tipW / 2, wrapW - tipW - 4));
-          const top = Math.max(2, Math.min(yOf(d.expected), yOf(d.actual)) - 64);
-          const f = FEELINGS.find((ff) => ff.key === d.feeling);
-          const verdict = d.actual < d.expected ? "easier than feared" : d.actual > d.expected ? "harder than feared" : "as feared";
-          return (
-            <div style={{ position: "absolute", left, top, width: tipW, background: C.ink, color: "#fff", borderRadius: 6, padding: "8px 10px", lineHeight: 1.35, pointerEvents: "none", zIndex: 5, boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}>
-              <div style={{ fontFamily: "var(--fl-mono)", fontSize: 10.5, color: "#cfc7b8", marginBottom: 2 }}>{fmtDate(d.ts)} {fmtTime(d.ts)}</div>
-              <div style={{ fontSize: 13, marginBottom: 3, wordBreak: "break-word" }}>{d.task}{f ? " " + f.glyph : ""}</div>
-              <div style={{ fontFamily: "var(--fl-mono)", fontSize: 12.5 }}>
-                <span style={{ color: settings.beginColor }}>{d.expected}</span>
-                <span> {"\u2192"} </span>
-                <span style={{ color: settings.endColor }}>{d.actual}</span>
-                <span style={{ color: gapColor(d.expected, d.actual) }}> {verdict}</span>
+            ))}
+            {trend && <line x1={trend.x1} y1={trend.y1} x2={trend.x2} y2={trend.y2} stroke={settings.beginColor} strokeWidth={1.5} strokeDasharray="2 4" opacity={0.55} />}
+            {ordered.map((d: any, i: number) => {
+              const x = xOf(i), yE = yOf(d.expected), yA = yOf(d.actual), on = active === d.id;
+              return (
+                <g key={d.id} onMouseEnter={() => setActive(d.id)} onMouseLeave={() => setActive((a: any) => (a === d.id ? null : a))} onClick={() => setActive((a: any) => (a === d.id ? null : d.id))} style={{ cursor: "pointer" }}>
+                  <rect x={x - step / 2} y={plotT} width={step} height={plotB - plotT} fill="transparent" />
+                  <line x1={x} y1={yE} x2={x} y2={yA} stroke={gapColor(d.expected, d.actual)} strokeWidth={on ? 4 : 2.5} />
+                  <circle cx={x} cy={yE} r={on ? 6 : 4.5} fill={settings.beginColor} />
+                  <circle cx={x} cy={yA} r={on ? 6 : 4.5} fill={settings.endColor} />
+                  {dotMode ? (
+                    <circle cx={x} cy={plotB + 18} r={6} fill={timeColor(d.ts, settings)} />
+                  ) : (
+                    <text x={x} y={plotB + 16} fontSize={9.5} fill={C.muted} textAnchor="end" fontFamily="var(--fl-mono)" transform={`rotate(-42 ${x} ${plotB + 16})`}>{fmtDate(d.ts)} {fmtTime(d.ts)}</text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+          {active && (() => {
+            const d = ordered.find((s: any) => s.id === active);
+            if (!d) return null;
+            const i = ordered.indexOf(d), x = xOf(i), tipW = 200, wrapW = Math.max(W, 220);
+            const left = Math.max(4, Math.min(x - tipW / 2, wrapW - tipW - 4));
+            const top = Math.max(2, Math.min(yOf(d.expected), yOf(d.actual)) - 64);
+            return (
+              <div style={{ position: "absolute", left, top, width: tipW, background: C.ink, color: "#fff", borderRadius: 6, padding: "8px 10px", lineHeight: 1.35, pointerEvents: "none", zIndex: 5, boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}>
+                <div style={{ fontFamily: "var(--fl-mono)", fontSize: 10.5, color: "#cfc7b8", marginBottom: 2 }}>{fmtDate(d.ts)} {fmtTime(d.ts)}</div>
+                <div style={{ fontSize: 13, marginBottom: 3, wordBreak: "break-word" }}>{d.task}</div>
+                <div style={{ fontFamily: "var(--fl-mono)", fontSize: 12.5 }}>
+                  <span style={{ color: settings.beginColor }}>{d.expected}</span>
+                  <span> {"\u2192"} </span>
+                  <span style={{ color: settings.endColor }}>{d.actual}</span>
+                  <span style={{ color: gapColor(d.expected, d.actual) }}> {verdictOf(d.expected, d.actual)}</span>
+                </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
         </div>
       </div>
     </div>
@@ -214,7 +219,7 @@ function Heatmap({ sessions, monthRef, settings }: any) {
             <div key={d} style={{ minHeight: 56, border: `1px solid ${C.line}`, borderRadius: 6, padding: 4, background: C.paper }}>
               <div style={{ fontSize: 10.5, fontFamily: "var(--fl-mono)", color: weekdayInk(wd), marginBottom: 3 }}>{d}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-                {list.map((x: any) => (<span key={x.id} title={`${x.task} · ${BAND_NAME[bandOf(x.ts, settings)]}`} style={{ width: 9, height: 9, borderRadius: 2, background: timeColor(x.ts, settings) }} />))}
+                {list.map((x: any) => (<span key={x.id} title={`${x.task} \u00B7 ${BAND_NAME[bandOf(x.ts, settings)]}`} style={{ width: 9, height: 9, borderRadius: 2, background: timeColor(x.ts, settings) }} />))}
               </div>
             </div>
           );
@@ -246,46 +251,58 @@ function Scale({ value, onChange, color, label }: any) {
   );
 }
 
-function LogForm({ tasks, preset, onAdd, settings }: any) {
+function LogForm({ tasks, preset, onAdd, settings, api }: any) {
   const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
   const [exp, setExp] = useState(3);
-  const [act, setAct] = useState(2);
-  const [feeling, setFeeling] = useState("neutral");
+  const [act, setAct] = useState(3);
   const [note, setNote] = useState("");
   const [secs, setSecs] = useState(25 * 60);
   const [running, setRunning] = useState(false);
   const tick = useRef<any>(null);
+  const fired = useRef<any>({});
+
   useEffect(() => setTask(preset || (tasks[0] && tasks[0].task) || ""), [preset, tasks]);
-  useEffect(() => { if (running) { tick.current = setInterval(() => setSecs((x: number) => (x > 0 ? x - 1 : 0)), 1000); return () => clearInterval(tick.current); } }, [running]);
+  useEffect(() => {
+    if (!running) return;
+    tick.current = setInterval(() => {
+      setSecs((x: number) => {
+        const nx = x > 0 ? x - 1 : 0;
+        if (nx === 900 && !fired.current[900]) { fired.current[900] = true; api.notify("15 minutes left. Still on this task?", 6000); }
+        if (nx === 300 && !fired.current[300]) { fired.current[300] = true; api.notify("5 minutes left. Stay with it.", 6000); }
+        if (nx === 0 && !fired.current[0]) { fired.current[0] = true; api.celebrate(); }
+        return nx;
+      });
+    }, 1000);
+    return () => clearInterval(tick.current);
+  }, [running]);
+  useEffect(() => { if (secs === 0) setRunning(false); }, [secs]);
+
+  const reset = () => { setRunning(false); setSecs(25 * 60); fired.current = {}; };
   const mm = String(Math.floor(secs / 60)).padStart(2, "0");
   const ss = String(secs % 60).padStart(2, "0");
   const meta: any = tasks.find((t: any) => t.task === task) || {};
   const submit = () => {
     if (!task.trim()) return;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), load: meta.load || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, feeling, note: note.trim(), minutes: 25 });
+    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), load: meta.load || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 });
     setNote("");
   };
   const inputStyle: any = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
   return (
     <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
-        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.relief : C.ink }}>{mm}:{ss}</span>
+        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => setRunning((r) => !r)} style={btn(C.ink)}>{running ? "pause" : "start 25m"}</button>
-          <button onClick={() => { setRunning(false); setSecs(25 * 60); }} style={btn(C.muted, true)}>reset</button>
+          <button onClick={reset} style={btn(C.muted, true)}>reset</button>
         </div>
       </div>
       <label style={{ color: C.muted, fontSize: 12 }}>task (Act +1 writes to this page)</label>
       <select value={task} onChange={(e) => setTask(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
         {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}</option>))}
       </select>
-      <Scale label="before: how much do I dread starting? (resistance)" value={exp} onChange={setExp} color={settings.beginColor} />
-      <Scale label="after: how hard was it really? (1 easy ... 5 awful)" value={act} onChange={setAct} color={settings.endColor} />
-      <label style={{ color: C.muted, fontSize: 12 }}>how I feel now</label>
-      <div style={{ display: "flex", gap: 8, marginTop: 4, marginBottom: 12 }}>
-        {FEELINGS.map((f) => (<button key={f.key} onClick={() => setFeeling(f.key)} title={f.label} style={{ fontSize: 22, width: 46, height: 46, borderRadius: 10, border: `1.5px solid ${feeling === f.key ? C.ink : C.faint}`, background: feeling === f.key ? C.paper : "transparent", cursor: "pointer" }}>{f.glyph}</button>))}
-      </div>
-      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 16 }} />
+      <Scale label="before: how enjoyable do I expect this to be? (1 dull ... 5 great)" value={exp} onChange={setExp} color={settings.beginColor} />
+      <Scale label="after: how enjoyable was it actually? (1 dull ... 5 great)" value={act} onChange={setAct} color={settings.endColor} />
+      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 16, marginTop: 4 }} />
       <button onClick={submit} style={{ ...btn(C.ink), width: "100%", padding: "10px" }}>log pomodoro + write Act</button>
     </div>
   );
@@ -297,6 +314,7 @@ export default function FocusLogApp({ api }: any) {
   const [tasks, setTasks] = useState<any[]>(init.tasks);
   const [pending, setPending] = useState<any[]>(init.pending);
   const [settings, setSettings] = useState<any>(api.settings);
+  const [doneSess, setDoneSess] = useState<any>({});
   const [view, setView] = useState("today");
   const [preset, setPreset] = useState("");
   const [weekOff, setWeekOff] = useState(0);
@@ -311,21 +329,23 @@ export default function FocusLogApp({ api }: any) {
 
   const doSync = async () => {
     setSync("loading");
-    try { const fresh = await api.sync(); setTasks(fresh); setSync("ok"); setFlash(fresh.length + " tasks loaded from Notion."); }
+    try { const fresh = await api.sync(); setTasks(fresh); setDoneSess({}); setSync("ok"); setFlash(fresh.length + " tasks loaded from Notion."); }
     catch (e: any) { setSync("error"); setFlash("Sync failed: " + (e?.message || e)); }
   };
 
   const logPomodoro = async (s: any) => {
     persist([...sessions, s]);
+    const key = s.pageId || s.task;
+    setDoneSess((m: any) => ({ ...m, [key]: (m[key] || 0) + 1 }));
     setView("today");
     if (!s.pageId) { setFlash("Logged. No Notion page linked, so Act was not written."); return; }
-    setFlash("Logged. Writing Act +1 to Notion…");
+    setFlash("Logged. Writing Act +1 to Notion\u2026");
     try { const act = await api.writeAct(s.pageId); setFlash("Logged. Act" + (act != null ? " = " + act : " +1") + " written."); }
     catch (e: any) { savePending([...pending, { sessionId: s.id, pageId: s.pageId, task: s.task }]); setFlash("Logged locally. Notion write failed, queued."); }
   };
   const retryPending = async () => {
     if (!pending.length) return;
-    setFlash("Retrying " + pending.length + "…");
+    setFlash("Retrying " + pending.length + "\u2026");
     const still: any[] = [];
     for (const p of pending) { try { await api.writeAct(p.pageId); } catch (e) { still.push(p); } }
     savePending(still);
@@ -346,15 +366,6 @@ export default function FocusLogApp({ api }: any) {
   const hrs = (c: number) => (Math.round((c * 25) / 6) / 10).toFixed(1);
   const monthRef = new Date(nowLD.getFullYear(), nowLD.getMonth() + monthOff, 1);
 
-  const todayGroups: any[] = [];
-  const seen: any = {};
-  tasks.forEach((t) => {
-    const g = groupOf(t);
-    if (!seen[g]) { seen[g] = { group: g, leaves: [], pomodoros: 0, load: t.load }; todayGroups.push(seen[g]); }
-    seen[g].leaves.push(t);
-    seen[g].pomodoros += t.pomodoros || 0;
-  });
-  const doneTodayGroup = (g: string) => sessions.filter((s) => (s.group || s.task) === g && sameLogicalDay(s.ts, Date.now(), settings)).length;
   const openLog = (leafTask: string) => { setPreset(leafTask); setView("log"); };
 
   const tab = (t: string): any => ({ padding: "7px 16px", borderRadius: 999, border: `1.5px solid ${view === t ? C.ink : C.faint}`, background: view === t ? C.ink : "transparent", color: view === t ? "#fff" : C.muted, fontSize: 13, cursor: "pointer", textTransform: "capitalize" });
@@ -368,12 +379,12 @@ export default function FocusLogApp({ api }: any) {
           <h1 style={{ fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: 0 }}>Focus Log</h1>
           <button onClick={() => setShowSettings((v) => !v)} style={btn(C.muted, true)}>settings</button>
         </div>
-        <p style={{ color: C.muted, fontSize: 13, marginBottom: 14 }}>Pomodoros vs today's Notion tasks. Each log writes <span style={{ color: C.ink }}>Act +1</span>. Day starts at {settings.dayStart}:00.</p>
+        <p style={{ color: C.muted, fontSize: 13, marginBottom: 14 }}>Pomodoros against today's Notion tasks. Each log writes <span style={{ color: C.ink }}>Act +1</span>. The gap between <span style={{ color: settings.beginColor }}>expected</span> and <span style={{ color: settings.endColor }}>actual</span> enjoyment is the trend you watch. Day starts at {settings.dayStart}:00.</p>
 
         {flash && (
           <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 }}>
             {flash}
-            {pending.length > 0 && <button onClick={retryPending} style={{ ...btn(C.harder, true), marginLeft: 10, padding: "3px 10px" }}>retry {pending.length}</button>}
+            {pending.length > 0 && <button onClick={retryPending} style={{ ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" }}>retry {pending.length}</button>}
           </div>
         )}
 
@@ -385,14 +396,14 @@ export default function FocusLogApp({ api }: any) {
               <label style={{ fontSize: 12, color: C.muted }}>morning ends at <input type="number" value={settings.morningEnd} onChange={(e) => saveSettings({ ...settings, morningEnd: Number(e.target.value) })} style={numInput} /></label>
               <label style={{ fontSize: 12, color: C.muted }}>afternoon ends at <input type="number" value={settings.afternoonEnd} onChange={(e) => saveSettings({ ...settings, afternoonEnd: Number(e.target.value) })} style={numInput} /></label>
             </div>
-            <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Rating colors (charts only, not the heatmap)</p>
+            <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Rating colors (chart dots only, not the heatmap)</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
-              <label style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 6 }}>before / dread <input type="color" value={settings.beginColor} onChange={(e) => saveSettings({ ...settings, beginColor: e.target.value })} /></label>
-              <label style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 6 }}>after / difficulty <input type="color" value={settings.endColor} onChange={(e) => saveSettings({ ...settings, endColor: e.target.value })} /></label>
+              <label style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 6 }}>before / expected <input type="color" value={settings.beginColor} onChange={(e) => saveSettings({ ...settings, beginColor: e.target.value })} /></label>
+              <label style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 6 }}>after / actual <input type="color" value={settings.endColor} onChange={(e) => saveSettings({ ...settings, endColor: e.target.value })} /></label>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button onClick={() => persist(seedSessions())} style={btn(C.muted, true)}>load sample</button>
-              <button onClick={() => persist([])} style={btn(C.harder, true)}>clear log</button>
+              <button onClick={() => persist([])} style={btn(C.worse, true)}>clear log</button>
             </div>
           </div>
         )}
@@ -404,19 +415,30 @@ export default function FocusLogApp({ api }: any) {
         {view === "today" && (
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={{ color: C.muted, fontSize: 12 }}>{todayGroups.length} groups · {countToday} {"\u{1F345}"} today</span>
-              <button onClick={doSync} style={btn(C.ink, true)} disabled={sync === "loading"}>{sync === "loading" ? "syncing…" : "sync from Notion"}</button>
+              <span style={{ color: C.muted, fontSize: 12 }}>{tasks.length} tasks \u00B7 {countToday} {"\u{1F345}"} today</span>
+              <button onClick={doSync} style={btn(C.ink, true)} disabled={sync === "loading"}>{sync === "loading" ? "syncing\u2026" : "sync from Notion"}</button>
             </div>
             {tasks.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No tasks yet. Set your Notion token in settings, then press sync.</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {todayGroups.map((g) => {
-                const done = doneTodayGroup(g.group), multi = g.leaves.length > 1;
+              {tasks.map((t) => {
+                const key = t.id || t.task;
+                const done = doneSess[key] || 0;
+                const est = t.pomodoros || 0;
+                const completed = (t.act || 0) + done;
+                const remaining = Math.max(0, est - completed);
+                const hier = hierarchyText(t);
                 return (
-                  <div key={g.group} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${C.line}` }}>
-                    <span style={{ width: 16, height: 16, borderRadius: 4, background: LOAD_COLOR[g.load] || C.neutral, flexShrink: 0 }} title={LOAD_LABEL[g.load]} />
-                    <span style={{ fontSize: 13.5, color: C.ink, flex: 1 }}>{g.group}{multi && <span style={{ color: C.muted, fontSize: 11 }}> · {g.leaves.length} sub-tasks</span>}</span>
-                    <Pips done={done} total={g.pomodoros} />
-                    <button onClick={() => openLog(g.leaves[0].task)} style={btn(C.muted, true)}>log</button>
+                  <div key={key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${C.line}` }}>
+                    <span style={{ width: 14, height: 14, borderRadius: 4, background: LOAD_COLOR[t.load] || C.neutral, flexShrink: 0 }} title={LOAD_LABEL[t.load]} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.task}</div>
+                      {hier && <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hier}</div>}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
+                      <TomatoPips vivid={done} grey={remaining} />
+                      <span style={{ fontSize: 10.5, color: C.muted, fontFamily: "var(--fl-mono)" }}>{completed} done</span>
+                    </div>
+                    <button onClick={() => openLog(t.task)} style={btn(C.muted, true)}>log</button>
                   </div>
                 );
               })}
@@ -428,16 +450,16 @@ export default function FocusLogApp({ api }: any) {
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <button onClick={() => setWeekOff((w) => w - 1)} style={btn(C.muted, true)}>{"\u2190"}</button>
-              <span style={{ fontFamily: "var(--fl-mono)", fontSize: 13 }}>{fmtDate(weekStart)} – {fmtDate(new Date(+weekEnd - DAY))}</span>
+              <span style={{ fontFamily: "var(--fl-mono)", fontSize: 13 }}>{fmtDate(weekStart)} \u2013 {fmtDate(new Date(+weekEnd - DAY))}</span>
               <button onClick={() => setWeekOff((w) => Math.min(0, w + 1))} style={btn(C.muted, true)}>{"\u2192"}</button>
             </div>
             {weekGroups.length === 0 ? <p style={{ color: C.muted, textAlign: "center", padding: "40px 0" }}>No pomodoros this week.</p> :
               weekGroups.map((g) => (<GroupChart key={g} group={g} sessions={weekSessions.filter((x) => (x.group || x.task) === g)} settings={settings} />))}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted }}>
-              <span><span style={{ color: settings.beginColor }}>●</span> dread before</span>
-              <span><span style={{ color: settings.endColor }}>●</span> difficulty after</span>
-              <span><span style={{ color: C.relief }}>—</span> easier than feared</span>
-              <span><span style={{ color: C.harder }}>—</span> harder than feared</span>
+              <span><span style={{ color: settings.beginColor }}>\u25CF</span> expected</span>
+              <span><span style={{ color: settings.endColor }}>\u25CF</span> actual</span>
+              <span><span style={{ color: C.better }}>\u2014</span> better than expected</span>
+              <span><span style={{ color: C.worse }}>\u2014</span> worse than expected</span>
             </div>
           </div>
         )}
@@ -469,7 +491,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} />}
+        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} api={api} />}
       </div>
     </div>
   );
