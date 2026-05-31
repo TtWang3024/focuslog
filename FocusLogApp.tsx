@@ -283,7 +283,7 @@ function LogForm({ tasks, preset, onAdd, settings, api }: any) {
   const meta: any = tasks.find((t: any) => t.task === task) || {};
   const submit = () => {
     if (!task.trim()) return;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), load: meta.load || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 });
+    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 });
     setNote("");
   };
   const inputStyle: any = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
@@ -325,7 +325,7 @@ export default function FocusLogApp({ api }: any) {
 
   const persist = useCallback((next: any[]) => { setSessions(next); api.saveSessions(next); }, [api]);
   const savePending = useCallback((next: any[]) => { setPending(next); api.savePending(next); }, [api]);
-  const saveSettings = (next: any) => { setSettings(next); api.saveSettings(next); };
+  const saveSettings = (next: any) => { setSettings(next); api.saveSettings({ dayStart: next.dayStart, morningEnd: next.morningEnd, afternoonEnd: next.afternoonEnd, beginColor: next.beginColor, endColor: next.endColor }); };
 
   const doSync = async () => {
     setSync("loading");
@@ -338,10 +338,16 @@ export default function FocusLogApp({ api }: any) {
     const key = s.pageId || s.task;
     setDoneSess((m: any) => ({ ...m, [key]: (m[key] || 0) + 1 }));
     setView("today");
-    if (!s.pageId) { setFlash("Logged. No Notion page linked, so Act was not written."); return; }
-    setFlash("Logged. Writing Act +1 to Notion\u2026");
-    try { const act = await api.writeAct(s.pageId); setFlash("Logged. Act" + (act != null ? " = " + act : " +1") + " written."); }
-    catch (e: any) { savePending([...pending, { sessionId: s.id, pageId: s.pageId, task: s.task }]); setFlash("Logged locally. Notion write failed, queued."); }
+    let msg = "Logged.";
+    if (s.pageId) {
+      try { const act = await api.writeAct(s.pageId); msg += " Act" + (act != null ? " = " + act : " +1") + " written."; }
+      catch (e: any) { savePending([...pending, { sessionId: s.id, pageId: s.pageId, task: s.task }]); msg += " Act write queued."; }
+    } else { msg += " No Notion page linked."; }
+    if (api.appendDaily) {
+      try { await api.appendDaily({ ts: +new Date(s.ts), minutes: s.minutes, task: s.task, hierarchy: s.hierarchy || "", note: s.note || "" }); msg += " Added to daily note."; }
+      catch (e: any) { msg += " Daily note skipped: " + (e?.message || e); }
+    }
+    setFlash(msg);
   };
   const retryPending = async () => {
     if (!pending.length) return;

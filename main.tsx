@@ -1,4 +1,4 @@
-import { App, ItemView, Modal, Notice, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, requestUrl } from "obsidian";
+import { App, ItemView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath, requestUrl } from "obsidian";
 import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
 import FocusLogApp from "./FocusLogApp";
@@ -14,6 +14,10 @@ export interface FocusLogSettings {
   afternoonEnd: number;
   beginColor: string;
   endColor: string;
+  dailyNoteWrite: boolean;
+  dailyHeading: string;
+  dailyCreateHeading: boolean;
+  dailyTemplate: string;
 }
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
@@ -24,6 +28,11 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   afternoonEnd: 18,
   beginColor: "#d98324",
   endColor: "#2f6f8f",
+  dailyNoteWrite: true,
+  dailyHeading: "\u{1F33B} Today",
+  dailyCreateHeading: true,
+  dailyTemplate:
+    "- [ ] <mark class=\"hltr-yellow\">{date}</mark> {start} - {end} \u{1F345}\n    - {task}{hierarchy}\n    - {note}",
 };
 
 interface PluginData {
@@ -65,6 +74,31 @@ function mapLoad(name: string | null): string {
   if (!name) return "B";
   const c = name[0];
   return c === "A" || c === "B" || c === "C" ? c : "B";
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+// Insert a block at the end of the section under a level-1 heading.
+// If the heading is absent, optionally append it (with the block) at the end of the note.
+function insertUnderHeading(data: string, heading: string, block: string, createIfMissing: boolean): string {
+  const lines = data.split("\n");
+  const headRe = new RegExp("^#\\s+" + escapeRe(heading) + "\\s*$");
+  const hi = lines.findIndex((l) => headRe.test(l.trim()));
+  const blockLines = block.split("\n");
+  if (hi === -1) {
+    if (!createIfMissing) return data;
+    const sep = data.length === 0 || data.endsWith("\n") ? "" : "\n";
+    return data + sep + "\n# " + heading + "\n" + blockLines.join("\n") + "\n";
+  }
+  let end = lines.length;
+  for (let i = hi + 1; i < lines.length; i++) {
+    if (/^#\s/.test(lines[i])) { end = i; break; } // next level-1 heading ends the section
+  }
+  let insertAt = end;
+  while (insertAt > hi + 1 && lines[insertAt - 1].trim() === "") insertAt--;
+  const out = [...lines.slice(0, insertAt), ...blockLines, ...lines.slice(insertAt)];
+  return out.join("\n");
 }
 
 export default class FocusLogPlugin extends Plugin {
@@ -202,6 +236,44 @@ export default class FocusLogPlugin extends Plugin {
     return next;
   }
 
+  // Append a formatted block under the configured heading in the (logical) day's daily note.
+  async appendToDailyNote(p: { ts: number; minutes: number; task: string; hierarchy: string; note: string }) {
+    const s = this.data.settings;
+    if (!s.dailyNoteWrite) return;
+    const moment = (window as any).moment;
+    if (!moment) throw new Error("moment unavailable");
+    const ld = new Date(p.ts - (s.dayStart || 0) * 3600000); // logical day
+    const m = moment(new Date(ld.getFullYear(), ld.getMonth(), ld.getDate()));
+
+    const dn: any = (this.app as any).internalPlugins?.getPluginById?.("daily-notes");
+    const opts = dn?.instance?.options || {};
+    const format = opts.format || "YYYY-MM-DD";
+    const folder = (opts.folder || "").trim();
+    const path = normalizePath((folder ? folder + "/" : "") + m.format(format) + ".md");
+
+    let file = this.app.vault.getAbstractFileByPath(path) as TFile;
+    if (!file) {
+      if (folder && !this.app.vault.getAbstractFileByPath(folder)) {
+        await this.app.vault.createFolder(folder).catch(() => {});
+      }
+      file = await this.app.vault.create(path, "# " + s.dailyHeading + "\n");
+    }
+
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const startT = new Date(p.ts - (p.minutes || 25) * 60000);
+    const endT = new Date(p.ts);
+    const hier = p.hierarchy ? " (" + p.hierarchy + ")" : "";
+    const block = (s.dailyTemplate || "")
+      .replace(/\{date\}/g, m.format("YYYY-MM-DD"))
+      .replace(/\{start\}/g, pad(startT.getHours()) + ":" + pad(startT.getMinutes()))
+      .replace(/\{end\}/g, pad(endT.getHours()) + ":" + pad(endT.getMinutes()))
+      .replace(/\{task\}/g, p.task || "")
+      .replace(/\{hierarchy\}/g, hier)
+      .replace(/\{note\}/g, p.note || "");
+
+    await this.app.vault.process(file, (data: string) => insertUnderHeading(data, s.dailyHeading, block, s.dailyCreateHeading));
+  }
+
   // ---------- bridge handed to the React app ----------
   makeApi() {
     const self = this;
@@ -218,6 +290,7 @@ export default class FocusLogPlugin extends Plugin {
       saveSettings: async (s: FocusLogSettings) => { self.data.settings = Object.assign({}, self.data.settings, s); await self.persist(); },
       sync: () => self.queryToday(),
       writeAct: (pageId: string) => self.incrementAct(pageId),
+      appendDaily: (p: any) => self.appendToDailyNote(p),
       notify: (msg: string, duration?: number) => new Notice(msg, duration),
       celebrate: () => new CelebrateModal(self.app).open(),
     };
@@ -298,8 +371,52 @@ class FocusLogSettingTab extends PluginSettingTab {
         })
       );
 
+    containerEl.createEl("h3", { text: "Daily note" });
+
+    new Setting(containerEl)
+      .setName("Append to daily note when logging")
+      .setDesc("On each logged pomodoro, write a block into today's daily note.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.dailyNoteWrite).onChange(async (v) => {
+          this.plugin.data.settings.dailyNoteWrite = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Section heading")
+      .setDesc("First-level heading (#) to append under. The leading # is added automatically.")
+      .addText((t) =>
+        t.setValue(this.plugin.data.settings.dailyHeading).onChange(async (v) => {
+          this.plugin.data.settings.dailyHeading = v.trim();
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Create the heading if missing")
+      .setDesc("If the section is not found, add it (with the block) at the end of the note.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.dailyCreateHeading).onChange(async (v) => {
+          this.plugin.data.settings.dailyCreateHeading = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Block template")
+      .setDesc("Placeholders: {date} {start} {end} {task} {hierarchy} {note}. {hierarchy} expands to \" (ancestor \u00B7 parent)\" when present.")
+      .addTextArea((t) => {
+        t.setValue(this.plugin.data.settings.dailyTemplate).onChange(async (v) => {
+          this.plugin.data.settings.dailyTemplate = v;
+          await this.plugin.persist();
+        });
+        t.inputEl.rows = 4;
+        t.inputEl.style.width = "100%";
+      });
+
     containerEl.createEl("p", {
-      text: "Day start, time bands, and rating colors are edited inside the Focus Log panel. Reopen the panel after changing the token.",
+      text: "Day start, time bands, and rating colors are edited inside the Focus Log panel. Reopen the panel after changing settings here.",
       cls: "setting-item-description",
     });
   }
