@@ -1,0 +1,6 @@
+/* Focus Log: the view renders a self-contained React panel, so most styling is inline.
+   This file only ensures the content element has no extra padding. */
+.workspace-leaf-content[data-type="focuslog-view"] .view-content {
+  padding: 0;
+  overflow: auto;
+}

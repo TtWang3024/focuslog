@@ -1,0 +1,14 @@
+# dependencies
+node_modules/
+
+# logs and OS cruft
+*.log
+.DS_Store
+
+# Obsidian plugin runtime data (NEVER commit: may contain your Notion token)
+data.json
+.hotreload
+
+# Optional: ignore the built bundle if you prefer to build on clone.
+# Leave it commented to keep main.js committed for drop-in installs.
+# main.js
