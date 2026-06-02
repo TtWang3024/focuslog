@@ -12,15 +12,24 @@ export interface FocusLogSettings {
   doneStatus: string;
   categoryProperty: string;
   tagNamespace: string;
+  showCategoryInView: boolean;
+  writeCategoryTag: boolean;
+  dailyGoal: number;
   dayStart: number;
   morningEnd: number;
   afternoonEnd: number;
   beginColor: string;
   endColor: string;
   dailyNoteWrite: boolean;
+  dailyNoteTrueDate: boolean;
   dailyHeading: string;
   dailyCreateHeading: boolean;
   dailyTemplate: string;
+  counterEnabled: boolean;
+  counterPrefix: string;
+  breakEnabled: boolean;
+  breakAutoStart: boolean;
+  breakMinutes: number;
 }
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
@@ -29,23 +38,40 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   doneStatus: "",
   categoryProperty: "Area",
   tagNamespace: "Notion",
+  showCategoryInView: true,
+  writeCategoryTag: true,
+  dailyGoal: 8,
   dayStart: 4,
   morningEnd: 12,
   afternoonEnd: 18,
   beginColor: "#d98324",
   endColor: "#2f6f8f",
   dailyNoteWrite: true,
+  dailyNoteTrueDate: true,
   dailyHeading: "\u{1F33B} Today",
   dailyCreateHeading: true,
   dailyTemplate:
     "- [ ] <mark class=\"hltr-yellow\">{date}</mark> {start} - {end} \u{1F345} {tag}\n    - {task}{hierarchy}\n    - {note}",
+  counterEnabled: false,
+  counterPrefix: "## \u{1F34E} Today_Pomodoro:: ",
+  breakEnabled: false,
+  breakAutoStart: true,
+  breakMinutes: 5,
 };
+
+const DEFAULT_ACTIVITIES = [
+  { id: "a-stretch", name: "Stretch", area: "Body", count: 0, lastUsed: null },
+  { id: "a-water", name: "Drink water", area: "Body", count: 0, lastUsed: null },
+  { id: "a-eyes", name: "Rest eyes — look far", area: "Body", count: 0, lastUsed: null },
+  { id: "a-breathe", name: "Deep breathing", area: "Mind", count: 0, lastUsed: null },
+];
 
 interface PluginData {
   settings: FocusLogSettings;
   sessions: any[];
   pending: any[];
   tasks: any[];
+  activities: any[];
 }
 
 // ---------- Notion property parsing ----------
@@ -56,6 +82,12 @@ function plainTitle(page: any): string {
 function selectName(page: any, name: string): string | null {
   const prop = page?.properties?.[name];
   return prop?.select?.name || prop?.status?.name || null;
+}
+// Like selectName but also reads a multi_select (first value) — the category property may be either.
+function categoryName(page: any, name: string): string | null {
+  const prop = page?.properties?.[name];
+  if (!prop) return null;
+  return prop.select?.name || prop.status?.name || prop.multi_select?.[0]?.name || null;
 }
 function numberProp(page: any, name: string): number {
   const n = page?.properties?.[name]?.number;
@@ -131,6 +163,27 @@ function insertUnderHeading(data: string, heading: string, block: string, create
   return out.join("\n");
 }
 
+// Set the trailing number of the unique counter line (a line whose trimmed text starts with
+// `prefix`) to `count`. If the prefix matches more than one line, leave the note unchanged so we
+// never edit the wrong line. If it matches none, add the line near the top.
+function updateCounterLine(data: string, prefix: string, count: number): { text: string; status: string } {
+  const core = (prefix || "").trim();
+  if (!core) return { text: data, status: "no-prefix" };
+  const lines = data.split("\n");
+  const idxs: number[] = [];
+  for (let i = 0; i < lines.length; i++) if (lines[i].trim().startsWith(core)) idxs.push(i);
+  if (idxs.length > 1) return { text: data, status: "ambiguous" };
+  if (idxs.length === 1) {
+    const lead = (lines[idxs[0]].match(/^\s*/) || [""])[0];
+    lines[idxs[0]] = lead + core + " " + count;
+    return { text: lines.join("\n"), status: "updated" };
+  }
+  let at = 0;
+  if (lines[0] === "---") { const e = lines.indexOf("---", 1); if (e !== -1) at = e + 1; }
+  lines.splice(at, 0, core + " " + count);
+  return { text: lines.join("\n"), status: "added" };
+}
+
 export default class FocusLogPlugin extends Plugin {
   data: PluginData;
   private doneStatusCache: string | null = null;
@@ -142,6 +195,7 @@ export default class FocusLogPlugin extends Plugin {
       sessions: loaded.sessions || [],
       pending: loaded.pending || [],
       tasks: loaded.tasks || [],
+      activities: loaded.activities || DEFAULT_ACTIVITIES.map((a) => ({ ...a })),
     };
 
     this.registerView(VIEW_TYPE, (leaf) => new FocusLogView(leaf, this));
@@ -190,6 +244,19 @@ export default class FocusLogPlugin extends Plugin {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
+  // The daily-note date key a timestamp belongs to (the same grouping used to pick the note file),
+  // and the number of logged sessions sharing that key — i.e. that note's pomodoro count.
+  private noteDateKey(ts: number): string {
+    const s = this.data.settings;
+    const d = s.dailyNoteTrueDate ? new Date(ts) : new Date(ts - dayShiftHours(s.dayStart) * 3600000);
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+  private countForNote(ts: number): number {
+    const key = this.noteDateKey(ts);
+    return (this.data.sessions || []).filter((x: any) => this.noteDateKey(+new Date(x.ts)) === key).length;
+  }
+
   // Mirrors the "Today Tasks" view: Today / King / This week, plus Daily dated today.
   async queryToday(): Promise<any[]> {
     const today = this.logicalTodayISO();
@@ -221,7 +288,7 @@ export default class FocusLogPlugin extends Plugin {
         load: mapLoad(selectName(p, "CognitiveLoad")),
         power: mapPower(selectName(p, "ExecutionPower")),
         king: (selectName(p, "Status") || "").includes("King"),
-        category: selectName(p, this.data.settings.categoryProperty) || null,
+        category: categoryName(p, this.data.settings.categoryProperty) || null,
         pomodoros: estTotalOf(p),
         act: numberProp(p, "Act"),
         url: p.url,
@@ -307,14 +374,19 @@ export default class FocusLogPlugin extends Plugin {
     if (!s.dailyNoteWrite) return;
     const moment = (window as any).moment;
     if (!moment) throw new Error("moment unavailable");
-    const ld = new Date(p.ts - dayShiftHours(s.dayStart) * 3600000); // logical day
-    const m = moment(new Date(ld.getFullYear(), ld.getMonth(), ld.getDate()));
+    // The note FILE follows the day-start rollover (an evening pomodoro can land in tomorrow's
+    // note), unless "File under the true date" puts it in the real date's note instead. The {date}
+    // TEXT is always the true calendar date of the pomodoro, regardless of which file it lands in.
+    const trueDate = new Date(p.ts);
+    const fileDate = s.dailyNoteTrueDate ? trueDate : new Date(p.ts - dayShiftHours(s.dayStart) * 3600000);
+    const fileM = moment(new Date(fileDate.getFullYear(), fileDate.getMonth(), fileDate.getDate()));
+    const dateM = moment(new Date(trueDate.getFullYear(), trueDate.getMonth(), trueDate.getDate()));
 
     const dn: any = (this.app as any).internalPlugins?.getPluginById?.("daily-notes");
     const opts = dn?.instance?.options || {};
     const format = opts.format || "YYYY-MM-DD";
     const folder = (opts.folder || "").trim();
-    const path = normalizePath((folder ? folder + "/" : "") + m.format(format) + ".md");
+    const path = normalizePath((folder ? folder + "/" : "") + fileM.format(format) + ".md");
 
     let file = this.app.vault.getAbstractFileByPath(path) as TFile;
     if (!file) {
@@ -328,11 +400,11 @@ export default class FocusLogPlugin extends Plugin {
     const startT = new Date(p.ts - (p.minutes || 25) * 60000);
     const endT = new Date(p.ts);
     const hier = p.hierarchy ? " (" + p.hierarchy + ")" : "";
-    const slug = p.category ? tagSlug(p.category) : "";
+    const slug = (s.writeCategoryTag !== false && p.category) ? tagSlug(p.category) : "";
     const ns = (s.tagNamespace || "").trim();
     const tag = slug ? "#" + (ns ? ns + "/" : "") + slug : "";
     const block = (s.dailyTemplate || "")
-      .replace(/\{date\}/g, m.format("YYYY-MM-DD"))
+      .replace(/\{date\}/g, dateM.format("YYYY-MM-DD"))
       .replace(/\{start\}/g, pad(startT.getHours()) + ":" + pad(startT.getMinutes()))
       .replace(/\{end\}/g, pad(endT.getHours()) + ":" + pad(endT.getMinutes()))
       .replace(/\{task\}/g, p.task || "")
@@ -340,7 +412,18 @@ export default class FocusLogPlugin extends Plugin {
       .replace(/\{tag\}/g, tag)
       .replace(/\{note\}/g, p.note || "");
 
-    await this.app.vault.process(file, (data: string) => insertUnderHeading(data, s.dailyHeading, block, s.dailyCreateHeading));
+    const count = this.countForNote(p.ts);
+    let counterStatus = "";
+    await this.app.vault.process(file, (data: string) => {
+      let out = insertUnderHeading(data, s.dailyHeading, block, s.dailyCreateHeading);
+      if (s.counterEnabled && (s.counterPrefix || "").trim()) {
+        const r = updateCounterLine(out, s.counterPrefix, count);
+        out = r.text;
+        counterStatus = r.status;
+      }
+      return out;
+    });
+    if (counterStatus === "ambiguous") new Notice("Focus Log: the counter prefix matches more than one line — counter not updated.");
   }
 
   // ---------- bridge handed to the React app ----------
@@ -352,10 +435,13 @@ export default class FocusLogPlugin extends Plugin {
         sessions: self.data.sessions || [],
         pending: self.data.pending || [],
         tasks: self.data.tasks || [],
+        activities: self.data.activities || [],
       }),
       saveSessions: async (arr: any[]) => { self.data.sessions = arr; await self.persist(); },
+      saveActivities: async (arr: any[]) => { self.data.activities = arr; await self.persist(); },
       savePending: async (arr: any[]) => { self.data.pending = arr; await self.persist(); },
       saveTasks: async (arr: any[]) => { self.data.tasks = arr; await self.persist(); },
+      patchSettings: async (partial: Partial<FocusLogSettings>) => { self.data.settings = Object.assign({}, self.data.settings, partial); await self.persist(); },
       sync: () => self.queryToday(),
       writeAct: (pageId: string) => self.incrementAct(pageId),
       setDone: (pageId: string) => self.setTaskDone(pageId),
@@ -461,11 +547,11 @@ class FocusLogSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Tag namespace")
-      .setDesc("Parent segment for the daily-note tag, via the {tag} placeholder. With “Notion”, an Area of En writes “#Notion/En”. Leave blank for a flat tag like “#En”.")
-      .addText((t) =>
-        t.setPlaceholder("Notion").setValue(this.plugin.data.settings.tagNamespace).onChange(async (v) => {
-          this.plugin.data.settings.tagNamespace = v.trim();
+      .setName("Show category in the today list")
+      .setDesc("Show each task's Area as a chip in the panel's today view. Off hides the chip and keeps the full task title.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.showCategoryInView).onChange(async (v) => {
+          this.plugin.data.settings.showCategoryInView = v;
           await this.plugin.persist();
         })
       );
@@ -533,10 +619,20 @@ class FocusLogSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Append to daily note when logging")
-      .setDesc("On each logged pomodoro, write a block into today's daily note.")
+      .setDesc("On each logged pomodoro, write a block into the daily note.")
       .addToggle((t) =>
         t.setValue(this.plugin.data.settings.dailyNoteWrite).onChange(async (v) => {
           this.plugin.data.settings.dailyNoteWrite = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("File the block under the true date")
+      .setDesc("Chooses which daily-note FILE the block goes into. On: the real date's note. Off: the day-start rollover note, so an evening pomodoro lands in tomorrow's note. The {date} text inside the block is always the true calendar date, either way.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.dailyNoteTrueDate).onChange(async (v) => {
+          this.plugin.data.settings.dailyNoteTrueDate = v;
           await this.plugin.persist();
         })
       );
@@ -563,7 +659,7 @@ class FocusLogSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Block template")
-      .setDesc("Placeholders: {date} {start} {end} {task} {hierarchy} {note}. {hierarchy} expands to \" (ancestor \u00B7 parent)\" when present.")
+      .setDesc("Placeholders: {date} {start} {end} {task} {hierarchy} {tag} {note}. {hierarchy} expands to \" (ancestor \u00B7 parent)\" when present; {tag} is the category tag configured below.")
       .addTextArea((t) => {
         t.setValue(this.plugin.data.settings.dailyTemplate).onChange(async (v) => {
           this.plugin.data.settings.dailyTemplate = v;
@@ -572,6 +668,79 @@ class FocusLogSettingTab extends PluginSettingTab {
         t.inputEl.rows = 4;
         t.inputEl.style.width = "100%";
       });
+
+    new Setting(containerEl)
+      .setName("Write the category tag to the daily note")
+      .setDesc("Expand the {tag} placeholder to a tag like #Notion/En when logging. Off leaves {tag} blank without editing your template.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.writeCategoryTag).onChange(async (v) => {
+          this.plugin.data.settings.writeCategoryTag = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Tag namespace")
+      .setDesc("Parent segment for the {tag}. With \u201CNotion\u201D, an Area of En writes \u201C#Notion/En\u201D. Leave blank for a flat tag like \u201C#En\u201D.")
+      .addText((t) =>
+        t.setPlaceholder("Notion").setValue(this.plugin.data.settings.tagNamespace).onChange(async (v) => {
+          this.plugin.data.settings.tagNamespace = v.trim();
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Update a daily pomodoro counter")
+      .setDesc("After each log, set the number on a counter line in the note to that day's pomodoro count, using the same day-start grouping as the note (so evening logs count toward tomorrow). The line must appear exactly once, or it is left untouched.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.counterEnabled).onChange(async (v) => {
+          this.plugin.data.settings.counterEnabled = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Counter line prefix")
+      .setDesc("The exact text before the number. The plugin finds the line that starts with this and rewrites the number after it. Example: \"## \uD83C\uDF4E Today_Pomodoro:: \".")
+      .addText((t) => {
+        t.setValue(this.plugin.data.settings.counterPrefix).onChange(async (v) => {
+          this.plugin.data.settings.counterPrefix = v;
+          await this.plugin.persist();
+        });
+        t.inputEl.style.width = "100%";
+      });
+
+    containerEl.createEl("h3", { text: "Break" });
+
+    new Setting(containerEl)
+      .setName("Take a break after logging")
+      .setDesc("After logging a pomodoro, open the Break view instead of returning straight to the today list.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.breakEnabled).onChange(async (v) => {
+          this.plugin.data.settings.breakEnabled = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Start the break automatically")
+      .setDesc("On: the break timer starts on its own. Off: you start it manually in the Break view.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.breakAutoStart).onChange(async (v) => {
+          this.plugin.data.settings.breakAutoStart = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Break length (minutes)")
+      .setDesc("How long the break timer runs.")
+      .addText((t) =>
+        t.setValue(String(this.plugin.data.settings.breakMinutes)).onChange(async (v) => {
+          this.plugin.data.settings.breakMinutes = Math.max(1, Math.min(60, parseInt(v, 10) || 5));
+          await this.plugin.persist();
+        })
+      );
 
     containerEl.createEl("p", {
       text: "Reopen the Focus Log panel after changing settings here so the panel picks up the new values.",

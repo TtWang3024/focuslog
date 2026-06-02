@@ -2439,7 +2439,7 @@ var require_react_dom_development = __commonJS({
         var HostPortal = 4;
         var HostComponent = 5;
         var HostText = 6;
-        var Fragment = 7;
+        var Fragment2 = 7;
         var Mode = 8;
         var ContextConsumer = 9;
         var ContextProvider = 10;
@@ -3595,7 +3595,7 @@ var require_react_dom_development = __commonJS({
               return "DehydratedFragment";
             case ForwardRef:
               return getWrappedName$1(type, type.render, "ForwardRef");
-            case Fragment:
+            case Fragment2:
               return "Fragment";
             case HostComponent:
               return type;
@@ -11996,7 +11996,7 @@ var require_react_dom_development = __commonJS({
             }
           }
           function updateFragment2(returnFiber, current2, fragment, lanes, key) {
-            if (current2 === null || current2.tag !== Fragment) {
+            if (current2 === null || current2.tag !== Fragment2) {
               var created = createFiberFromFragment(fragment, returnFiber.mode, lanes, key);
               created.return = returnFiber;
               return created;
@@ -12399,7 +12399,7 @@ var require_react_dom_development = __commonJS({
               if (child.key === key) {
                 var elementType = element.type;
                 if (elementType === REACT_FRAGMENT_TYPE) {
-                  if (child.tag === Fragment) {
+                  if (child.tag === Fragment2) {
                     deleteRemainingChildren(returnFiber, child.sibling);
                     var existing = useFiber(child, element.props.children);
                     existing.return = returnFiber;
@@ -17876,7 +17876,7 @@ var require_react_dom_development = __commonJS({
               var _resolvedProps2 = workInProgress2.elementType === type ? _unresolvedProps2 : resolveDefaultProps(type, _unresolvedProps2);
               return updateForwardRef(current2, workInProgress2, type, _resolvedProps2, renderLanes2);
             }
-            case Fragment:
+            case Fragment2:
               return updateFragment(current2, workInProgress2, renderLanes2);
             case Mode:
               return updateMode(current2, workInProgress2, renderLanes2);
@@ -18149,7 +18149,7 @@ var require_react_dom_development = __commonJS({
             case SimpleMemoComponent:
             case FunctionComponent:
             case ForwardRef:
-            case Fragment:
+            case Fragment2:
             case Mode:
             case Profiler:
             case ContextConsumer:
@@ -22408,7 +22408,7 @@ var require_react_dom_development = __commonJS({
           return fiber;
         }
         function createFiberFromFragment(elements, mode, lanes, key) {
-          var fiber = createFiber(Fragment, elements, key, mode);
+          var fiber = createFiber(Fragment2, elements, key, mode);
           fiber.lanes = lanes;
           return fiber;
         }
@@ -23760,6 +23760,27 @@ function Heatmap({ sessions, monthRef, settings }) {
 function Scale({ value, onChange, color, label }) {
   return /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("label", { style: { color: C.muted, fontSize: 12 } }, label), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 4 } }, [1, 2, 3, 4, 5].map((s) => /* @__PURE__ */ React.createElement("button", { key: s, onClick: () => onChange(s), style: { width: 38, height: 38, borderRadius: 8, border: `1.5px solid ${value === s ? color : C.faint}`, background: value === s ? color : "transparent", color: value === s ? "#fff" : C.ink, fontFamily: "var(--fl-mono)", cursor: "pointer" } }, s))));
 }
+var PIE = ["#b4533a", "#cda32f", "#5b8c5a", "#4e7d9c", "#9a6f9c", "#c0772e", "#6f9461", "#847bb2"];
+function polarPt(cx, cy, r, deg) {
+  const a = deg * Math.PI / 180;
+  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+}
+function PieChart({ data }) {
+  const total = data.reduce((a, d) => a + d.value, 0);
+  if (!total)
+    return /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No break activities logged yet.");
+  const cx = 80, cy = 80, r = 70;
+  let angle = -90;
+  const slices = data.map((d) => {
+    const frac = d.value / total, a0 = angle, a1 = angle + frac * 360;
+    angle = a1;
+    const large = frac > 0.5 ? 1 : 0;
+    const p0 = polarPt(cx, cy, r, a0), p1 = polarPt(cx, cy, r, a1);
+    const path = frac >= 1 ? `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z` : `M ${cx} ${cy} L ${p0.x.toFixed(2)} ${p0.y.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} Z`;
+    return { ...d, path, frac };
+  });
+  return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("svg", { width: 160, height: 160, style: { flexShrink: 0 } }, slices.map((s, i) => /* @__PURE__ */ React.createElement("path", { key: i, d: s.path, fill: s.color, stroke: C.card, strokeWidth: 1.5 }))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, slices.map((s, i) => /* @__PURE__ */ React.createElement("span", { key: i, style: { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 2, background: s.color } }), s.label, /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)" } }, s.value, " (", Math.round(s.frac * 100), "%)")))));
+}
 function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, resetTimer }) {
   const [task, setTask] = useState(preset || tasks[0] && tasks[0].task || "");
   const [exp, setExp] = useState(3);
@@ -23801,6 +23822,63 @@ function FocusLogApp({ api }) {
   const [sync, setSync] = useState("idle");
   const [flash, setFlash] = useState("");
   const settings = api.settings;
+  const [goal, setGoal] = useState(Number(settings.dailyGoal) || 8);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const saveGoal = (n) => {
+    const g = Math.max(1, Math.min(99, Math.round(n) || 1));
+    setGoal(g);
+    api.patchSettings && api.patchSettings({ dailyGoal: g });
+    setEditingGoal(false);
+  };
+  const [activities, setActivities] = useState(init.activities || []);
+  const saveActivities = (next) => {
+    setActivities(next);
+    api.saveActivities && api.saveActivities(next);
+  };
+  const [brk, setBrk] = useState({ active: false, secs: 0, running: false, picked: [], finished: false });
+  const brkTick = useRef(null);
+  const [newAct, setNewAct] = useState({ name: "", area: "" });
+  useEffect(() => {
+    if (!brk.active || !brk.running)
+      return;
+    brkTick.current = setInterval(() => {
+      setBrk((b) => {
+        if (!b.active || !b.running)
+          return b;
+        const nx = b.secs > 0 ? b.secs - 1 : 0;
+        if (nx === 0 && !b.finished) {
+          api.notify("Break over \u2014 ready for the next pomodoro?", 6e3);
+          return { ...b, secs: 0, running: false, finished: true };
+        }
+        return { ...b, secs: nx };
+      });
+    }, 1e3);
+    return () => clearInterval(brkTick.current);
+  }, [brk.active, brk.running]);
+  const startBreak = () => setBrk({ active: true, secs: (Number(settings.breakMinutes) || 5) * 60, running: settings.breakAutoStart !== false, picked: [], finished: false });
+  const togglePick = (id) => setBrk((b) => {
+    if (b.picked.includes(id))
+      return { ...b, picked: b.picked.filter((x) => x !== id) };
+    if (b.picked.length >= 3)
+      return b;
+    return { ...b, picked: [...b.picked, id] };
+  });
+  const endBreak = () => {
+    if (brk.picked.length) {
+      const now = Date.now();
+      saveActivities(activities.map((a) => brk.picked.includes(a.id) ? { ...a, count: (a.count || 0) + 1, lastUsed: now } : a));
+    }
+    setBrk({ active: false, secs: 0, running: false, picked: [], finished: false });
+    setView("today");
+  };
+  const addActivity = () => {
+    const name = (newAct.name || "").trim();
+    if (!name)
+      return;
+    saveActivities([...activities, { id: "a" + Date.now(), name, area: (newAct.area || "").trim() || "Other", count: 0, lastUsed: null }]);
+    setNewAct({ name: "", area: "" });
+  };
+  const removeActivity = (id) => saveActivities(activities.filter((a) => a.id !== id));
   const [secs, setSecs] = useState(25 * 60);
   const [running, setRunning] = useState(false);
   const tick = useRef(null);
@@ -23904,7 +23982,12 @@ ${s.task}`))
     persist([...sessions, s]);
     const key = s.pageId || s.task;
     setDoneSess((m) => ({ ...m, [key]: (m[key] || 0) + 1 }));
-    setView("today");
+    if (settings.breakEnabled) {
+      startBreak();
+      setView("break");
+    } else {
+      setView("today");
+    }
     let msg = "Logged.";
     if (s.pageId) {
       try {
@@ -23974,6 +24057,25 @@ ${s.task}`))
   const countToday = sessions.filter((s) => sameLogicalDay(s.ts, Date.now(), settings)).length;
   const hrs = (c) => (Math.round(c * 25 / 6) / 10).toFixed(1);
   const monthRef = new Date(nowLD.getFullYear(), nowLD.getMonth() + monthOff, 1);
+  const rated = sessions.length;
+  const betterCount = sessions.filter((s) => s.actual > s.expected).length;
+  const betterPct = rated ? Math.round(100 * betterCount / rated) : 0;
+  const avgGapAll = rated ? sessions.reduce((a, s) => a + (s.actual - s.expected), 0) / rated : 0;
+  const surprises = [...sessions].filter((s) => s.actual > s.expected).sort((a, b) => b.actual - b.expected - (a.actual - a.expected) || +new Date(b.ts) - +new Date(a.ts)).slice(0, 3);
+  const bandStats = [0, 1, 2].map((b) => {
+    const list = sessions.filter((s) => bandOf(s.ts, settings) === b);
+    return { band: b, name: BAND_NAME[b], count: list.length, avg: list.length ? list.reduce((a, s) => a + s.actual, 0) / list.length : null };
+  });
+  const bestBand = bandStats.filter((b) => b.avg != null).sort((a, b) => b.avg - a.avg)[0];
+  const actByCount = [...activities].sort((a, b) => (b.count || 0) - (a.count || 0));
+  const favs = actByCount.filter((a) => (a.count || 0) > 0).slice(0, 3);
+  const disliked = actByCount.slice().reverse().slice(0, 2);
+  const areaAgg = {};
+  activities.forEach((a) => {
+    if ((a.count || 0) > 0)
+      areaAgg[a.area || "Other"] = (areaAgg[a.area || "Other"] || 0) + (a.count || 0);
+  });
+  const pieData = Object.keys(areaAgg).map((k, i) => ({ label: k, value: areaAgg[k], color: PIE[i % PIE.length] }));
   const openLog = (leafTask) => {
     setPreset(leafTask);
     setView("log");
@@ -23982,15 +24084,33 @@ ${s.task}`))
   return /* @__PURE__ */ React.createElement("div", { style: { background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)" } }, /* @__PURE__ */ React.createElement("style", null, `
         @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&display=swap');
         :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:ui-monospace,'SF Mono',Menlo,monospace; }
-      `), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Square = ExecutionPower:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Letter = CognitiveLoad:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" } }, "A"), " high"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" } }, "B"), " medium"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" } }, "C"), " low"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 4 } }, "\u{1F451}", " = King ", "\xB7", " day starts at ", settings.dayStart, ":00"))), flash && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" } }, ["today", "week", "month", "totals", "log"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, onClick: () => setView(t), style: tab(t) }, t))), view === "today" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12 } }, tasks.length, " tasks ", "\xB7", " ", countToday, " ", "\u{1F345}", " today"), /* @__PURE__ */ React.createElement("button", { onClick: doSync, style: btn(C.ink, true), disabled: sync === "loading" }, sync === "loading" ? "syncing\u2026" : "sync from Notion")), tasks.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), tasks.length > 1 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, margin: "0 0 8px" } }, "Drag the grip to reorder. The order is kept for tomorrow; new tasks from Notion appear on top."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, tasks.map((t, i) => {
+      `), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Square = ExecutionPower:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Letter = CognitiveLoad:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" } }, "A"), " high"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" } }, "B"), " medium"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" } }, "C"), " low"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 4 } }, "\u{1F451}", " = King ", "\xB7", " day starts at ", settings.dayStart, ":00"))), flash && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" } }, ["today", "week", "month", "totals", "log", "break"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, onClick: () => setView(t), style: tab(t) }, t))), view === "today" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 } }, tasks.length, " tasks ", "\xB7", " ", countToday, " /", editingGoal ? /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "number",
+      min: 1,
+      max: 99,
+      autoFocus: true,
+      defaultValue: goal,
+      onBlur: (e) => saveGoal(Number(e.target.value)),
+      onKeyDown: (e) => {
+        if (e.key === "Enter")
+          saveGoal(Number(e.target.value));
+        if (e.key === "Escape")
+          setEditingGoal(false);
+      },
+      style: { width: 40, fontSize: 12, padding: "1px 4px", border: `1px solid ${C.faint}`, borderRadius: 4, fontFamily: "var(--fl-mono)" }
+    }
+  ) : /* @__PURE__ */ React.createElement("button", { onClick: () => setEditingGoal(true), title: "click to set today's goal", style: { border: "none", background: "transparent", color: C.ink, fontFamily: "var(--fl-mono)", fontSize: 12, cursor: "pointer", textDecoration: "underline dotted", padding: 0 } }, goal), "\u{1F345}", " today"), /* @__PURE__ */ React.createElement("button", { onClick: doSync, style: btn(C.ink, true), disabled: sync === "loading" }, sync === "loading" ? "syncing\u2026" : "sync from Notion")), tasks.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), tasks.length > 1 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, margin: "0 0 8px" } }, "Drag the grip to reorder. The order is kept for tomorrow; new tasks from Notion appear on top."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, tasks.map((t, i) => {
     const key = t.id || t.task;
     const done = doneSess[key] || 0;
     const est = t.pomodoros || 0;
     const completed = (t.act || 0) + done;
     const remaining = Math.max(0, est - completed);
     const hier = hierarchyText(t);
-    const cat = t.category || null;
-    const titleText = cat ? stripLeadingTag(t.task) : t.task;
+    const showCat = !!t.category && settings.showCategoryInView !== false;
+    const cat = showCat ? t.category : null;
+    const titleText = showCat ? stripLeadingTag(t.task) : t.task;
     const isDragging = dragIndex === i;
     const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
     return /* @__PURE__ */ React.createElement(
@@ -24033,7 +24153,14 @@ ${s.task}`))
       /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(TomatoPips, { vivid: done, grey: remaining }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10.5, color: C.muted, fontFamily: "var(--fl-mono)" } }, completed, " done")),
       /* @__PURE__ */ React.createElement("button", { onClick: () => openLog(t.task), style: btn(C.muted, true) }, "log")
     );
-  }))), view === "week" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOff((w) => w - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, fmtDate(weekStart), " ", "\u2013", " ", fmtDate(new Date(+weekEnd - DAY))), /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOff((w) => Math.min(0, w + 1)), style: btn(C.muted, true) }, "\u2192")), weekGroups.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, textAlign: "center", padding: "40px 0" } }, "No pomodoros this week.") : weekGroups.map((g) => /* @__PURE__ */ React.createElement(GroupChart, { key: g, group: g, sessions: weekSessions.filter((x) => (x.group || x.task) === g), settings })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted } }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: settings.beginColor } }, "\u25CF"), " expected"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: settings.endColor } }, "\u25CF"), " actual"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: C.better } }, "\u2014"), " better than expected"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: C.worse } }, "\u2014"), " worse than expected"))), view === "month" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setMonthOff((m) => m - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, monthRef.toLocaleDateString(void 0, { month: "long", year: "numeric" })), /* @__PURE__ */ React.createElement("button", { onClick: () => setMonthOff((m) => Math.min(0, m + 1)), style: btn(C.muted, true) }, "\u2192")), /* @__PURE__ */ React.createElement(Heatmap, { sessions, monthRef, settings })), view === "totals" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 6 } }, "All pomodoros, every project combined."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around" } }, /* @__PURE__ */ React.createElement(Stat, { label: "this week", value: countWeek, big: true }), /* @__PURE__ */ React.createElement(Stat, { label: "this month", value: countMonth, big: true }), /* @__PURE__ */ React.createElement(Stat, { label: "this year", value: countYear, big: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 } }, /* @__PURE__ */ React.createElement(Stat, { label: "hours, week", value: hrs(countWeek), color: C.muted }), /* @__PURE__ */ React.createElement(Stat, { label: "hours, month", value: hrs(countMonth), color: C.muted }), /* @__PURE__ */ React.createElement(Stat, { label: "hours, year", value: hrs(countYear), color: C.muted }))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "All sessions"), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), sessions.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion."))), view === "log" && /* @__PURE__ */ React.createElement(LogForm, { tasks, preset, onAdd: logPomodoro, settings, secs, running, setRunning, resetTimer })));
+  }))), view === "week" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOff((w) => w - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, fmtDate(weekStart), " ", "\u2013", " ", fmtDate(new Date(+weekEnd - DAY))), /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOff((w) => Math.min(0, w + 1)), style: btn(C.muted, true) }, "\u2192")), weekGroups.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, textAlign: "center", padding: "40px 0" } }, "No pomodoros this week.") : weekGroups.map((g) => /* @__PURE__ */ React.createElement(GroupChart, { key: g, group: g, sessions: weekSessions.filter((x) => (x.group || x.task) === g), settings })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted } }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: settings.beginColor } }, "\u25CF"), " expected"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: settings.endColor } }, "\u25CF"), " actual"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: C.better } }, "\u2014"), " better than expected"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: C.worse } }, "\u2014"), " worse than expected"))), view === "month" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setMonthOff((m) => m - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, monthRef.toLocaleDateString(void 0, { month: "long", year: "numeric" })), /* @__PURE__ */ React.createElement("button", { onClick: () => setMonthOff((m) => Math.min(0, m + 1)), style: btn(C.muted, true) }, "\u2192")), /* @__PURE__ */ React.createElement(Heatmap, { sessions, monthRef, settings })), view === "totals" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 6 } }, "All pomodoros, every project combined."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around" } }, /* @__PURE__ */ React.createElement(Stat, { label: "this week", value: countWeek, big: true }), /* @__PURE__ */ React.createElement(Stat, { label: "this month", value: countMonth, big: true }), /* @__PURE__ */ React.createElement(Stat, { label: "this year", value: countYear, big: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 } }, /* @__PURE__ */ React.createElement(Stat, { label: "hours, week", value: hrs(countWeek), color: C.muted }), /* @__PURE__ */ React.createElement(Stat, { label: "hours, month", value: hrs(countMonth), color: C.muted }), /* @__PURE__ */ React.createElement(Stat, { label: "hours, year", value: hrs(countYear), color: C.muted }))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "Expected vs actual enjoyment."), rated === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No ratings yet. Log a few pomodoros to see your calibration.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, lineHeight: 1.5, marginBottom: surprises.length ? 14 : 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 22, color: C.better } }, betterPct, "%"), " of your pomodoros turned out ", /* @__PURE__ */ React.createElement("span", { style: { color: C.better } }, "more enjoyable"), " than you expected", /* @__PURE__ */ React.createElement("span", { style: { color: C.muted } }, " (avg gap ", /* @__PURE__ */ React.createElement("span", { style: { color: avgGapAll > 0 ? C.better : avgGapAll < 0 ? C.worse : C.neutral, fontFamily: "var(--fl-mono)" } }, (avgGapAll >= 0 ? "+" : "") + avgGapAll.toFixed(1)), ").")), surprises.length > 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 } }, "Biggest surprises \u2014 dreaded, then enjoyed"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, surprises.map((s) => /* @__PURE__ */ React.createElement("div", { key: s.id, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.better, minWidth: 28 } }, "+", s.actual - s.expected), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, s.task), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" } }, /* @__PURE__ */ React.createElement("span", { style: { color: settings.beginColor } }, s.expected), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted } }, " \u2192 "), /* @__PURE__ */ React.createElement("span", { style: { color: settings.endColor } }, s.actual)), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 11, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap" } }, fmtDate(s.ts)))))))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "Best time of day (average enjoyment)."), !bestBand ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "Not enough data yet.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, marginBottom: 12 } }, "Your highest-enjoyment band is ", /* @__PURE__ */ React.createElement("b", { style: { color: C.ink } }, bestBand.name), " ", /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 13 } }, "(", bestBand.avg.toFixed(1), " / 5)"), "."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, bandStats.map((b) => {
+    const pct = b.avg != null ? b.avg / 5 * 100 : 0;
+    const isBest = bestBand && b.band === bestBand.band;
+    return /* @__PURE__ */ React.createElement("div", { key: b.band, style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 70, fontSize: 12, color: C.muted, textTransform: "capitalize" } }, b.name), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("div", { style: { width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral } })), /* @__PURE__ */ React.createElement("span", { style: { width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted } }, b.avg != null ? b.avg.toFixed(1) : "\u2014", " \xB7 ", b.count, "\u{1F345}"));
+  })))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "All sessions"), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), sessions.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion."))), view === "log" && /* @__PURE__ */ React.createElement(LogForm, { tasks, preset, onAdd: logPomodoro, settings, secs, running, setRunning, resetTimer }), view === "break" && /* @__PURE__ */ React.createElement("div", null, brk.active && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink } }, String(Math.floor(brk.secs / 60)).padStart(2, "0"), ":", String(brk.secs % 60).padStart(2, "0")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, !brk.finished && /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, running: !b.running })), style: btn(C.ink) }, brk.running ? "pause" : "start"), /* @__PURE__ */ React.createElement("button", { onClick: endBreak, style: btn(C.muted, true) }, brk.finished ? "back to today" : "end break"))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, margin: "0 0 8px" } }, "Pick up to 3 things to do on this break (", brk.picked.length, "/3):"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } }, activities.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "No activities yet \u2014 add some below.") : activities.map((a) => {
+    const on = brk.picked.includes(a.id);
+    return /* @__PURE__ */ React.createElement("button", { key: a.id, onClick: () => togglePick(a.id), style: { padding: "6px 12px", borderRadius: 999, border: `1.5px solid ${on ? C.ink : C.faint}`, background: on ? C.ink : "transparent", color: on ? "#fff" : C.ink, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)" } }, a.name);
+  }))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Break activities"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 } }, activities.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "None yet. Add an activity and an area below."), activities.map((a) => /* @__PURE__ */ React.createElement("div", { key: a.id, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, a.name), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" } }, "#", a.area), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" } }, a.count || 0, "\xD7"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 48, textAlign: "right" } }, a.lastUsed ? fmtDate(a.lastUsed) : "\u2014"), /* @__PURE__ */ React.createElement("button", { onClick: () => removeActivity(a.id), style: { ...btn(C.worse, true), padding: "3px 9px" } }, "\u2715")))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("input", { value: newAct.name, onChange: (e) => setNewAct({ ...newAct, name: e.target.value }), placeholder: "activity name", style: { flex: 2, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" } }), /* @__PURE__ */ React.createElement("input", { value: newAct.area, onChange: (e) => setNewAct({ ...newAct, area: e.target.value }), placeholder: "area / tag", style: { flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" } }), /* @__PURE__ */ React.createElement("button", { onClick: addActivity, style: btn(C.ink) }, "add"))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "What you reach for on breaks."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, "Favourites"), favs.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "\u2014") : favs.map((a) => /* @__PURE__ */ React.createElement("div", { key: a.id, style: { fontSize: 13 } }, a.name, " ", /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 11 } }, a.count, "\xD7")))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, "Least chosen"), disliked.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "\u2014") : disliked.map((a) => /* @__PURE__ */ React.createElement("div", { key: a.id, style: { fontSize: 13, color: C.muted } }, a.name, " ", /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 11 } }, a.count || 0, "\xD7"))))), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 } }, "By area"), /* @__PURE__ */ React.createElement(PieChart, { data: pieData })))));
 }
 
 // main.tsx
@@ -24046,16 +24173,31 @@ var DEFAULT_SETTINGS = {
   doneStatus: "",
   categoryProperty: "Area",
   tagNamespace: "Notion",
+  showCategoryInView: true,
+  writeCategoryTag: true,
+  dailyGoal: 8,
   dayStart: 4,
   morningEnd: 12,
   afternoonEnd: 18,
   beginColor: "#d98324",
   endColor: "#2f6f8f",
   dailyNoteWrite: true,
+  dailyNoteTrueDate: true,
   dailyHeading: "\u{1F33B} Today",
   dailyCreateHeading: true,
-  dailyTemplate: '- [ ] <mark class="hltr-yellow">{date}</mark> {start} - {end} \u{1F345} {tag}\n    - {task}{hierarchy}\n    - {note}'
+  dailyTemplate: '- [ ] <mark class="hltr-yellow">{date}</mark> {start} - {end} \u{1F345} {tag}\n    - {task}{hierarchy}\n    - {note}',
+  counterEnabled: false,
+  counterPrefix: "## \u{1F34E} Today_Pomodoro:: ",
+  breakEnabled: false,
+  breakAutoStart: true,
+  breakMinutes: 5
 };
+var DEFAULT_ACTIVITIES = [
+  { id: "a-stretch", name: "Stretch", area: "Body", count: 0, lastUsed: null },
+  { id: "a-water", name: "Drink water", area: "Body", count: 0, lastUsed: null },
+  { id: "a-eyes", name: "Rest eyes \u2014 look far", area: "Body", count: 0, lastUsed: null },
+  { id: "a-breathe", name: "Deep breathing", area: "Mind", count: 0, lastUsed: null }
+];
 function plainTitle(page) {
   var _a, _b;
   const t = ((_b = (_a = page == null ? void 0 : page.properties) == null ? void 0 : _a["Task"]) == null ? void 0 : _b.title) || [];
@@ -24065,6 +24207,13 @@ function selectName(page, name) {
   var _a, _b, _c;
   const prop = (_a = page == null ? void 0 : page.properties) == null ? void 0 : _a[name];
   return ((_b = prop == null ? void 0 : prop.select) == null ? void 0 : _b.name) || ((_c = prop == null ? void 0 : prop.status) == null ? void 0 : _c.name) || null;
+}
+function categoryName(page, name) {
+  var _a, _b, _c, _d, _e;
+  const prop = (_a = page == null ? void 0 : page.properties) == null ? void 0 : _a[name];
+  if (!prop)
+    return null;
+  return ((_b = prop.select) == null ? void 0 : _b.name) || ((_c = prop.status) == null ? void 0 : _c.name) || ((_e = (_d = prop.multi_select) == null ? void 0 : _d[0]) == null ? void 0 : _e.name) || null;
 }
 function numberProp(page, name) {
   var _a, _b;
@@ -24136,6 +24285,31 @@ function insertUnderHeading(data, heading, block, createIfMissing) {
   const out = [...lines.slice(0, insertAt), ...blockLines, ...lines.slice(insertAt)];
   return out.join("\n");
 }
+function updateCounterLine(data, prefix, count) {
+  const core = (prefix || "").trim();
+  if (!core)
+    return { text: data, status: "no-prefix" };
+  const lines = data.split("\n");
+  const idxs = [];
+  for (let i = 0; i < lines.length; i++)
+    if (lines[i].trim().startsWith(core))
+      idxs.push(i);
+  if (idxs.length > 1)
+    return { text: data, status: "ambiguous" };
+  if (idxs.length === 1) {
+    const lead = (lines[idxs[0]].match(/^\s*/) || [""])[0];
+    lines[idxs[0]] = lead + core + " " + count;
+    return { text: lines.join("\n"), status: "updated" };
+  }
+  let at = 0;
+  if (lines[0] === "---") {
+    const e = lines.indexOf("---", 1);
+    if (e !== -1)
+      at = e + 1;
+  }
+  lines.splice(at, 0, core + " " + count);
+  return { text: lines.join("\n"), status: "added" };
+}
 var FocusLogPlugin = class extends import_obsidian.Plugin {
   constructor() {
     super(...arguments);
@@ -24147,7 +24321,8 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       settings: Object.assign({}, DEFAULT_SETTINGS, loaded.settings || {}),
       sessions: loaded.sessions || [],
       pending: loaded.pending || [],
-      tasks: loaded.tasks || []
+      tasks: loaded.tasks || [],
+      activities: loaded.activities || DEFAULT_ACTIVITIES.map((a) => ({ ...a }))
     };
     this.registerView(VIEW_TYPE, (leaf) => new FocusLogView(leaf, this));
     this.addRibbonIcon("timer", "Open Focus Log", () => this.activateView());
@@ -24192,6 +24367,18 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     const p = (n) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
+  // The daily-note date key a timestamp belongs to (the same grouping used to pick the note file),
+  // and the number of logged sessions sharing that key — i.e. that note's pomodoro count.
+  noteDateKey(ts) {
+    const s = this.data.settings;
+    const d = s.dailyNoteTrueDate ? new Date(ts) : new Date(ts - dayShiftHours(s.dayStart) * 36e5);
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+  countForNote(ts) {
+    const key = this.noteDateKey(ts);
+    return (this.data.sessions || []).filter((x) => this.noteDateKey(+new Date(x.ts)) === key).length;
+  }
   // Mirrors the "Today Tasks" view: Today / King / This week, plus Daily dated today.
   async queryToday() {
     const today = this.logicalTodayISO();
@@ -24224,7 +24411,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         load: mapLoad(selectName(p, "CognitiveLoad")),
         power: mapPower(selectName(p, "ExecutionPower")),
         king: (selectName(p, "Status") || "").includes("King"),
-        category: selectName(p, this.data.settings.categoryProperty) || null,
+        category: categoryName(p, this.data.settings.categoryProperty) || null,
         pomodoros: estTotalOf(p),
         act: numberProp(p, "Act"),
         url: p.url,
@@ -24316,13 +24503,15 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     const moment = window.moment;
     if (!moment)
       throw new Error("moment unavailable");
-    const ld = new Date(p.ts - dayShiftHours(s.dayStart) * 36e5);
-    const m = moment(new Date(ld.getFullYear(), ld.getMonth(), ld.getDate()));
+    const trueDate = new Date(p.ts);
+    const fileDate = s.dailyNoteTrueDate ? trueDate : new Date(p.ts - dayShiftHours(s.dayStart) * 36e5);
+    const fileM = moment(new Date(fileDate.getFullYear(), fileDate.getMonth(), fileDate.getDate()));
+    const dateM = moment(new Date(trueDate.getFullYear(), trueDate.getMonth(), trueDate.getDate()));
     const dn = (_b = (_a = this.app.internalPlugins) == null ? void 0 : _a.getPluginById) == null ? void 0 : _b.call(_a, "daily-notes");
     const opts = ((_c = dn == null ? void 0 : dn.instance) == null ? void 0 : _c.options) || {};
     const format = opts.format || "YYYY-MM-DD";
     const folder = (opts.folder || "").trim();
-    const path = (0, import_obsidian.normalizePath)((folder ? folder + "/" : "") + m.format(format) + ".md");
+    const path = (0, import_obsidian.normalizePath)((folder ? folder + "/" : "") + fileM.format(format) + ".md");
     let file = this.app.vault.getAbstractFileByPath(path);
     if (!file) {
       if (folder && !this.app.vault.getAbstractFileByPath(folder)) {
@@ -24335,11 +24524,23 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     const startT = new Date(p.ts - (p.minutes || 25) * 6e4);
     const endT = new Date(p.ts);
     const hier = p.hierarchy ? " (" + p.hierarchy + ")" : "";
-    const slug = p.category ? tagSlug(p.category) : "";
+    const slug = s.writeCategoryTag !== false && p.category ? tagSlug(p.category) : "";
     const ns = (s.tagNamespace || "").trim();
     const tag = slug ? "#" + (ns ? ns + "/" : "") + slug : "";
-    const block = (s.dailyTemplate || "").replace(/\{date\}/g, m.format("YYYY-MM-DD")).replace(/\{start\}/g, pad(startT.getHours()) + ":" + pad(startT.getMinutes())).replace(/\{end\}/g, pad(endT.getHours()) + ":" + pad(endT.getMinutes())).replace(/\{task\}/g, p.task || "").replace(/\{hierarchy\}/g, hier).replace(/\{tag\}/g, tag).replace(/\{note\}/g, p.note || "");
-    await this.app.vault.process(file, (data) => insertUnderHeading(data, s.dailyHeading, block, s.dailyCreateHeading));
+    const block = (s.dailyTemplate || "").replace(/\{date\}/g, dateM.format("YYYY-MM-DD")).replace(/\{start\}/g, pad(startT.getHours()) + ":" + pad(startT.getMinutes())).replace(/\{end\}/g, pad(endT.getHours()) + ":" + pad(endT.getMinutes())).replace(/\{task\}/g, p.task || "").replace(/\{hierarchy\}/g, hier).replace(/\{tag\}/g, tag).replace(/\{note\}/g, p.note || "");
+    const count = this.countForNote(p.ts);
+    let counterStatus = "";
+    await this.app.vault.process(file, (data) => {
+      let out = insertUnderHeading(data, s.dailyHeading, block, s.dailyCreateHeading);
+      if (s.counterEnabled && (s.counterPrefix || "").trim()) {
+        const r = updateCounterLine(out, s.counterPrefix, count);
+        out = r.text;
+        counterStatus = r.status;
+      }
+      return out;
+    });
+    if (counterStatus === "ambiguous")
+      new import_obsidian.Notice("Focus Log: the counter prefix matches more than one line \u2014 counter not updated.");
   }
   // ---------- bridge handed to the React app ----------
   makeApi() {
@@ -24349,10 +24550,15 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       getInitial: () => ({
         sessions: self.data.sessions || [],
         pending: self.data.pending || [],
-        tasks: self.data.tasks || []
+        tasks: self.data.tasks || [],
+        activities: self.data.activities || []
       }),
       saveSessions: async (arr) => {
         self.data.sessions = arr;
+        await self.persist();
+      },
+      saveActivities: async (arr) => {
+        self.data.activities = arr;
         await self.persist();
       },
       savePending: async (arr) => {
@@ -24361,6 +24567,10 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       },
       saveTasks: async (arr) => {
         self.data.tasks = arr;
+        await self.persist();
+      },
+      patchSettings: async (partial) => {
+        self.data.settings = Object.assign({}, self.data.settings, partial);
         await self.persist();
       },
       sync: () => self.queryToday(),
@@ -24452,9 +24662,9 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.persist();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Tag namespace").setDesc("Parent segment for the daily-note tag, via the {tag} placeholder. With \u201CNotion\u201D, an Area of En writes \u201C#Notion/En\u201D. Leave blank for a flat tag like \u201C#En\u201D.").addText(
-      (t) => t.setPlaceholder("Notion").setValue(this.plugin.data.settings.tagNamespace).onChange(async (v) => {
-        this.plugin.data.settings.tagNamespace = v.trim();
+    new import_obsidian.Setting(containerEl).setName("Show category in the today list").setDesc("Show each task's Area as a chip in the panel's today view. Off hides the chip and keeps the full task title.").addToggle(
+      (t) => t.setValue(this.plugin.data.settings.showCategoryInView).onChange(async (v) => {
+        this.plugin.data.settings.showCategoryInView = v;
         await this.plugin.persist();
       })
     );
@@ -24498,9 +24708,15 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Daily note" });
-    new import_obsidian.Setting(containerEl).setName("Append to daily note when logging").setDesc("On each logged pomodoro, write a block into today's daily note.").addToggle(
+    new import_obsidian.Setting(containerEl).setName("Append to daily note when logging").setDesc("On each logged pomodoro, write a block into the daily note.").addToggle(
       (t) => t.setValue(this.plugin.data.settings.dailyNoteWrite).onChange(async (v) => {
         this.plugin.data.settings.dailyNoteWrite = v;
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("File the block under the true date").setDesc("Chooses which daily-note FILE the block goes into. On: the real date's note. Off: the day-start rollover note, so an evening pomodoro lands in tomorrow's note. The {date} text inside the block is always the true calendar date, either way.").addToggle(
+      (t) => t.setValue(this.plugin.data.settings.dailyNoteTrueDate).onChange(async (v) => {
+        this.plugin.data.settings.dailyNoteTrueDate = v;
         await this.plugin.persist();
       })
     );
@@ -24516,7 +24732,7 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.persist();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Block template").setDesc('Placeholders: {date} {start} {end} {task} {hierarchy} {note}. {hierarchy} expands to " (ancestor \xB7 parent)" when present.').addTextArea((t) => {
+    new import_obsidian.Setting(containerEl).setName("Block template").setDesc('Placeholders: {date} {start} {end} {task} {hierarchy} {tag} {note}. {hierarchy} expands to " (ancestor \xB7 parent)" when present; {tag} is the category tag configured below.').addTextArea((t) => {
       t.setValue(this.plugin.data.settings.dailyTemplate).onChange(async (v) => {
         this.plugin.data.settings.dailyTemplate = v;
         await this.plugin.persist();
@@ -24524,6 +24740,50 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
       t.inputEl.rows = 4;
       t.inputEl.style.width = "100%";
     });
+    new import_obsidian.Setting(containerEl).setName("Write the category tag to the daily note").setDesc("Expand the {tag} placeholder to a tag like #Notion/En when logging. Off leaves {tag} blank without editing your template.").addToggle(
+      (t) => t.setValue(this.plugin.data.settings.writeCategoryTag).onChange(async (v) => {
+        this.plugin.data.settings.writeCategoryTag = v;
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Tag namespace").setDesc("Parent segment for the {tag}. With \u201CNotion\u201D, an Area of En writes \u201C#Notion/En\u201D. Leave blank for a flat tag like \u201C#En\u201D.").addText(
+      (t) => t.setPlaceholder("Notion").setValue(this.plugin.data.settings.tagNamespace).onChange(async (v) => {
+        this.plugin.data.settings.tagNamespace = v.trim();
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Update a daily pomodoro counter").setDesc("After each log, set the number on a counter line in the note to that day's pomodoro count, using the same day-start grouping as the note (so evening logs count toward tomorrow). The line must appear exactly once, or it is left untouched.").addToggle(
+      (t) => t.setValue(this.plugin.data.settings.counterEnabled).onChange(async (v) => {
+        this.plugin.data.settings.counterEnabled = v;
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Counter line prefix").setDesc('The exact text before the number. The plugin finds the line that starts with this and rewrites the number after it. Example: "## \u{1F34E} Today_Pomodoro:: ".').addText((t) => {
+      t.setValue(this.plugin.data.settings.counterPrefix).onChange(async (v) => {
+        this.plugin.data.settings.counterPrefix = v;
+        await this.plugin.persist();
+      });
+      t.inputEl.style.width = "100%";
+    });
+    containerEl.createEl("h3", { text: "Break" });
+    new import_obsidian.Setting(containerEl).setName("Take a break after logging").setDesc("After logging a pomodoro, open the Break view instead of returning straight to the today list.").addToggle(
+      (t) => t.setValue(this.plugin.data.settings.breakEnabled).onChange(async (v) => {
+        this.plugin.data.settings.breakEnabled = v;
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Start the break automatically").setDesc("On: the break timer starts on its own. Off: you start it manually in the Break view.").addToggle(
+      (t) => t.setValue(this.plugin.data.settings.breakAutoStart).onChange(async (v) => {
+        this.plugin.data.settings.breakAutoStart = v;
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Break length (minutes)").setDesc("How long the break timer runs.").addText(
+      (t) => t.setValue(String(this.plugin.data.settings.breakMinutes)).onChange(async (v) => {
+        this.plugin.data.settings.breakMinutes = Math.max(1, Math.min(60, parseInt(v, 10) || 5));
+        await this.plugin.persist();
+      })
+    );
     containerEl.createEl("p", {
       text: "Reopen the Focus Log panel after changing settings here so the panel picks up the new values.",
       cls: "setting-item-description"

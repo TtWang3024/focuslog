@@ -254,6 +254,43 @@ function Scale({ value, onChange, color, label }: any) {
   );
 }
 
+const PIE = ["#b4533a", "#cda32f", "#5b8c5a", "#4e7d9c", "#9a6f9c", "#c0772e", "#6f9461", "#847bb2"];
+function polarPt(cx: number, cy: number, r: number, deg: number) {
+  const a = (deg * Math.PI) / 180;
+  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+}
+function PieChart({ data }: any) {
+  const total = data.reduce((a: number, d: any) => a + d.value, 0);
+  if (!total) return <p style={{ color: C.muted, fontSize: 13 }}>No break activities logged yet.</p>;
+  const cx = 80, cy = 80, r = 70;
+  let angle = -90;
+  const slices = data.map((d: any) => {
+    const frac = d.value / total, a0 = angle, a1 = angle + frac * 360;
+    angle = a1;
+    const large = frac > 0.5 ? 1 : 0;
+    const p0 = polarPt(cx, cy, r, a0), p1 = polarPt(cx, cy, r, a1);
+    const path = frac >= 1
+      ? `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r} Z`
+      : `M ${cx} ${cy} L ${p0.x.toFixed(2)} ${p0.y.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} Z`;
+    return { ...d, path, frac };
+  });
+  return (
+    <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+      <svg width={160} height={160} style={{ flexShrink: 0 }}>
+        {slices.map((s: any, i: number) => (<path key={i} d={s.path} fill={s.color} stroke={C.card} strokeWidth={1.5} />))}
+      </svg>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {slices.map((s: any, i: number) => (
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <span style={{ width: 11, height: 11, borderRadius: 2, background: s.color }} />{s.label}
+            <span style={{ color: C.muted, fontFamily: "var(--fl-mono)" }}>{s.value} ({Math.round(s.frac * 100)}%)</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, resetTimer }: any) {
   const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
   const [exp, setExp] = useState(3);
@@ -352,6 +389,49 @@ export default function FocusLogApp({ api }: any) {
   const [sync, setSync] = useState("idle");
   const [flash, setFlash] = useState("");
   const settings = api.settings;
+  const [goal, setGoal] = useState<number>(Number(settings.dailyGoal) || 8);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const saveGoal = (n: number) => { const g = Math.max(1, Math.min(99, Math.round(n) || 1)); setGoal(g); api.patchSettings && api.patchSettings({ dailyGoal: g }); setEditingGoal(false); };
+
+  // Break activities + the post-log break timer.
+  const [activities, setActivities] = useState<any[]>(init.activities || []);
+  const saveActivities = (next: any[]) => { setActivities(next); api.saveActivities && api.saveActivities(next); };
+  const [brk, setBrk] = useState<any>({ active: false, secs: 0, running: false, picked: [], finished: false });
+  const brkTick = useRef<any>(null);
+  const [newAct, setNewAct] = useState<any>({ name: "", area: "" });
+  useEffect(() => {
+    if (!brk.active || !brk.running) return;
+    brkTick.current = setInterval(() => {
+      setBrk((b: any) => {
+        if (!b.active || !b.running) return b;
+        const nx = b.secs > 0 ? b.secs - 1 : 0;
+        if (nx === 0 && !b.finished) { api.notify("Break over — ready for the next pomodoro?", 6000); return { ...b, secs: 0, running: false, finished: true }; }
+        return { ...b, secs: nx };
+      });
+    }, 1000);
+    return () => clearInterval(brkTick.current);
+  }, [brk.active, brk.running]);
+  const startBreak = () => setBrk({ active: true, secs: (Number(settings.breakMinutes) || 5) * 60, running: settings.breakAutoStart !== false, picked: [], finished: false });
+  const togglePick = (id: string) => setBrk((b: any) => {
+    if (b.picked.includes(id)) return { ...b, picked: b.picked.filter((x: string) => x !== id) };
+    if (b.picked.length >= 3) return b;
+    return { ...b, picked: [...b.picked, id] };
+  });
+  const endBreak = () => {
+    if (brk.picked.length) {
+      const now = Date.now();
+      saveActivities(activities.map((a) => brk.picked.includes(a.id) ? { ...a, count: (a.count || 0) + 1, lastUsed: now } : a));
+    }
+    setBrk({ active: false, secs: 0, running: false, picked: [], finished: false });
+    setView("today");
+  };
+  const addActivity = () => {
+    const name = (newAct.name || "").trim();
+    if (!name) return;
+    saveActivities([...activities, { id: "a" + Date.now(), name, area: (newAct.area || "").trim() || "Other", count: 0, lastUsed: null }]);
+    setNewAct({ name: "", area: "" });
+  };
+  const removeActivity = (id: string) => saveActivities(activities.filter((a) => a.id !== id));
 
   // Timer state lives here so it survives tab switches (LogForm mounts/unmounts).
   const [secs, setSecs] = useState(25 * 60);
@@ -428,7 +508,7 @@ export default function FocusLogApp({ api }: any) {
     persist([...sessions, s]);
     const key = s.pageId || s.task;
     setDoneSess((m: any) => ({ ...m, [key]: (m[key] || 0) + 1 }));
-    setView("today");
+    if (settings.breakEnabled) { startBreak(); setView("break"); } else { setView("today"); }
     let msg = "Logged.";
     if (s.pageId) {
       try { const act = await api.writeAct(s.pageId); msg += " Act" + (act != null ? " = " + act : " +1") + " written."; }
@@ -471,6 +551,31 @@ export default function FocusLogApp({ api }: any) {
   const hrs = (c: number) => (Math.round((c * 25) / 6) / 10).toFixed(1);
   const monthRef = new Date(nowLD.getFullYear(), nowLD.getMonth() + monthOff, 1);
 
+  // Rating summary: how often the actual beat the expected, the average gap, and the biggest
+  // positive surprises (dreaded but enjoyed).
+  const rated = sessions.length;
+  const betterCount = sessions.filter((s) => s.actual > s.expected).length;
+  const betterPct = rated ? Math.round((100 * betterCount) / rated) : 0;
+  const avgGapAll = rated ? sessions.reduce((a, s) => a + (s.actual - s.expected), 0) / rated : 0;
+  const surprises = [...sessions]
+    .filter((s) => s.actual > s.expected)
+    .sort((a, b) => (b.actual - b.expected) - (a.actual - a.expected) || +new Date(b.ts) - +new Date(a.ts))
+    .slice(0, 3);
+  // Best time of day: average actual enjoyment per time band.
+  const bandStats = [0, 1, 2].map((b) => {
+    const list = sessions.filter((s) => bandOf(s.ts, settings) === b);
+    return { band: b, name: BAND_NAME[b], count: list.length, avg: list.length ? list.reduce((a, s) => a + s.actual, 0) / list.length : null };
+  });
+  const bestBand = bandStats.filter((b) => b.avg != null).sort((a: any, b: any) => b.avg - a.avg)[0];
+
+  // Break activity stats: most-reached-for (top 3), least (bottom 2), and the Area distribution.
+  const actByCount = [...activities].sort((a, b) => (b.count || 0) - (a.count || 0));
+  const favs = actByCount.filter((a) => (a.count || 0) > 0).slice(0, 3);
+  const disliked = actByCount.slice().reverse().slice(0, 2);
+  const areaAgg: any = {};
+  activities.forEach((a) => { if ((a.count || 0) > 0) areaAgg[a.area || "Other"] = (areaAgg[a.area || "Other"] || 0) + (a.count || 0); });
+  const pieData = Object.keys(areaAgg).map((k, i) => ({ label: k, value: areaAgg[k], color: PIE[i % PIE.length] }));
+
   const openLog = (leafTask: string) => { setPreset(leafTask); setView("log"); };
 
   const tab = (t: string): any => ({ padding: "7px 16px", borderRadius: 999, border: `1.5px solid ${view === t ? C.ink : C.faint}`, background: view === t ? C.ink : "transparent", color: view === t ? "#fff" : C.muted, fontSize: 13, cursor: "pointer", textTransform: "capitalize" });
@@ -507,13 +612,26 @@ export default function FocusLogApp({ api }: any) {
         )}
 
         <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-          {["today", "week", "month", "totals", "log"].map((t) => (<button key={t} onClick={() => setView(t)} style={tab(t)}>{t}</button>))}
+          {["today", "week", "month", "totals", "log", "break"].map((t) => (<button key={t} onClick={() => setView(t)} style={tab(t)}>{t}</button>))}
         </div>
 
         {view === "today" && (
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={{ color: C.muted, fontSize: 12 }}>{tasks.length} tasks {"\u00B7"} {countToday} {"\u{1F345}"} today</span>
+              <span style={{ color: C.muted, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {tasks.length} tasks {"\u00B7"} {countToday} /
+                {editingGoal ? (
+                  <input
+                    type="number" min={1} max={99} autoFocus defaultValue={goal}
+                    onBlur={(e) => saveGoal(Number(e.target.value))}
+                    onKeyDown={(e) => { if (e.key === "Enter") saveGoal(Number((e.target as HTMLInputElement).value)); if (e.key === "Escape") setEditingGoal(false); }}
+                    style={{ width: 40, fontSize: 12, padding: "1px 4px", border: `1px solid ${C.faint}`, borderRadius: 4, fontFamily: "var(--fl-mono)" }}
+                  />
+                ) : (
+                  <button onClick={() => setEditingGoal(true)} title="click to set today's goal" style={{ border: "none", background: "transparent", color: C.ink, fontFamily: "var(--fl-mono)", fontSize: 12, cursor: "pointer", textDecoration: "underline dotted", padding: 0 }}>{goal}</button>
+                )}
+                {"\u{1F345}"} today
+              </span>
               <button onClick={doSync} style={btn(C.ink, true)} disabled={sync === "loading"}>{sync === "loading" ? "syncing\u2026" : "sync from Notion"}</button>
             </div>
             {tasks.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No tasks yet. Set your Notion token in settings, then press sync.</p>}
@@ -526,8 +644,9 @@ export default function FocusLogApp({ api }: any) {
                 const completed = (t.act || 0) + done;
                 const remaining = Math.max(0, est - completed);
                 const hier = hierarchyText(t);
-                const cat = t.category || null;
-                const titleText = cat ? stripLeadingTag(t.task) : t.task;
+                const showCat = !!t.category && settings.showCategoryInView !== false;
+                const cat = showCat ? t.category : null;
+                const titleText = showCat ? stripLeadingTag(t.task) : t.task;
                 const isDragging = dragIndex === i;
                 const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
                 return (
@@ -608,6 +727,61 @@ export default function FocusLogApp({ api }: any) {
               </div>
             </div>
 
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
+              <p style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>Expected vs actual enjoyment.</p>
+              {rated === 0 ? (
+                <p style={{ color: C.muted, fontSize: 13 }}>No ratings yet. Log a few pomodoros to see your calibration.</p>
+              ) : (
+                <>
+                  <div style={{ fontSize: 15, lineHeight: 1.5, marginBottom: surprises.length ? 14 : 0 }}>
+                    <span style={{ fontFamily: "var(--fl-mono)", fontSize: 22, color: C.better }}>{betterPct}%</span> of your pomodoros turned out <span style={{ color: C.better }}>more enjoyable</span> than you expected
+                    <span style={{ color: C.muted }}> (avg gap <span style={{ color: avgGapAll > 0 ? C.better : avgGapAll < 0 ? C.worse : C.neutral, fontFamily: "var(--fl-mono)" }}>{(avgGapAll >= 0 ? "+" : "") + avgGapAll.toFixed(1)}</span>).</span>
+                  </div>
+                  {surprises.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Biggest surprises — dreaded, then enjoyed</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {surprises.map((s) => (
+                          <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+                            <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.better, minWidth: 28 }}>+{s.actual - s.expected}</span>
+                            <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{s.task}</span>
+                            <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" }}><span style={{ color: settings.beginColor }}>{s.expected}</span><span style={{ color: C.muted }}>{" → "}</span><span style={{ color: settings.endColor }}>{s.actual}</span></span>
+                            <span style={{ color: C.muted, fontSize: 11, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap" }}>{fmtDate(s.ts)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
+              <p style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>Best time of day (average enjoyment).</p>
+              {!bestBand ? (
+                <p style={{ color: C.muted, fontSize: 13 }}>Not enough data yet.</p>
+              ) : (
+                <>
+                  <div style={{ fontSize: 15, marginBottom: 12 }}>Your highest-enjoyment band is <b style={{ color: C.ink }}>{bestBand.name}</b> <span style={{ color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 13 }}>({(bestBand.avg as number).toFixed(1)} / 5)</span>.</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {bandStats.map((b) => {
+                      const pct = b.avg != null ? ((b.avg as number) / 5) * 100 : 0;
+                      const isBest = bestBand && b.band === bestBand.band;
+                      return (
+                        <div key={b.band} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ width: 70, fontSize: 12, color: C.muted, textTransform: "capitalize" }}>{b.name}</span>
+                          <div style={{ flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` }}>
+                            <div style={{ width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral }} />
+                          </div>
+                          <span style={{ width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{b.avg != null ? (b.avg as number).toFixed(1) : "—"} · {b.count}{"\u{1F345}"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
             <div style={{ marginTop: 20 }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
                 <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>All sessions</h3>
@@ -634,6 +808,71 @@ export default function FocusLogApp({ api }: any) {
         )}
 
         {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} setRunning={setRunning} resetTimer={resetTimer} />}
+
+        {view === "break" && (
+          <div>
+            {brk.active && (
+              <div style={{ background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink }}>{String(Math.floor(brk.secs / 60)).padStart(2, "0")}:{String(brk.secs % 60).padStart(2, "0")}</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {!brk.finished && <button onClick={() => setBrk((b: any) => ({ ...b, running: !b.running }))} style={btn(C.ink)}>{brk.running ? "pause" : "start"}</button>}
+                    <button onClick={endBreak} style={btn(C.muted, true)}>{brk.finished ? "back to today" : "end break"}</button>
+                  </div>
+                </div>
+                <p style={{ color: C.muted, fontSize: 12, margin: "0 0 8px" }}>Pick up to 3 things to do on this break ({brk.picked.length}/3):</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {activities.length === 0 ? <span style={{ color: C.muted, fontSize: 13 }}>No activities yet — add some below.</span> :
+                    activities.map((a) => {
+                      const on = brk.picked.includes(a.id);
+                      return <button key={a.id} onClick={() => togglePick(a.id)} style={{ padding: "6px 12px", borderRadius: 999, border: `1.5px solid ${on ? C.ink : C.faint}`, background: on ? C.ink : "transparent", color: on ? "#fff" : C.ink, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)" }}>{a.name}</button>;
+                    })}
+                </div>
+              </div>
+            )}
+
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
+              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Break activities</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                {activities.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>None yet. Add an activity and an area below.</p>}
+                {activities.map((a) => (
+                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                    <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{a.name}</span>
+                    <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>#{a.area}</span>
+                    <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>{a.count || 0}{"×"}</span>
+                    <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>
+                    <button onClick={() => removeActivity(a.id)} style={{ ...btn(C.worse, true), padding: "3px 9px" }}>{"✕"}</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <input value={newAct.name} onChange={(e) => setNewAct({ ...newAct, name: e.target.value })} placeholder="activity name" style={{ flex: 2, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" }} />
+                <input value={newAct.area} onChange={(e) => setNewAct({ ...newAct, area: e.target.value })} placeholder="area / tag" style={{ flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" }} />
+                <button onClick={addActivity} style={btn(C.ink)}>add</button>
+              </div>
+            </div>
+
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+              <p style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>What you reach for on breaks.</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 }}>
+                <div>
+                  <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Favourites</p>
+                  {favs.length === 0 ? <span style={{ color: C.muted, fontSize: 13 }}>{"—"}</span> : favs.map((a) => (
+                    <div key={a.id} style={{ fontSize: 13 }}>{a.name} <span style={{ color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 11 }}>{a.count}{"×"}</span></div>
+                  ))}
+                </div>
+                <div>
+                  <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Least chosen</p>
+                  {disliked.length === 0 ? <span style={{ color: C.muted, fontSize: 13 }}>{"—"}</span> : disliked.map((a) => (
+                    <div key={a.id} style={{ fontSize: 13, color: C.muted }}>{a.name} <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11 }}>{a.count || 0}{"×"}</span></div>
+                  ))}
+                </div>
+              </div>
+              <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>By area</p>
+              <PieChart data={pieData} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
