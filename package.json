@@ -1,0 +1,33 @@
+{
+  "name": "focuslog",
+  "version": "0.3.0",
+  "description": "Pomodoro logging against a Notion Pressure-to-Progress database, with rating, heatmap, and Act write-back.",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "pomodoro",
+    "notion"
+  ],
+  "author": "Tingting Wang",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.0",
+    "obsidian": "^1.4.11",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

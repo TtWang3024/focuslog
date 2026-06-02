@@ -5,6 +5,24 @@
   overflow: auto;
 }
 
+/* Native date-time input: keep the calendar icon clear of the digits in every theme.
+   Some themes absolutely-position the picker indicator on the left, where it overlaps
+   the text; force it back into normal flow on the right with a little breathing room. */
+.workspace-leaf-content[data-type="focuslog-view"] input[type="datetime-local"] {
+  padding-left: 10px;
+}
+.workspace-leaf-content[data-type="focuslog-view"] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  position: static !important;
+  left: auto !important;
+  right: auto !important;
+  margin: 0 0 0 8px !important;
+  opacity: 0.55;
+  cursor: pointer;
+}
+.workspace-leaf-content[data-type="focuslog-view"] input[type="datetime-local"]::-webkit-datetime-edit {
+  padding-left: 0;
+}
+
 /* Celebration modal */
 .focuslog-celebrate { text-align: center; position: relative; overflow: hidden; }
 .focuslog-celebrate .fl-popper { font-size: 56px; animation: fl-pop 0.5s cubic-bezier(.2,1.4,.4,1) both; }

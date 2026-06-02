@@ -17,7 +17,10 @@ Logs pomodoros against your Notion **⛅ Pressure to Progress** database. Each p
 3. In Obsidian: Settings → Focus Log → paste the token. The database ID is prefilled.
 4. Open the panel (timer ribbon icon or the "Open Focus Log" command) and press **sync from Notion**.
 
-Day start, time bands, and rating colors are edited inside the panel's settings button. The rating colors only affect the chart dots; the heatmap colors are computed from weekday and time band and are independent.
+All configuration — Notion connection, day start, time bands, rating colours, daily-note template — lives in **Settings → Focus Log**. Reopen the panel after editing settings so it picks up the new values. The rating colours only affect the chart dots; the heatmap colours come from weekday and time band and are independent.
+
+## Editing logs
+The timer in the **log** tab keeps running when you switch tabs, so checking the weekly chart mid-pomodoro does not reset it. In the **totals** tab, every logged session has **edit** and **delete** buttons. Editing lets you change the time, task name, and the two ratings; the original quick note is preserved. Deleting only removes the local entry — the `Act +1` already written to Notion is not undone.
 
 ## Caveats
 - The Notion API has no atomic increment, so Act write-back reads the current value then writes value + 1. With a single user this is safe; avoid editing the same page in two places at the exact same moment.
@@ -31,4 +34,4 @@ npm install
 npm run build   # outputs main.js
 # npm run dev   # watch mode
 ```
-Files: `src/main.tsx` (plugin, Notion client, settings, view) and `src/FocusLogApp.tsx` (the React UI).
+Files: `main.tsx` (plugin entry, Notion client, settings tab, view registration) and `FocusLogApp.tsx` (the React UI). `esbuild.config.mjs` bundles them into `main.js`.

@@ -8,6 +8,9 @@ const { useState, useEffect, useRef, useCallback } = React;
 
 const LOAD_COLOR: any = { A: "#c0772e", B: "#4e7d9c", C: "#6f9461" };
 const LOAD_LABEL: any = { A: "A high", B: "B medium", C: "C low" };
+// ExecutionPower colour code: pink = Must Today, yellow = Aim Today (default), green = Bonus If Done.
+const POWER_COLOR: any = { P: "#c96f86", Y: "#cda32f", G: "#6f9461" };
+const POWER_LABEL: any = { P: "Must Today", Y: "Aim Today", G: "Bonus If Done" };
 
 const WEEKDAY: any = {
   1: { h: 140, s: 42, name: "Mon" },
@@ -29,11 +32,17 @@ const C: any = {
 const DAY = 86400000;
 const startOfDay = (d: any) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 function mondayOf(d: any) { const x = startOfDay(d); const k = (x.getDay() + 6) % 7; x.setDate(x.getDate() - k); return x; }
-const logicalDay = (ts: any, s: any) => startOfDay(new Date(ts).getTime() - (s.dayStart || 0) * 3600000);
+// Hours to shift a timestamp before taking its calendar date. A morning start (0–12)
+// pushes the boundary later into the morning, so late-night work stays on the previous
+// day (subtract). An evening start (13–23) rolls the day over that night, so the late
+// hours fall on the next date (add).
+const dayShift = (s: any) => { const h = s.dayStart || 0; return h <= 12 ? h : h - 24; };
+const logicalDay = (ts: any, s: any) => startOfDay(new Date(ts).getTime() - dayShift(s) * 3600000);
 const logicalWeekStart = (ts: any, s: any) => mondayOf(logicalDay(ts, s));
 function bandOf(ts: any, s: any) {
   const h = new Date(ts).getHours();
-  if (h < (s.dayStart || 0)) return 2;
+  const ds = s.dayStart || 0;
+  if (ds <= 12 && h < ds) return 2; // pre-dawn tail of a morning-offset day reads as evening
   if (h < s.morningEnd) return 0;
   if (h < s.afternoonEnd) return 1;
   return 2;
@@ -63,23 +72,10 @@ const hierarchyText = (t: any) => {
   return t.ancestor || t.parent || "";
 };
 
-function seedSessions() {
-  const out: any[] = [];
-  const ws = mondayOf(new Date());
-  let id = 1;
-  const push = (task: string, group: string, load: string, off: number, hour: number, exp: number, act: number, note: string) => {
-    const t = new Date(ws); t.setDate(t.getDate() + off); t.setHours(hour, 0, 0, 0);
-    out.push({ id: id++, task, group, load, pageId: null, url: null, ts: t.toISOString(), expected: exp, actual: act, note, minutes: 25 });
-  };
-  const P = "[Pro] mol-CSPy pipeline";
-  push("[Pro] 1.1 review script", P, "B", 0, 10, 2, 4, "more fun than I thought");
-  push("[Pro] 1.1 review script", P, "B", 1, 11, 3, 3, "");
-  push("[Me] Pause Lab", "[Me] Pause Lab", "B", 1, 21, 2, 3, "");
-  push("[Pro] 1.2 array job", P, "B", 2, 9, 3, 4, "");
-  push("[G] stand up on Slack", "[G] stand up on Slack", "A", 2, 9, 4, 2, "draining today");
-  push("[Pro] 1.3 ovito analysis", P, "B", 3, 20, 3, 4, "satisfying");
-  push("[Pro] 1.1 review script", P, "B", 4, 11, 4, 4, "");
-  return out;
+function toLocalDatetime(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function Stat({ label, value, color, big }: any) {
@@ -99,7 +95,7 @@ function TomatoPips({ vivid, grey }: any) {
 }
 const btn = (color: string, ghost?: boolean): any => ({
   padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${color}`, background: ghost ? "transparent" : color,
-  color: ghost ? color : "#fff", fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-mono)",
+  color: ghost ? color : "#fff", fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)",
 });
 
 function GroupChart({ group, sessions, settings }: any) {
@@ -251,17 +247,105 @@ function Scale({ value, onChange, color, label }: any) {
   );
 }
 
-function LogForm({ tasks, preset, onAdd, settings, api }: any) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, resetTimer }: any) {
   const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
   const [note, setNote] = useState("");
+
+  useEffect(() => setTask(preset || (tasks[0] && tasks[0].task) || ""), [preset, tasks]);
+
+  const mm = String(Math.floor(secs / 60)).padStart(2, "0");
+  const ss = String(secs % 60).padStart(2, "0");
+  const meta: any = tasks.find((t: any) => t.task === task) || {};
+  const submit = () => {
+    if (!task.trim()) return;
+    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 });
+    setNote("");
+  };
+  const inputStyle: any = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
+        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setRunning((r: boolean) => !r)} style={btn(C.ink)}>{running ? "pause" : "start 25m"}</button>
+          <button onClick={resetTimer} style={btn(C.muted, true)}>reset</button>
+        </div>
+      </div>
+      <label style={{ color: C.muted, fontSize: 12 }}>task (Act +1 writes to this page)</label>
+      <select value={task} onChange={(e) => setTask(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
+        {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
+      </select>
+      <Scale label="before: how enjoyable do I expect this to be? (1 dull ... 5 great)" value={exp} onChange={setExp} color={settings.beginColor} />
+      <Scale label="after: how enjoyable was it actually? (1 dull ... 5 great)" value={act} onChange={setAct} color={settings.endColor} />
+      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 16, marginTop: 4 }} />
+      <button onClick={submit} style={{ ...btn(C.ink), width: "100%", padding: "10px" }}>log pomodoro + write Act</button>
+    </div>
+  );
+}
+
+function SessionRow({ s, settings, onEdit, onDelete }: any) {
+  const d = new Date(s.ts);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 6, background: C.paper, border: `1px solid ${C.line}` }}>
+      <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, minWidth: 96 }}>{fmtDate(d)} {fmtTime(d)}</span>
+      <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.ink, overflowWrap: "anywhere" }}>{s.task}</div>
+      <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" }}>
+        <span style={{ color: settings.beginColor }}>{s.expected}</span>
+        <span style={{ color: C.muted }}> {"→"} </span>
+        <span style={{ color: settings.endColor }}>{s.actual}</span>
+      </span>
+      <button onClick={() => onEdit(s)} style={btn(C.muted, true)}>edit</button>
+      <button onClick={() => onDelete(s)} style={btn(C.worse, true)}>delete</button>
+    </div>
+  );
+}
+
+function SessionEditRow({ draft, setDraft, settings, onSave, onCancel }: any) {
+  const inputStyle: any = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "6px 10px", boxSizing: "border-box", fontFamily: "var(--fl-display)" };
+  return (
+    <div style={{ padding: 12, borderRadius: 6, background: C.card, border: `1.5px solid ${C.ink}`, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+        <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>
+          time
+          <input type="datetime-local" value={draft.ts} onChange={(e) => setDraft({ ...draft, ts: e.target.value })} style={{ ...inputStyle, paddingLeft: 14, minWidth: 220 }} />
+        </label>
+        <label style={{ fontSize: 11, color: C.muted, flex: 1, minWidth: 200, display: "flex", flexDirection: "column", gap: 2 }}>
+          task
+          <input type="text" value={draft.task} onChange={(e) => setDraft({ ...draft, task: e.target.value })} style={{ ...inputStyle, width: "100%" }} />
+        </label>
+      </div>
+      <Scale label="expected (before)" value={draft.expected} onChange={(v: number) => setDraft({ ...draft, expected: v })} color={settings.beginColor} />
+      <Scale label="actual (after)" value={draft.actual} onChange={(v: number) => setDraft({ ...draft, actual: v })} color={settings.endColor} />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <button onClick={onCancel} style={btn(C.muted, true)}>cancel</button>
+        <button onClick={onSave} style={btn(C.ink)}>save</button>
+      </div>
+    </div>
+  );
+}
+
+export default function FocusLogApp({ api }: any) {
+  const init = api.getInitial();
+  const [sessions, setSessions] = useState<any[]>(init.sessions);
+  const [tasks, setTasks] = useState<any[]>(init.tasks);
+  const [pending, setPending] = useState<any[]>(init.pending);
+  const [doneSess, setDoneSess] = useState<any>({});
+  const [view, setView] = useState("today");
+  const [preset, setPreset] = useState("");
+  const [weekOff, setWeekOff] = useState(0);
+  const [monthOff, setMonthOff] = useState(0);
+  const [sync, setSync] = useState("idle");
+  const [flash, setFlash] = useState("");
+  const settings = api.settings;
+
+  // Timer state lives here so it survives tab switches (LogForm mounts/unmounts).
   const [secs, setSecs] = useState(25 * 60);
   const [running, setRunning] = useState(false);
   const tick = useRef<any>(null);
   const fired = useRef<any>({});
 
-  useEffect(() => setTask(preset || (tasks[0] && tasks[0].task) || ""), [preset, tasks]);
   useEffect(() => {
     if (!running) return;
     tick.current = setInterval(() => {
@@ -277,55 +361,36 @@ function LogForm({ tasks, preset, onAdd, settings, api }: any) {
   }, [running]);
   useEffect(() => { if (secs === 0) setRunning(false); }, [secs]);
 
-  const reset = () => { setRunning(false); setSecs(25 * 60); fired.current = {}; };
-  const mm = String(Math.floor(secs / 60)).padStart(2, "0");
-  const ss = String(secs % 60).padStart(2, "0");
-  const meta: any = tasks.find((t: any) => t.task === task) || {};
-  const submit = () => {
-    if (!task.trim()) return;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 });
-    setNote("");
-  };
-  const inputStyle: any = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
-  return (
-    <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
-        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => setRunning((r) => !r)} style={btn(C.ink)}>{running ? "pause" : "start 25m"}</button>
-          <button onClick={reset} style={btn(C.muted, true)}>reset</button>
-        </div>
-      </div>
-      <label style={{ color: C.muted, fontSize: 12 }}>task (Act +1 writes to this page)</label>
-      <select value={task} onChange={(e) => setTask(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
-        {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}</option>))}
-      </select>
-      <Scale label="before: how enjoyable do I expect this to be? (1 dull ... 5 great)" value={exp} onChange={setExp} color={settings.beginColor} />
-      <Scale label="after: how enjoyable was it actually? (1 dull ... 5 great)" value={act} onChange={setAct} color={settings.endColor} />
-      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 16, marginTop: 4 }} />
-      <button onClick={submit} style={{ ...btn(C.ink), width: "100%", padding: "10px" }}>log pomodoro + write Act</button>
-    </div>
-  );
-}
+  const resetTimer = () => { setRunning(false); setSecs(25 * 60); fired.current = {}; };
 
-export default function FocusLogApp({ api }: any) {
-  const init = api.getInitial();
-  const [sessions, setSessions] = useState<any[]>(init.sessions);
-  const [tasks, setTasks] = useState<any[]>(init.tasks);
-  const [pending, setPending] = useState<any[]>(init.pending);
-  const [settings, setSettings] = useState<any>(api.settings);
-  const [doneSess, setDoneSess] = useState<any>({});
-  const [view, setView] = useState("today");
-  const [preset, setPreset] = useState("");
-  const [weekOff, setWeekOff] = useState(0);
-  const [monthOff, setMonthOff] = useState(0);
-  const [showSettings, setShowSettings] = useState(false);
-  const [sync, setSync] = useState("idle");
-  const [flash, setFlash] = useState("");
+  // Session edit/delete state for Totals view.
+  const [editingId, setEditingId] = useState<any>(null);
+  const [editDraft, setEditDraft] = useState<any>(null);
 
   const persist = useCallback((next: any[]) => { setSessions(next); api.saveSessions(next); }, [api]);
   const savePending = useCallback((next: any[]) => { setPending(next); api.savePending(next); }, [api]);
-  const saveSettings = (next: any) => { setSettings(next); api.saveSettings({ dayStart: next.dayStart, morningEnd: next.morningEnd, afternoonEnd: next.afternoonEnd, beginColor: next.beginColor, endColor: next.endColor }); };
+
+  const startEdit = (s: any) => {
+    setEditingId(s.id);
+    setEditDraft({ ts: toLocalDatetime(s.ts), task: s.task, expected: s.expected, actual: s.actual });
+  };
+  const cancelEdit = () => { setEditingId(null); setEditDraft(null); };
+  const saveEdit = () => {
+    if (!editDraft) return;
+    const trimmedTask = (editDraft.task || "").trim();
+    const next = sessions.map((s) => {
+      if (s.id !== editingId) return s;
+      const tsIso = editDraft.ts ? new Date(editDraft.ts).toISOString() : s.ts;
+      return { ...s, ts: tsIso, task: trimmedTask || s.task, expected: editDraft.expected, actual: editDraft.actual };
+    });
+    persist(next);
+    cancelEdit();
+  };
+  const deleteSession = (s: any) => {
+    if (typeof window !== "undefined" && !window.confirm(`Delete this session?\n${s.task}`)) return;
+    persist(sessions.filter((x) => x.id !== s.id));
+    if (editingId === s.id) cancelEdit();
+  };
 
   const doSync = async () => {
     setSync("loading");
@@ -375,42 +440,27 @@ export default function FocusLogApp({ api }: any) {
   const openLog = (leafTask: string) => { setPreset(leafTask); setView("log"); };
 
   const tab = (t: string): any => ({ padding: "7px 16px", borderRadius: 999, border: `1.5px solid ${view === t ? C.ink : C.faint}`, background: view === t ? C.ink : "transparent", color: view === t ? "#fff" : C.muted, fontSize: 13, cursor: "pointer", textTransform: "capitalize" });
-  const numInput: any = { width: 56, padding: "4px 6px", border: `1px solid ${C.faint}`, borderRadius: 6 };
 
   return (
     <div style={{ background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)" }}>
-      <style>{`:root{ --fl-display:Georgia,'Iowan Old Style',serif; --fl-mono:ui-monospace,'SF Mono',Menlo,monospace; }`}</style>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&display=swap');
+        :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:ui-monospace,'SF Mono',Menlo,monospace; }
+      `}</style>
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" }}>
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 4 }}>
-          <h1 style={{ fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: 0 }}>Focus Log</h1>
-          <button onClick={() => setShowSettings((v) => !v)} style={btn(C.muted, true)}>settings</button>
+        <h1 style={{ fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" }}>Focus Log</h1>
+        <div style={{ color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" }}>
+          <span>Square colour = ExecutionPower:</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P }} />Must Today</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y }} />Aim Today (default)</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G }} />Bonus If Done</span>
+          <span>{"\u{1F451}"} = King {"·"} day starts at {settings.dayStart}:00</span>
         </div>
-        <p style={{ color: C.muted, fontSize: 13, marginBottom: 14 }}>Pomodoros against today's Notion tasks. Each log writes <span style={{ color: C.ink }}>Act +1</span>. The gap between <span style={{ color: settings.beginColor }}>expected</span> and <span style={{ color: settings.endColor }}>actual</span> enjoyment is the trend you watch. Day starts at {settings.dayStart}:00.</p>
 
         {flash && (
           <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 }}>
             {flash}
             {pending.length > 0 && <button onClick={retryPending} style={{ ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" }}>retry {pending.length}</button>}
-          </div>
-        )}
-
-        {showSettings && (
-          <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
-            <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Day & time bands</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center", marginBottom: 16 }}>
-              <label style={{ fontSize: 12, color: C.muted }}>today begins at <input type="number" min={0} max={11} value={settings.dayStart} onChange={(e) => saveSettings({ ...settings, dayStart: Number(e.target.value) })} style={numInput} /></label>
-              <label style={{ fontSize: 12, color: C.muted }}>morning ends at <input type="number" value={settings.morningEnd} onChange={(e) => saveSettings({ ...settings, morningEnd: Number(e.target.value) })} style={numInput} /></label>
-              <label style={{ fontSize: 12, color: C.muted }}>afternoon ends at <input type="number" value={settings.afternoonEnd} onChange={(e) => saveSettings({ ...settings, afternoonEnd: Number(e.target.value) })} style={numInput} /></label>
-            </div>
-            <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Rating colors (chart dots only, not the heatmap)</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
-              <label style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 6 }}>before / expected <input type="color" value={settings.beginColor} onChange={(e) => saveSettings({ ...settings, beginColor: e.target.value })} /></label>
-              <label style={{ fontSize: 12, color: C.muted, display: "flex", alignItems: "center", gap: 6 }}>after / actual <input type="color" value={settings.endColor} onChange={(e) => saveSettings({ ...settings, endColor: e.target.value })} /></label>
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button onClick={() => persist(seedSessions())} style={btn(C.muted, true)}>load sample</button>
-              <button onClick={() => persist([])} style={btn(C.worse, true)}>clear log</button>
-            </div>
           </div>
         )}
 
@@ -435,9 +485,9 @@ export default function FocusLogApp({ api }: any) {
                 const hier = hierarchyText(t);
                 return (
                   <div key={key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${C.line}` }}>
-                    <span style={{ width: 14, height: 14, borderRadius: 4, background: LOAD_COLOR[t.load] || C.neutral, flexShrink: 0 }} title={LOAD_LABEL[t.load]} />
+                    <span style={{ width: 14, height: 14, borderRadius: 4, background: POWER_COLOR[t.power] || POWER_COLOR.Y, flexShrink: 0 }} title={POWER_LABEL[t.power] || POWER_LABEL.Y} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}>{t.task}</div>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}>{t.task}{t.king ? " \u{1F451}" : ""}</div>
                       {hier && <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hier}</div>}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
@@ -482,22 +532,47 @@ export default function FocusLogApp({ api }: any) {
         )}
 
         {view === "totals" && (
-          <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
-            <p style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>All pomodoros, every project combined.</p>
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around" }}>
-              <Stat label="this week" value={countWeek} big />
-              <Stat label="this month" value={countMonth} big />
-              <Stat label="this year" value={countYear} big />
+          <div>
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+              <p style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>All pomodoros, every project combined.</p>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around" }}>
+                <Stat label="this week" value={countWeek} big />
+                <Stat label="this month" value={countMonth} big />
+                <Stat label="this year" value={countYear} big />
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 }}>
+                <Stat label="hours, week" value={hrs(countWeek)} color={C.muted} />
+                <Stat label="hours, month" value={hrs(countMonth)} color={C.muted} />
+                <Stat label="hours, year" value={hrs(countYear)} color={C.muted} />
+              </div>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 }}>
-              <Stat label="hours, week" value={hrs(countWeek)} color={C.muted} />
-              <Stat label="hours, month" value={hrs(countMonth)} color={C.muted} />
-              <Stat label="hours, year" value={hrs(countYear)} color={C.muted} />
+
+            <div style={{ marginTop: 20 }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>All sessions</h3>
+                <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{sessions.length} logged</span>
+              </div>
+              {sessions.length === 0 ? (
+                <p style={{ color: C.muted, fontSize: 13 }}>No sessions yet. Log a pomodoro to see it here.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {[...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => (
+                    editingId === s.id ? (
+                      <SessionEditRow key={s.id} draft={editDraft} setDraft={setEditDraft} settings={settings} onSave={saveEdit} onCancel={cancelEdit} />
+                    ) : (
+                      <SessionRow key={s.id} s={s} settings={settings} onEdit={startEdit} onDelete={deleteSession} />
+                    )
+                  ))}
+                </div>
+              )}
+              <p style={{ color: C.muted, fontSize: 11, marginTop: 10 }}>
+                Edits and deletes only change the local log; they do not undo the Act write-back on Notion.
+              </p>
             </div>
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} api={api} />}
+        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} setRunning={setRunning} resetTimer={resetTimer} />}
       </div>
     </div>
   );

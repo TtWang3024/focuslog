@@ -48,7 +48,8 @@ function plainTitle(page: any): string {
   return t.map((x: any) => x.plain_text).join("").trim();
 }
 function selectName(page: any, name: string): string | null {
-  return page?.properties?.[name]?.select?.name || null;
+  const prop = page?.properties?.[name];
+  return prop?.select?.name || prop?.status?.name || null;
 }
 function numberProp(page: any, name: string): number {
   const n = page?.properties?.[name]?.number;
@@ -74,6 +75,20 @@ function mapLoad(name: string | null): string {
   if (!name) return "B";
   const c = name[0];
   return c === "A" || c === "B" || c === "C" ? c : "B";
+}
+// ExecutionPower select -> colour code. Default to Aim Today (yellow) when unset.
+function mapPower(name: string | null): string {
+  if (!name) return "Y";
+  if (name.includes("Must")) return "P";
+  if (name.includes("Bonus")) return "G";
+  return "Y";
+}
+// Hours to shift a timestamp before taking its calendar date. A morning start (0–12)
+// keeps late-night work on the previous day; an evening start (13–23) rolls the day over
+// that night, so work after that hour counts toward the next date. Mirrors dayShift in the UI.
+function dayShiftHours(dayStart: number): number {
+  const h = dayStart || 0;
+  return h <= 12 ? h : h - 24;
 }
 
 function escapeRe(s: string): string {
@@ -154,7 +169,7 @@ export default class FocusLogPlugin extends Plugin {
   }
 
   private logicalTodayISO(): string {
-    const d = new Date(Date.now() - (this.data.settings.dayStart || 0) * 3600000);
+    const d = new Date(Date.now() - dayShiftHours(this.data.settings.dayStart) * 3600000);
     const p = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
@@ -188,6 +203,8 @@ export default class FocusLogPlugin extends Plugin {
       tasks.push({
         task,
         load: mapLoad(selectName(p, "CognitiveLoad")),
+        power: mapPower(selectName(p, "ExecutionPower")),
+        king: (selectName(p, "Status") || "").includes("King"),
         pomodoros: estTotalOf(p),
         act: numberProp(p, "Act"),
         url: p.url,
@@ -242,7 +259,7 @@ export default class FocusLogPlugin extends Plugin {
     if (!s.dailyNoteWrite) return;
     const moment = (window as any).moment;
     if (!moment) throw new Error("moment unavailable");
-    const ld = new Date(p.ts - (s.dayStart || 0) * 3600000); // logical day
+    const ld = new Date(p.ts - dayShiftHours(s.dayStart) * 3600000); // logical day
     const m = moment(new Date(ld.getFullYear(), ld.getMonth(), ld.getDate()));
 
     const dn: any = (this.app as any).internalPlugins?.getPluginById?.("daily-notes");
@@ -287,7 +304,6 @@ export default class FocusLogPlugin extends Plugin {
       saveSessions: async (arr: any[]) => { self.data.sessions = arr; await self.persist(); },
       savePending: async (arr: any[]) => { self.data.pending = arr; await self.persist(); },
       saveTasks: async (arr: any[]) => { self.data.tasks = arr; await self.persist(); },
-      saveSettings: async (s: FocusLogSettings) => { self.data.settings = Object.assign({}, self.data.settings, s); await self.persist(); },
       sync: () => self.queryToday(),
       writeAct: (pageId: string) => self.incrementAct(pageId),
       appendDaily: (p: any) => self.appendToDailyNote(p),
@@ -371,6 +387,65 @@ class FocusLogSettingTab extends PluginSettingTab {
         })
       );
 
+    containerEl.createEl("h3", { text: "Day and time bands" });
+
+    new Setting(containerEl)
+      .setName("Day starts at (hour, 0–23)")
+      .setDesc("The clock hour your logical day rolls over. A morning value like 4 keeps late-night work on the previous day (anything up to 03:59 counts as yesterday). An evening value like 22 starts a fresh day that night, so a pomodoro after 22:00 counts toward the next date.")
+      .addText((t) =>
+        t.setValue(String(this.plugin.data.settings.dayStart)).onChange(async (v) => {
+          const n = Math.max(0, Math.min(23, parseInt(v, 10) || 0));
+          this.plugin.data.settings.dayStart = n;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Morning ends at (hour)")
+      .setDesc("Pomodoros logged before this hour are coloured as morning on the heatmap.")
+      .addText((t) =>
+        t.setValue(String(this.plugin.data.settings.morningEnd)).onChange(async (v) => {
+          const n = Math.max(0, Math.min(24, parseInt(v, 10) || 0));
+          this.plugin.data.settings.morningEnd = n;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Afternoon ends at (hour)")
+      .setDesc("Anything after this hour is coloured as evening.")
+      .addText((t) =>
+        t.setValue(String(this.plugin.data.settings.afternoonEnd)).onChange(async (v) => {
+          const n = Math.max(0, Math.min(24, parseInt(v, 10) || 0));
+          this.plugin.data.settings.afternoonEnd = n;
+          await this.plugin.persist();
+        })
+      );
+
+    containerEl.createEl("h3", { text: "Rating colours" });
+    containerEl.createEl("p", {
+      text: "These colours show on the weekly chart dots: expected before, actual after.",
+      cls: "setting-item-description",
+    });
+
+    new Setting(containerEl)
+      .setName("Expected (before)")
+      .addColorPicker((c) =>
+        c.setValue(this.plugin.data.settings.beginColor).onChange(async (v) => {
+          this.plugin.data.settings.beginColor = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Actual (after)")
+      .addColorPicker((c) =>
+        c.setValue(this.plugin.data.settings.endColor).onChange(async (v) => {
+          this.plugin.data.settings.endColor = v;
+          await this.plugin.persist();
+        })
+      );
+
     containerEl.createEl("h3", { text: "Daily note" });
 
     new Setting(containerEl)
@@ -416,7 +491,7 @@ class FocusLogSettingTab extends PluginSettingTab {
       });
 
     containerEl.createEl("p", {
-      text: "Day start, time bands, and rating colors are edited inside the Focus Log panel. Reopen the panel after changing settings here.",
+      text: "Reopen the Focus Log panel after changing settings here so the panel picks up the new values.",
       cls: "setting-item-description",
     });
   }
