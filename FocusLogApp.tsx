@@ -6,8 +6,9 @@ const { useState, useEffect, useRef, useCallback } = React;
 // Scoring is enjoyment-based: expected enjoyment BEFORE, actual enjoyment AFTER.
 // A higher actual is the good outcome (green); a lower actual is worse (red).
 
-const LOAD_COLOR: any = { A: "#c0772e", B: "#4e7d9c", C: "#6f9461" };
-const LOAD_LABEL: any = { A: "A high", B: "B medium", C: "C low" };
+// CognitiveLoad letter shown before the task name: A red (high), B yellow (medium), C green (low).
+const LOAD_COLOR: any = { A: "#b4533a", B: "#c79a2e", C: "#5b8c5a" };
+const LOAD_LABEL: any = { A: "A — high load", B: "B — medium load", C: "C — low load" };
 // ExecutionPower colour code: pink = Must Today, yellow = Aim Today (default), green = Bonus If Done.
 const POWER_COLOR: any = { P: "#c96f86", Y: "#cda32f", G: "#6f9461" };
 const POWER_LABEL: any = { P: "Must Today", Y: "Aim Today", G: "Bonus If Done" };
@@ -76,6 +77,12 @@ function toLocalDatetime(iso: string): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+// Drop a single leading [tag] or #tag token (used when a category chip already shows the area).
+function stripLeadingTag(title: string): string {
+  const s = (title || "").trim();
+  const m = s.match(/^(\[[^\]]*\]|#\S+)\s+/);
+  return m ? s.slice(m[0].length) : s;
 }
 
 function Stat({ label, value, color, big }: any) {
@@ -261,7 +268,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, re
   const meta: any = tasks.find((t: any) => t.task === task) || {};
   const submit = () => {
     if (!task.trim()) return;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 }, markDone);
+    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 }, markDone);
     setNote("");
     setMarkDone(false);
   };
@@ -436,7 +443,7 @@ export default function FocusLogApp({ api }: any) {
       } catch (e: any) { msg += " Mark-done failed: " + (e?.message || e); }
     }
     if (api.appendDaily) {
-      try { await api.appendDaily({ ts: +new Date(s.ts), minutes: s.minutes, task: s.task, hierarchy: s.hierarchy || "", note: s.note || "" }); msg += " Added to daily note."; }
+      try { await api.appendDaily({ ts: +new Date(s.ts), minutes: s.minutes, task: s.task, hierarchy: s.hierarchy || "", note: s.note || "", category: s.category || null }); msg += " Added to daily note."; }
       catch (e: any) { msg += " Daily note skipped: " + (e?.message || e); }
     }
     setFlash(msg);
@@ -476,12 +483,20 @@ export default function FocusLogApp({ api }: any) {
       `}</style>
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" }}>
         <h1 style={{ fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" }}>Focus Log</h1>
-        <div style={{ color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" }}>
-          <span>Square colour = ExecutionPower:</span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P }} />Must Today</span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y }} />Aim Today (default)</span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G }} />Bonus If Done</span>
-          <span>{"\u{1F451}"} = King {"·"} day starts at {settings.dayStart}:00</span>
+        <div style={{ color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" }}>
+            <span>Square = ExecutionPower:</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P }} />Must Today</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y }} />Aim Today (default)</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G }} />Bonus If Done</span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" }}>
+            <span>Letter = CognitiveLoad:</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><b style={{ color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" }}>A</b> high</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><b style={{ color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" }}>B</b> medium</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><b style={{ color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" }}>C</b> low</span>
+            <span style={{ marginLeft: 4 }}>{"\u{1F451}"} = King {"·"} day starts at {settings.dayStart}:00</span>
+          </div>
         </div>
 
         {flash && (
@@ -511,6 +526,8 @@ export default function FocusLogApp({ api }: any) {
                 const completed = (t.act || 0) + done;
                 const remaining = Math.max(0, est - completed);
                 const hier = hierarchyText(t);
+                const cat = t.category || null;
+                const titleText = cat ? stripLeadingTag(t.task) : t.task;
                 const isDragging = dragIndex === i;
                 const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
                 return (
@@ -531,7 +548,7 @@ export default function FocusLogApp({ api }: any) {
                     </span>
                     <span style={{ width: 14, height: 14, borderRadius: 4, background: POWER_COLOR[t.power] || POWER_COLOR.Y, flexShrink: 0 }} title={POWER_LABEL[t.power] || POWER_LABEL.Y} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}>{t.task}{t.king ? " \u{1F451}" : ""}</div>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}><span style={{ color: LOAD_COLOR[t.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, marginRight: 6 }} title={LOAD_LABEL[t.load] || LOAD_LABEL.B}>{t.load || "B"}</span>{cat && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "1px 5px", marginRight: 6, whiteSpace: "nowrap" }}>{cat}</span>}{titleText}{t.king ? " \u{1F451}" : ""}</div>
                       {hier && <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hier}</div>}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>

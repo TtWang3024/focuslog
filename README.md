@@ -25,6 +25,9 @@ The timer in the **log** tab keeps running when you switch tabs, so checking the
 ## Ordering and finishing tasks
 Drag the grip handle on the left of any task in the **today** list to reorder it. The order is saved and carried into the next day: after a sync, tasks you have already ranked keep their position (even if you edited them in Notion), while brand-new tasks appear on top. The **log** form has an optional "set this task's status to Done" checkbox; ticking it sets the page's Status to your Done value when you log. The Done value is auto-detected from the database (the first Status option whose name contains "Done"), or set it explicitly in settings.
 
+## Categories and Obsidian tags
+Each task can carry a category (Me / En / Pro / G …) read from a Notion **select** property — name it in settings under *Category property* (default `Area`). The category shows as a chip in the today list, and when a matching `[X]` prefix is present in the title it is hidden to avoid duplication. Put the `{tag}` placeholder in your daily-note template and each logged block gets a real Obsidian tag built from the category: with *Tag namespace* `Notion`, an Area of `En` writes `#Notion/En`, so all of them nest under one parent in the tag pane. Leave the namespace blank for a flat `#En`, or the category property blank to switch the feature off.
+
 ## Caveats
 - The Notion API has no atomic increment, so Act write-back reads the current value then writes value + 1. With a single user this is safe; avoid editing the same page in two places at the exact same moment.
 - The "Today Tasks" filter here is an approximation (Today / King / This week, plus Daily dated today). It does not yet exclude the `🏔️` estimate. Adjust in `queryToday()` if you want an exact match.

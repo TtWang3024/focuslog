@@ -23571,6 +23571,8 @@ var import_client = __toESM(require_client());
 // FocusLogApp.tsx
 var React = __toESM(require_react());
 var { useState, useEffect, useRef, useCallback } = React;
+var LOAD_COLOR = { A: "#b4533a", B: "#c79a2e", C: "#5b8c5a" };
+var LOAD_LABEL = { A: "A \u2014 high load", B: "B \u2014 medium load", C: "C \u2014 low load" };
 var POWER_COLOR = { P: "#c96f86", Y: "#cda32f", G: "#6f9461" };
 var POWER_LABEL = { P: "Must Today", Y: "Aim Today", G: "Bonus If Done" };
 var WEEKDAY = {
@@ -23660,6 +23662,11 @@ function toLocalDatetime(iso) {
   const d = new Date(iso);
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function stripLeadingTag(title) {
+  const s = (title || "").trim();
+  const m = s.match(/^(\[[^\]]*\]|#\S+)\s+/);
+  return m ? s.slice(m[0].length) : s;
 }
 function Stat({ label, value, color, big }) {
   return /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 12px", display: "flex", flexDirection: "column", alignItems: "center" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: big ? 34 : 20, color: color || C.ink } }, value), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 11, letterSpacing: 0.4 } }, label));
@@ -23766,7 +23773,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, re
   const submit = () => {
     if (!task.trim())
       return;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, url: meta.url || null, pageId: meta.id || null, ts: (/* @__PURE__ */ new Date()).toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 }, markDone);
+    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: (/* @__PURE__ */ new Date()).toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 }, markDone);
     setNote("");
     setMarkDone(false);
   };
@@ -23923,7 +23930,7 @@ ${s.task}`))
     }
     if (api.appendDaily) {
       try {
-        await api.appendDaily({ ts: +new Date(s.ts), minutes: s.minutes, task: s.task, hierarchy: s.hierarchy || "", note: s.note || "" });
+        await api.appendDaily({ ts: +new Date(s.ts), minutes: s.minutes, task: s.task, hierarchy: s.hierarchy || "", note: s.note || "", category: s.category || null });
         msg += " Added to daily note.";
       } catch (e) {
         msg += " Daily note skipped: " + ((e == null ? void 0 : e.message) || e);
@@ -23975,13 +23982,15 @@ ${s.task}`))
   return /* @__PURE__ */ React.createElement("div", { style: { background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)" } }, /* @__PURE__ */ React.createElement("style", null, `
         @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&display=swap');
         :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:ui-monospace,'SF Mono',Menlo,monospace; }
-      `), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Square colour = ExecutionPower:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done"), /* @__PURE__ */ React.createElement("span", null, "\u{1F451}", " = King ", "\xB7", " day starts at ", settings.dayStart, ":00")), flash && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" } }, ["today", "week", "month", "totals", "log"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, onClick: () => setView(t), style: tab(t) }, t))), view === "today" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12 } }, tasks.length, " tasks ", "\xB7", " ", countToday, " ", "\u{1F345}", " today"), /* @__PURE__ */ React.createElement("button", { onClick: doSync, style: btn(C.ink, true), disabled: sync === "loading" }, sync === "loading" ? "syncing\u2026" : "sync from Notion")), tasks.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), tasks.length > 1 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, margin: "0 0 8px" } }, "Drag the grip to reorder. The order is kept for tomorrow; new tasks from Notion appear on top."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, tasks.map((t, i) => {
+      `), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Square = ExecutionPower:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Letter = CognitiveLoad:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" } }, "A"), " high"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" } }, "B"), " medium"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" } }, "C"), " low"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 4 } }, "\u{1F451}", " = King ", "\xB7", " day starts at ", settings.dayStart, ":00"))), flash && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" } }, ["today", "week", "month", "totals", "log"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, onClick: () => setView(t), style: tab(t) }, t))), view === "today" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12 } }, tasks.length, " tasks ", "\xB7", " ", countToday, " ", "\u{1F345}", " today"), /* @__PURE__ */ React.createElement("button", { onClick: doSync, style: btn(C.ink, true), disabled: sync === "loading" }, sync === "loading" ? "syncing\u2026" : "sync from Notion")), tasks.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), tasks.length > 1 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, margin: "0 0 8px" } }, "Drag the grip to reorder. The order is kept for tomorrow; new tasks from Notion appear on top."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, tasks.map((t, i) => {
     const key = t.id || t.task;
     const done = doneSess[key] || 0;
     const est = t.pomodoros || 0;
     const completed = (t.act || 0) + done;
     const remaining = Math.max(0, est - completed);
     const hier = hierarchyText(t);
+    const cat = t.category || null;
+    const titleText = cat ? stripLeadingTag(t.task) : t.task;
     const isDragging = dragIndex === i;
     const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
     return /* @__PURE__ */ React.createElement(
@@ -24020,7 +24029,7 @@ ${s.task}`))
         Array.from({ length: 6 }).map((_, k) => /* @__PURE__ */ React.createElement("span", { key: k, style: { width: 3, height: 3, borderRadius: "50%", background: C.faint } }))
       ),
       /* @__PURE__ */ React.createElement("span", { style: { width: 14, height: 14, borderRadius: 4, background: POWER_COLOR[t.power] || POWER_COLOR.Y, flexShrink: 0 }, title: POWER_LABEL[t.power] || POWER_LABEL.Y }),
-      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" } }, t.task, t.king ? " \u{1F451}" : ""), hier && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hier)),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" } }, /* @__PURE__ */ React.createElement("span", { style: { color: LOAD_COLOR[t.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, marginRight: 6 }, title: LOAD_LABEL[t.load] || LOAD_LABEL.B }, t.load || "B"), cat && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "1px 5px", marginRight: 6, whiteSpace: "nowrap" } }, cat), titleText, t.king ? " \u{1F451}" : ""), hier && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hier)),
       /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(TomatoPips, { vivid: done, grey: remaining }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10.5, color: C.muted, fontFamily: "var(--fl-mono)" } }, completed, " done")),
       /* @__PURE__ */ React.createElement("button", { onClick: () => openLog(t.task), style: btn(C.muted, true) }, "log")
     );
@@ -24035,6 +24044,8 @@ var DEFAULT_SETTINGS = {
   databaseId: "24f3423255b680ce9dd5eb8eeece3ca0",
   // Pressure to Progress
   doneStatus: "",
+  categoryProperty: "Area",
+  tagNamespace: "Notion",
   dayStart: 4,
   morningEnd: 12,
   afternoonEnd: 18,
@@ -24043,7 +24054,7 @@ var DEFAULT_SETTINGS = {
   dailyNoteWrite: true,
   dailyHeading: "\u{1F33B} Today",
   dailyCreateHeading: true,
-  dailyTemplate: '- [ ] <mark class="hltr-yellow">{date}</mark> {start} - {end} \u{1F345}\n    - {task}{hierarchy}\n    - {note}'
+  dailyTemplate: '- [ ] <mark class="hltr-yellow">{date}</mark> {start} - {end} \u{1F345} {tag}\n    - {task}{hierarchy}\n    - {note}'
 };
 function plainTitle(page) {
   var _a, _b;
@@ -24090,6 +24101,9 @@ function mapPower(name) {
   if (name.includes("Bonus"))
     return "G";
   return "Y";
+}
+function tagSlug(value) {
+  return (value || "").trim().replace(/\s+/g, "-").replace(/[^\p{L}\p{N}_-]+/gu, "").replace(/^-+|-+$/g, "");
 }
 function dayShiftHours(dayStart) {
   const h = dayStart || 0;
@@ -24210,6 +24224,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         load: mapLoad(selectName(p, "CognitiveLoad")),
         power: mapPower(selectName(p, "ExecutionPower")),
         king: (selectName(p, "Status") || "").includes("King"),
+        category: selectName(p, this.data.settings.categoryProperty) || null,
         pomodoros: estTotalOf(p),
         act: numberProp(p, "Act"),
         url: p.url,
@@ -24320,7 +24335,10 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     const startT = new Date(p.ts - (p.minutes || 25) * 6e4);
     const endT = new Date(p.ts);
     const hier = p.hierarchy ? " (" + p.hierarchy + ")" : "";
-    const block = (s.dailyTemplate || "").replace(/\{date\}/g, m.format("YYYY-MM-DD")).replace(/\{start\}/g, pad(startT.getHours()) + ":" + pad(startT.getMinutes())).replace(/\{end\}/g, pad(endT.getHours()) + ":" + pad(endT.getMinutes())).replace(/\{task\}/g, p.task || "").replace(/\{hierarchy\}/g, hier).replace(/\{note\}/g, p.note || "");
+    const slug = p.category ? tagSlug(p.category) : "";
+    const ns = (s.tagNamespace || "").trim();
+    const tag = slug ? "#" + (ns ? ns + "/" : "") + slug : "";
+    const block = (s.dailyTemplate || "").replace(/\{date\}/g, m.format("YYYY-MM-DD")).replace(/\{start\}/g, pad(startT.getHours()) + ":" + pad(startT.getMinutes())).replace(/\{end\}/g, pad(endT.getHours()) + ":" + pad(endT.getMinutes())).replace(/\{task\}/g, p.task || "").replace(/\{hierarchy\}/g, hier).replace(/\{tag\}/g, tag).replace(/\{note\}/g, p.note || "");
     await this.app.vault.process(file, (data) => insertUnderHeading(data, s.dailyHeading, block, s.dailyCreateHeading));
   }
   // ---------- bridge handed to the React app ----------
@@ -24425,6 +24443,18 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
     new import_obsidian.Setting(containerEl).setName("Done status value").setDesc("Optional. The exact Status option to set when you tick \u201Cmark done\u201D while logging. Leave blank to auto-detect an option whose name contains \u201CDone\u201D.").addText(
       (t) => t.setPlaceholder("auto-detect").setValue(this.plugin.data.settings.doneStatus).onChange(async (v) => {
         this.plugin.data.settings.doneStatus = v.trim();
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Category property").setDesc("Name of the Notion select that holds each task's area (e.g. Area, with options like Me / En / Pro). Shown as a chip in the panel and written to the daily note as a tag. Leave blank to disable.").addText(
+      (t) => t.setPlaceholder("Area").setValue(this.plugin.data.settings.categoryProperty).onChange(async (v) => {
+        this.plugin.data.settings.categoryProperty = v.trim();
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Tag namespace").setDesc("Parent segment for the daily-note tag, via the {tag} placeholder. With \u201CNotion\u201D, an Area of En writes \u201C#Notion/En\u201D. Leave blank for a flat tag like \u201C#En\u201D.").addText(
+      (t) => t.setPlaceholder("Notion").setValue(this.plugin.data.settings.tagNamespace).onChange(async (v) => {
+        this.plugin.data.settings.tagNamespace = v.trim();
         await this.plugin.persist();
       })
     );

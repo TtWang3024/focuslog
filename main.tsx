@@ -10,6 +10,8 @@ export interface FocusLogSettings {
   notionToken: string;
   databaseId: string;
   doneStatus: string;
+  categoryProperty: string;
+  tagNamespace: string;
   dayStart: number;
   morningEnd: number;
   afternoonEnd: number;
@@ -25,6 +27,8 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   notionToken: "",
   databaseId: "24f3423255b680ce9dd5eb8eeece3ca0", // Pressure to Progress
   doneStatus: "",
+  categoryProperty: "Area",
+  tagNamespace: "Notion",
   dayStart: 4,
   morningEnd: 12,
   afternoonEnd: 18,
@@ -34,7 +38,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   dailyHeading: "\u{1F33B} Today",
   dailyCreateHeading: true,
   dailyTemplate:
-    "- [ ] <mark class=\"hltr-yellow\">{date}</mark> {start} - {end} \u{1F345}\n    - {task}{hierarchy}\n    - {note}",
+    "- [ ] <mark class=\"hltr-yellow\">{date}</mark> {start} - {end} \u{1F345} {tag}\n    - {task}{hierarchy}\n    - {note}",
 };
 
 interface PluginData {
@@ -84,6 +88,15 @@ function mapPower(name: string | null): string {
   if (name.includes("Must")) return "P";
   if (name.includes("Bonus")) return "G";
   return "Y";
+}
+// Turn a category value into an Obsidian-tag-safe slug: drop emoji/punctuation, spaces -> "-".
+// Keeps Unicode letters/digits (incl. CJK) plus underscore and hyphen.
+function tagSlug(value: string): string {
+  return (value || "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^\p{L}\p{N}_-]+/gu, "")
+    .replace(/^-+|-+$/g, "");
 }
 // Hours to shift a timestamp before taking its calendar date. A morning start (0–12)
 // keeps late-night work on the previous day; an evening start (13–23) rolls the day over
@@ -208,6 +221,7 @@ export default class FocusLogPlugin extends Plugin {
         load: mapLoad(selectName(p, "CognitiveLoad")),
         power: mapPower(selectName(p, "ExecutionPower")),
         king: (selectName(p, "Status") || "").includes("King"),
+        category: selectName(p, this.data.settings.categoryProperty) || null,
         pomodoros: estTotalOf(p),
         act: numberProp(p, "Act"),
         url: p.url,
@@ -288,7 +302,7 @@ export default class FocusLogPlugin extends Plugin {
   }
 
   // Append a formatted block under the configured heading in the (logical) day's daily note.
-  async appendToDailyNote(p: { ts: number; minutes: number; task: string; hierarchy: string; note: string }) {
+  async appendToDailyNote(p: { ts: number; minutes: number; task: string; hierarchy: string; note: string; category?: string | null }) {
     const s = this.data.settings;
     if (!s.dailyNoteWrite) return;
     const moment = (window as any).moment;
@@ -314,12 +328,16 @@ export default class FocusLogPlugin extends Plugin {
     const startT = new Date(p.ts - (p.minutes || 25) * 60000);
     const endT = new Date(p.ts);
     const hier = p.hierarchy ? " (" + p.hierarchy + ")" : "";
+    const slug = p.category ? tagSlug(p.category) : "";
+    const ns = (s.tagNamespace || "").trim();
+    const tag = slug ? "#" + (ns ? ns + "/" : "") + slug : "";
     const block = (s.dailyTemplate || "")
       .replace(/\{date\}/g, m.format("YYYY-MM-DD"))
       .replace(/\{start\}/g, pad(startT.getHours()) + ":" + pad(startT.getMinutes()))
       .replace(/\{end\}/g, pad(endT.getHours()) + ":" + pad(endT.getMinutes()))
       .replace(/\{task\}/g, p.task || "")
       .replace(/\{hierarchy\}/g, hier)
+      .replace(/\{tag\}/g, tag)
       .replace(/\{note\}/g, p.note || "");
 
     await this.app.vault.process(file, (data: string) => insertUnderHeading(data, s.dailyHeading, block, s.dailyCreateHeading));
@@ -428,6 +446,26 @@ class FocusLogSettingTab extends PluginSettingTab {
       .addText((t) =>
         t.setPlaceholder("auto-detect").setValue(this.plugin.data.settings.doneStatus).onChange(async (v) => {
           this.plugin.data.settings.doneStatus = v.trim();
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Category property")
+      .setDesc("Name of the Notion select that holds each task's area (e.g. Area, with options like Me / En / Pro). Shown as a chip in the panel and written to the daily note as a tag. Leave blank to disable.")
+      .addText((t) =>
+        t.setPlaceholder("Area").setValue(this.plugin.data.settings.categoryProperty).onChange(async (v) => {
+          this.plugin.data.settings.categoryProperty = v.trim();
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Tag namespace")
+      .setDesc("Parent segment for the daily-note tag, via the {tag} placeholder. With “Notion”, an Area of En writes “#Notion/En”. Leave blank for a flat tag like “#En”.")
+      .addText((t) =>
+        t.setPlaceholder("Notion").setValue(this.plugin.data.settings.tagNamespace).onChange(async (v) => {
+          this.plugin.data.settings.tagNamespace = v.trim();
           await this.plugin.persist();
         })
       );
