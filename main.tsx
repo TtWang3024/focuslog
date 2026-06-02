@@ -9,6 +9,7 @@ const NOTION_VERSION = "2022-06-28";
 export interface FocusLogSettings {
   notionToken: string;
   databaseId: string;
+  doneStatus: string;
   dayStart: number;
   morningEnd: number;
   afternoonEnd: number;
@@ -23,6 +24,7 @@ export interface FocusLogSettings {
 const DEFAULT_SETTINGS: FocusLogSettings = {
   notionToken: "",
   databaseId: "24f3423255b680ce9dd5eb8eeece3ca0", // Pressure to Progress
+  doneStatus: "",
   dayStart: 4,
   morningEnd: 12,
   afternoonEnd: 18,
@@ -118,6 +120,7 @@ function insertUnderHeading(data: string, heading: string, block: string, create
 
 export default class FocusLogPlugin extends Plugin {
   data: PluginData;
+  private doneStatusCache: string | null = null;
 
   async onload() {
     const loaded = (await this.loadData()) || {};
@@ -214,9 +217,18 @@ export default class FocusLogPlugin extends Plugin {
         group: h.ancestor || task,
       });
     }
-    this.data.tasks = tasks;
+    // Preserve the user's manual ranking across syncs: tasks whose id we have not seen
+    // go to the top (in Notion order); already-ranked ids keep their saved position.
+    const prevIndex: Record<string, number> = {};
+    (this.data.tasks || []).forEach((t: any, i: number) => { if (t && t.id != null) prevIndex[t.id] = i; });
+    const fresh = tasks.filter((t) => prevIndex[t.id] === undefined);
+    const known = tasks
+      .filter((t) => prevIndex[t.id] !== undefined)
+      .sort((a, b) => prevIndex[a.id] - prevIndex[b.id]);
+    const ordered = [...fresh, ...known];
+    this.data.tasks = ordered;
     await this.persist();
-    return tasks;
+    return ordered;
   }
 
   // Walk Parent item up: immediate parent title and top-level ancestor title (else null).
@@ -251,6 +263,28 @@ export default class FocusLogPlugin extends Plugin {
     const next = numberProp(page, "Act") + 1;
     await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Act: { number: next } } });
     return next;
+  }
+
+  // Resolve the Status option that means "done": an explicit setting wins, otherwise
+  // auto-detect from the database schema (first option whose name reads as done/complete).
+  private async resolveDoneStatus(): Promise<string> {
+    const override = (this.data.settings.doneStatus || "").trim();
+    if (override) return override;
+    if (this.doneStatusCache) return this.doneStatusCache;
+    const db = await this.notionFetch(`/databases/${this.data.settings.databaseId}`);
+    const status = db?.properties?.["Status"];
+    const opts = status?.select?.options || status?.status?.options || [];
+    const match = opts.find((o: any) => /done|complete|finish/i.test(o.name || ""));
+    if (!match) throw new Error("No 'Done' status option found. Set the Done status value in Focus Log settings.");
+    this.doneStatusCache = match.name;
+    return match.name;
+  }
+
+  // Set a task page's Status select to the resolved done value.
+  async setTaskDone(pageId: string): Promise<string> {
+    const name = await this.resolveDoneStatus();
+    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Status: { select: { name } } } });
+    return name;
   }
 
   // Append a formatted block under the configured heading in the (logical) day's daily note.
@@ -306,6 +340,7 @@ export default class FocusLogPlugin extends Plugin {
       saveTasks: async (arr: any[]) => { self.data.tasks = arr; await self.persist(); },
       sync: () => self.queryToday(),
       writeAct: (pageId: string) => self.incrementAct(pageId),
+      setDone: (pageId: string) => self.setTaskDone(pageId),
       appendDaily: (p: any) => self.appendToDailyNote(p),
       notify: (msg: string, duration?: number) => new Notice(msg, duration),
       celebrate: () => new CelebrateModal(self.app).open(),
@@ -383,6 +418,16 @@ class FocusLogSettingTab extends PluginSettingTab {
       .addText((t) =>
         t.setValue(this.plugin.data.settings.databaseId).onChange(async (v) => {
           this.plugin.data.settings.databaseId = v.trim();
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Done status value")
+      .setDesc("Optional. The exact Status option to set when you tick “mark done” while logging. Leave blank to auto-detect an option whose name contains “Done”.")
+      .addText((t) =>
+        t.setPlaceholder("auto-detect").setValue(this.plugin.data.settings.doneStatus).onChange(async (v) => {
+          this.plugin.data.settings.doneStatus = v.trim();
           await this.plugin.persist();
         })
       );

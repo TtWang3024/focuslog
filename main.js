@@ -23758,6 +23758,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, re
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
   const [note, setNote] = useState("");
+  const [markDone, setMarkDone] = useState(false);
   useEffect(() => setTask(preset || tasks[0] && tasks[0].task || ""), [preset, tasks]);
   const mm = String(Math.floor(secs / 60)).padStart(2, "0");
   const ss = String(secs % 60).padStart(2, "0");
@@ -23765,11 +23766,12 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, re
   const submit = () => {
     if (!task.trim())
       return;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, url: meta.url || null, pageId: meta.id || null, ts: (/* @__PURE__ */ new Date()).toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 });
+    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, url: meta.url || null, pageId: meta.id || null, ts: (/* @__PURE__ */ new Date()).toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 }, markDone);
     setNote("");
+    setMarkDone(false);
   };
   const inputStyle = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
-  return /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink } }, mm, ":", ss), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setRunning((r) => !r), style: btn(C.ink) }, running ? "pause" : "start 25m"), /* @__PURE__ */ React.createElement("button", { onClick: resetTimer, style: btn(C.muted, true) }, "reset"))), /* @__PURE__ */ React.createElement("label", { style: { color: C.muted, fontSize: 12 } }, "task (Act +1 writes to this page)"), /* @__PURE__ */ React.createElement("select", { value: task, onChange: (e) => setTask(e.target.value), style: { ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 } }, tasks.map((t) => /* @__PURE__ */ React.createElement("option", { key: t.task, value: t.task }, t.task, t.king ? " \u{1F451}" : ""))), /* @__PURE__ */ React.createElement(Scale, { label: "before: how enjoyable do I expect this to be? (1 dull ... 5 great)", value: exp, onChange: setExp, color: settings.beginColor }), /* @__PURE__ */ React.createElement(Scale, { label: "after: how enjoyable was it actually? (1 dull ... 5 great)", value: act, onChange: setAct, color: settings.endColor }), /* @__PURE__ */ React.createElement("input", { value: note, onChange: (e) => setNote(e.target.value), placeholder: "quick note (optional)", style: { ...inputStyle, marginBottom: 16, marginTop: 4 } }), /* @__PURE__ */ React.createElement("button", { onClick: submit, style: { ...btn(C.ink), width: "100%", padding: "10px" } }, "log pomodoro + write Act"));
+  return /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink } }, mm, ":", ss), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setRunning((r) => !r), style: btn(C.ink) }, running ? "pause" : "start 25m"), /* @__PURE__ */ React.createElement("button", { onClick: resetTimer, style: btn(C.muted, true) }, "reset"))), /* @__PURE__ */ React.createElement("label", { style: { color: C.muted, fontSize: 12 } }, "task (Act +1 writes to this page)"), /* @__PURE__ */ React.createElement("select", { value: task, onChange: (e) => setTask(e.target.value), style: { ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 } }, tasks.map((t) => /* @__PURE__ */ React.createElement("option", { key: t.task, value: t.task }, t.task, t.king ? " \u{1F451}" : ""))), /* @__PURE__ */ React.createElement(Scale, { label: "before: how enjoyable do I expect this to be? (1 dull ... 5 great)", value: exp, onChange: setExp, color: settings.beginColor }), /* @__PURE__ */ React.createElement(Scale, { label: "after: how enjoyable was it actually? (1 dull ... 5 great)", value: act, onChange: setAct, color: settings.endColor }), /* @__PURE__ */ React.createElement("input", { value: note, onChange: (e) => setNote(e.target.value), placeholder: "quick note (optional)", style: { ...inputStyle, marginBottom: 14, marginTop: 4 } }), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13, color: C.ink, cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: markDone, onChange: (e) => setMarkDone(e.target.checked), style: { width: 16, height: 16, accentColor: C.better, cursor: "pointer" } }), "also set this task's status to Done in Notion"), /* @__PURE__ */ React.createElement("button", { onClick: submit, style: { ...btn(C.ink), width: "100%", padding: "10px" } }, "log pomodoro + write Act"));
 }
 function SessionRow({ s, settings, onEdit, onDelete }) {
   const d = new Date(s.ts);
@@ -23830,6 +23832,17 @@ function FocusLogApp({ api }) {
   };
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState(null);
+  const [dragIndex, setDragIndex] = useState(null);
+  const [overIndex, setOverIndex] = useState(null);
+  const moveTask = (from, to) => {
+    if (from == null || from === to)
+      return;
+    const a = [...tasks];
+    const [m] = a.splice(from, 1);
+    a.splice(to, 0, m);
+    setTasks(a);
+    api.saveTasks(a);
+  };
   const persist = useCallback((next) => {
     setSessions(next);
     api.saveSessions(next);
@@ -23880,7 +23893,7 @@ ${s.task}`))
       setFlash("Sync failed: " + ((e == null ? void 0 : e.message) || e));
     }
   };
-  const logPomodoro = async (s) => {
+  const logPomodoro = async (s, markDone) => {
     persist([...sessions, s]);
     const key = s.pageId || s.task;
     setDoneSess((m) => ({ ...m, [key]: (m[key] || 0) + 1 }));
@@ -23896,6 +23909,17 @@ ${s.task}`))
       }
     } else {
       msg += " No Notion page linked.";
+    }
+    if (markDone && s.pageId && api.setDone) {
+      try {
+        const name = await api.setDone(s.pageId);
+        const nt = tasks.filter((t) => t.id !== s.pageId);
+        setTasks(nt);
+        api.saveTasks(nt);
+        msg += " Status set to " + name + ".";
+      } catch (e) {
+        msg += " Mark-done failed: " + ((e == null ? void 0 : e.message) || e);
+      }
     }
     if (api.appendDaily) {
       try {
@@ -23951,14 +23975,55 @@ ${s.task}`))
   return /* @__PURE__ */ React.createElement("div", { style: { background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)" } }, /* @__PURE__ */ React.createElement("style", null, `
         @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&display=swap');
         :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:ui-monospace,'SF Mono',Menlo,monospace; }
-      `), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Square colour = ExecutionPower:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done"), /* @__PURE__ */ React.createElement("span", null, "\u{1F451}", " = King ", "\xB7", " day starts at ", settings.dayStart, ":00")), flash && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" } }, ["today", "week", "month", "totals", "log"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, onClick: () => setView(t), style: tab(t) }, t))), view === "today" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12 } }, tasks.length, " tasks ", "\xB7", " ", countToday, " ", "\u{1F345}", " today"), /* @__PURE__ */ React.createElement("button", { onClick: doSync, style: btn(C.ink, true), disabled: sync === "loading" }, sync === "loading" ? "syncing\u2026" : "sync from Notion")), tasks.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, tasks.map((t) => {
+      `), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Square colour = ExecutionPower:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done"), /* @__PURE__ */ React.createElement("span", null, "\u{1F451}", " = King ", "\xB7", " day starts at ", settings.dayStart, ":00")), flash && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" } }, ["today", "week", "month", "totals", "log"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, onClick: () => setView(t), style: tab(t) }, t))), view === "today" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12 } }, tasks.length, " tasks ", "\xB7", " ", countToday, " ", "\u{1F345}", " today"), /* @__PURE__ */ React.createElement("button", { onClick: doSync, style: btn(C.ink, true), disabled: sync === "loading" }, sync === "loading" ? "syncing\u2026" : "sync from Notion")), tasks.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), tasks.length > 1 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, margin: "0 0 8px" } }, "Drag the grip to reorder. The order is kept for tomorrow; new tasks from Notion appear on top."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, tasks.map((t, i) => {
     const key = t.id || t.task;
     const done = doneSess[key] || 0;
     const est = t.pomodoros || 0;
     const completed = (t.act || 0) + done;
     const remaining = Math.max(0, est - completed);
     const hier = hierarchyText(t);
-    return /* @__PURE__ */ React.createElement("div", { key, style: { display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("span", { style: { width: 14, height: 14, borderRadius: 4, background: POWER_COLOR[t.power] || POWER_COLOR.Y, flexShrink: 0 }, title: POWER_LABEL[t.power] || POWER_LABEL.Y }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" } }, t.task, t.king ? " \u{1F451}" : ""), hier && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hier)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(TomatoPips, { vivid: done, grey: remaining }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10.5, color: C.muted, fontFamily: "var(--fl-mono)" } }, completed, " done")), /* @__PURE__ */ React.createElement("button", { onClick: () => openLog(t.task), style: btn(C.muted, true) }, "log"));
+    const isDragging = dragIndex === i;
+    const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key,
+        onDragOver: (e) => {
+          e.preventDefault();
+          if (overIndex !== i)
+            setOverIndex(i);
+        },
+        onDrop: (e) => {
+          e.preventDefault();
+          moveTask(dragIndex, i);
+          setDragIndex(null);
+          setOverIndex(null);
+        },
+        style: { display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${isOver ? C.ink : C.line}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }
+      },
+      /* @__PURE__ */ React.createElement(
+        "span",
+        {
+          draggable: true,
+          onDragStart: (e) => {
+            setDragIndex(i);
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", String(i));
+          },
+          onDragEnd: () => {
+            setDragIndex(null);
+            setOverIndex(null);
+          },
+          title: "drag to reorder",
+          style: { display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }
+        },
+        Array.from({ length: 6 }).map((_, k) => /* @__PURE__ */ React.createElement("span", { key: k, style: { width: 3, height: 3, borderRadius: "50%", background: C.faint } }))
+      ),
+      /* @__PURE__ */ React.createElement("span", { style: { width: 14, height: 14, borderRadius: 4, background: POWER_COLOR[t.power] || POWER_COLOR.Y, flexShrink: 0 }, title: POWER_LABEL[t.power] || POWER_LABEL.Y }),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" } }, t.task, t.king ? " \u{1F451}" : ""), hier && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hier)),
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(TomatoPips, { vivid: done, grey: remaining }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10.5, color: C.muted, fontFamily: "var(--fl-mono)" } }, completed, " done")),
+      /* @__PURE__ */ React.createElement("button", { onClick: () => openLog(t.task), style: btn(C.muted, true) }, "log")
+    );
   }))), view === "week" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOff((w) => w - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, fmtDate(weekStart), " ", "\u2013", " ", fmtDate(new Date(+weekEnd - DAY))), /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOff((w) => Math.min(0, w + 1)), style: btn(C.muted, true) }, "\u2192")), weekGroups.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, textAlign: "center", padding: "40px 0" } }, "No pomodoros this week.") : weekGroups.map((g) => /* @__PURE__ */ React.createElement(GroupChart, { key: g, group: g, sessions: weekSessions.filter((x) => (x.group || x.task) === g), settings })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted } }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: settings.beginColor } }, "\u25CF"), " expected"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: settings.endColor } }, "\u25CF"), " actual"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: C.better } }, "\u2014"), " better than expected"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: C.worse } }, "\u2014"), " worse than expected"))), view === "month" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setMonthOff((m) => m - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, monthRef.toLocaleDateString(void 0, { month: "long", year: "numeric" })), /* @__PURE__ */ React.createElement("button", { onClick: () => setMonthOff((m) => Math.min(0, m + 1)), style: btn(C.muted, true) }, "\u2192")), /* @__PURE__ */ React.createElement(Heatmap, { sessions, monthRef, settings })), view === "totals" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 6 } }, "All pomodoros, every project combined."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around" } }, /* @__PURE__ */ React.createElement(Stat, { label: "this week", value: countWeek, big: true }), /* @__PURE__ */ React.createElement(Stat, { label: "this month", value: countMonth, big: true }), /* @__PURE__ */ React.createElement(Stat, { label: "this year", value: countYear, big: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 } }, /* @__PURE__ */ React.createElement(Stat, { label: "hours, week", value: hrs(countWeek), color: C.muted }), /* @__PURE__ */ React.createElement(Stat, { label: "hours, month", value: hrs(countMonth), color: C.muted }), /* @__PURE__ */ React.createElement(Stat, { label: "hours, year", value: hrs(countYear), color: C.muted }))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "All sessions"), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), sessions.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion."))), view === "log" && /* @__PURE__ */ React.createElement(LogForm, { tasks, preset, onAdd: logPomodoro, settings, secs, running, setRunning, resetTimer })));
 }
 
@@ -23969,6 +24034,7 @@ var DEFAULT_SETTINGS = {
   notionToken: "",
   databaseId: "24f3423255b680ce9dd5eb8eeece3ca0",
   // Pressure to Progress
+  doneStatus: "",
   dayStart: 4,
   morningEnd: 12,
   afternoonEnd: 18,
@@ -24057,6 +24123,10 @@ function insertUnderHeading(data, heading, block, createIfMissing) {
   return out.join("\n");
 }
 var FocusLogPlugin = class extends import_obsidian.Plugin {
+  constructor() {
+    super(...arguments);
+    this.doneStatusCache = null;
+  }
   async onload() {
     const loaded = await this.loadData() || {};
     this.data = {
@@ -24149,9 +24219,17 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         group: h.ancestor || task
       });
     }
-    this.data.tasks = tasks;
+    const prevIndex = {};
+    (this.data.tasks || []).forEach((t, i) => {
+      if (t && t.id != null)
+        prevIndex[t.id] = i;
+    });
+    const fresh = tasks.filter((t) => prevIndex[t.id] === void 0);
+    const known = tasks.filter((t) => prevIndex[t.id] !== void 0).sort((a, b) => prevIndex[a.id] - prevIndex[b.id]);
+    const ordered = [...fresh, ...known];
+    this.data.tasks = ordered;
     await this.persist();
-    return tasks;
+    return ordered;
   }
   // Walk Parent item up: immediate parent title and top-level ancestor title (else null).
   async resolveHierarchy(page, cache) {
@@ -24189,6 +24267,30 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     const next = numberProp(page, "Act") + 1;
     await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Act: { number: next } } });
     return next;
+  }
+  // Resolve the Status option that means "done": an explicit setting wins, otherwise
+  // auto-detect from the database schema (first option whose name reads as done/complete).
+  async resolveDoneStatus() {
+    var _a, _b, _c;
+    const override = (this.data.settings.doneStatus || "").trim();
+    if (override)
+      return override;
+    if (this.doneStatusCache)
+      return this.doneStatusCache;
+    const db = await this.notionFetch(`/databases/${this.data.settings.databaseId}`);
+    const status = (_a = db == null ? void 0 : db.properties) == null ? void 0 : _a["Status"];
+    const opts = ((_b = status == null ? void 0 : status.select) == null ? void 0 : _b.options) || ((_c = status == null ? void 0 : status.status) == null ? void 0 : _c.options) || [];
+    const match = opts.find((o) => /done|complete|finish/i.test(o.name || ""));
+    if (!match)
+      throw new Error("No 'Done' status option found. Set the Done status value in Focus Log settings.");
+    this.doneStatusCache = match.name;
+    return match.name;
+  }
+  // Set a task page's Status select to the resolved done value.
+  async setTaskDone(pageId) {
+    const name = await this.resolveDoneStatus();
+    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Status: { select: { name } } } });
+    return name;
   }
   // Append a formatted block under the configured heading in the (logical) day's daily note.
   async appendToDailyNote(p) {
@@ -24245,6 +24347,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       },
       sync: () => self.queryToday(),
       writeAct: (pageId) => self.incrementAct(pageId),
+      setDone: (pageId) => self.setTaskDone(pageId),
       appendDaily: (p) => self.appendToDailyNote(p),
       notify: (msg, duration) => new import_obsidian.Notice(msg, duration),
       celebrate: () => new CelebrateModal(self.app).open()
@@ -24316,6 +24419,12 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
     new import_obsidian.Setting(containerEl).setName("Database ID").setDesc("The Pressure to Progress database ID (prefilled).").addText(
       (t) => t.setValue(this.plugin.data.settings.databaseId).onChange(async (v) => {
         this.plugin.data.settings.databaseId = v.trim();
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Done status value").setDesc("Optional. The exact Status option to set when you tick \u201Cmark done\u201D while logging. Leave blank to auto-detect an option whose name contains \u201CDone\u201D.").addText(
+      (t) => t.setPlaceholder("auto-detect").setValue(this.plugin.data.settings.doneStatus).onChange(async (v) => {
+        this.plugin.data.settings.doneStatus = v.trim();
         await this.plugin.persist();
       })
     );

@@ -252,6 +252,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, re
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
   const [note, setNote] = useState("");
+  const [markDone, setMarkDone] = useState(false);
 
   useEffect(() => setTask(preset || (tasks[0] && tasks[0].task) || ""), [preset, tasks]);
 
@@ -260,8 +261,9 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, re
   const meta: any = tasks.find((t: any) => t.task === task) || {};
   const submit = () => {
     if (!task.trim()) return;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 });
+    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 }, markDone);
     setNote("");
+    setMarkDone(false);
   };
   const inputStyle: any = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
   return (
@@ -279,7 +281,11 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, re
       </select>
       <Scale label="before: how enjoyable do I expect this to be? (1 dull ... 5 great)" value={exp} onChange={setExp} color={settings.beginColor} />
       <Scale label="after: how enjoyable was it actually? (1 dull ... 5 great)" value={act} onChange={setAct} color={settings.endColor} />
-      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 16, marginTop: 4 }} />
+      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
+      <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13, color: C.ink, cursor: "pointer" }}>
+        <input type="checkbox" checked={markDone} onChange={(e) => setMarkDone(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.better, cursor: "pointer" }} />
+        also set this task's status to Done in Notion
+      </label>
       <button onClick={submit} style={{ ...btn(C.ink), width: "100%", padding: "10px" }}>log pomodoro + write Act</button>
     </div>
   );
@@ -367,6 +373,19 @@ export default function FocusLogApp({ api }: any) {
   const [editingId, setEditingId] = useState<any>(null);
   const [editDraft, setEditDraft] = useState<any>(null);
 
+  // Drag-to-reorder for the Today list. The order persists; on sync, queryToday keeps
+  // already-ranked tasks in place and floats brand-new ones to the top.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const moveTask = (from: number | null, to: number) => {
+    if (from == null || from === to) return;
+    const a = [...tasks];
+    const [m] = a.splice(from, 1);
+    a.splice(to, 0, m);
+    setTasks(a);
+    api.saveTasks(a);
+  };
+
   const persist = useCallback((next: any[]) => { setSessions(next); api.saveSessions(next); }, [api]);
   const savePending = useCallback((next: any[]) => { setPending(next); api.savePending(next); }, [api]);
 
@@ -398,7 +417,7 @@ export default function FocusLogApp({ api }: any) {
     catch (e: any) { setSync("error"); setFlash("Sync failed: " + (e?.message || e)); }
   };
 
-  const logPomodoro = async (s: any) => {
+  const logPomodoro = async (s: any, markDone?: boolean) => {
     persist([...sessions, s]);
     const key = s.pageId || s.task;
     setDoneSess((m: any) => ({ ...m, [key]: (m[key] || 0) + 1 }));
@@ -408,6 +427,14 @@ export default function FocusLogApp({ api }: any) {
       try { const act = await api.writeAct(s.pageId); msg += " Act" + (act != null ? " = " + act : " +1") + " written."; }
       catch (e: any) { savePending([...pending, { sessionId: s.id, pageId: s.pageId, task: s.task }]); msg += " Act write queued."; }
     } else { msg += " No Notion page linked."; }
+    if (markDone && s.pageId && api.setDone) {
+      try {
+        const name = await api.setDone(s.pageId);
+        const nt = tasks.filter((t) => t.id !== s.pageId);
+        setTasks(nt); api.saveTasks(nt);
+        msg += " Status set to " + name + ".";
+      } catch (e: any) { msg += " Mark-done failed: " + (e?.message || e); }
+    }
     if (api.appendDaily) {
       try { await api.appendDaily({ ts: +new Date(s.ts), minutes: s.minutes, task: s.task, hierarchy: s.hierarchy || "", note: s.note || "" }); msg += " Added to daily note."; }
       catch (e: any) { msg += " Daily note skipped: " + (e?.message || e); }
@@ -475,16 +502,33 @@ export default function FocusLogApp({ api }: any) {
               <button onClick={doSync} style={btn(C.ink, true)} disabled={sync === "loading"}>{sync === "loading" ? "syncing\u2026" : "sync from Notion"}</button>
             </div>
             {tasks.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No tasks yet. Set your Notion token in settings, then press sync.</p>}
+            {tasks.length > 1 && <p style={{ color: C.muted, fontSize: 11, margin: "0 0 8px" }}>Drag the grip to reorder. The order is kept for tomorrow; new tasks from Notion appear on top.</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {tasks.map((t) => {
+              {tasks.map((t, i) => {
                 const key = t.id || t.task;
                 const done = doneSess[key] || 0;
                 const est = t.pomodoros || 0;
                 const completed = (t.act || 0) + done;
                 const remaining = Math.max(0, est - completed);
                 const hier = hierarchyText(t);
+                const isDragging = dragIndex === i;
+                const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
                 return (
-                  <div key={key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${C.line}` }}>
+                  <div
+                    key={key}
+                    onDragOver={(e) => { e.preventDefault(); if (overIndex !== i) setOverIndex(i); }}
+                    onDrop={(e) => { e.preventDefault(); moveTask(dragIndex, i); setDragIndex(null); setOverIndex(null); }}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${isOver ? C.ink : C.line}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }}
+                  >
+                    <span
+                      draggable
+                      onDragStart={(e) => { setDragIndex(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }}
+                      onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+                      title="drag to reorder"
+                      style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}
+                    >
+                      {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
+                    </span>
                     <span style={{ width: 14, height: 14, borderRadius: 4, background: POWER_COLOR[t.power] || POWER_COLOR.Y, flexShrink: 0 }} title={POWER_LABEL[t.power] || POWER_LABEL.Y} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}>{t.task}{t.king ? " \u{1F451}" : ""}</div>

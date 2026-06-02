@@ -22,6 +22,9 @@ All configuration — Notion connection, day start, time bands, rating colours, 
 ## Editing logs
 The timer in the **log** tab keeps running when you switch tabs, so checking the weekly chart mid-pomodoro does not reset it. In the **totals** tab, every logged session has **edit** and **delete** buttons. Editing lets you change the time, task name, and the two ratings; the original quick note is preserved. Deleting only removes the local entry — the `Act +1` already written to Notion is not undone.
 
+## Ordering and finishing tasks
+Drag the grip handle on the left of any task in the **today** list to reorder it. The order is saved and carried into the next day: after a sync, tasks you have already ranked keep their position (even if you edited them in Notion), while brand-new tasks appear on top. The **log** form has an optional "set this task's status to Done" checkbox; ticking it sets the page's Status to your Done value when you log. The Done value is auto-detected from the database (the first Status option whose name contains "Done"), or set it explicitly in settings.
+
 ## Caveats
 - The Notion API has no atomic increment, so Act write-back reads the current value then writes value + 1. With a single user this is safe; avoid editing the same page in two places at the exact same moment.
 - The "Today Tasks" filter here is an approximation (Today / King / This week, plus Daily dated today). It does not yet exclude the `🏔️` estimate. Adjust in `queryToday()` if you want an exact match.
