@@ -305,6 +305,21 @@ function ContribHeatmap({ sessions, settings }: any) {
 }
 
 const PIE = ["#b4533a", "#cda32f", "#5b8c5a", "#4e7d9c", "#9a6f9c", "#c0772e", "#6f9461", "#847bb2"];
+// 12 macaron colours, assigned by name so an area/tag keeps the same colour in the list and the pie.
+const MACARON = [
+  "rgb(199, 224, 168)", // Pistachio
+  "rgb(243, 197, 206)", // Rose
+  "rgb(205, 188, 226)", // Lavender
+  "rgb(247, 232, 164)", // Lemon
+  "rgb(228, 201, 160)", // Salted caramel
+  "rgb(244, 236, 221)", // Vanilla cream
+  "rgb(186, 214, 230)", // Blueberry
+  "rgb(248, 199, 172)", // Coral peach
+  "rgb(125, 90, 65)",   // Chocolate brown
+  "rgb(181, 224, 206)", // Mint
+  "rgb(246, 201, 140)", // Mandarin
+  "rgb(183, 158, 203)", // Blackcurrant
+];
 function polarPt(cx: number, cy: number, r: number, deg: number) {
   const a = (deg * Math.PI) / 180;
   return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
@@ -353,12 +368,22 @@ function AutoTextarea({ value, onChange, placeholder, style }: any) {
   return <textarea ref={ref} value={value} onChange={onChange} placeholder={placeholder} rows={1} style={style} />;
 }
 
-function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag }: any) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag }: any) {
   const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
   const [note, setNote] = useState("");
   const [markDone, setMarkDone] = useState(false);
+  // Press-and-hold the −/+ length buttons to repeat, accelerating the longer you hold.
+  const holdRef = useRef<any>(null);
+  const beginHold = (delta: number) => {
+    stepPomo(delta);
+    let delay = 300;
+    const run = () => { stepPomo(delta); delay = Math.max(45, delay - 35); holdRef.current = setTimeout(run, delay); };
+    holdRef.current = setTimeout(run, delay);
+  };
+  const endHold = () => { if (holdRef.current) { clearTimeout(holdRef.current); holdRef.current = null; } };
+  useEffect(() => () => endHold(), []);
 
   useEffect(() => setTask(preset || (tasks[0] && tasks[0].task) || ""), [preset, tasks]);
 
@@ -377,9 +402,9 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, po
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          <button onClick={() => changePomo(pomoMin - 1)} disabled={pomoMin <= 15} title="shorter (min 15)" style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin <= 15 ? 0.4 : 1 }}>{"−"}</button>
+          <button onMouseDown={() => beginHold(-1)} onMouseUp={endHold} onMouseLeave={endHold} title="shorter — hold to speed up (min 5)" style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin <= 5 ? 0.4 : 1 }}>{"−"}</button>
           <button onClick={onStart} style={btn(C.ink)}>start {pomoMin}m</button>
-          <button onClick={() => changePomo(pomoMin + 1)} disabled={pomoMin >= 25} title="longer (max 25)" style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin >= 25 ? 0.4 : 1 }}>{"+"}</button>
+          <button onMouseDown={() => beginHold(1)} onMouseUp={endHold} onMouseLeave={endHold} title="longer — hold to speed up (max 30)" style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin >= 30 ? 0.4 : 1 }}>{"+"}</button>
           <button onClick={onPause} style={btn(C.muted, true)}>pause</button>
           <button onClick={resetTimer} style={btn(C.muted, true)}>reset</button>
         </div>
@@ -481,7 +506,7 @@ export default function FocusLogApp({ api }: any) {
   const saveGoal = (n: number) => { const g = Math.max(1, Math.min(99, Math.round(n) || 1)); setGoal(g); api.patchSettings && api.patchSettings({ dailyGoal: g }); setEditingGoal(false); };
 
   // Pomodoro length (15–25 min), and the "pick the next task before a break" option.
-  const [pomoMin, setPomoMin] = useState<number>(Math.max(15, Math.min(25, Number(settings.pomodoroMinutes) || 25)));
+  const [pomoMin, setPomoMin] = useState<number>(Math.max(5, Math.min(30, Number(settings.pomodoroMinutes) || 25)));
   const [chooseNext, setChooseNextState] = useState<boolean>(settings.chooseNextTask !== false);
   const setChooseNext = (v: boolean) => { setChooseNextState(v); api.patchSettings && api.patchSettings({ chooseNextTask: v }); };
   const [nextTask, setNextTask] = useState<string>("");
@@ -574,11 +599,14 @@ export default function FocusLogApp({ api }: any) {
 
   const resetTimer = () => { setRunning(false); setSecs(pomoMin * 60); fired.current = {}; setPomoStart(null); setPauseStart(null); setPauseTag(""); };
   const changePomo = (n: number) => {
-    const m = Math.max(15, Math.min(25, Math.round(n) || 25));
+    const m = Math.max(5, Math.min(30, Math.round(n) || 25));
     setPomoMin(m);
     if (!running) { setSecs(m * 60); fired.current = {}; }
     api.patchSettings && api.patchSettings({ pomodoroMinutes: m });
   };
+  const pomoMinRef = useRef(pomoMin);
+  pomoMinRef.current = pomoMin;
+  const stepPomo = (delta: number) => changePomo(pomoMinRef.current + delta);
   // Pause/resume with a recorded reason.
   const commitPause = (end: number) => {
     if (pauseStart != null && pauseTag) {
@@ -687,11 +715,15 @@ export default function FocusLogApp({ api }: any) {
 
   const nowLD = logicalDay(Date.now(), settings);
   const wkStartNow = logicalWeekStart(Date.now(), settings);
-  const countWeek = sessions.filter((s) => { const d = logicalDay(s.ts, settings); return d >= wkStartNow && d < new Date(wkStartNow.getTime() + 7 * DAY); }).length;
-  const countMonth = sessions.filter((s) => { const d = logicalDay(s.ts, settings); return d.getMonth() === nowLD.getMonth() && d.getFullYear() === nowLD.getFullYear(); }).length;
-  const countYear = sessions.filter((s) => logicalDay(s.ts, settings).getFullYear() === nowLD.getFullYear()).length;
+  const inWeek = sessions.filter((s) => { const d = logicalDay(s.ts, settings); return d >= wkStartNow && d < new Date(wkStartNow.getTime() + 7 * DAY); });
+  const inMonth = sessions.filter((s) => { const d = logicalDay(s.ts, settings); return d.getMonth() === nowLD.getMonth() && d.getFullYear() === nowLD.getFullYear(); });
+  const inYear = sessions.filter((s) => logicalDay(s.ts, settings).getFullYear() === nowLD.getFullYear());
+  const countWeek = inWeek.length;
+  const countMonth = inMonth.length;
+  const countYear = inYear.length;
   const countToday = sessions.filter((s) => sameLogicalDay(s.ts, Date.now(), settings)).length;
-  const hrs = (c: number) => (Math.round((c * 25) / 6) / 10).toFixed(1);
+  const sumMin = (arr: any[]) => arr.reduce((a, s) => a + (Number(s.minutes) || 25), 0);
+  const hrsOf = (mins: number) => (Math.round(mins / 6) / 10).toFixed(1);
   const monthRef = new Date(nowLD.getFullYear(), nowLD.getMonth() + monthOff, 1);
 
   // Rating summary: how often the actual beat the expected, the average gap, and the biggest
@@ -717,7 +749,10 @@ export default function FocusLogApp({ api }: any) {
   const disliked = actByCount.slice().reverse().slice(0, 2);
   const areaAgg: any = {};
   activities.forEach((a) => { if ((a.count || 0) > 0) areaAgg[a.area || "Other"] = (areaAgg[a.area || "Other"] || 0) + (a.count || 0); });
-  const pieData = Object.keys(areaAgg).map((k, i) => ({ label: k, value: areaAgg[k], color: PIE[i % PIE.length] }));
+  // Distinct areas/tags each take the next macaron colour (unique until there are more than 12).
+  const areaNames = Array.from(new Set(activities.map((a) => a.area || "Other")));
+  const areaColor = (a: any) => MACARON[Math.max(0, areaNames.indexOf(a)) % MACARON.length];
+  const pieData = Object.keys(areaAgg).map((k) => ({ label: k, value: areaAgg[k], color: areaColor(k) }));
 
   // Pause stats: most common this week / month, and each tag's typical time of day over all history.
   const topPauseOf = (list: any[]) => { const c: any = {}; list.forEach((p) => (c[p.tag] = (c[p.tag] || 0) + 1)); const e = Object.entries(c).sort((a: any, b: any) => b[1] - a[1])[0]; return e ? { tag: e[0], n: e[1] as number } : null; };
@@ -731,10 +766,12 @@ export default function FocusLogApp({ api }: any) {
     evs.forEach((p) => { bands[bandOf(p.ts, settings)]++; });
     return { name: t.name, total: evs.length, bands, top: evs.length ? BAND_NAME[bands.indexOf(Math.max(...bands))] : null };
   });
+  const tagColor = (n: any) => MACARON[Math.max(0, pauseTags.findIndex((t: any) => t.name === n)) % MACARON.length];
+  const pausePie = tagBands.filter((t: any) => t.total > 0).map((t: any) => ({ label: t.name, value: t.total, color: tagColor(t.name) }));
 
   const openLog = (leafTask: string) => { setPreset(leafTask); setView("log"); };
 
-  const tab = (t: string): any => ({ padding: "7px 16px", borderRadius: 999, border: `1.5px solid ${view === t ? C.ink : C.faint}`, background: view === t ? C.ink : "transparent", color: view === t ? "#fff" : C.muted, fontSize: 13, cursor: "pointer", textTransform: "capitalize" });
+  const seg = (on: boolean): any => ({ padding: "6px 14px", borderRadius: 9, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", textTransform: "capitalize", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.14)" : "none", fontFamily: "var(--fl-display)", whiteSpace: "nowrap" });
 
   return (
     <div style={{ background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)" }}>
@@ -767,8 +804,10 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-          {["today", "week", "month", "totals", "log", "break", "pause"].map((t) => (<button key={t} onClick={() => setView(t)} style={tab(t)}>{t}</button>))}
+        <div style={{ marginBottom: 20, overflowX: "auto" }}>
+          <div style={{ display: "inline-flex", gap: 2, background: C.line, borderRadius: 12, padding: 4 }}>
+            {["today", "week", "month", "totals", "log", "break", "pause"].map((t) => (<button key={t} onClick={() => setView(t)} style={seg(view === t)}>{t}</button>))}
+          </div>
         </div>
 
         {view === "today" && (
@@ -878,9 +917,9 @@ export default function FocusLogApp({ api }: any) {
                 <Stat label="this year" value={countYear} big />
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 }}>
-                <Stat label="hours, week" value={hrs(countWeek)} color={C.muted} />
-                <Stat label="hours, month" value={hrs(countMonth)} color={C.muted} />
-                <Stat label="hours, year" value={hrs(countYear)} color={C.muted} />
+                <Stat label="hours, week" value={hrsOf(sumMin(inWeek))} color={C.muted} />
+                <Stat label="hours, month" value={hrsOf(sumMin(inMonth))} color={C.muted} />
+                <Stat label="hours, year" value={hrsOf(sumMin(inYear))} color={C.muted} />
               </div>
             </div>
 
@@ -972,7 +1011,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} />}
+        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} />}
 
         {view === "break" && (
           <div>
@@ -1018,7 +1057,7 @@ export default function FocusLogApp({ api }: any) {
                   ) : (
                     <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{a.name}</span>
-                      <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>#{a.area}</span>
+                      <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: "50%", background: areaColor(a.area), flexShrink: 0 }} />#{a.area}</span>
                       <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>{a.count || 0}{"×"}</span>
                       <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>
                       <button onClick={() => startEditAct(a)} style={{ ...btn(C.muted, true), padding: "3px 9px" }}>edit</button>
@@ -1073,6 +1112,7 @@ export default function FocusLogApp({ api }: any) {
                     </div>
                   ) : (
                     <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                      <span style={{ width: 11, height: 11, borderRadius: "50%", background: tagColor(t.name), flexShrink: 0 }} />
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
                       <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); }} style={{ ...btn(C.muted, true), padding: "3px 9px" }}>edit</button>
                       <button onClick={() => removePauseTag(t.id)} style={{ ...btn(C.worse, true), padding: "3px 9px" }}>{"✕"}</button>
@@ -1099,6 +1139,8 @@ export default function FocusLogApp({ api }: any) {
                   <div style={{ fontSize: 14, color: C.ink }}>{topPauseMonth ? `${topPauseMonth.tag} (${topPauseMonth.n})` : "—"}</div>
                 </div>
               </div>
+              <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>By tag</p>
+              <div style={{ marginBottom: 16 }}><PieChart data={pausePie} /></div>
               <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Typical time of day (all history)</p>
               {tagBands.filter((t: any) => t.total > 0).length === 0 ? (
                 <p style={{ color: C.muted, fontSize: 13 }}>No pauses recorded yet.</p>
@@ -1106,6 +1148,7 @@ export default function FocusLogApp({ api }: any) {
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {tagBands.filter((t: any) => t.total > 0).sort((a: any, b: any) => b.total - a.total).map((t: any) => (
                     <div key={t.name} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: tagColor(t.name), flexShrink: 0 }} />
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
                       <span style={{ display: "flex", gap: 3 }}>
                         {t.bands.map((n: number, i: number) => (<span key={i} title={`${BAND_NAME[i]}: ${n}`} style={{ width: 26, textAlign: "center", fontFamily: "var(--fl-mono)", fontSize: 11, color: i === t.bands.indexOf(Math.max(...t.bands)) ? C.ink : C.faint }}>{n}</span>))}
