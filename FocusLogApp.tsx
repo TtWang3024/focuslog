@@ -32,14 +32,14 @@ const C: any = {
 
 const DAY = 86400000;
 const startOfDay = (d: any) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-function mondayOf(d: any) { const x = startOfDay(d); const k = (x.getDay() + 6) % 7; x.setDate(x.getDate() - k); return x; }
+function weekStartOf(d: any, sundayStart?: boolean) { const x = startOfDay(d); const k = sundayStart ? x.getDay() : (x.getDay() + 6) % 7; x.setDate(x.getDate() - k); return x; }
 // Hours to shift a timestamp before taking its calendar date. A morning start (0–12)
 // pushes the boundary later into the morning, so late-night work stays on the previous
 // day (subtract). An evening start (13–23) rolls the day over that night, so the late
 // hours fall on the next date (add).
 const dayShift = (s: any) => { const h = s.dayStart || 0; return h <= 12 ? h : h - 24; };
 const logicalDay = (ts: any, s: any) => startOfDay(new Date(ts).getTime() - dayShift(s) * 3600000);
-const logicalWeekStart = (ts: any, s: any) => mondayOf(logicalDay(ts, s));
+const logicalWeekStart = (ts: any, s: any) => weekStartOf(logicalDay(ts, s), s.weekStartsSunday);
 function bandOf(ts: any, s: any) {
   const h = new Date(ts).getHours();
   const ds = s.dayStart || 0;
@@ -203,11 +203,11 @@ function Heatmap({ sessions, monthRef, settings }: any) {
     if (d.getFullYear() === year && d.getMonth() === month) (byDay[d.getDate()] = byDay[d.getDate()] || []).push(x);
   });
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const lead = (new Date(year, month, 1).getDay() + 6) % 7;
+  const lead = settings.weekStartsSunday ? new Date(year, month, 1).getDay() : (new Date(year, month, 1).getDay() + 6) % 7;
   const cells: any[] = [];
   for (let i = 0; i < lead; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  const headers = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const headers = settings.weekStartsSunday ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   return (
     <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginBottom: 20 }}>
@@ -249,6 +249,56 @@ function Scale({ value, onChange, color, label }: any) {
         {[1, 2, 3, 4, 5].map((s) => (
           <button key={s} onClick={() => onChange(s)} style={{ width: 38, height: 38, borderRadius: 8, border: `1.5px solid ${value === s ? color : C.faint}`, background: value === s ? color : "transparent", color: value === s ? "#fff" : C.ink, fontFamily: "var(--fl-mono)", cursor: "pointer" }}>{s}</button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Last-6-months contributions heatmap: weeks as columns, Mon–Sun as rows, coloured by the day's
+// pomodoro count. Computed from sessions grouped by logical day (so it respects the day-start).
+const HEAT = ["#f3d9bf", "#eab784", "#df8a4e", "#c9603a", "#a23b22"];
+function ContribHeatmap({ sessions, settings }: any) {
+  const CELL = 13, GAP = 3, MONTH_H = 14, HEAD_GAP = 4;
+  const ymd = (d: any) => { const p = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+  const counts: any = {};
+  sessions.forEach((s: any) => { const k = ymd(logicalDay(s.ts, settings)); counts[k] = (counts[k] || 0) + 1; });
+  const now = startOfDay(new Date());
+  const startMonth = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const sun = !!settings.weekStartsSunday;
+  const gridStart = weekStartOf(startMonth, sun);
+  const weeks = Math.round((+weekStartOf(end, sun) - +gridStart) / (7 * DAY)) + 1;
+  const heat = (n: number) => { if (!n) return "#e8e0cf"; const cap = Math.min(n, 8); return HEAT[Math.min(HEAT.length - 1, Math.floor(((cap - 1) / 8) * HEAT.length))]; };
+
+  const cells: any[] = [];
+  for (let dow = 0; dow < 7; dow++) for (let w = 0; w < weeks; w++) {
+    const day = new Date(+gridStart + (w * 7 + dow) * DAY);
+    const inRange = day >= startMonth && day <= end;
+    const k = ymd(day), n = counts[k] || 0;
+    cells.push(<div key={dow + "-" + w} title={inRange ? `${k}: ${n}${"\u{1F345}"}` : ""} style={{ width: CELL, height: CELL, borderRadius: 2, boxSizing: "border-box", background: inRange ? heat(n) : "transparent", border: `1px solid ${inRange ? C.line : "transparent"}` }} />);
+  }
+  const monthLabels: any[] = [];
+  let cur = new Date(startMonth);
+  while (cur <= end) {
+    const col = Math.round((+weekStartOf(cur, sun) - +gridStart) / (7 * DAY));
+    if (col >= 0 && col < weeks) monthLabels.push(<span key={+cur} style={{ position: "absolute", left: col * (CELL + GAP), fontSize: 10, color: C.muted, fontFamily: "var(--fl-mono)" }}>{cur.toLocaleDateString(undefined, { month: "short" })}</span>);
+    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+  }
+  const wdNames = sun ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const wd = wdNames.map((n, i) => (i === 0 || i === 2 || i === 4 ? n : ""));
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 6, overflowX: "auto" }}>
+        <div style={{ display: "flex", flexDirection: "column", paddingTop: MONTH_H + HEAD_GAP, gap: GAP, flexShrink: 0 }}>
+          {wd.map((label, i) => (<div key={i} style={{ height: CELL, lineHeight: CELL + "px", fontSize: 9, color: C.muted, fontFamily: "var(--fl-mono)", textAlign: "right" }}>{label}</div>))}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: HEAD_GAP }}>
+          <div style={{ position: "relative", height: MONTH_H, width: weeks * (CELL + GAP) }}>{monthLabels}</div>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${weeks}, ${CELL}px)`, gridTemplateRows: `repeat(7, ${CELL}px)`, gap: GAP, gridAutoFlow: "row" }}>{cells}</div>
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end", marginTop: 8, fontSize: 10, color: C.muted }}>
+        less {["#e8e0cf", ...HEAT].map((c, i) => (<span key={i} style={{ width: CELL, height: CELL, borderRadius: 2, background: c, border: `1px solid ${C.line}`, boxSizing: "border-box" }} />))} more
       </div>
     </div>
   );
@@ -725,6 +775,11 @@ export default function FocusLogApp({ api }: any) {
                 <Stat label="hours, month" value={hrs(countMonth)} color={C.muted} />
                 <Stat label="hours, year" value={hrs(countYear)} color={C.muted} />
               </div>
+            </div>
+
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
+              <p style={{ color: C.muted, fontSize: 12, marginBottom: 12 }}>Last 6 months — pomodoros per day.</p>
+              <ContribHeatmap sessions={sessions} settings={settings} />
             </div>
 
             <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>

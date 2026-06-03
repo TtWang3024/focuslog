@@ -16,6 +16,7 @@ export interface FocusLogSettings {
   writeCategoryTag: boolean;
   dailyGoal: number;
   dayStart: number;
+  weekStartsSunday: boolean;
   morningEnd: number;
   afternoonEnd: number;
   beginColor: string;
@@ -42,6 +43,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   writeCategoryTag: true,
   dailyGoal: 8,
   dayStart: 4,
+  weekStartsSunday: false,
   morningEnd: 12,
   afternoonEnd: 18,
   beginColor: "#d98324",
@@ -587,6 +589,16 @@ class FocusLogSettingTab extends PluginSettingTab {
         t.setValue(String(this.plugin.data.settings.afternoonEnd)).onChange(async (v) => {
           const n = Math.max(0, Math.min(24, parseInt(v, 10) || 0));
           this.plugin.data.settings.afternoonEnd = n;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Start the week on Sunday")
+      .setDesc("Off (default): weeks run Monday–Sunday. On: weeks run Sunday–Saturday. Affects the week view range, the weekly grouping, and the weekday headers on both heatmaps.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.weekStartsSunday).onChange(async (v) => {
+          this.plugin.data.settings.weekStartsSunday = v;
           await this.plugin.persist();
         })
       );
