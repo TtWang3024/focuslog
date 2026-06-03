@@ -341,7 +341,7 @@ function PieChart({ data }: any) {
   );
 }
 
-function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, resetTimer }: any) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag }: any) {
   const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
@@ -355,20 +355,35 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, re
   const meta: any = tasks.find((t: any) => t.task === task) || {};
   const submit = () => {
     if (!task.trim()) return;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 }, markDone);
+    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: pomoMin }, markDone);
     setNote("");
     setMarkDone(false);
   };
   const inputStyle: any = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
   return (
     <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => setRunning((r: boolean) => !r)} style={btn(C.ink)}>{running ? "pause" : "start 25m"}</button>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={() => changePomo(pomoMin - 1)} disabled={pomoMin <= 15} title="shorter (min 15)" style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin <= 15 ? 0.4 : 1 }}>{"−"}</button>
+          <button onClick={onStart} style={btn(C.ink)}>start {pomoMin}m</button>
+          <button onClick={() => changePomo(pomoMin + 1)} disabled={pomoMin >= 25} title="longer (max 25)" style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin >= 25 ? 0.4 : 1 }}>{"+"}</button>
+          <button onClick={onPause} style={btn(C.muted, true)}>pause</button>
           <button onClick={resetTimer} style={btn(C.muted, true)}>reset</button>
         </div>
       </div>
+      {pauseActive && (
+        <div style={{ marginBottom: 14, padding: 10, borderRadius: 8, background: C.paper, border: `1px solid ${C.faint}` }}>
+          <p style={{ margin: "0 0 6px", fontSize: 12, color: C.muted }}>Paused — why? Pick a tag; it's written to your note when you resume.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {pauseTags.length === 0 ? <span style={{ fontSize: 12, color: C.muted }}>No pause tags — add some in the Pause tab.</span> :
+              pauseTags.map((pt: any) => {
+                const on = pauseTag === pt.name;
+                return <button key={pt.id} onClick={() => setPauseTag(on ? "" : pt.name)} style={{ padding: "5px 11px", borderRadius: 999, border: `1.5px solid ${on ? C.worse : C.faint}`, background: on ? C.worse : "transparent", color: on ? "#fff" : C.ink, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)" }}>{pt.name}</button>;
+              })}
+          </div>
+        </div>
+      )}
       <label style={{ color: C.muted, fontSize: 12 }}>task (Act +1 writes to this page)</label>
       <select value={task} onChange={(e) => setTask(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
         {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
@@ -380,6 +395,16 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, re
         <input type="checkbox" checked={markDone} onChange={(e) => setMarkDone(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.better, cursor: "pointer" }} />
         also set this task's status to Done in Notion
       </label>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: chooseNext ? 8 : 14, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
+        <input type="checkbox" checked={chooseNext} onChange={(e) => setChooseNext(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.ink, cursor: "pointer" }} />
+        pick the next task now (the log reopens to it after the break)
+      </label>
+      {chooseNext && (
+        <select value={nextTask} onChange={(e) => setNextTask(e.target.value)} style={{ ...inputStyle, marginBottom: 14, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
+          <option value="">{"— next pomodoro: decide later —"}</option>
+          {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
+        </select>
+      )}
       <button onClick={submit} style={{ ...btn(C.ink), width: "100%", padding: "10px" }}>log pomodoro + write Act</button>
     </div>
   );
@@ -443,6 +468,15 @@ export default function FocusLogApp({ api }: any) {
   const [editingGoal, setEditingGoal] = useState(false);
   const saveGoal = (n: number) => { const g = Math.max(1, Math.min(99, Math.round(n) || 1)); setGoal(g); api.patchSettings && api.patchSettings({ dailyGoal: g }); setEditingGoal(false); };
 
+  // Pomodoro length (15–25 min), and the "pick the next task before a break" option.
+  const [pomoMin, setPomoMin] = useState<number>(Math.max(15, Math.min(25, Number(settings.pomodoroMinutes) || 25)));
+  const [chooseNext, setChooseNextState] = useState<boolean>(settings.chooseNextTask !== false);
+  const setChooseNext = (v: boolean) => { setChooseNextState(v); api.patchSettings && api.patchSettings({ chooseNextTask: v }); };
+  const [nextTask, setNextTask] = useState<string>("");
+  const [pomoStart, setPomoStart] = useState<number | null>(null);
+  const [pauseStart, setPauseStart] = useState<number | null>(null);
+  const [pauseTag, setPauseTag] = useState<string>("");
+
   // Break activities + the post-log break timer.
   const [activities, setActivities] = useState<any[]>(init.activities || []);
   const saveActivities = (next: any[]) => { setActivities(next); api.saveActivities && api.saveActivities(next); };
@@ -473,7 +507,8 @@ export default function FocusLogApp({ api }: any) {
       saveActivities(activities.map((a) => brk.picked.includes(a.id) ? { ...a, count: (a.count || 0) + 1, lastUsed: now } : a));
     }
     setBrk({ active: false, secs: 0, running: false, picked: [], finished: false });
-    setView("today");
+    if (chooseNext && nextTask) { setPreset(nextTask); setNextTask(""); resetTimer(); setView("log"); }
+    else setView("today");
   };
   const addActivity = () => {
     const name = (newAct.name || "").trim();
@@ -482,9 +517,30 @@ export default function FocusLogApp({ api }: any) {
     setNewAct({ name: "", area: "" });
   };
   const removeActivity = (id: string) => saveActivities(activities.filter((a) => a.id !== id));
+  const [editActId, setEditActId] = useState<any>(null);
+  const [editActDraft, setEditActDraft] = useState<any>({ name: "", area: "" });
+  const startEditAct = (a: any) => { setEditActId(a.id); setEditActDraft({ name: a.name, area: a.area || "" }); };
+  const saveEditAct = () => {
+    const name = (editActDraft.name || "").trim();
+    if (!name) return;
+    saveActivities(activities.map((a) => a.id === editActId ? { ...a, name, area: (editActDraft.area || "").trim() || "Other" } : a));
+    setEditActId(null);
+  };
+
+  // Pause tags + recorded pause events.
+  const [pauseTags, setPauseTags] = useState<any[]>(init.pauseTags || []);
+  const savePauseTags = (next: any[]) => { setPauseTags(next); api.savePauseTags && api.savePauseTags(next); };
+  const [pauses, setPauses] = useState<any[]>(init.pauses || []);
+  const savePauses = (next: any[]) => { setPauses(next); api.savePauses && api.savePauses(next); };
+  const [newPauseTag, setNewPauseTag] = useState("");
+  const [editTagId, setEditTagId] = useState<any>(null);
+  const [editTagName, setEditTagName] = useState("");
+  const addPauseTag = () => { const n = newPauseTag.trim(); if (!n) return; savePauseTags([...pauseTags, { id: "pt" + Date.now(), name: n }]); setNewPauseTag(""); };
+  const removePauseTag = (id: string) => savePauseTags(pauseTags.filter((t) => t.id !== id));
+  const saveEditTag = () => { const n = editTagName.trim(); if (!n) return; savePauseTags(pauseTags.map((t) => t.id === editTagId ? { ...t, name: n } : t)); setEditTagId(null); };
 
   // Timer state lives here so it survives tab switches (LogForm mounts/unmounts).
-  const [secs, setSecs] = useState(25 * 60);
+  const [secs, setSecs] = useState(pomoMin * 60);
   const [running, setRunning] = useState(false);
   const tick = useRef<any>(null);
   const fired = useRef<any>({});
@@ -504,7 +560,30 @@ export default function FocusLogApp({ api }: any) {
   }, [running]);
   useEffect(() => { if (secs === 0) setRunning(false); }, [secs]);
 
-  const resetTimer = () => { setRunning(false); setSecs(25 * 60); fired.current = {}; };
+  const resetTimer = () => { setRunning(false); setSecs(pomoMin * 60); fired.current = {}; setPomoStart(null); setPauseStart(null); setPauseTag(""); };
+  const changePomo = (n: number) => {
+    const m = Math.max(15, Math.min(25, Math.round(n) || 25));
+    setPomoMin(m);
+    if (!running) { setSecs(m * 60); fired.current = {}; }
+    api.patchSettings && api.patchSettings({ pomodoroMinutes: m });
+  };
+  // Pause/resume with a recorded reason.
+  const commitPause = (end: number) => {
+    if (pauseStart != null && pauseTag) {
+      savePauses([...pauses, { id: "pa" + Date.now(), ts: pauseStart, tag: pauseTag }]);
+      if (api.appendPause) Promise.resolve(api.appendPause({ pomodoroStart: pomoStart, pauseStart, pauseEnd: end, tag: pauseTag })).catch(() => {});
+    }
+    setPauseStart(null); setPauseTag("");
+  };
+  const onStart = () => {
+    if (pauseStart != null) commitPause(Date.now());
+    if (pomoStart == null) setPomoStart(Date.now());
+    setRunning(true);
+  };
+  const onPause = () => {
+    setRunning(false);
+    if (pauseStart == null) { setPauseStart(Date.now()); setPauseTag(""); }
+  };
 
   // Session edit/delete state for Totals view.
   const [editingId, setEditingId] = useState<any>(null);
@@ -556,6 +635,8 @@ export default function FocusLogApp({ api }: any) {
 
   const logPomodoro = async (s: any, markDone?: boolean) => {
     persist([...sessions, s]);
+    if (pauseStart != null) commitPause(Date.now());
+    setPomoStart(null);
     const key = s.pageId || s.task;
     setDoneSess((m: any) => ({ ...m, [key]: (m[key] || 0) + 1 }));
     if (settings.breakEnabled) { startBreak(); setView("break"); } else { setView("today"); }
@@ -626,6 +707,19 @@ export default function FocusLogApp({ api }: any) {
   activities.forEach((a) => { if ((a.count || 0) > 0) areaAgg[a.area || "Other"] = (areaAgg[a.area || "Other"] || 0) + (a.count || 0); });
   const pieData = Object.keys(areaAgg).map((k, i) => ({ label: k, value: areaAgg[k], color: PIE[i % PIE.length] }));
 
+  // Pause stats: most common this week / month, and each tag's typical time of day over all history.
+  const topPauseOf = (list: any[]) => { const c: any = {}; list.forEach((p) => (c[p.tag] = (c[p.tag] || 0) + 1)); const e = Object.entries(c).sort((a: any, b: any) => b[1] - a[1])[0]; return e ? { tag: e[0], n: e[1] as number } : null; };
+  const pauseWeek = pauses.filter((p) => { const d = logicalDay(p.ts, settings); return d >= wkStartNow && d < new Date(wkStartNow.getTime() + 7 * DAY); });
+  const pauseMonth = pauses.filter((p) => { const d = logicalDay(p.ts, settings); return d.getMonth() === nowLD.getMonth() && d.getFullYear() === nowLD.getFullYear(); });
+  const topPauseWeek = topPauseOf(pauseWeek);
+  const topPauseMonth = topPauseOf(pauseMonth);
+  const tagBands = pauseTags.map((t: any) => {
+    const evs = pauses.filter((p) => p.tag === t.name);
+    const bands = [0, 0, 0];
+    evs.forEach((p) => { bands[bandOf(p.ts, settings)]++; });
+    return { name: t.name, total: evs.length, bands, top: evs.length ? BAND_NAME[bands.indexOf(Math.max(...bands))] : null };
+  });
+
   const openLog = (leafTask: string) => { setPreset(leafTask); setView("log"); };
 
   const tab = (t: string): any => ({ padding: "7px 16px", borderRadius: 999, border: `1.5px solid ${view === t ? C.ink : C.faint}`, background: view === t ? C.ink : "transparent", color: view === t ? "#fff" : C.muted, fontSize: 13, cursor: "pointer", textTransform: "capitalize" });
@@ -662,7 +756,7 @@ export default function FocusLogApp({ api }: any) {
         )}
 
         <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-          {["today", "week", "month", "totals", "log", "break"].map((t) => (<button key={t} onClick={() => setView(t)} style={tab(t)}>{t}</button>))}
+          {["today", "week", "month", "totals", "log", "break", "pause"].map((t) => (<button key={t} onClick={() => setView(t)} style={tab(t)}>{t}</button>))}
         </div>
 
         {view === "today" && (
@@ -862,7 +956,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} setRunning={setRunning} resetTimer={resetTimer} />}
+        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} />}
 
         {view === "break" && (
           <div>
@@ -870,7 +964,14 @@ export default function FocusLogApp({ api }: any) {
               <div style={{ background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink }}>{String(Math.floor(brk.secs / 60)).padStart(2, "0")}:{String(brk.secs % 60).padStart(2, "0")}</span>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    {!brk.finished && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, marginRight: 4 }}>
+                        <button onClick={() => setBrk((b: any) => ({ ...b, secs: Math.max(60, b.secs - 60), finished: false }))} style={{ ...btn(C.muted, true), padding: "4px 9px" }}>{"−"}</button>
+                        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, minWidth: 34, textAlign: "center" }}>{Math.round(brk.secs / 60)}m</span>
+                        <button onClick={() => setBrk((b: any) => ({ ...b, secs: Math.min(30 * 60, b.secs + 60), finished: false }))} style={{ ...btn(C.muted, true), padding: "4px 9px" }}>{"+"}</button>
+                      </span>
+                    )}
                     {!brk.finished && <button onClick={() => setBrk((b: any) => ({ ...b, running: !b.running }))} style={btn(C.ink)}>{brk.running ? "pause" : "start"}</button>}
                     <button onClick={endBreak} style={btn(C.muted, true)}>{brk.finished ? "back to today" : "end break"}</button>
                   </div>
@@ -891,13 +992,23 @@ export default function FocusLogApp({ api }: any) {
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
                 {activities.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>None yet. Add an activity and an area below.</p>}
                 {activities.map((a) => (
-                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
-                    <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{a.name}</span>
-                    <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>#{a.area}</span>
-                    <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>{a.count || 0}{"×"}</span>
-                    <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>
-                    <button onClick={() => removeActivity(a.id)} style={{ ...btn(C.worse, true), padding: "3px 9px" }}>{"✕"}</button>
-                  </div>
+                  editActId === a.id ? (
+                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
+                      <input value={editActDraft.name} onChange={(e) => setEditActDraft({ ...editActDraft, name: e.target.value })} style={{ flex: 2, minWidth: 110, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
+                      <input value={editActDraft.area} onChange={(e) => setEditActDraft({ ...editActDraft, area: e.target.value })} placeholder="area" style={{ flex: 1, minWidth: 70, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
+                      <button onClick={saveEditAct} style={{ ...btn(C.ink), padding: "4px 10px" }}>save</button>
+                      <button onClick={() => setEditActId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
+                    </div>
+                  ) : (
+                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                      <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{a.name}</span>
+                      <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>#{a.area}</span>
+                      <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>{a.count || 0}{"×"}</span>
+                      <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>
+                      <button onClick={() => startEditAct(a)} style={{ ...btn(C.muted, true), padding: "3px 9px" }}>edit</button>
+                      <button onClick={() => removeActivity(a.id)} style={{ ...btn(C.worse, true), padding: "3px 9px" }}>{"✕"}</button>
+                    </div>
+                  )
                 ))}
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -925,6 +1036,72 @@ export default function FocusLogApp({ api }: any) {
               </div>
               <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>By area</p>
               <PieChart data={pieData} />
+            </div>
+          </div>
+        )}
+
+        {view === "pause" && (
+          <div>
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
+              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 6px" }}>Pause tags</h3>
+              <p style={{ color: C.muted, fontSize: 12, margin: "0 0 10px" }}>Reasons you can tag a pause with. Picked from the log view when you pause.</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                {pauseTags.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>None yet. Add one below.</p>}
+                {pauseTags.map((t) => (
+                  editTagId === t.id ? (
+                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
+                      <input value={editTagName} onChange={(e) => setEditTagName(e.target.value)} style={{ flex: 1, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
+                      <button onClick={saveEditTag} style={{ ...btn(C.ink), padding: "4px 10px" }}>save</button>
+                      <button onClick={() => setEditTagId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
+                    </div>
+                  ) : (
+                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                      <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
+                      <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); }} style={{ ...btn(C.muted, true), padding: "3px 9px" }}>edit</button>
+                      <button onClick={() => removePauseTag(t.id)} style={{ ...btn(C.worse, true), padding: "3px 9px" }}>{"✕"}</button>
+                    </div>
+                  )
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={newPauseTag} onChange={(e) => setNewPauseTag(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addPauseTag(); }} placeholder="new pause reason" style={{ flex: 1, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" }} />
+                <button onClick={addPauseTag} style={btn(C.ink)}>add</button>
+              </div>
+            </div>
+
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+              <p style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>When and why you pause.</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 }}>
+                <Stat label="pauses this week" value={pauseWeek.length} />
+                <Stat label="pauses this month" value={pauseMonth.length} />
+                <div style={{ padding: "8px 12px" }}>
+                  <div style={{ fontSize: 12, color: C.muted }}>top this week</div>
+                  <div style={{ fontSize: 14, color: C.ink }}>{topPauseWeek ? `${topPauseWeek.tag} (${topPauseWeek.n})` : "—"}</div>
+                  <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>top this month</div>
+                  <div style={{ fontSize: 14, color: C.ink }}>{topPauseMonth ? `${topPauseMonth.tag} (${topPauseMonth.n})` : "—"}</div>
+                </div>
+              </div>
+              <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Typical time of day (all history)</p>
+              {tagBands.filter((t: any) => t.total > 0).length === 0 ? (
+                <p style={{ color: C.muted, fontSize: 13 }}>No pauses recorded yet.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {tagBands.filter((t: any) => t.total > 0).sort((a: any, b: any) => b.total - a.total).map((t: any) => (
+                    <div key={t.name} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+                      <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
+                      <span style={{ display: "flex", gap: 3 }}>
+                        {t.bands.map((n: number, i: number) => (<span key={i} title={`${BAND_NAME[i]}: ${n}`} style={{ width: 26, textAlign: "center", fontFamily: "var(--fl-mono)", fontSize: 11, color: i === t.bands.indexOf(Math.max(...t.bands)) ? C.ink : C.faint }}>{n}</span>))}
+                      </span>
+                      <span style={{ minWidth: 70, textAlign: "right", fontSize: 12, color: C.muted }}>{t.top}</span>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", gap: 3, justifyContent: "flex-end", fontSize: 10, color: C.muted, marginTop: 2 }}>
+                    <span style={{ flex: 1 }} />
+                    {BAND_NAME.map((b, i) => (<span key={i} style={{ width: 26, textAlign: "center" }}>{b.slice(0, 3)}</span>))}
+                    <span style={{ minWidth: 70 }} />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

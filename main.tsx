@@ -31,6 +31,9 @@ export interface FocusLogSettings {
   breakEnabled: boolean;
   breakAutoStart: boolean;
   breakMinutes: number;
+  pomodoroMinutes: number;
+  chooseNextTask: boolean;
+  pauseTemplate: string;
 }
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
@@ -59,7 +62,19 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   breakEnabled: false,
   breakAutoStart: true,
   breakMinutes: 5,
+  pomodoroMinutes: 25,
+  chooseNextTask: true,
+  pauseTemplate: "- [ ] <mark class=\"hltr-pink\">{date}</mark> {pause-start} - {pause-end} ⏸️ {pause-tag}",
 };
+
+const DEFAULT_PAUSE_TAGS = [
+  { id: "p-bathroom", name: "bathroom" },
+  { id: "p-water", name: "water / snack" },
+  { id: "p-distracted", name: "got distracted" },
+  { id: "p-phone", name: "phone" },
+  { id: "p-tired", name: "tired" },
+  { id: "p-interrupted", name: "interrupted" },
+];
 
 const DEFAULT_ACTIVITIES = [
   { id: "a-stretch", name: "Stretch", area: "Body", count: 0, lastUsed: null },
@@ -74,6 +89,8 @@ interface PluginData {
   pending: any[];
   tasks: any[];
   activities: any[];
+  pauseTags: any[];
+  pauses: any[];
 }
 
 // ---------- Notion property parsing ----------
@@ -198,6 +215,8 @@ export default class FocusLogPlugin extends Plugin {
       pending: loaded.pending || [],
       tasks: loaded.tasks || [],
       activities: loaded.activities || DEFAULT_ACTIVITIES.map((a) => ({ ...a })),
+      pauseTags: loaded.pauseTags || DEFAULT_PAUSE_TAGS.map((a) => ({ ...a })),
+      pauses: loaded.pauses || [],
     };
 
     this.registerView(VIEW_TYPE, (leaf) => new FocusLogView(leaf, this));
@@ -428,6 +447,36 @@ export default class FocusLogPlugin extends Plugin {
     if (counterStatus === "ambiguous") new Notice("Focus Log: the counter prefix matches more than one line — counter not updated.");
   }
 
+  // Append a pause entry under the daily heading, using the pause template and its placeholders.
+  async appendPauseToDailyNote(p: { pomodoroStart: number | null; pauseStart: number; pauseEnd: number; tag: string }) {
+    const s = this.data.settings;
+    if (!s.dailyNoteWrite) return;
+    const moment = (window as any).moment;
+    if (!moment) throw new Error("moment unavailable");
+    const fileDate = s.dailyNoteTrueDate ? new Date(p.pauseEnd) : new Date(p.pauseEnd - dayShiftHours(s.dayStart) * 3600000);
+    const m = moment(new Date(fileDate.getFullYear(), fileDate.getMonth(), fileDate.getDate()));
+    const dn: any = (this.app as any).internalPlugins?.getPluginById?.("daily-notes");
+    const opts = dn?.instance?.options || {};
+    const format = opts.format || "YYYY-MM-DD";
+    const folder = (opts.folder || "").trim();
+    const path = normalizePath((folder ? folder + "/" : "") + m.format(format) + ".md");
+    let file = this.app.vault.getAbstractFileByPath(path) as TFile;
+    if (!file) {
+      if (folder && !this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder).catch(() => {});
+      file = await this.app.vault.create(path, "# " + s.dailyHeading + "\n");
+    }
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const hm = (ts: number) => { const d = new Date(ts); return pad(d.getHours()) + ":" + pad(d.getMinutes()); };
+    const block = (s.pauseTemplate || "")
+      .replace(/\{date\}/g, m.format("YYYY-MM-DD"))
+      .replace(/\{pomodoro-start\}/g, hm(p.pomodoroStart || p.pauseStart))
+      .replace(/\{pomodoro-resume\}/g, hm(p.pauseEnd))
+      .replace(/\{pause-start\}/g, hm(p.pauseStart))
+      .replace(/\{pause-end\}/g, hm(p.pauseEnd))
+      .replace(/\{pause-tag\}/g, p.tag || "");
+    await this.app.vault.process(file, (data: string) => insertUnderHeading(data, s.dailyHeading, block, s.dailyCreateHeading));
+  }
+
   // ---------- bridge handed to the React app ----------
   makeApi() {
     const self = this;
@@ -438,9 +487,14 @@ export default class FocusLogPlugin extends Plugin {
         pending: self.data.pending || [],
         tasks: self.data.tasks || [],
         activities: self.data.activities || [],
+        pauseTags: self.data.pauseTags || [],
+        pauses: self.data.pauses || [],
       }),
       saveSessions: async (arr: any[]) => { self.data.sessions = arr; await self.persist(); },
       saveActivities: async (arr: any[]) => { self.data.activities = arr; await self.persist(); },
+      savePauseTags: async (arr: any[]) => { self.data.pauseTags = arr; await self.persist(); },
+      savePauses: async (arr: any[]) => { self.data.pauses = arr; await self.persist(); },
+      appendPause: (p: any) => self.appendPauseToDailyNote(p),
       savePending: async (arr: any[]) => { self.data.pending = arr; await self.persist(); },
       saveTasks: async (arr: any[]) => { self.data.tasks = arr; await self.persist(); },
       patchSettings: async (partial: Partial<FocusLogSettings>) => { self.data.settings = Object.assign({}, self.data.settings, partial); await self.persist(); },
@@ -753,6 +807,20 @@ class FocusLogSettingTab extends PluginSettingTab {
           await this.plugin.persist();
         })
       );
+
+    containerEl.createEl("h3", { text: "Pause" });
+
+    new Setting(containerEl)
+      .setName("Pause block template")
+      .setDesc("Written to the daily note when you tag a pause. Placeholders: {date} {pomodoro-start} {pause-start} {pause-end} {pomodoro-resume} {pause-tag}. ({pause-end} and {pomodoro-resume} are both the moment you resumed.) Manage pause tags in the panel's Pause tab.")
+      .addTextArea((t) => {
+        t.setValue(this.plugin.data.settings.pauseTemplate).onChange(async (v) => {
+          this.plugin.data.settings.pauseTemplate = v;
+          await this.plugin.persist();
+        });
+        t.inputEl.rows = 3;
+        t.inputEl.style.width = "100%";
+      });
 
     containerEl.createEl("p", {
       text: "Reopen the Focus Log panel after changing settings here so the panel picks up the new values.",

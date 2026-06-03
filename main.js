@@ -23825,7 +23825,7 @@ function PieChart({ data }) {
   });
   return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("svg", { width: 160, height: 160, style: { flexShrink: 0 } }, slices.map((s, i) => /* @__PURE__ */ React.createElement("path", { key: i, d: s.path, fill: s.color, stroke: C.card, strokeWidth: 1.5 }))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, slices.map((s, i) => /* @__PURE__ */ React.createElement("span", { key: i, style: { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 2, background: s.color } }), s.label, /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)" } }, s.value, " (", Math.round(s.frac * 100), "%)")))));
 }
-function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, resetTimer }) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag }) {
   const [task, setTask] = useState(preset || tasks[0] && tasks[0].task || "");
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
@@ -23838,12 +23838,15 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, setRunning, re
   const submit = () => {
     if (!task.trim())
       return;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: (/* @__PURE__ */ new Date()).toISOString(), expected: exp, actual: act, note: note.trim(), minutes: 25 }, markDone);
+    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: (/* @__PURE__ */ new Date()).toISOString(), expected: exp, actual: act, note: note.trim(), minutes: pomoMin }, markDone);
     setNote("");
     setMarkDone(false);
   };
   const inputStyle = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
-  return /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink } }, mm, ":", ss), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setRunning((r) => !r), style: btn(C.ink) }, running ? "pause" : "start 25m"), /* @__PURE__ */ React.createElement("button", { onClick: resetTimer, style: btn(C.muted, true) }, "reset"))), /* @__PURE__ */ React.createElement("label", { style: { color: C.muted, fontSize: 12 } }, "task (Act +1 writes to this page)"), /* @__PURE__ */ React.createElement("select", { value: task, onChange: (e) => setTask(e.target.value), style: { ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 } }, tasks.map((t) => /* @__PURE__ */ React.createElement("option", { key: t.task, value: t.task }, t.task, t.king ? " \u{1F451}" : ""))), /* @__PURE__ */ React.createElement(Scale, { label: "before: how enjoyable do I expect this to be? (1 dull ... 5 great)", value: exp, onChange: setExp, color: settings.beginColor }), /* @__PURE__ */ React.createElement(Scale, { label: "after: how enjoyable was it actually? (1 dull ... 5 great)", value: act, onChange: setAct, color: settings.endColor }), /* @__PURE__ */ React.createElement("input", { value: note, onChange: (e) => setNote(e.target.value), placeholder: "quick note (optional)", style: { ...inputStyle, marginBottom: 14, marginTop: 4 } }), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13, color: C.ink, cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: markDone, onChange: (e) => setMarkDone(e.target.checked), style: { width: 16, height: 16, accentColor: C.better, cursor: "pointer" } }), "also set this task's status to Done in Notion"), /* @__PURE__ */ React.createElement("button", { onClick: submit, style: { ...btn(C.ink), width: "100%", padding: "10px" } }, "log pomodoro + write Act"));
+  return /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink } }, mm, ":", ss), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => changePomo(pomoMin - 1), disabled: pomoMin <= 15, title: "shorter (min 15)", style: { ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin <= 15 ? 0.4 : 1 } }, "\u2212"), /* @__PURE__ */ React.createElement("button", { onClick: onStart, style: btn(C.ink) }, "start ", pomoMin, "m"), /* @__PURE__ */ React.createElement("button", { onClick: () => changePomo(pomoMin + 1), disabled: pomoMin >= 25, title: "longer (max 25)", style: { ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin >= 25 ? 0.4 : 1 } }, "+"), /* @__PURE__ */ React.createElement("button", { onClick: onPause, style: btn(C.muted, true) }, "pause"), /* @__PURE__ */ React.createElement("button", { onClick: resetTimer, style: btn(C.muted, true) }, "reset"))), pauseActive && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, background: C.paper, border: `1px solid ${C.faint}` } }, /* @__PURE__ */ React.createElement("p", { style: { margin: "0 0 6px", fontSize: 12, color: C.muted } }, "Paused \u2014 why? Pick a tag; it's written to your note when you resume."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, pauseTags.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: C.muted } }, "No pause tags \u2014 add some in the Pause tab.") : pauseTags.map((pt) => {
+    const on = pauseTag === pt.name;
+    return /* @__PURE__ */ React.createElement("button", { key: pt.id, onClick: () => setPauseTag(on ? "" : pt.name), style: { padding: "5px 11px", borderRadius: 999, border: `1.5px solid ${on ? C.worse : C.faint}`, background: on ? C.worse : "transparent", color: on ? "#fff" : C.ink, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)" } }, pt.name);
+  }))), /* @__PURE__ */ React.createElement("label", { style: { color: C.muted, fontSize: 12 } }, "task (Act +1 writes to this page)"), /* @__PURE__ */ React.createElement("select", { value: task, onChange: (e) => setTask(e.target.value), style: { ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 } }, tasks.map((t) => /* @__PURE__ */ React.createElement("option", { key: t.task, value: t.task }, t.task, t.king ? " \u{1F451}" : ""))), /* @__PURE__ */ React.createElement(Scale, { label: "before: how enjoyable do I expect this to be? (1 dull ... 5 great)", value: exp, onChange: setExp, color: settings.beginColor }), /* @__PURE__ */ React.createElement(Scale, { label: "after: how enjoyable was it actually? (1 dull ... 5 great)", value: act, onChange: setAct, color: settings.endColor }), /* @__PURE__ */ React.createElement("input", { value: note, onChange: (e) => setNote(e.target.value), placeholder: "quick note (optional)", style: { ...inputStyle, marginBottom: 14, marginTop: 4 } }), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13, color: C.ink, cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: markDone, onChange: (e) => setMarkDone(e.target.checked), style: { width: 16, height: 16, accentColor: C.better, cursor: "pointer" } }), "also set this task's status to Done in Notion"), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: chooseNext ? 8 : 14, fontSize: 12.5, color: C.ink, cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: chooseNext, onChange: (e) => setChooseNext(e.target.checked), style: { width: 15, height: 15, accentColor: C.ink, cursor: "pointer" } }), "pick the next task now (the log reopens to it after the break)"), chooseNext && /* @__PURE__ */ React.createElement("select", { value: nextTask, onChange: (e) => setNextTask(e.target.value), style: { ...inputStyle, marginBottom: 14, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 next pomodoro: decide later \u2014"), tasks.map((t) => /* @__PURE__ */ React.createElement("option", { key: t.task, value: t.task }, t.task, t.king ? " \u{1F451}" : ""))), /* @__PURE__ */ React.createElement("button", { onClick: submit, style: { ...btn(C.ink), width: "100%", padding: "10px" } }, "log pomodoro + write Act"));
 }
 function SessionRow({ s, settings, onEdit, onDelete }) {
   const d = new Date(s.ts);
@@ -23874,6 +23877,16 @@ function FocusLogApp({ api }) {
     api.patchSettings && api.patchSettings({ dailyGoal: g });
     setEditingGoal(false);
   };
+  const [pomoMin, setPomoMin] = useState(Math.max(15, Math.min(25, Number(settings.pomodoroMinutes) || 25)));
+  const [chooseNext, setChooseNextState] = useState(settings.chooseNextTask !== false);
+  const setChooseNext = (v) => {
+    setChooseNextState(v);
+    api.patchSettings && api.patchSettings({ chooseNextTask: v });
+  };
+  const [nextTask, setNextTask] = useState("");
+  const [pomoStart, setPomoStart] = useState(null);
+  const [pauseStart, setPauseStart] = useState(null);
+  const [pauseTag, setPauseTag] = useState("");
   const [activities, setActivities] = useState(init.activities || []);
   const saveActivities = (next) => {
     setActivities(next);
@@ -23913,7 +23926,13 @@ function FocusLogApp({ api }) {
       saveActivities(activities.map((a) => brk.picked.includes(a.id) ? { ...a, count: (a.count || 0) + 1, lastUsed: now } : a));
     }
     setBrk({ active: false, secs: 0, running: false, picked: [], finished: false });
-    setView("today");
+    if (chooseNext && nextTask) {
+      setPreset(nextTask);
+      setNextTask("");
+      resetTimer();
+      setView("log");
+    } else
+      setView("today");
   };
   const addActivity = () => {
     const name = (newAct.name || "").trim();
@@ -23923,7 +23942,48 @@ function FocusLogApp({ api }) {
     setNewAct({ name: "", area: "" });
   };
   const removeActivity = (id) => saveActivities(activities.filter((a) => a.id !== id));
-  const [secs, setSecs] = useState(25 * 60);
+  const [editActId, setEditActId] = useState(null);
+  const [editActDraft, setEditActDraft] = useState({ name: "", area: "" });
+  const startEditAct = (a) => {
+    setEditActId(a.id);
+    setEditActDraft({ name: a.name, area: a.area || "" });
+  };
+  const saveEditAct = () => {
+    const name = (editActDraft.name || "").trim();
+    if (!name)
+      return;
+    saveActivities(activities.map((a) => a.id === editActId ? { ...a, name, area: (editActDraft.area || "").trim() || "Other" } : a));
+    setEditActId(null);
+  };
+  const [pauseTags, setPauseTags] = useState(init.pauseTags || []);
+  const savePauseTags = (next) => {
+    setPauseTags(next);
+    api.savePauseTags && api.savePauseTags(next);
+  };
+  const [pauses, setPauses] = useState(init.pauses || []);
+  const savePauses = (next) => {
+    setPauses(next);
+    api.savePauses && api.savePauses(next);
+  };
+  const [newPauseTag, setNewPauseTag] = useState("");
+  const [editTagId, setEditTagId] = useState(null);
+  const [editTagName, setEditTagName] = useState("");
+  const addPauseTag = () => {
+    const n = newPauseTag.trim();
+    if (!n)
+      return;
+    savePauseTags([...pauseTags, { id: "pt" + Date.now(), name: n }]);
+    setNewPauseTag("");
+  };
+  const removePauseTag = (id) => savePauseTags(pauseTags.filter((t) => t.id !== id));
+  const saveEditTag = () => {
+    const n = editTagName.trim();
+    if (!n)
+      return;
+    savePauseTags(pauseTags.map((t) => t.id === editTagId ? { ...t, name: n } : t));
+    setEditTagId(null);
+  };
+  const [secs, setSecs] = useState(pomoMin * 60);
   const [running, setRunning] = useState(false);
   const tick = useRef(null);
   const fired = useRef({});
@@ -23956,8 +24016,44 @@ function FocusLogApp({ api }) {
   }, [secs]);
   const resetTimer = () => {
     setRunning(false);
-    setSecs(25 * 60);
+    setSecs(pomoMin * 60);
     fired.current = {};
+    setPomoStart(null);
+    setPauseStart(null);
+    setPauseTag("");
+  };
+  const changePomo = (n) => {
+    const m = Math.max(15, Math.min(25, Math.round(n) || 25));
+    setPomoMin(m);
+    if (!running) {
+      setSecs(m * 60);
+      fired.current = {};
+    }
+    api.patchSettings && api.patchSettings({ pomodoroMinutes: m });
+  };
+  const commitPause = (end) => {
+    if (pauseStart != null && pauseTag) {
+      savePauses([...pauses, { id: "pa" + Date.now(), ts: pauseStart, tag: pauseTag }]);
+      if (api.appendPause)
+        Promise.resolve(api.appendPause({ pomodoroStart: pomoStart, pauseStart, pauseEnd: end, tag: pauseTag })).catch(() => {
+        });
+    }
+    setPauseStart(null);
+    setPauseTag("");
+  };
+  const onStart = () => {
+    if (pauseStart != null)
+      commitPause(Date.now());
+    if (pomoStart == null)
+      setPomoStart(Date.now());
+    setRunning(true);
+  };
+  const onPause = () => {
+    setRunning(false);
+    if (pauseStart == null) {
+      setPauseStart(Date.now());
+      setPauseTag("");
+    }
   };
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState(null);
@@ -24024,6 +24120,9 @@ ${s.task}`))
   };
   const logPomodoro = async (s, markDone) => {
     persist([...sessions, s]);
+    if (pauseStart != null)
+      commitPause(Date.now());
+    setPomoStart(null);
     const key = s.pageId || s.task;
     setDoneSess((m) => ({ ...m, [key]: (m[key] || 0) + 1 }));
     if (settings.breakEnabled) {
@@ -24120,6 +24219,30 @@ ${s.task}`))
       areaAgg[a.area || "Other"] = (areaAgg[a.area || "Other"] || 0) + (a.count || 0);
   });
   const pieData = Object.keys(areaAgg).map((k, i) => ({ label: k, value: areaAgg[k], color: PIE[i % PIE.length] }));
+  const topPauseOf = (list) => {
+    const c = {};
+    list.forEach((p) => c[p.tag] = (c[p.tag] || 0) + 1);
+    const e = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+    return e ? { tag: e[0], n: e[1] } : null;
+  };
+  const pauseWeek = pauses.filter((p) => {
+    const d = logicalDay(p.ts, settings);
+    return d >= wkStartNow && d < new Date(wkStartNow.getTime() + 7 * DAY);
+  });
+  const pauseMonth = pauses.filter((p) => {
+    const d = logicalDay(p.ts, settings);
+    return d.getMonth() === nowLD.getMonth() && d.getFullYear() === nowLD.getFullYear();
+  });
+  const topPauseWeek = topPauseOf(pauseWeek);
+  const topPauseMonth = topPauseOf(pauseMonth);
+  const tagBands = pauseTags.map((t) => {
+    const evs = pauses.filter((p) => p.tag === t.name);
+    const bands = [0, 0, 0];
+    evs.forEach((p) => {
+      bands[bandOf(p.ts, settings)]++;
+    });
+    return { name: t.name, total: evs.length, bands, top: evs.length ? BAND_NAME[bands.indexOf(Math.max(...bands))] : null };
+  });
   const openLog = (leafTask) => {
     setPreset(leafTask);
     setView("log");
@@ -24128,7 +24251,7 @@ ${s.task}`))
   return /* @__PURE__ */ React.createElement("div", { style: { background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)" } }, /* @__PURE__ */ React.createElement("style", null, `
         @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&display=swap');
         :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:ui-monospace,'SF Mono',Menlo,monospace; }
-      `), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Square = ExecutionPower:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Letter = CognitiveLoad:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" } }, "A"), " high"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" } }, "B"), " medium"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" } }, "C"), " low"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 4 } }, "\u{1F451}", " = King ", "\xB7", " day starts at ", settings.dayStart, ":00"))), flash && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" } }, ["today", "week", "month", "totals", "log", "break"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, onClick: () => setView(t), style: tab(t) }, t))), view === "today" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 } }, tasks.length, " tasks ", "\xB7", " ", countToday, " /", editingGoal ? /* @__PURE__ */ React.createElement(
+      `), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Square = ExecutionPower:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Letter = CognitiveLoad:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" } }, "A"), " high"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" } }, "B"), " medium"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" } }, "C"), " low"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 4 } }, "\u{1F451}", " = King ", "\xB7", " day starts at ", settings.dayStart, ":00"))), flash && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" } }, ["today", "week", "month", "totals", "log", "break", "pause"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, onClick: () => setView(t), style: tab(t) }, t))), view === "today" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 } }, tasks.length, " tasks ", "\xB7", " ", countToday, " /", editingGoal ? /* @__PURE__ */ React.createElement(
     "input",
     {
       type: "number",
@@ -24201,10 +24324,16 @@ ${s.task}`))
     const pct = b.avg != null ? b.avg / 5 * 100 : 0;
     const isBest = bestBand && b.band === bestBand.band;
     return /* @__PURE__ */ React.createElement("div", { key: b.band, style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 70, fontSize: 12, color: C.muted, textTransform: "capitalize" } }, b.name), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("div", { style: { width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral } })), /* @__PURE__ */ React.createElement("span", { style: { width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted } }, b.avg != null ? b.avg.toFixed(1) : "\u2014", " \xB7 ", b.count, "\u{1F345}"));
-  })))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "All sessions"), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), sessions.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion."))), view === "log" && /* @__PURE__ */ React.createElement(LogForm, { tasks, preset, onAdd: logPomodoro, settings, secs, running, setRunning, resetTimer }), view === "break" && /* @__PURE__ */ React.createElement("div", null, brk.active && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink } }, String(Math.floor(brk.secs / 60)).padStart(2, "0"), ":", String(brk.secs % 60).padStart(2, "0")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, !brk.finished && /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, running: !b.running })), style: btn(C.ink) }, brk.running ? "pause" : "start"), /* @__PURE__ */ React.createElement("button", { onClick: endBreak, style: btn(C.muted, true) }, brk.finished ? "back to today" : "end break"))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, margin: "0 0 8px" } }, "Pick up to 3 things to do on this break (", brk.picked.length, "/3):"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } }, activities.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "No activities yet \u2014 add some below.") : activities.map((a) => {
+  })))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "All sessions"), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), sessions.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion."))), view === "log" && /* @__PURE__ */ React.createElement(LogForm, { tasks, preset, onAdd: logPomodoro, settings, secs, running, resetTimer, pomoMin, changePomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive: pauseStart != null, pauseTags, pauseTag, setPauseTag }), view === "break" && /* @__PURE__ */ React.createElement("div", null, brk.active && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink } }, String(Math.floor(brk.secs / 60)).padStart(2, "0"), ":", String(brk.secs % 60).padStart(2, "0")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, !brk.finished && /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 4, marginRight: 4 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, secs: Math.max(60, b.secs - 60), finished: false })), style: { ...btn(C.muted, true), padding: "4px 9px" } }, "\u2212"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, minWidth: 34, textAlign: "center" } }, Math.round(brk.secs / 60), "m"), /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, secs: Math.min(30 * 60, b.secs + 60), finished: false })), style: { ...btn(C.muted, true), padding: "4px 9px" } }, "+")), !brk.finished && /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, running: !b.running })), style: btn(C.ink) }, brk.running ? "pause" : "start"), /* @__PURE__ */ React.createElement("button", { onClick: endBreak, style: btn(C.muted, true) }, brk.finished ? "back to today" : "end break"))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, margin: "0 0 8px" } }, "Pick up to 3 things to do on this break (", brk.picked.length, "/3):"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } }, activities.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "No activities yet \u2014 add some below.") : activities.map((a) => {
     const on = brk.picked.includes(a.id);
     return /* @__PURE__ */ React.createElement("button", { key: a.id, onClick: () => togglePick(a.id), style: { padding: "6px 12px", borderRadius: 999, border: `1.5px solid ${on ? C.ink : C.faint}`, background: on ? C.ink : "transparent", color: on ? "#fff" : C.ink, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)" } }, a.name);
-  }))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Break activities"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 } }, activities.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "None yet. Add an activity and an area below."), activities.map((a) => /* @__PURE__ */ React.createElement("div", { key: a.id, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, a.name), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" } }, "#", a.area), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" } }, a.count || 0, "\xD7"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 48, textAlign: "right" } }, a.lastUsed ? fmtDate(a.lastUsed) : "\u2014"), /* @__PURE__ */ React.createElement("button", { onClick: () => removeActivity(a.id), style: { ...btn(C.worse, true), padding: "3px 9px" } }, "\u2715")))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("input", { value: newAct.name, onChange: (e) => setNewAct({ ...newAct, name: e.target.value }), placeholder: "activity name", style: { flex: 2, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" } }), /* @__PURE__ */ React.createElement("input", { value: newAct.area, onChange: (e) => setNewAct({ ...newAct, area: e.target.value }), placeholder: "area / tag", style: { flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" } }), /* @__PURE__ */ React.createElement("button", { onClick: addActivity, style: btn(C.ink) }, "add"))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "What you reach for on breaks."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, "Favourites"), favs.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "\u2014") : favs.map((a) => /* @__PURE__ */ React.createElement("div", { key: a.id, style: { fontSize: 13 } }, a.name, " ", /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 11 } }, a.count, "\xD7")))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, "Least chosen"), disliked.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "\u2014") : disliked.map((a) => /* @__PURE__ */ React.createElement("div", { key: a.id, style: { fontSize: 13, color: C.muted } }, a.name, " ", /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 11 } }, a.count || 0, "\xD7"))))), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 } }, "By area"), /* @__PURE__ */ React.createElement(PieChart, { data: pieData })))));
+  }))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Break activities"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 } }, activities.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "None yet. Add an activity and an area below."), activities.map((a) => editActId === a.id ? /* @__PURE__ */ React.createElement("div", { key: a.id, style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 } }, /* @__PURE__ */ React.createElement("input", { value: editActDraft.name, onChange: (e) => setEditActDraft({ ...editActDraft, name: e.target.value }), style: { flex: 2, minWidth: 110, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } }), /* @__PURE__ */ React.createElement("input", { value: editActDraft.area, onChange: (e) => setEditActDraft({ ...editActDraft, area: e.target.value }), placeholder: "area", style: { flex: 1, minWidth: 70, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } }), /* @__PURE__ */ React.createElement("button", { onClick: saveEditAct, style: { ...btn(C.ink), padding: "4px 10px" } }, "save"), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditActId(null), style: { ...btn(C.muted, true), padding: "4px 10px" } }, "cancel")) : /* @__PURE__ */ React.createElement("div", { key: a.id, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, a.name), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" } }, "#", a.area), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" } }, a.count || 0, "\xD7"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 48, textAlign: "right" } }, a.lastUsed ? fmtDate(a.lastUsed) : "\u2014"), /* @__PURE__ */ React.createElement("button", { onClick: () => startEditAct(a), style: { ...btn(C.muted, true), padding: "3px 9px" } }, "edit"), /* @__PURE__ */ React.createElement("button", { onClick: () => removeActivity(a.id), style: { ...btn(C.worse, true), padding: "3px 9px" } }, "\u2715")))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("input", { value: newAct.name, onChange: (e) => setNewAct({ ...newAct, name: e.target.value }), placeholder: "activity name", style: { flex: 2, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" } }), /* @__PURE__ */ React.createElement("input", { value: newAct.area, onChange: (e) => setNewAct({ ...newAct, area: e.target.value }), placeholder: "area / tag", style: { flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" } }), /* @__PURE__ */ React.createElement("button", { onClick: addActivity, style: btn(C.ink) }, "add"))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "What you reach for on breaks."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, "Favourites"), favs.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "\u2014") : favs.map((a) => /* @__PURE__ */ React.createElement("div", { key: a.id, style: { fontSize: 13 } }, a.name, " ", /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 11 } }, a.count, "\xD7")))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, "Least chosen"), disliked.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "\u2014") : disliked.map((a) => /* @__PURE__ */ React.createElement("div", { key: a.id, style: { fontSize: 13, color: C.muted } }, a.name, " ", /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 11 } }, a.count || 0, "\xD7"))))), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 } }, "By area"), /* @__PURE__ */ React.createElement(PieChart, { data: pieData }))), view === "pause" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 6px" } }, "Pause tags"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, margin: "0 0 10px" } }, "Reasons you can tag a pause with. Picked from the log view when you pause."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 } }, pauseTags.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "None yet. Add one below."), pauseTags.map((t) => editTagId === t.id ? /* @__PURE__ */ React.createElement("div", { key: t.id, style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 } }, /* @__PURE__ */ React.createElement("input", { value: editTagName, onChange: (e) => setEditTagName(e.target.value), style: { flex: 1, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } }), /* @__PURE__ */ React.createElement("button", { onClick: saveEditTag, style: { ...btn(C.ink), padding: "4px 10px" } }, "save"), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditTagId(null), style: { ...btn(C.muted, true), padding: "4px 10px" } }, "cancel")) : /* @__PURE__ */ React.createElement("div", { key: t.id, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, t.name), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+    setEditTagId(t.id);
+    setEditTagName(t.name);
+  }, style: { ...btn(C.muted, true), padding: "3px 9px" } }, "edit"), /* @__PURE__ */ React.createElement("button", { onClick: () => removePauseTag(t.id), style: { ...btn(C.worse, true), padding: "3px 9px" } }, "\u2715")))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("input", { value: newPauseTag, onChange: (e) => setNewPauseTag(e.target.value), onKeyDown: (e) => {
+    if (e.key === "Enter")
+      addPauseTag();
+  }, placeholder: "new pause reason", style: { flex: 1, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" } }), /* @__PURE__ */ React.createElement("button", { onClick: addPauseTag, style: btn(C.ink) }, "add"))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "When and why you pause."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 } }, /* @__PURE__ */ React.createElement(Stat, { label: "pauses this week", value: pauseWeek.length }), /* @__PURE__ */ React.createElement(Stat, { label: "pauses this month", value: pauseMonth.length }), /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 12px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: C.muted } }, "top this week"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: C.ink } }, topPauseWeek ? `${topPauseWeek.tag} (${topPauseWeek.n})` : "\u2014"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: C.muted, marginTop: 4 } }, "top this month"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: C.ink } }, topPauseMonth ? `${topPauseMonth.tag} (${topPauseMonth.n})` : "\u2014"))), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 } }, "Typical time of day (all history)"), tagBands.filter((t) => t.total > 0).length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No pauses recorded yet.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, tagBands.filter((t) => t.total > 0).sort((a, b) => b.total - a.total).map((t) => /* @__PURE__ */ React.createElement("div", { key: t.name, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, t.name), /* @__PURE__ */ React.createElement("span", { style: { display: "flex", gap: 3 } }, t.bands.map((n, i) => /* @__PURE__ */ React.createElement("span", { key: i, title: `${BAND_NAME[i]}: ${n}`, style: { width: 26, textAlign: "center", fontFamily: "var(--fl-mono)", fontSize: 11, color: i === t.bands.indexOf(Math.max(...t.bands)) ? C.ink : C.faint } }, n))), /* @__PURE__ */ React.createElement("span", { style: { minWidth: 70, textAlign: "right", fontSize: 12, color: C.muted } }, t.top))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3, justifyContent: "flex-end", fontSize: 10, color: C.muted, marginTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }), BAND_NAME.map((b, i) => /* @__PURE__ */ React.createElement("span", { key: i, style: { width: 26, textAlign: "center" } }, b.slice(0, 3))), /* @__PURE__ */ React.createElement("span", { style: { minWidth: 70 } })))))));
 }
 
 // main.tsx
@@ -24235,8 +24364,19 @@ var DEFAULT_SETTINGS = {
   counterPrefix: "## \u{1F34E} Today_Pomodoro:: ",
   breakEnabled: false,
   breakAutoStart: true,
-  breakMinutes: 5
+  breakMinutes: 5,
+  pomodoroMinutes: 25,
+  chooseNextTask: true,
+  pauseTemplate: '- [ ] <mark class="hltr-pink">{date}</mark> {pause-start} - {pause-end} \u23F8\uFE0F {pause-tag}'
 };
+var DEFAULT_PAUSE_TAGS = [
+  { id: "p-bathroom", name: "bathroom" },
+  { id: "p-water", name: "water / snack" },
+  { id: "p-distracted", name: "got distracted" },
+  { id: "p-phone", name: "phone" },
+  { id: "p-tired", name: "tired" },
+  { id: "p-interrupted", name: "interrupted" }
+];
 var DEFAULT_ACTIVITIES = [
   { id: "a-stretch", name: "Stretch", area: "Body", count: 0, lastUsed: null },
   { id: "a-water", name: "Drink water", area: "Body", count: 0, lastUsed: null },
@@ -24367,7 +24507,9 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       sessions: loaded.sessions || [],
       pending: loaded.pending || [],
       tasks: loaded.tasks || [],
-      activities: loaded.activities || DEFAULT_ACTIVITIES.map((a) => ({ ...a }))
+      activities: loaded.activities || DEFAULT_ACTIVITIES.map((a) => ({ ...a })),
+      pauseTags: loaded.pauseTags || DEFAULT_PAUSE_TAGS.map((a) => ({ ...a })),
+      pauses: loaded.pauses || []
     };
     this.registerView(VIEW_TYPE, (leaf) => new FocusLogView(leaf, this));
     this.addRibbonIcon("timer", "Open Focus Log", () => this.activateView());
@@ -24587,6 +24729,37 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     if (counterStatus === "ambiguous")
       new import_obsidian.Notice("Focus Log: the counter prefix matches more than one line \u2014 counter not updated.");
   }
+  // Append a pause entry under the daily heading, using the pause template and its placeholders.
+  async appendPauseToDailyNote(p) {
+    var _a, _b, _c;
+    const s = this.data.settings;
+    if (!s.dailyNoteWrite)
+      return;
+    const moment = window.moment;
+    if (!moment)
+      throw new Error("moment unavailable");
+    const fileDate = s.dailyNoteTrueDate ? new Date(p.pauseEnd) : new Date(p.pauseEnd - dayShiftHours(s.dayStart) * 36e5);
+    const m = moment(new Date(fileDate.getFullYear(), fileDate.getMonth(), fileDate.getDate()));
+    const dn = (_b = (_a = this.app.internalPlugins) == null ? void 0 : _a.getPluginById) == null ? void 0 : _b.call(_a, "daily-notes");
+    const opts = ((_c = dn == null ? void 0 : dn.instance) == null ? void 0 : _c.options) || {};
+    const format = opts.format || "YYYY-MM-DD";
+    const folder = (opts.folder || "").trim();
+    const path = (0, import_obsidian.normalizePath)((folder ? folder + "/" : "") + m.format(format) + ".md");
+    let file = this.app.vault.getAbstractFileByPath(path);
+    if (!file) {
+      if (folder && !this.app.vault.getAbstractFileByPath(folder))
+        await this.app.vault.createFolder(folder).catch(() => {
+        });
+      file = await this.app.vault.create(path, "# " + s.dailyHeading + "\n");
+    }
+    const pad = (n) => String(n).padStart(2, "0");
+    const hm = (ts) => {
+      const d = new Date(ts);
+      return pad(d.getHours()) + ":" + pad(d.getMinutes());
+    };
+    const block = (s.pauseTemplate || "").replace(/\{date\}/g, m.format("YYYY-MM-DD")).replace(/\{pomodoro-start\}/g, hm(p.pomodoroStart || p.pauseStart)).replace(/\{pomodoro-resume\}/g, hm(p.pauseEnd)).replace(/\{pause-start\}/g, hm(p.pauseStart)).replace(/\{pause-end\}/g, hm(p.pauseEnd)).replace(/\{pause-tag\}/g, p.tag || "");
+    await this.app.vault.process(file, (data) => insertUnderHeading(data, s.dailyHeading, block, s.dailyCreateHeading));
+  }
   // ---------- bridge handed to the React app ----------
   makeApi() {
     const self = this;
@@ -24596,7 +24769,9 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         sessions: self.data.sessions || [],
         pending: self.data.pending || [],
         tasks: self.data.tasks || [],
-        activities: self.data.activities || []
+        activities: self.data.activities || [],
+        pauseTags: self.data.pauseTags || [],
+        pauses: self.data.pauses || []
       }),
       saveSessions: async (arr) => {
         self.data.sessions = arr;
@@ -24606,6 +24781,15 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         self.data.activities = arr;
         await self.persist();
       },
+      savePauseTags: async (arr) => {
+        self.data.pauseTags = arr;
+        await self.persist();
+      },
+      savePauses: async (arr) => {
+        self.data.pauses = arr;
+        await self.persist();
+      },
+      appendPause: (p) => self.appendPauseToDailyNote(p),
       savePending: async (arr) => {
         self.data.pending = arr;
         await self.persist();
@@ -24835,6 +25019,15 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.persist();
       })
     );
+    containerEl.createEl("h3", { text: "Pause" });
+    new import_obsidian.Setting(containerEl).setName("Pause block template").setDesc("Written to the daily note when you tag a pause. Placeholders: {date} {pomodoro-start} {pause-start} {pause-end} {pomodoro-resume} {pause-tag}. ({pause-end} and {pomodoro-resume} are both the moment you resumed.) Manage pause tags in the panel's Pause tab.").addTextArea((t) => {
+      t.setValue(this.plugin.data.settings.pauseTemplate).onChange(async (v) => {
+        this.plugin.data.settings.pauseTemplate = v;
+        await this.plugin.persist();
+      });
+      t.inputEl.rows = 3;
+      t.inputEl.style.width = "100%";
+    });
     containerEl.createEl("p", {
       text: "Reopen the Focus Log panel after changing settings here so the panel picks up the new values.",
       cls: "setting-item-description"
