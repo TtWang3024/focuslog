@@ -320,6 +320,18 @@ const MACARON = [
   "rgb(246, 201, 140)", // Mandarin
   "rgb(183, 158, 203)", // Blackcurrant
 ];
+// A darker shade of a macaron colour (for borders), and a readable text colour over it.
+function darken(rgb: any, f: number): string {
+  const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(String(rgb));
+  if (!m) return String(rgb);
+  return `rgb(${Math.round(+m[1] * f)}, ${Math.round(+m[2] * f)}, ${Math.round(+m[3] * f)})`;
+}
+function textOn(rgb: any): string {
+  const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(String(rgb));
+  if (!m) return C.ink;
+  const lum = 0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3];
+  return lum > 150 ? C.ink : "#fff";
+}
 function polarPt(cx: number, cy: number, r: number, deg: number) {
   const a = (deg * Math.PI) / 180;
   return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
@@ -368,7 +380,7 @@ function AutoTextarea({ value, onChange, placeholder, style }: any) {
   return <textarea ref={ref} value={value} onChange={onChange} placeholder={placeholder} rows={1} style={style} />;
 }
 
-function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag }: any) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor }: any) {
   const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
@@ -416,7 +428,8 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, po
             {pauseTags.length === 0 ? <span style={{ fontSize: 12, color: C.muted }}>No pause tags — add some in the Pause tab.</span> :
               pauseTags.map((pt: any) => {
                 const on = pauseTag === pt.name;
-                return <button key={pt.id} onClick={() => setPauseTag(on ? "" : pt.name)} style={{ padding: "5px 11px", borderRadius: 999, border: `1.5px solid ${on ? C.worse : C.faint}`, background: on ? C.worse : "transparent", color: on ? "#fff" : C.ink, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)" }}>{pt.name}</button>;
+                const fill = tagColor(pt.name);
+                return <button key={pt.id} onClick={() => setPauseTag(on ? "" : pt.name)} style={{ padding: "5px 11px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${darken(fill, on ? 0.5 : 0.72)}`, background: fill, color: textOn(fill), opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", maxWidth: "100%" }}>{on ? "✓ " : ""}{pt.name}</button>;
               })}
           </div>
         </div>
@@ -1011,7 +1024,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} />}
+        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} />}
 
         {view === "break" && (
           <div>
@@ -1028,15 +1041,16 @@ export default function FocusLogApp({ api }: any) {
                       </span>
                     )}
                     {!brk.finished && <button onClick={() => setBrk((b: any) => ({ ...b, running: !b.running }))} style={btn(C.ink)}>{brk.running ? "pause" : "start"}</button>}
-                    <button onClick={endBreak} style={btn(C.muted, true)}>{brk.finished ? "back to today" : "end break"}</button>
+                    <button onClick={endBreak} style={btn(C.muted, true)}>{brk.finished ? "go back to my task" : "end break"}</button>
                   </div>
                 </div>
                 <p style={{ color: C.muted, fontSize: 12, margin: "0 0 8px" }}>Pick up to 3 things to do on this break ({brk.picked.length}/3):</p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 8 }}>
                   {activities.length === 0 ? <span style={{ color: C.muted, fontSize: 13 }}>No activities yet — add some below.</span> :
                     activities.map((a) => {
                       const on = brk.picked.includes(a.id);
-                      return <button key={a.id} onClick={() => togglePick(a.id)} style={{ padding: "6px 12px", borderRadius: 999, border: `1.5px solid ${on ? C.ink : C.faint}`, background: on ? C.ink : "transparent", color: on ? "#fff" : C.ink, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)" }}>{a.name}</button>;
+                      const fill = areaColor(a.area);
+                      return <button key={a.id} onClick={() => togglePick(a.id)} style={{ padding: "6px 12px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${darken(fill, on ? 0.5 : 0.72)}`, background: fill, color: textOn(fill), opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", textAlign: "left", maxWidth: "100%" }}>{on ? "✓ " : ""}{a.name}</button>;
                     })}
                 </div>
               </div>
@@ -1055,11 +1069,11 @@ export default function FocusLogApp({ api }: any) {
                       <button onClick={() => setEditActId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
                     </div>
                   ) : (
-                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: areaColor(a.area), border: `1.5px solid ${darken(areaColor(a.area), 0.6)}`, borderRadius: 6, color: textOn(areaColor(a.area)) }}>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{a.name}</span>
-                      <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: "50%", background: areaColor(a.area), flexShrink: 0 }} />#{a.area}</span>
-                      <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>{a.count || 0}{"×"}</span>
-                      <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>
+                      <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", opacity: 0.8 }}>#{a.area}</span>
+                      <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", opacity: 0.8 }}>{a.count || 0}{"×"}</span>
+                      <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", opacity: 0.8, minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>
                       <button onClick={() => startEditAct(a)} style={{ ...btn(C.muted, true), padding: "3px 9px" }}>edit</button>
                       <button onClick={() => removeActivity(a.id)} style={{ ...btn(C.worse, true), padding: "3px 9px" }}>{"✕"}</button>
                     </div>
@@ -1111,8 +1125,7 @@ export default function FocusLogApp({ api }: any) {
                       <button onClick={() => setEditTagId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
                     </div>
                   ) : (
-                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
-                      <span style={{ width: 11, height: 11, borderRadius: "50%", background: tagColor(t.name), flexShrink: 0 }} />
+                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: tagColor(t.name), border: `1.5px solid ${darken(tagColor(t.name), 0.6)}`, borderRadius: 6, color: textOn(tagColor(t.name)) }}>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
                       <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); }} style={{ ...btn(C.muted, true), padding: "3px 9px" }}>edit</button>
                       <button onClick={() => removePauseTag(t.id)} style={{ ...btn(C.worse, true), padding: "3px 9px" }}>{"✕"}</button>
@@ -1147,13 +1160,12 @@ export default function FocusLogApp({ api }: any) {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {tagBands.filter((t: any) => t.total > 0).sort((a: any, b: any) => b.total - a.total).map((t: any) => (
-                    <div key={t.name} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: tagColor(t.name), flexShrink: 0 }} />
+                    <div key={t.name} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "5px 10px", background: tagColor(t.name), border: `1.5px solid ${darken(tagColor(t.name), 0.6)}`, borderRadius: 6, color: textOn(tagColor(t.name)) }}>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
                       <span style={{ display: "flex", gap: 3 }}>
-                        {t.bands.map((n: number, i: number) => (<span key={i} title={`${BAND_NAME[i]}: ${n}`} style={{ width: 26, textAlign: "center", fontFamily: "var(--fl-mono)", fontSize: 11, color: i === t.bands.indexOf(Math.max(...t.bands)) ? C.ink : C.faint }}>{n}</span>))}
+                        {t.bands.map((n: number, i: number) => (<span key={i} title={`${BAND_NAME[i]}: ${n}`} style={{ width: 26, textAlign: "center", fontFamily: "var(--fl-mono)", fontSize: 11, opacity: i === t.bands.indexOf(Math.max(...t.bands)) ? 1 : 0.45 }}>{n}</span>))}
                       </span>
-                      <span style={{ minWidth: 70, textAlign: "right", fontSize: 12, color: C.muted }}>{t.top}</span>
+                      <span style={{ minWidth: 70, textAlign: "right", fontSize: 12, opacity: 0.85 }}>{t.top}</span>
                     </div>
                   ))}
                   <div style={{ display: "flex", gap: 3, justifyContent: "flex-end", fontSize: 10, color: C.muted, marginTop: 2 }}>
