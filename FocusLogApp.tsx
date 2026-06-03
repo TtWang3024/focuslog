@@ -321,6 +321,12 @@ const MACARON = [
   { fill: "rgb(238, 201, 238)", border: "rgb(213, 144, 213)" }, // Magenta
   { fill: "rgb(238, 201, 219)", border: "rgb(213, 144, 179)" }, // Pink
 ];
+// A darker shade of a colour (for readable label text on a light fill).
+function darken(rgb: any, f: number): string {
+  const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(String(rgb));
+  if (!m) return String(rgb);
+  return `rgb(${Math.round(+m[1] * f)}, ${Math.round(+m[2] * f)}, ${Math.round(+m[3] * f)})`;
+}
 // Manager buttons: a quiet edit, a cautious delete (soft wash on hover via .fl-del in styles.css),
 // and a terracotta add.
 const EDIT_BTN: any = { padding: "3px 9px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "#F2EEE6", border: "1px solid #C9C1B2", color: "#6B6256" };
@@ -1114,14 +1120,14 @@ export default function FocusLogApp({ api }: any) {
                     <div key={a.id}
                       onDragOver={(e) => { e.preventDefault(); if (actOver !== i) setActOver(i); }}
                       onDrop={(e) => { e.preventDefault(); moveActivity(actDrag, i); setActDrag(null); setActOver(null); }}
-                      style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: areaColor(a.area), border: `1.5px solid ${actOver === i && actDrag !== null && actDrag !== i ? C.ink : areaBorder(a.area)}`, borderRadius: 6, color: C.ink, opacity: actDrag === i ? 0.4 : 1, boxShadow: actOver === i && actDrag !== null && actDrag !== i ? `inset 0 2px 0 ${C.ink}` : "none" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: "#fbf8f1", border: `1px solid ${C.line}`, borderLeft: `4px solid ${areaBorder(a.area)}`, borderRadius: 6, color: C.ink, opacity: actDrag === i ? 0.4 : 1, boxShadow: actOver === i && actDrag !== null && actDrag !== i ? `inset 0 2px 0 ${C.ink}` : "none" }}>
                       <span draggable onDragStart={(e) => { setActDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }} onDragEnd={() => { setActDrag(null); setActOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
-                        {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: areaBorder(a.area) }} />))}
+                        {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
                       </span>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{a.name}</span>
-                      <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", opacity: 0.8 }}>#{a.area}</span>
-                      <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", opacity: 0.8 }}>{a.count || 0}{"×"}</span>
-                      <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", opacity: 0.8, minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>
+                      <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", padding: "1px 8px", borderRadius: 999, background: areaColor(a.area), border: `1px solid ${areaBorder(a.area)}`, color: darken(areaBorder(a.area), 0.62), whiteSpace: "nowrap" }}>#{a.area}</span>
+                      <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted }}>{a.count || 0}{"×"}</span>
+                      <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>
                       <button onClick={() => startEditAct(a)} style={EDIT_BTN}>edit</button>
                       <button onClick={() => removeActivity(a.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
                     </div>
@@ -1205,9 +1211,9 @@ export default function FocusLogApp({ api }: any) {
                     <div key={t.id}
                       onDragOver={(e) => { e.preventDefault(); if (tagOver !== i) setTagOver(i); }}
                       onDrop={(e) => { e.preventDefault(); moveTag(tagDrag, i); setTagDrag(null); setTagOver(null); }}
-                      style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: tagColor(t.name), border: `1.5px solid ${tagOver === i && tagDrag !== null && tagDrag !== i ? C.ink : tagBorder(t.name)}`, borderRadius: 6, color: C.ink, opacity: tagDrag === i ? 0.4 : 1, boxShadow: tagOver === i && tagDrag !== null && tagDrag !== i ? `inset 0 2px 0 ${C.ink}` : "none" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: "#fbf8f1", border: `1px solid ${C.line}`, borderLeft: `4px solid ${tagBorder(t.name)}`, borderRadius: 6, color: C.ink, opacity: tagDrag === i ? 0.4 : 1, boxShadow: tagOver === i && tagDrag !== null && tagDrag !== i ? `inset 0 2px 0 ${C.ink}` : "none" }}>
                       <span draggable onDragStart={(e) => { setTagDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }} onDragEnd={() => { setTagDrag(null); setTagOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
-                        {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: tagBorder(t.name) }} />))}
+                        {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
                       </span>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
                       <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); }} style={EDIT_BTN}>edit</button>
