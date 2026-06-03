@@ -524,6 +524,8 @@ export default function FocusLogApp({ api }: any) {
   // Break activities + the post-log break timer.
   const [activities, setActivities] = useState<any[]>(init.activities || []);
   const saveActivities = (next: any[]) => { setActivities(next); api.saveActivities && api.saveActivities(next); };
+  const [breaks, setBreaks] = useState<any[]>(init.breaks || []);
+  const saveBreaks = (next: any[]) => { setBreaks(next); api.saveBreaks && api.saveBreaks(next); };
   const [brk, setBrk] = useState<any>({ active: false, secs: 0, running: false, picked: [], finished: false });
   const brkTick = useRef<any>(null);
   const [newAct, setNewAct] = useState<any>({ name: "", area: "" });
@@ -539,16 +541,22 @@ export default function FocusLogApp({ api }: any) {
     }, 1000);
     return () => clearInterval(brkTick.current);
   }, [brk.active, brk.running]);
-  const startBreak = () => setBrk({ active: true, secs: (Number(settings.breakMinutes) || 5) * 60, running: settings.breakAutoStart !== false, picked: [], finished: false });
+  const startBreak = () => setBrk({ active: true, start: Date.now(), secs: (Number(settings.breakMinutes) || 5) * 60, running: settings.breakAutoStart !== false, picked: [], finished: false });
   const togglePick = (id: string) => setBrk((b: any) => {
     if (b.picked.includes(id)) return { ...b, picked: b.picked.filter((x: string) => x !== id) };
     if (b.picked.length >= 3) return b;
     return { ...b, picked: [...b.picked, id] };
   });
   const endBreak = () => {
+    const now = Date.now();
     if (brk.picked.length) {
-      const now = Date.now();
       saveActivities(activities.map((a) => brk.picked.includes(a.id) ? { ...a, count: (a.count || 0) + 1, lastUsed: now } : a));
+    }
+    if (brk.active && brk.start) {
+      const picked = brk.picked.map((id: string) => activities.find((x) => x.id === id)).filter(Boolean);
+      const names = picked.map((a: any) => a.name);
+      const areas = Array.from(new Set(picked.map((a: any) => a.area || "Other")));
+      saveBreaks([...breaks, { id: "br" + Date.now(), start: brk.start, end: now, activities: names, areas }]);
     }
     setBrk({ active: false, secs: 0, running: false, picked: [], finished: false });
     if (chooseNext && nextTask) { setPreset(nextTask); setNextTask(""); resetTimer(); setView("log"); }
@@ -597,6 +605,27 @@ export default function FocusLogApp({ api }: any) {
     savePauseTags(a);
   };
 
+  // Edit/delete for logged pause and break events (the "all sessions" lists).
+  const [editPauseId, setEditPauseId] = useState<any>(null);
+  const [pauseDraft, setPauseDraft] = useState<any>({ ts: "", tag: "" });
+  const startEditPause = (p: any) => { setEditPauseId(p.id); setPauseDraft({ ts: toLocalDatetime(p.ts), tag: p.tag }); };
+  const saveEditPause = () => {
+    const t = pauseDraft.ts ? new Date(pauseDraft.ts).getTime() : NaN;
+    savePauses(pauses.map((p) => p.id === editPauseId ? { ...p, ts: isNaN(t) ? p.ts : t, tag: pauseDraft.tag || p.tag } : p));
+    setEditPauseId(null);
+  };
+  const deletePause = (id: string) => { savePauses(pauses.filter((p) => p.id !== id)); if (editPauseId === id) setEditPauseId(null); };
+  const [editBreakId, setEditBreakId] = useState<any>(null);
+  const [breakDraft, setBreakDraft] = useState<any>({ start: "", end: "" });
+  const startEditBreak = (b: any) => { setEditBreakId(b.id); setBreakDraft({ start: toLocalDatetime(b.start), end: toLocalDatetime(b.end) }); };
+  const saveEditBreak = () => {
+    const s = breakDraft.start ? new Date(breakDraft.start).getTime() : NaN;
+    const e = breakDraft.end ? new Date(breakDraft.end).getTime() : NaN;
+    saveBreaks(breaks.map((b) => b.id === editBreakId ? { ...b, start: isNaN(s) ? b.start : s, end: isNaN(e) ? b.end : e } : b));
+    setEditBreakId(null);
+  };
+  const deleteBreak = (id: string) => { saveBreaks(breaks.filter((b) => b.id !== id)); if (editBreakId === id) setEditBreakId(null); };
+
   // Timer state lives here so it survives tab switches (LogForm mounts/unmounts).
   const [secs, setSecs] = useState(pomoMin * 60);
   const [running, setRunning] = useState(false);
@@ -631,7 +660,7 @@ export default function FocusLogApp({ api }: any) {
   // Pause/resume with a recorded reason.
   const commitPause = (end: number) => {
     if (pauseStart != null && pauseTag) {
-      savePauses([...pauses, { id: "pa" + Date.now(), ts: pauseStart, tag: pauseTag }]);
+      savePauses([...pauses, { id: "pa" + Date.now(), ts: pauseStart, end, mins: Math.max(0, Math.round((end - pauseStart) / 60000)), tag: pauseTag }]);
       if (api.appendPause) Promise.resolve(api.appendPause({ pomodoroStart: pomoStart, pauseStart, pauseEnd: end, tag: pauseTag })).catch(() => {});
     }
     setPauseStart(null); setPauseTag("");
@@ -1126,6 +1155,35 @@ export default function FocusLogApp({ api }: any) {
               <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>By area</p>
               <PieChart data={pieData} />
             </div>
+
+            <div style={{ marginTop: 20 }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>All breaks</h3>
+                <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{breaks.length} logged</span>
+              </div>
+              {breaks.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No breaks logged yet.</p> : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {[...breaks].sort((a, b) => b.start - a.start).map((b) => (
+                    editBreakId === b.id ? (
+                      <div key={b.id} style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
+                        <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>start<input type="datetime-local" value={breakDraft.start} onChange={(e) => setBreakDraft({ ...breakDraft, start: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
+                        <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>end<input type="datetime-local" value={breakDraft.end} onChange={(e) => setBreakDraft({ ...breakDraft, end: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
+                        <button onClick={saveEditBreak} style={{ ...btn(C.ink), padding: "4px 10px" }}>save</button>
+                        <button onClick={() => setEditBreakId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
+                      </div>
+                    ) : (
+                      <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(b.start)} {fmtTime(b.start)}{"–"}{fmtTime(b.end)}</span>
+                        <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{(b.activities && b.activities.length) ? b.activities.join(", ") : "—"}</span>
+                        <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap" }}>{(b.areas && b.areas.length) ? b.areas.join(" · ") : ""}</span>
+                        <button onClick={() => startEditBreak(b)} style={EDIT_BTN}>edit</button>
+                        <button onClick={() => deleteBreak(b.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
+                      </div>
+                    )
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1198,6 +1256,37 @@ export default function FocusLogApp({ api }: any) {
                     {BAND_NAME.map((b, i) => (<span key={i} style={{ width: 26, textAlign: "center" }}>{b.slice(0, 3)}</span>))}
                     <span style={{ minWidth: 70 }} />
                   </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: 20 }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>All pauses</h3>
+                <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{pauses.length} logged</span>
+              </div>
+              {pauses.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No pauses logged yet.</p> : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {[...pauses].sort((a, b) => (+new Date(b.ts)) - (+new Date(a.ts))).map((p) => (
+                    editPauseId === p.id ? (
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
+                        <input type="datetime-local" value={pauseDraft.ts} onChange={(e) => setPauseDraft({ ...pauseDraft, ts: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
+                        <select value={pauseDraft.tag} onChange={(e) => setPauseDraft({ ...pauseDraft, tag: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }}>
+                          {pauseTags.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+                        </select>
+                        <button onClick={saveEditPause} style={{ ...btn(C.ink), padding: "4px 10px" }}>save</button>
+                        <button onClick={() => setEditPauseId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
+                      </div>
+                    ) : (
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(p.ts)} {fmtTime(p.ts)}</span>
+                        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, minWidth: 34 }}>{p.mins != null ? p.mins + "m" : "—"}</span>
+                        <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{p.tag}</span>
+                        <button onClick={() => startEditPause(p)} style={EDIT_BTN}>edit</button>
+                        <button onClick={() => deletePause(p.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
+                      </div>
+                    )
+                  ))}
                 </div>
               )}
             </div>

@@ -91,6 +91,7 @@ interface PluginData {
   activities: any[];
   pauseTags: any[];
   pauses: any[];
+  breaks: any[];
 }
 
 // ---------- Notion property parsing ----------
@@ -217,6 +218,7 @@ export default class FocusLogPlugin extends Plugin {
       activities: loaded.activities || DEFAULT_ACTIVITIES.map((a) => ({ ...a })),
       pauseTags: loaded.pauseTags || DEFAULT_PAUSE_TAGS.map((a) => ({ ...a })),
       pauses: loaded.pauses || [],
+      breaks: loaded.breaks || [],
     };
 
     this.registerView(VIEW_TYPE, (leaf) => new FocusLogView(leaf, this));
@@ -489,11 +491,13 @@ export default class FocusLogPlugin extends Plugin {
         activities: self.data.activities || [],
         pauseTags: self.data.pauseTags || [],
         pauses: self.data.pauses || [],
+        breaks: self.data.breaks || [],
       }),
       saveSessions: async (arr: any[]) => { self.data.sessions = arr; await self.persist(); },
       saveActivities: async (arr: any[]) => { self.data.activities = arr; await self.persist(); },
       savePauseTags: async (arr: any[]) => { self.data.pauseTags = arr; await self.persist(); },
       savePauses: async (arr: any[]) => { self.data.pauses = arr; await self.persist(); },
+      saveBreaks: async (arr: any[]) => { self.data.breaks = arr; await self.persist(); },
       appendPause: (p: any) => self.appendPauseToDailyNote(p),
       savePending: async (arr: any[]) => { self.data.pending = arr; await self.persist(); },
       saveTasks: async (arr: any[]) => { self.data.tasks = arr; await self.persist(); },
