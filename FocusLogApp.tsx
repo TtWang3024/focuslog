@@ -26,7 +26,7 @@ const BAND_L = [72, 52, 36];
 const BAND_NAME = ["morning", "afternoon", "evening"];
 
 const C: any = {
-  paper: "#f5f1e8", card: "#fbf8f1", ink: "#2b2723", muted: "#8a8175",
+  paper: "#fdfbf6", card: "#fffefc", ink: "#2b2723", muted: "#8a8175",
   faint: "#cfc7b8", line: "#e4ddcf", better: "#5b8c5a", worse: "#b4533a", neutral: "#a59c8c",
 };
 
@@ -306,32 +306,26 @@ function ContribHeatmap({ sessions, settings }: any) {
 
 const PIE = ["#b4533a", "#cda32f", "#5b8c5a", "#4e7d9c", "#9a6f9c", "#c0772e", "#6f9461", "#847bb2"];
 // 12 macaron colours, assigned by name so an area/tag keeps the same colour in the list and the pie.
+// 12 colours, each a {fill, border} pair, assigned to areas/tags by index.
 const MACARON = [
-  "rgb(199, 224, 168)", // Pistachio
-  "rgb(243, 197, 206)", // Rose
-  "rgb(205, 188, 226)", // Lavender
-  "rgb(247, 232, 164)", // Lemon
-  "rgb(228, 201, 160)", // Salted caramel
-  "rgb(244, 236, 221)", // Vanilla cream
-  "rgb(186, 214, 230)", // Blueberry
-  "rgb(248, 199, 172)", // Coral peach
-  "rgb(125, 90, 65)",   // Chocolate brown
-  "rgb(181, 224, 206)", // Mint
-  "rgb(246, 201, 140)", // Mandarin
-  "rgb(183, 158, 203)", // Blackcurrant
+  { fill: "rgb(238, 201, 201)", border: "rgb(213, 144, 144)" }, // Rose
+  { fill: "rgb(238, 219, 201)", border: "rgb(213, 179, 144)" }, // Apricot
+  { fill: "rgb(238, 238, 201)", border: "rgb(213, 213, 144)" }, // Lemon
+  { fill: "rgb(219, 238, 201)", border: "rgb(179, 213, 144)" }, // Lime
+  { fill: "rgb(201, 238, 201)", border: "rgb(144, 213, 144)" }, // Green
+  { fill: "rgb(201, 238, 219)", border: "rgb(144, 213, 179)" }, // Mint
+  { fill: "rgb(201, 238, 238)", border: "rgb(144, 213, 213)" }, // Teal
+  { fill: "rgb(201, 219, 238)", border: "rgb(144, 179, 213)" }, // Sky
+  { fill: "rgb(201, 201, 238)", border: "rgb(144, 144, 213)" }, // Blue
+  { fill: "rgb(219, 201, 238)", border: "rgb(179, 144, 213)" }, // Violet
+  { fill: "rgb(238, 201, 238)", border: "rgb(213, 144, 213)" }, // Magenta
+  { fill: "rgb(238, 201, 219)", border: "rgb(213, 144, 179)" }, // Pink
 ];
-// A darker shade of a macaron colour (for borders), and a readable text colour over it.
-function darken(rgb: any, f: number): string {
-  const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(String(rgb));
-  if (!m) return String(rgb);
-  return `rgb(${Math.round(+m[1] * f)}, ${Math.round(+m[2] * f)}, ${Math.round(+m[3] * f)})`;
-}
-function textOn(rgb: any): string {
-  const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(String(rgb));
-  if (!m) return C.ink;
-  const lum = 0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3];
-  return lum > 150 ? C.ink : "#fff";
-}
+// Manager buttons: a quiet edit, a cautious delete (soft wash on hover via .fl-del in styles.css),
+// and a terracotta add.
+const EDIT_BTN: any = { padding: "3px 9px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "#F2EEE6", border: "1px solid #C9C1B2", color: "#6B6256" };
+const DEL_BTN: any = { padding: "3px 9px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "transparent", border: "1px solid #D89A8E", color: "#C06A57" };
+const ADD_BTN: any = { padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "#C57B5A", border: "1px solid #C57B5A", color: "rgb(251, 248, 241)" };
 function polarPt(cx: number, cy: number, r: number, deg: number) {
   const a = (deg * Math.PI) / 180;
   return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
@@ -380,7 +374,7 @@ function AutoTextarea({ value, onChange, placeholder, style }: any) {
   return <textarea ref={ref} value={value} onChange={onChange} placeholder={placeholder} rows={1} style={style} />;
 }
 
-function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor }: any) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder }: any) {
   const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
@@ -429,7 +423,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, po
               pauseTags.map((pt: any) => {
                 const on = pauseTag === pt.name;
                 const fill = tagColor(pt.name);
-                return <button key={pt.id} onClick={() => setPauseTag(on ? "" : pt.name)} style={{ padding: "5px 11px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${darken(fill, on ? 0.5 : 0.72)}`, background: fill, color: textOn(fill), opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", maxWidth: "100%" }}>{on ? "✓ " : ""}{pt.name}</button>;
+                return <button key={pt.id} onClick={() => setPauseTag(on ? "" : pt.name)} style={{ padding: "5px 11px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${tagBorder(pt.name)}`, background: fill, color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", maxWidth: "100%" }}>{on ? "✓ " : ""}{pt.name}</button>;
               })}
           </div>
         </div>
@@ -576,6 +570,13 @@ export default function FocusLogApp({ api }: any) {
     saveActivities(activities.map((a) => a.id === editActId ? { ...a, name, area: (editActDraft.area || "").trim() || "Other" } : a));
     setEditActId(null);
   };
+  const [actDrag, setActDrag] = useState<number | null>(null);
+  const [actOver, setActOver] = useState<number | null>(null);
+  const moveActivity = (from: number | null, to: number) => {
+    if (from == null || from === to) return;
+    const a = [...activities]; const [m] = a.splice(from, 1); a.splice(to, 0, m);
+    saveActivities(a);
+  };
 
   // Pause tags + recorded pause events.
   const [pauseTags, setPauseTags] = useState<any[]>(init.pauseTags || []);
@@ -588,6 +589,13 @@ export default function FocusLogApp({ api }: any) {
   const addPauseTag = () => { const n = newPauseTag.trim(); if (!n) return; savePauseTags([...pauseTags, { id: "pt" + Date.now(), name: n }]); setNewPauseTag(""); };
   const removePauseTag = (id: string) => savePauseTags(pauseTags.filter((t) => t.id !== id));
   const saveEditTag = () => { const n = editTagName.trim(); if (!n) return; savePauseTags(pauseTags.map((t) => t.id === editTagId ? { ...t, name: n } : t)); setEditTagId(null); };
+  const [tagDrag, setTagDrag] = useState<number | null>(null);
+  const [tagOver, setTagOver] = useState<number | null>(null);
+  const moveTag = (from: number | null, to: number) => {
+    if (from == null || from === to) return;
+    const a = [...pauseTags]; const [m] = a.splice(from, 1); a.splice(to, 0, m);
+    savePauseTags(a);
+  };
 
   // Timer state lives here so it survives tab switches (LogForm mounts/unmounts).
   const [secs, setSecs] = useState(pomoMin * 60);
@@ -763,8 +771,10 @@ export default function FocusLogApp({ api }: any) {
   const areaAgg: any = {};
   activities.forEach((a) => { if ((a.count || 0) > 0) areaAgg[a.area || "Other"] = (areaAgg[a.area || "Other"] || 0) + (a.count || 0); });
   // Distinct areas/tags each take the next macaron colour (unique until there are more than 12).
-  const areaNames = Array.from(new Set(activities.map((a) => a.area || "Other")));
-  const areaColor = (a: any) => MACARON[Math.max(0, areaNames.indexOf(a)) % MACARON.length];
+  const areaNames = Array.from(new Set(activities.map((a) => a.area || "Other"))).sort();
+  const areaIdx = (a: any) => Math.max(0, areaNames.indexOf(a)) % MACARON.length;
+  const areaColor = (a: any) => MACARON[areaIdx(a)].fill;
+  const areaBorder = (a: any) => MACARON[areaIdx(a)].border;
   const pieData = Object.keys(areaAgg).map((k) => ({ label: k, value: areaAgg[k], color: areaColor(k) }));
 
   // Pause stats: most common this week / month, and each tag's typical time of day over all history.
@@ -779,7 +789,10 @@ export default function FocusLogApp({ api }: any) {
     evs.forEach((p) => { bands[bandOf(p.ts, settings)]++; });
     return { name: t.name, total: evs.length, bands, top: evs.length ? BAND_NAME[bands.indexOf(Math.max(...bands))] : null };
   });
-  const tagColor = (n: any) => MACARON[Math.max(0, pauseTags.findIndex((t: any) => t.name === n)) % MACARON.length];
+  const tagNamesSorted = pauseTags.map((t: any) => t.name).slice().sort();
+  const tagIdx = (n: any) => Math.max(0, tagNamesSorted.indexOf(n)) % MACARON.length;
+  const tagColor = (n: any) => MACARON[tagIdx(n)].fill;
+  const tagBorder = (n: any) => MACARON[tagIdx(n)].border;
   const pausePie = tagBands.filter((t: any) => t.total > 0).map((t: any) => ({ label: t.name, value: t.total, color: tagColor(t.name) }));
 
   const openLog = (leafTask: string) => { setPreset(leafTask); setView("log"); };
@@ -1024,7 +1037,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} />}
+        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} />}
 
         {view === "break" && (
           <div>
@@ -1050,7 +1063,7 @@ export default function FocusLogApp({ api }: any) {
                     activities.map((a) => {
                       const on = brk.picked.includes(a.id);
                       const fill = areaColor(a.area);
-                      return <button key={a.id} onClick={() => togglePick(a.id)} style={{ padding: "6px 12px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${darken(fill, on ? 0.5 : 0.72)}`, background: fill, color: textOn(fill), opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", textAlign: "left", maxWidth: "100%" }}>{on ? "✓ " : ""}{a.name}</button>;
+                      return <button key={a.id} onClick={() => togglePick(a.id)} style={{ padding: "6px 12px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${areaBorder(a.area)}`, background: fill, color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", textAlign: "left", maxWidth: "100%" }}>{on ? "✓ " : ""}{a.name}</button>;
                     })}
                 </div>
               </div>
@@ -1060,7 +1073,7 @@ export default function FocusLogApp({ api }: any) {
               <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Break activities</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
                 {activities.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>None yet. Add an activity and an area below.</p>}
-                {activities.map((a) => (
+                {activities.map((a, i) => (
                   editActId === a.id ? (
                     <div key={a.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap", padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
                       <AutoTextarea value={editActDraft.name} onChange={(e: any) => setEditActDraft({ ...editActDraft, name: e.target.value })} style={{ flex: 2, minWidth: 110, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" }} />
@@ -1069,13 +1082,19 @@ export default function FocusLogApp({ api }: any) {
                       <button onClick={() => setEditActId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
                     </div>
                   ) : (
-                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: areaColor(a.area), border: `1.5px solid ${darken(areaColor(a.area), 0.6)}`, borderRadius: 6, color: textOn(areaColor(a.area)) }}>
+                    <div key={a.id}
+                      onDragOver={(e) => { e.preventDefault(); if (actOver !== i) setActOver(i); }}
+                      onDrop={(e) => { e.preventDefault(); moveActivity(actDrag, i); setActDrag(null); setActOver(null); }}
+                      style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: areaColor(a.area), border: `1.5px solid ${actOver === i && actDrag !== null && actDrag !== i ? C.ink : areaBorder(a.area)}`, borderRadius: 6, color: C.ink, opacity: actDrag === i ? 0.4 : 1, boxShadow: actOver === i && actDrag !== null && actDrag !== i ? `inset 0 2px 0 ${C.ink}` : "none" }}>
+                      <span draggable onDragStart={(e) => { setActDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }} onDragEnd={() => { setActDrag(null); setActOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
+                        {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: areaBorder(a.area) }} />))}
+                      </span>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{a.name}</span>
                       <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", opacity: 0.8 }}>#{a.area}</span>
                       <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", opacity: 0.8 }}>{a.count || 0}{"×"}</span>
                       <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", opacity: 0.8, minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>
-                      <button onClick={() => startEditAct(a)} style={{ ...btn(C.muted, true), padding: "3px 9px" }}>edit</button>
-                      <button onClick={() => removeActivity(a.id)} style={{ ...btn(C.worse, true), padding: "3px 9px" }}>{"✕"}</button>
+                      <button onClick={() => startEditAct(a)} style={EDIT_BTN}>edit</button>
+                      <button onClick={() => removeActivity(a.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
                     </div>
                   )
                 ))}
@@ -1083,7 +1102,7 @@ export default function FocusLogApp({ api }: any) {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
                 <AutoTextarea value={newAct.name} onChange={(e: any) => setNewAct({ ...newAct, name: e.target.value })} placeholder="activity name" style={{ flex: 2, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" }} />
                 <input value={newAct.area} onChange={(e) => setNewAct({ ...newAct, area: e.target.value })} placeholder="area / tag" style={{ flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", boxSizing: "border-box" }} />
-                <button onClick={addActivity} style={btn(C.ink)}>add</button>
+                <button onClick={addActivity} style={ADD_BTN}>add</button>
               </div>
             </div>
 
@@ -1117,7 +1136,7 @@ export default function FocusLogApp({ api }: any) {
               <p style={{ color: C.muted, fontSize: 12, margin: "0 0 10px" }}>Reasons you can tag a pause with. Picked from the log view when you pause.</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
                 {pauseTags.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>None yet. Add one below.</p>}
-                {pauseTags.map((t) => (
+                {pauseTags.map((t, i) => (
                   editTagId === t.id ? (
                     <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
                       <input value={editTagName} onChange={(e) => setEditTagName(e.target.value)} style={{ flex: 1, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
@@ -1125,17 +1144,23 @@ export default function FocusLogApp({ api }: any) {
                       <button onClick={() => setEditTagId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
                     </div>
                   ) : (
-                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: tagColor(t.name), border: `1.5px solid ${darken(tagColor(t.name), 0.6)}`, borderRadius: 6, color: textOn(tagColor(t.name)) }}>
+                    <div key={t.id}
+                      onDragOver={(e) => { e.preventDefault(); if (tagOver !== i) setTagOver(i); }}
+                      onDrop={(e) => { e.preventDefault(); moveTag(tagDrag, i); setTagDrag(null); setTagOver(null); }}
+                      style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: tagColor(t.name), border: `1.5px solid ${tagOver === i && tagDrag !== null && tagDrag !== i ? C.ink : tagBorder(t.name)}`, borderRadius: 6, color: C.ink, opacity: tagDrag === i ? 0.4 : 1, boxShadow: tagOver === i && tagDrag !== null && tagDrag !== i ? `inset 0 2px 0 ${C.ink}` : "none" }}>
+                      <span draggable onDragStart={(e) => { setTagDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }} onDragEnd={() => { setTagDrag(null); setTagOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
+                        {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: tagBorder(t.name) }} />))}
+                      </span>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
-                      <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); }} style={{ ...btn(C.muted, true), padding: "3px 9px" }}>edit</button>
-                      <button onClick={() => removePauseTag(t.id)} style={{ ...btn(C.worse, true), padding: "3px 9px" }}>{"✕"}</button>
+                      <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); }} style={EDIT_BTN}>edit</button>
+                      <button onClick={() => removePauseTag(t.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
                     </div>
                   )
                 ))}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <input value={newPauseTag} onChange={(e) => setNewPauseTag(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addPauseTag(); }} placeholder="new pause reason" style={{ flex: 1, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" }} />
-                <button onClick={addPauseTag} style={btn(C.ink)}>add</button>
+                <button onClick={addPauseTag} style={ADD_BTN}>add</button>
               </div>
             </div>
 
@@ -1160,7 +1185,7 @@ export default function FocusLogApp({ api }: any) {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {tagBands.filter((t: any) => t.total > 0).sort((a: any, b: any) => b.total - a.total).map((t: any) => (
-                    <div key={t.name} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "5px 10px", background: tagColor(t.name), border: `1.5px solid ${darken(tagColor(t.name), 0.6)}`, borderRadius: 6, color: textOn(tagColor(t.name)) }}>
+                    <div key={t.name} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "5px 10px", background: tagColor(t.name), border: `1.5px solid ${tagBorder(t.name)}`, borderRadius: 6, color: C.ink }}>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
                       <span style={{ display: "flex", gap: 3 }}>
                         {t.bands.map((n: number, i: number) => (<span key={i} title={`${BAND_NAME[i]}: ${n}`} style={{ width: 26, textAlign: "center", fontFamily: "var(--fl-mono)", fontSize: 11, opacity: i === t.bands.indexOf(Math.max(...t.bands)) ? 1 : 0.45 }}>{n}</span>))}

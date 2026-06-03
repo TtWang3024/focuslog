@@ -23,6 +23,11 @@
   padding-left: 0;
 }
 
+/* Delete (×) button in the break/pause managers: soft wash only on hover. */
+.workspace-leaf-content[data-type="focuslog-view"] .fl-del:hover {
+  background: #F6E4DF !important;
+}
+
 /* Celebration modal */
 .focuslog-celebrate { text-align: center; position: relative; overflow: hidden; }
 .focuslog-celebrate .fl-popper { font-size: 56px; animation: fl-pop 0.5s cubic-bezier(.2,1.4,.4,1) both; }
