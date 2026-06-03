@@ -341,6 +341,18 @@ function PieChart({ data }: any) {
   );
 }
 
+// A textarea that starts at one line and grows to fit its content as the text wraps.
+function AutoTextarea({ value, onChange, placeholder, style }: any) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, [value]);
+  return <textarea ref={ref} value={value} onChange={onChange} placeholder={placeholder} rows={1} style={style} />;
+}
+
 function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag }: any) {
   const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
   const [exp, setExp] = useState(3);
@@ -762,17 +774,17 @@ export default function FocusLogApp({ api }: any) {
         {view === "today" && (
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={{ color: C.muted, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span style={{ color: C.ink, fontSize: 16, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
                 {tasks.length} tasks {"\u00B7"} {countToday} /
                 {editingGoal ? (
                   <input
-                    type="number" min={1} max={99} autoFocus defaultValue={goal}
+                    type="text" inputMode="numeric" autoFocus defaultValue={goal}
                     onBlur={(e) => saveGoal(Number(e.target.value))}
                     onKeyDown={(e) => { if (e.key === "Enter") saveGoal(Number((e.target as HTMLInputElement).value)); if (e.key === "Escape") setEditingGoal(false); }}
-                    style={{ width: 40, fontSize: 12, padding: "1px 4px", border: `1px solid ${C.faint}`, borderRadius: 4, fontFamily: "var(--fl-mono)" }}
+                    style={{ width: 32, height: 32, fontSize: 16, fontWeight: 700, padding: 0, textAlign: "center", border: `1.5px solid ${C.ink}`, borderRadius: 6, fontFamily: "var(--fl-mono)", boxSizing: "border-box" }}
                   />
                 ) : (
-                  <button onClick={() => setEditingGoal(true)} title="click to set today's goal" style={{ border: "none", background: "transparent", color: C.ink, fontFamily: "var(--fl-mono)", fontSize: 12, cursor: "pointer", textDecoration: "underline dotted", padding: 0 }}>{goal}</button>
+                  <button onClick={() => setEditingGoal(true)} title="click to set today's goal" style={{ width: 32, height: 32, border: `1.5px solid ${C.faint}`, background: "transparent", color: C.ink, fontFamily: "var(--fl-mono)", fontSize: 16, fontWeight: 700, cursor: "pointer", borderRadius: 6, padding: 0, boxSizing: "border-box" }}>{goal}</button>
                 )}
                 {"\u{1F345}"} today
               </span>
@@ -858,6 +870,7 @@ export default function FocusLogApp({ api }: any) {
         {view === "totals" && (
           <div>
             <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" }}>Pomodoro totals</h3>
               <p style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>All pomodoros, every project combined.</p>
               <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around" }}>
                 <Stat label="this week" value={countWeek} big />
@@ -872,11 +885,13 @@ export default function FocusLogApp({ api }: any) {
             </div>
 
             <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
+              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" }}>Six-month heatmap</h3>
               <p style={{ color: C.muted, fontSize: 12, marginBottom: 12 }}>Last 6 months — pomodoros per day.</p>
               <ContribHeatmap sessions={sessions} settings={settings} />
             </div>
 
             <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
+              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" }}>Expected vs actual</h3>
               <p style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>Expected vs actual enjoyment.</p>
               {rated === 0 ? (
                 <p style={{ color: C.muted, fontSize: 13 }}>No ratings yet. Log a few pomodoros to see your calibration.</p>
@@ -906,7 +921,8 @@ export default function FocusLogApp({ api }: any) {
             </div>
 
             <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
-              <p style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>Best time of day (average enjoyment).</p>
+              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" }}>Best time of day</h3>
+              <p style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>Average enjoyment per band.</p>
               {!bestBand ? (
                 <p style={{ color: C.muted, fontSize: 13 }}>Not enough data yet.</p>
               ) : (
@@ -993,8 +1009,8 @@ export default function FocusLogApp({ api }: any) {
                 {activities.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>None yet. Add an activity and an area below.</p>}
                 {activities.map((a) => (
                   editActId === a.id ? (
-                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
-                      <input value={editActDraft.name} onChange={(e) => setEditActDraft({ ...editActDraft, name: e.target.value })} style={{ flex: 2, minWidth: 110, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
+                    <div key={a.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap", padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
+                      <AutoTextarea value={editActDraft.name} onChange={(e: any) => setEditActDraft({ ...editActDraft, name: e.target.value })} style={{ flex: 2, minWidth: 110, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" }} />
                       <input value={editActDraft.area} onChange={(e) => setEditActDraft({ ...editActDraft, area: e.target.value })} placeholder="area" style={{ flex: 1, minWidth: 70, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
                       <button onClick={saveEditAct} style={{ ...btn(C.ink), padding: "4px 10px" }}>save</button>
                       <button onClick={() => setEditActId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
@@ -1011,14 +1027,15 @@ export default function FocusLogApp({ api }: any) {
                   )
                 ))}
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <input value={newAct.name} onChange={(e) => setNewAct({ ...newAct, name: e.target.value })} placeholder="activity name" style={{ flex: 2, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" }} />
-                <input value={newAct.area} onChange={(e) => setNewAct({ ...newAct, area: e.target.value })} placeholder="area / tag" style={{ flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" }} />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+                <AutoTextarea value={newAct.name} onChange={(e: any) => setNewAct({ ...newAct, name: e.target.value })} placeholder="activity name" style={{ flex: 2, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" }} />
+                <input value={newAct.area} onChange={(e) => setNewAct({ ...newAct, area: e.target.value })} placeholder="area / tag" style={{ flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", boxSizing: "border-box" }} />
                 <button onClick={addActivity} style={btn(C.ink)}>add</button>
               </div>
             </div>
 
             <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" }}>Break stats</h3>
               <p style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>What you reach for on breaks.</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 }}>
                 <div>
@@ -1070,6 +1087,7 @@ export default function FocusLogApp({ api }: any) {
             </div>
 
             <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" }}>Pause stats</h3>
               <p style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>When and why you pause.</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 }}>
                 <Stat label="pauses this week" value={pauseWeek.length} />

@@ -220,7 +220,7 @@ export default class FocusLogPlugin extends Plugin {
     };
 
     this.registerView(VIEW_TYPE, (leaf) => new FocusLogView(leaf, this));
-    this.addRibbonIcon("timer", "Open Focus Log", () => this.activateView());
+    this.addRibbonIcon("bird", "Open Focus Log", () => this.activateView());
     this.addCommand({ id: "open-focus-log", name: "Open Focus Log", callback: () => this.activateView() });
     this.addSettingTab(new FocusLogSettingTab(this.app, this));
   }
@@ -541,7 +541,7 @@ class FocusLogView extends ItemView {
   }
   getViewType() { return VIEW_TYPE; }
   getDisplayText() { return "Focus Log"; }
-  getIcon() { return "timer"; }
+  getIcon() { return "bird"; }
   async onOpen() {
     this.root = createRoot(this.contentEl);
     this.root.render(React.createElement(FocusLogApp, { api: this.plugin.makeApi() }));
