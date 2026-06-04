@@ -835,10 +835,10 @@ export default function FocusLogApp({ api }: any) {
   const seg = (on: boolean): any => ({ padding: "6px 14px", borderRadius: 9, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", textTransform: "capitalize", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.14)" : "none", fontFamily: "var(--fl-display)", whiteSpace: "nowrap" });
 
   return (
-    <div style={{ background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)" }}>
+    <div style={{ background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&display=swap');
-        :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:ui-monospace,'SF Mono',Menlo,monospace; }
+        :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:'Baloo 2',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
       `}</style>
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" }}>
         <h1 style={{ fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" }}>Focus Log</h1>

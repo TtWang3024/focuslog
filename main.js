@@ -24392,9 +24392,9 @@ ${s.task}`))
     setView("log");
   };
   const seg = (on) => ({ padding: "6px 14px", borderRadius: 9, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", textTransform: "capitalize", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.14)" : "none", fontFamily: "var(--fl-display)", whiteSpace: "nowrap" });
-  return /* @__PURE__ */ React.createElement("div", { style: { background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)" } }, /* @__PURE__ */ React.createElement("style", null, `
+  return /* @__PURE__ */ React.createElement("div", { style: { background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums" } }, /* @__PURE__ */ React.createElement("style", null, `
         @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&display=swap');
-        :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:ui-monospace,'SF Mono',Menlo,monospace; }
+        :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:'Baloo 2',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
       `), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Square = ExecutionPower:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Letter = CognitiveLoad:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" } }, "A"), " high"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" } }, "B"), " medium"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" } }, "C"), " low"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 4 } }, "\u{1F451}", " = King ", "\xB7", " day starts at ", settings.dayStart, ":00"))), flash && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20, overflowX: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "inline-flex", gap: 2, background: C.line, borderRadius: 12, padding: 4 } }, ["today", "week", "month", "totals", "log", "break", "pause"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, onClick: () => setView(t), style: seg(view === t) }, t)))), view === "today" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: C.ink, fontSize: 16, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 } }, tasks.length, " tasks ", "\xB7", " ", countToday, " /", editingGoal ? /* @__PURE__ */ React.createElement(
     "input",
     {
@@ -24563,6 +24563,10 @@ var DEFAULT_SETTINGS = {
   dailyHeading: "\u{1F33B} Today",
   dailyCreateHeading: true,
   dailyTemplate: '- [ ] <mark class="hltr-yellow">{date}</mark> {start} - {end} \u{1F345} {tag}\n    - {task}{hierarchy}\n    - {note}',
+  createDailyIfMissing: true,
+  dailyTitleFormat: "",
+  dailyTemplatePath: "",
+  dailyNoteFolder: "",
   counterEnabled: false,
   counterPrefix: "## \u{1F34E} Today_Pomodoro:: ",
   breakEnabled: false,
@@ -24885,6 +24889,24 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Status: { select: { name } } } });
     return name;
   }
+  // Build the initial content for a newly created daily note: a template (Focus Log's, else the
+  // Daily Notes / Periodic Notes one) with the common {{title}}/{{date}}/{{time}} tokens filled,
+  // or a bare heading if no template is set.
+  async buildDailyNoteContent(m, format, coreTemplate) {
+    const s = this.data.settings;
+    const tplPath = (s.dailyTemplatePath || coreTemplate || "").trim();
+    if (tplPath) {
+      const norm = (0, import_obsidian.normalizePath)(tplPath.endsWith(".md") ? tplPath : tplPath + ".md");
+      const tf = this.app.vault.getAbstractFileByPath(norm);
+      if (tf) {
+        const raw = await this.app.vault.read(tf);
+        const moment = window.moment;
+        const title = m.format(format);
+        return raw.replace(/\{\{\s*title\s*\}\}/gi, title).replace(/\{\{\s*date\s*:\s*([^}]+)\}\}/gi, (_, f) => m.format(f.trim())).replace(/\{\{\s*time\s*:\s*([^}]+)\}\}/gi, (_, f) => moment().format(f.trim())).replace(/\{\{\s*date\s*\}\}/gi, m.format("YYYY-MM-DD")).replace(/\{\{\s*time\s*\}\}/gi, moment().format("HH:mm"));
+      }
+    }
+    return "# " + s.dailyHeading + "\n";
+  }
   // Append a formatted block under the configured heading in the (logical) day's daily note.
   async appendToDailyNote(p) {
     var _a, _b, _c;
@@ -24900,16 +24922,20 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     const dateM = moment(new Date(trueDate.getFullYear(), trueDate.getMonth(), trueDate.getDate()));
     const dn = (_b = (_a = this.app.internalPlugins) == null ? void 0 : _a.getPluginById) == null ? void 0 : _b.call(_a, "daily-notes");
     const opts = ((_c = dn == null ? void 0 : dn.instance) == null ? void 0 : _c.options) || {};
-    const format = opts.format || "YYYY-MM-DD";
-    const folder = (opts.folder || "").trim();
+    const format = (s.dailyTitleFormat || opts.format || "YYYY-MM-DD").trim();
+    const folder = (s.dailyNoteFolder || opts.folder || "").trim();
     const path = (0, import_obsidian.normalizePath)((folder ? folder + "/" : "") + fileM.format(format) + ".md");
     let file = this.app.vault.getAbstractFileByPath(path);
     if (!file) {
+      if (!s.createDailyIfMissing) {
+        new import_obsidian.Notice("Focus Log: today's daily note doesn't exist. Enable \u201CCreate new daily note if missing\u201D in settings.");
+        return;
+      }
       if (folder && !this.app.vault.getAbstractFileByPath(folder)) {
         await this.app.vault.createFolder(folder).catch(() => {
         });
       }
-      file = await this.app.vault.create(path, "# " + s.dailyHeading + "\n");
+      file = await this.app.vault.create(path, await this.buildDailyNoteContent(fileM, format, opts.template));
     }
     const pad = (n) => String(n).padStart(2, "0");
     const startT = new Date(p.ts - (p.minutes || 25) * 6e4);
@@ -25155,6 +25181,30 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
     new import_obsidian.Setting(containerEl).setName("Append to daily note when logging").setDesc("On each logged pomodoro, write a block into the daily note.").addToggle(
       (t) => t.setValue(this.plugin.data.settings.dailyNoteWrite).onChange(async (v) => {
         this.plugin.data.settings.dailyNoteWrite = v;
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Create new daily note if missing").setDesc("If that day's note doesn't exist when you log, create it from the template below. Off: the daily-note block is skipped when the note is missing.").addToggle(
+      (t) => t.setValue(this.plugin.data.settings.createDailyIfMissing).onChange(async (v) => {
+        this.plugin.data.settings.createDailyIfMissing = v;
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Title format").setDesc("Filename date format (moment.js). Blank = use your Daily Notes / Periodic Notes format. Tokens: YYYY year \xB7 MM month \xB7 DD day \xB7 ddd Mon \xB7 dddd Monday \xB7 Do 3rd \xB7 [W]WW W23. Examples: YYYY-MM-DD \u2192 2026-06-03 \xB7 YY_[W]WW_MM_DD_ddd \u2192 26_W23_06_03_Wed.").addText(
+      (t) => t.setPlaceholder("(from Daily Notes)").setValue(this.plugin.data.settings.dailyTitleFormat).onChange(async (v) => {
+        this.plugin.data.settings.dailyTitleFormat = v.trim();
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Template path").setDesc("Note used as the template for new daily notes. Supports {{title}}, {{date}}, {{date:FORMAT}}, {{time}}, {{time:FORMAT}}. Blank = use your Daily Notes template. (Templater <% %> syntax is not run.)").addText(
+      (t) => t.setPlaceholder("0_BuJo/Z_templates/Template.md").setValue(this.plugin.data.settings.dailyTemplatePath).onChange(async (v) => {
+        this.plugin.data.settings.dailyTemplatePath = v.trim();
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Note folder").setDesc("Folder for new daily notes. Blank = use your Daily Notes folder.").addText(
+      (t) => t.setPlaceholder("(from Daily Notes)").setValue(this.plugin.data.settings.dailyNoteFolder).onChange(async (v) => {
+        this.plugin.data.settings.dailyNoteFolder = v.trim();
         await this.plugin.persist();
       })
     );

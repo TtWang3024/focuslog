@@ -26,6 +26,10 @@ export interface FocusLogSettings {
   dailyHeading: string;
   dailyCreateHeading: boolean;
   dailyTemplate: string;
+  createDailyIfMissing: boolean;
+  dailyTitleFormat: string;
+  dailyTemplatePath: string;
+  dailyNoteFolder: string;
   counterEnabled: boolean;
   counterPrefix: string;
   breakEnabled: boolean;
@@ -57,6 +61,10 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   dailyCreateHeading: true,
   dailyTemplate:
     "- [ ] <mark class=\"hltr-yellow\">{date}</mark> {start} - {end} \u{1F345} {tag}\n    - {task}{hierarchy}\n    - {note}",
+  createDailyIfMissing: true,
+  dailyTitleFormat: "",
+  dailyTemplatePath: "",
+  dailyNoteFolder: "",
   counterEnabled: false,
   counterPrefix: "## \u{1F34E} Today_Pomodoro:: ",
   breakEnabled: false,
@@ -391,6 +399,30 @@ export default class FocusLogPlugin extends Plugin {
     return name;
   }
 
+  // Build the initial content for a newly created daily note: a template (Focus Log's, else the
+  // Daily Notes / Periodic Notes one) with the common {{title}}/{{date}}/{{time}} tokens filled,
+  // or a bare heading if no template is set.
+  private async buildDailyNoteContent(m: any, format: string, coreTemplate?: string): Promise<string> {
+    const s = this.data.settings;
+    const tplPath = (s.dailyTemplatePath || coreTemplate || "").trim();
+    if (tplPath) {
+      const norm = normalizePath(tplPath.endsWith(".md") ? tplPath : tplPath + ".md");
+      const tf = this.app.vault.getAbstractFileByPath(norm) as TFile;
+      if (tf) {
+        const raw = await this.app.vault.read(tf);
+        const moment = (window as any).moment;
+        const title = m.format(format);
+        return raw
+          .replace(/\{\{\s*title\s*\}\}/gi, title)
+          .replace(/\{\{\s*date\s*:\s*([^}]+)\}\}/gi, (_: any, f: string) => m.format(f.trim()))
+          .replace(/\{\{\s*time\s*:\s*([^}]+)\}\}/gi, (_: any, f: string) => moment().format(f.trim()))
+          .replace(/\{\{\s*date\s*\}\}/gi, m.format("YYYY-MM-DD"))
+          .replace(/\{\{\s*time\s*\}\}/gi, moment().format("HH:mm"));
+      }
+    }
+    return "# " + s.dailyHeading + "\n";
+  }
+
   // Append a formatted block under the configured heading in the (logical) day's daily note.
   async appendToDailyNote(p: { ts: number; minutes: number; task: string; hierarchy: string; note: string; category?: string | null }) {
     const s = this.data.settings;
@@ -407,16 +439,21 @@ export default class FocusLogPlugin extends Plugin {
 
     const dn: any = (this.app as any).internalPlugins?.getPluginById?.("daily-notes");
     const opts = dn?.instance?.options || {};
-    const format = opts.format || "YYYY-MM-DD";
-    const folder = (opts.folder || "").trim();
+    // Focus Log's own format/folder win; otherwise fall back to the Daily Notes / Periodic Notes setting.
+    const format = (s.dailyTitleFormat || opts.format || "YYYY-MM-DD").trim();
+    const folder = (s.dailyNoteFolder || opts.folder || "").trim();
     const path = normalizePath((folder ? folder + "/" : "") + fileM.format(format) + ".md");
 
     let file = this.app.vault.getAbstractFileByPath(path) as TFile;
     if (!file) {
+      if (!s.createDailyIfMissing) {
+        new Notice("Focus Log: today's daily note doesn't exist. Enable “Create new daily note if missing” in settings.");
+        return;
+      }
       if (folder && !this.app.vault.getAbstractFileByPath(folder)) {
         await this.app.vault.createFolder(folder).catch(() => {});
       }
-      file = await this.app.vault.create(path, "# " + s.dailyHeading + "\n");
+      file = await this.app.vault.create(path, await this.buildDailyNoteContent(fileM, format, opts.template));
     }
 
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -693,6 +730,46 @@ class FocusLogSettingTab extends PluginSettingTab {
       .addToggle((t) =>
         t.setValue(this.plugin.data.settings.dailyNoteWrite).onChange(async (v) => {
           this.plugin.data.settings.dailyNoteWrite = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Create new daily note if missing")
+      .setDesc("If that day's note doesn't exist when you log, create it from the template below. Off: the daily-note block is skipped when the note is missing.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.createDailyIfMissing).onChange(async (v) => {
+          this.plugin.data.settings.createDailyIfMissing = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Title format")
+      .setDesc("Filename date format (moment.js). Blank = use your Daily Notes / Periodic Notes format. Tokens: YYYY year · MM month · DD day · ddd Mon · dddd Monday · Do 3rd · [W]WW W23. Examples: YYYY-MM-DD → 2026-06-03 · YY_[W]WW_MM_DD_ddd → 26_W23_06_03_Wed.")
+      .addText((t) =>
+        t.setPlaceholder("(from Daily Notes)").setValue(this.plugin.data.settings.dailyTitleFormat).onChange(async (v) => {
+          this.plugin.data.settings.dailyTitleFormat = v.trim();
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Template path")
+      .setDesc("Note used as the template for new daily notes. Supports {{title}}, {{date}}, {{date:FORMAT}}, {{time}}, {{time:FORMAT}}. Blank = use your Daily Notes template. (Templater <% %> syntax is not run.)")
+      .addText((t) =>
+        t.setPlaceholder("0_BuJo/Z_templates/Template.md").setValue(this.plugin.data.settings.dailyTemplatePath).onChange(async (v) => {
+          this.plugin.data.settings.dailyTemplatePath = v.trim();
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Note folder")
+      .setDesc("Folder for new daily notes. Blank = use your Daily Notes folder.")
+      .addText((t) =>
+        t.setPlaceholder("(from Daily Notes)").setValue(this.plugin.data.settings.dailyNoteFolder).onChange(async (v) => {
+          this.plugin.data.settings.dailyNoteFolder = v.trim();
           await this.plugin.persist();
         })
       );
