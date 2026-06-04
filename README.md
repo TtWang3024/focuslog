@@ -29,7 +29,7 @@ Your synced tasks, newest ranking first. Each row shows a coloured square for **
 
 ### log
 Start a focus session here. The timer row is `[−] [start Nm] [+] [pause] [reset]`:
-- **− / +** adjust the pomodoro length from **15 to 25 minutes**; each session records its actual length.
+- **− / +** adjust the pomodoro length from **5 to 30 minutes** (hold to change quickly); each session records its actual length, and **start** reads *resume* while paused.
 - **start** runs the countdown; **pause** asks for a reason (see *Pauses*); **reset** discards the in-progress pomodoro, so it never reaches the totals.
 
 Pick the task (Act +1 writes to that page), rate expected and actual enjoyment, add an optional note, and press **log pomodoro + write Act**. Two toggles sit above the button: **set this task's status to Done in Notion**, and **pick the next task now** (default on) — choose what's next, and after your break the log view reopens already set to it.
@@ -40,10 +40,10 @@ Pick the task (Act +1 writes to that page), rate expected and actual enjoyment, 
 - **totals** — week/month/year counts and hours; a **6-month contributions heatmap** (weeks as columns, days shaded by count); a **rating summary** ("73% of your pomodoros turned out more enjoyable than you expected (avg gap +0.8)") with your **biggest surprises**; and **best time of day** (average enjoyment per band). Below that, **every session** with **edit** and **delete** (edit covers time, task name, and the two ratings; the note is preserved). Deleting only removes the local entry — the `Act +1` already written to Notion is not undone.
 
 ### break
-Optional. Turn on **Settings → Break → "Take a break after logging"**, and logging opens this view with a countdown instead of returning to today; choose whether it auto-starts. The break length is adjustable from the popup. Pick **up to 3 activities** to do; on finish it records them and returns to today. Manage activities here (name + an **area** tag; add / edit / delete), and see your **favourites**, **least-chosen**, and a **pie chart of break activity by area**.
+Optional. Turn on **Settings → Break → "Take a break after logging"**, and logging opens this view with a countdown instead of returning to today; choose whether it auto-starts. The break length is adjustable from the popup. Pick **up to 3 activities** to do; on finish it records them and returns to today. Manage activities here (name + an **area** tag; add / **edit** / delete, and **drag to reorder**), and see your **favourites**, **least-chosen**, and a **pie chart of break activity by area**. An **All breaks** list logs each break's start–end time, its activities, and its areas, with edit and delete.
 
 ### pause
-Manage **pause tags** (add / edit / delete) and see your pause stats: counts this week and this month, the top tag for each, and — per tag, across all history — the **typical time of day** (morning / afternoon / evening).
+Manage **pause tags** (add / edit / delete, and **drag to reorder**) and see your pause stats: counts this week and this month, the top tag for each, a by-tag pie, and — per tag, across all history — the **typical time of day** (morning / afternoon / evening). An **All pauses** list logs each pause (time, duration, tag); edit reassigns the tag or fixes the time, and delete removes it.
 
 ## Pauses
 When you click **pause**, the timer stops and a reason picker appears. Choose a tag; when you **resume** (or when you log), a block is written to the daily note from a configurable template. Placeholders: `{date} {pomodoro-start} {pause-start} {pause-end} {pomodoro-resume} {pause-tag}` — `{pause-start}–{pause-end}` is the pause interval, and `{pomodoro-start}` lets you also show the focus-before-pause. An untagged pause just resumes (nothing written); a reset discards it.
@@ -51,6 +51,7 @@ When you click **pause**, the timer stops and a reason picker appears. Choose a 
 ## The daily note
 With **Append to daily note when logging** on, each logged pomodoro adds a block under your chosen heading. Template placeholders: `{date} {start} {end} {task} {hierarchy} {tag} {note}`.
 - **File the block under the true date** chooses which note the block goes into: on → the real date's note; off → the day-start rollover note (an evening pomodoro lands in tomorrow's note). The `{date}` text inside the block is always the true calendar date.
+- **Create new daily note if missing** — if that day's note doesn't exist when you log, create it from a template (Focus Log's *Template path*, else your Daily Notes / Periodic Notes template), filling `{{title}}`, `{{date}}`, `{{date:FORMAT}}`, and `{{time}}`. Set *Title format*, *Template path*, and *Note folder*; blank fields fall back to your Daily Notes config. (Templater `<% %>` syntax is not executed.)
 - **Daily pomodoro counter** — point it at a unique counter line (e.g. `## 🍎 Today_Pomodoro:: 0`) and each log rewrites the number to that day's count (using the same day-start grouping). The line is left untouched if its prefix is not unique.
 
 ## Categories and Obsidian tags
@@ -65,8 +66,10 @@ Each task can carry a category (Me / En / Pro …) read from a Notion **select**
 - The Notion API has no atomic increment, so Act write-back reads the current value then writes value + 1. With a single user this is safe; avoid editing the same page in two places at the exact same moment.
 - The "Today Tasks" filter is an approximation (Today / King / This week, plus Daily dated today). Adjust in `queryToday()` for an exact match.
 - It uses Notion API version `2022-06-28`. If your workspace requires data-source IDs, update the version and endpoints in `main.tsx`.
-- The Totals **hours** figure approximates 25 min per pomodoro; with variable lengths it is a rough estimate.
 - Desktop only (it makes network requests).
+
+## Thanks
+The **Create new daily note if missing** feature is modelled on **[Periodic Notes](https://github.com/liamcain/obsidian-periodic-notes)** by Liam Cain — its clean *format / folder / template* model for periodic notes shaped how Focus Log finds and creates the daily note. Thank you for that work, which a good slice of the Obsidian daily-note workflow is built on.
 
 ## Build from source
 ```

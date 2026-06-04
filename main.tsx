@@ -744,15 +744,33 @@ class FocusLogSettingTab extends PluginSettingTab {
         })
       );
 
-    new Setting(containerEl)
+    const moment = (window as any).moment;
+    const dnOpts: any = ((this.app as any).internalPlugins?.getPluginById?.("daily-notes"))?.instance?.options || {};
+    const coreFmt = (dnOpts.format || "YYYY-MM-DD").trim();
+    let fmtPreview: HTMLElement | null = null;
+    const renderFmtPreview = (val: string) => {
+      if (fmtPreview && moment) fmtPreview.setText(moment().format((val || coreFmt || "YYYY-MM-DD")));
+    };
+    const titleSetting = new Setting(containerEl)
       .setName("Title format")
-      .setDesc("Filename date format (moment.js). Blank = use your Daily Notes / Periodic Notes format. Tokens: YYYY year · MM month · DD day · ddd Mon · dddd Monday · Do 3rd · [W]WW W23. Examples: YYYY-MM-DD → 2026-06-03 · YY_[W]WW_MM_DD_ddd → 26_W23_06_03_Wed.")
       .addText((t) =>
         t.setPlaceholder("(from Daily Notes)").setValue(this.plugin.data.settings.dailyTitleFormat).onChange(async (v) => {
           this.plugin.data.settings.dailyTitleFormat = v.trim();
+          renderFmtPreview(v.trim());
           await this.plugin.persist();
         })
       );
+    titleSetting.descEl.empty();
+    titleSetting.descEl.appendText("Filename date format. Blank = use your Daily Notes / Periodic Notes format. For more syntax, refer to ");
+    const fmtLink = titleSetting.descEl.createEl("a", { text: "format reference" });
+    fmtLink.setAttr("href", "https://momentjs.com/docs/#/displaying/format/");
+    fmtLink.setAttr("target", "_blank");
+    fmtLink.setAttr("rel", "noopener");
+    titleSetting.descEl.createEl("br");
+    titleSetting.descEl.appendText("Your current syntax looks like this: ");
+    fmtPreview = titleSetting.descEl.createEl("b");
+    fmtPreview.style.color = "var(--text-accent)";
+    renderFmtPreview(this.plugin.data.settings.dailyTitleFormat);
 
     new Setting(containerEl)
       .setName("Template path")

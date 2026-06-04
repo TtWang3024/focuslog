@@ -25099,6 +25099,7 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
     this.plugin = plugin;
   }
   display() {
+    var _a, _b, _c, _d;
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h3", { text: "Focus Log \u2014 Notion connection" });
@@ -25190,12 +25191,32 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.persist();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Title format").setDesc("Filename date format (moment.js). Blank = use your Daily Notes / Periodic Notes format. Tokens: YYYY year \xB7 MM month \xB7 DD day \xB7 ddd Mon \xB7 dddd Monday \xB7 Do 3rd \xB7 [W]WW W23. Examples: YYYY-MM-DD \u2192 2026-06-03 \xB7 YY_[W]WW_MM_DD_ddd \u2192 26_W23_06_03_Wed.").addText(
+    const moment = window.moment;
+    const dnOpts = ((_d = (_c = (_b = (_a = this.app.internalPlugins) == null ? void 0 : _a.getPluginById) == null ? void 0 : _b.call(_a, "daily-notes")) == null ? void 0 : _c.instance) == null ? void 0 : _d.options) || {};
+    const coreFmt = (dnOpts.format || "YYYY-MM-DD").trim();
+    let fmtPreview = null;
+    const renderFmtPreview = (val) => {
+      if (fmtPreview && moment)
+        fmtPreview.setText(moment().format(val || coreFmt || "YYYY-MM-DD"));
+    };
+    const titleSetting = new import_obsidian.Setting(containerEl).setName("Title format").addText(
       (t) => t.setPlaceholder("(from Daily Notes)").setValue(this.plugin.data.settings.dailyTitleFormat).onChange(async (v) => {
         this.plugin.data.settings.dailyTitleFormat = v.trim();
+        renderFmtPreview(v.trim());
         await this.plugin.persist();
       })
     );
+    titleSetting.descEl.empty();
+    titleSetting.descEl.appendText("Filename date format. Blank = use your Daily Notes / Periodic Notes format. For more syntax, refer to ");
+    const fmtLink = titleSetting.descEl.createEl("a", { text: "format reference" });
+    fmtLink.setAttr("href", "https://momentjs.com/docs/#/displaying/format/");
+    fmtLink.setAttr("target", "_blank");
+    fmtLink.setAttr("rel", "noopener");
+    titleSetting.descEl.createEl("br");
+    titleSetting.descEl.appendText("Your current syntax looks like this: ");
+    fmtPreview = titleSetting.descEl.createEl("b");
+    fmtPreview.style.color = "var(--text-accent)";
+    renderFmtPreview(this.plugin.data.settings.dailyTitleFormat);
     new import_obsidian.Setting(containerEl).setName("Template path").setDesc("Note used as the template for new daily notes. Supports {{title}}, {{date}}, {{date:FORMAT}}, {{time}}, {{time:FORMAT}}. Blank = use your Daily Notes template. (Templater <% %> syntax is not run.)").addText(
       (t) => t.setPlaceholder("0_BuJo/Z_templates/Template.md").setValue(this.plugin.data.settings.dailyTemplatePath).onChange(async (v) => {
         this.plugin.data.settings.dailyTemplatePath = v.trim();
