@@ -415,7 +415,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, po
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <button onMouseDown={() => beginHold(-1)} onMouseUp={endHold} onMouseLeave={endHold} title="shorter — hold to speed up (min 5)" style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin <= 5 ? 0.4 : 1 }}>{"−"}</button>
-          <button onClick={onStart} style={btn(C.ink)}>start {pomoMin}m</button>
+          <button onClick={onStart} style={btn(C.ink)}>{pauseActive ? "resume" : "start"} {pomoMin}m</button>
           <button onMouseDown={() => beginHold(1)} onMouseUp={endHold} onMouseLeave={endHold} title="longer — hold to speed up (max 30)" style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin >= 30 ? 0.4 : 1 }}>{"+"}</button>
           <button onClick={onPause} style={btn(C.muted, true)}>pause</button>
           <button onClick={resetTimer} style={btn(C.muted, true)}>reset</button>
