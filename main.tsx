@@ -384,6 +384,7 @@ export default class FocusLogPlugin extends Plugin {
   timer: TimerEngine;
   floatWin: any = null;
   private floatSubs = new Set<() => void>();
+  private openingFloat = false; // true between asking for a float popout and the window-open handler claiming it
   private doneStatusCache: string | null = null;
 
   async onload() {
@@ -403,6 +404,9 @@ export default class FocusLogPlugin extends Plugin {
     // When the main window is revealed again, recompute at once so any alert or
     // finish that came due while it was hidden (and its timers throttled) fires.
     this.registerDomEvent(document, "visibilitychange", () => { if (!document.hidden) this.timer.poll(); });
+    // Catch our float popout the instant its OS window is created, so we can size
+    // and place it before its first visible frame (no large-window-then-jump).
+    this.registerEvent(this.app.workspace.on("window-open", () => this.onFloatWindowOpen()));
 
     this.registerView(VIEW_TYPE, (leaf) => new FocusLogView(leaf, this));
     this.registerView(VIEW_TYPE_FLOAT, (leaf) => new FloatTimerView(leaf, this));
@@ -467,6 +471,10 @@ export default class FocusLogPlugin extends Plugin {
     }
     leaves.forEach((l) => l.detach());
     const ws: any = this.app.workspace;
+    // Mark the next popout as ours: onFloatWindowOpen() fires the instant the OS
+    // window is created and hides → sizes → reveals it, so the first visible frame
+    // is already small and in the corner (no large-window-in-the-middle flash).
+    this.openingFloat = true;
     let leaf: WorkspaceLeaf;
     try {
       leaf = ws.openPopoutLeaf ? ws.openPopoutLeaf() : ws.getLeaf("window");
@@ -474,8 +482,32 @@ export default class FocusLogPlugin extends Plugin {
       leaf = ws.getLeaf("window");
     }
     await leaf.setViewState({ type: VIEW_TYPE_FLOAT, active: true });
-    // The OS window needs a moment to exist before Electron can see it.
-    window.setTimeout(() => this.pinFloatWindow(true), 80);
+    // Fallbacks: if window-open never fired, still size/pin; and never leave the
+    // window stuck invisible from the opacity trick.
+    window.setTimeout(() => {
+      this.openingFloat = false;
+      this.pinFloatWindow(true);
+      try { if (this.floatWin && this.floatWin.setOpacity) this.floatWin.setOpacity(1); } catch {}
+    }, 90);
+  }
+
+  // Fires from workspace "window-open". If this popout is the one we just asked for,
+  // hide it immediately, size + place it, then reveal it a beat later — so it never
+  // shows at the default large size first.
+  private onFloatWindowOpen() {
+    if (!this.openingFloat) return;
+    this.openingFloat = false;
+    try {
+      const remote = getElectronRemote();
+      if (!remote || !remote.BrowserWindow) return;
+      const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
+      const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
+      const win = all.filter((w: any) => !cur || w.id !== cur.id).pop();
+      if (!win) return;
+      try { win.setOpacity(0); } catch {}
+      this.pinFloatWindow(true, win);
+      window.setTimeout(() => { try { win.setOpacity(1); } catch {} }, 50);
+    } catch {}
   }
 
   closeFloating() {
@@ -487,30 +519,36 @@ export default class FocusLogPlugin extends Plugin {
     else this.openFloating();
   }
 
-  // Pin the most-recently-opened popout above other apps (best-effort). Only size
-  // and place it on first open, so a later user resize/move is respected.
-  pinFloatWindow(initial: boolean) {
-    if (this.data.settings.floatAlwaysOnTop === false) return;
+  // Size, place, and pin a float popout. `winOverride` may be passed (from the
+  // window-open handler, which has the brand-new window); otherwise we take the
+  // most-recently-opened popout. Sizing happens regardless of the always-on-top
+  // setting; only the always-on-top call itself is gated.
+  pinFloatWindow(initial: boolean, winOverride?: any) {
     try {
       const remote = getElectronRemote();
       if (!remote || !remote.BrowserWindow) {
-        if (initial) new Notice("Focus Log: the timer opened, but couldn't be pinned on top (Electron API unavailable in this Obsidian).", 7000);
+        if (initial && this.data.settings.floatAlwaysOnTop !== false) new Notice("Focus Log: the timer opened, but couldn't be pinned on top (Electron API unavailable in this Obsidian).", 7000);
         return;
       }
-      const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
-      const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-      const others = all.filter((w: any) => !cur || w.id !== cur.id);
-      const win = others[others.length - 1];
+      let win = winOverride;
+      if (!win) {
+        const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
+        const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
+        win = all.filter((w: any) => !cur || w.id !== cur.id).pop();
+      }
       if (!win) return;
-      win.setAlwaysOnTop(true, "floating");
-      try { win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch {}
+      if (this.data.settings.floatAlwaysOnTop !== false) {
+        win.setAlwaysOnTop(true, "floating");
+        try { win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch {}
+      }
       try { if (win.webContents && win.webContents.setBackgroundThrottling) win.webContents.setBackgroundThrottling(false); } catch {}
       if (initial) {
         try {
           const screen = remote.screen;
           const wa = screen && screen.getPrimaryDisplay ? screen.getPrimaryDisplay().workArea : null;
-          win.setSize(320, 300);
-          if (wa) win.setPosition(wa.x + wa.width - 340, wa.y + 40);
+          // animate:false → instant, no Electron resize/move animation.
+          win.setSize(320, 300, false);
+          if (wa) win.setPosition(Math.round(wa.x + wa.width - 340), Math.round(wa.y + 40), false);
         } catch {}
       }
       this.floatWin = win;

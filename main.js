@@ -24871,6 +24871,8 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     super(...arguments);
     this.floatWin = null;
     this.floatSubs = /* @__PURE__ */ new Set();
+    this.openingFloat = false;
+    // true between asking for a float popout and the window-open handler claiming it
     this.doneStatusCache = null;
   }
   async onload() {
@@ -24890,6 +24892,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       if (!document.hidden)
         this.timer.poll();
     });
+    this.registerEvent(this.app.workspace.on("window-open", () => this.onFloatWindowOpen()));
     this.registerView(VIEW_TYPE, (leaf) => new FocusLogView(leaf, this));
     this.registerView(VIEW_TYPE_FLOAT, (leaf) => new FloatTimerView(leaf, this));
     this.addRibbonIcon("bird", "Open Focus Log", () => this.activateView());
@@ -24961,6 +24964,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     }
     leaves.forEach((l) => l.detach());
     const ws = this.app.workspace;
+    this.openingFloat = true;
     let leaf;
     try {
       leaf = ws.openPopoutLeaf ? ws.openPopoutLeaf() : ws.getLeaf("window");
@@ -24968,7 +24972,45 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       leaf = ws.getLeaf("window");
     }
     await leaf.setViewState({ type: VIEW_TYPE_FLOAT, active: true });
-    window.setTimeout(() => this.pinFloatWindow(true), 80);
+    window.setTimeout(() => {
+      this.openingFloat = false;
+      this.pinFloatWindow(true);
+      try {
+        if (this.floatWin && this.floatWin.setOpacity)
+          this.floatWin.setOpacity(1);
+      } catch (e) {
+      }
+    }, 90);
+  }
+  // Fires from workspace "window-open". If this popout is the one we just asked for,
+  // hide it immediately, size + place it, then reveal it a beat later — so it never
+  // shows at the default large size first.
+  onFloatWindowOpen() {
+    if (!this.openingFloat)
+      return;
+    this.openingFloat = false;
+    try {
+      const remote = getElectronRemote();
+      if (!remote || !remote.BrowserWindow)
+        return;
+      const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
+      const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
+      const win = all.filter((w) => !cur || w.id !== cur.id).pop();
+      if (!win)
+        return;
+      try {
+        win.setOpacity(0);
+      } catch (e) {
+      }
+      this.pinFloatWindow(true, win);
+      window.setTimeout(() => {
+        try {
+          win.setOpacity(1);
+        } catch (e) {
+        }
+      }, 50);
+    } catch (e) {
+    }
   }
   closeFloating() {
     this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT).forEach((l) => l.detach());
@@ -24980,28 +25022,32 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     else
       this.openFloating();
   }
-  // Pin the most-recently-opened popout above other apps (best-effort). Only size
-  // and place it on first open, so a later user resize/move is respected.
-  pinFloatWindow(initial) {
-    if (this.data.settings.floatAlwaysOnTop === false)
-      return;
+  // Size, place, and pin a float popout. `winOverride` may be passed (from the
+  // window-open handler, which has the brand-new window); otherwise we take the
+  // most-recently-opened popout. Sizing happens regardless of the always-on-top
+  // setting; only the always-on-top call itself is gated.
+  pinFloatWindow(initial, winOverride) {
     try {
       const remote = getElectronRemote();
       if (!remote || !remote.BrowserWindow) {
-        if (initial)
+        if (initial && this.data.settings.floatAlwaysOnTop !== false)
           new import_obsidian.Notice("Focus Log: the timer opened, but couldn't be pinned on top (Electron API unavailable in this Obsidian).", 7e3);
         return;
       }
-      const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
-      const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-      const others = all.filter((w) => !cur || w.id !== cur.id);
-      const win = others[others.length - 1];
+      let win = winOverride;
+      if (!win) {
+        const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
+        const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
+        win = all.filter((w) => !cur || w.id !== cur.id).pop();
+      }
       if (!win)
         return;
-      win.setAlwaysOnTop(true, "floating");
-      try {
-        win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-      } catch (e) {
+      if (this.data.settings.floatAlwaysOnTop !== false) {
+        win.setAlwaysOnTop(true, "floating");
+        try {
+          win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        } catch (e) {
+        }
       }
       try {
         if (win.webContents && win.webContents.setBackgroundThrottling)
@@ -25012,9 +25058,9 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         try {
           const screen = remote.screen;
           const wa = screen && screen.getPrimaryDisplay ? screen.getPrimaryDisplay().workArea : null;
-          win.setSize(320, 300);
+          win.setSize(320, 300, false);
           if (wa)
-            win.setPosition(wa.x + wa.width - 340, wa.y + 40);
+            win.setPosition(Math.round(wa.x + wa.width - 340), Math.round(wa.y + 40), false);
         } catch (e) {
         }
       }
