@@ -35,6 +35,15 @@
 
 /* ---------- Floating timer (popout window) ---------- */
 .workspace-leaf-content[data-type="focuslog-float"] .view-content { padding: 0; }
+
+/* Frameless look: hide Obsidian's tab strip and view header for the float popout
+   only (scoped by the body class added to that window), leaving just the timer.
+   The macOS window dots stay so you can still move/close it; the whole panel is a
+   drag handle (buttons stay clickable), with a little top room to clear the dots. */
+body.focuslog-float-window .workspace-tab-header-container,
+body.focuslog-float-window .view-header { display: none !important; }
+body.focuslog-float-window .focuslog-float .flt-wrap { -webkit-app-region: drag; padding-top: 18px; }
+body.focuslog-float-window .focuslog-float .flt-btn { -webkit-app-region: no-drag; }
 .focuslog-float {
   height: 100%;
   display: flex;
@@ -81,12 +90,17 @@
   border-radius: 7px;
   padding: 5px 12px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.12s ease, opacity 0.12s ease;
 }
 .focuslog-float .flt-btn:hover { background: #f3eee3; }
 .focuslog-float .flt-btn:disabled { opacity: 0.4; cursor: default; }
-.focuslog-float .flt-btn.flt-step { padding: 5px 10px; font-size: 15px; line-height: 1; }
-.focuslog-float .flt-btn.flt-primary { background: #2b2723; color: #fdfbf6; border-color: #2b2723; min-width: 92px; }
+.focuslog-float .flt-btn svg { width: 18px; height: 18px; display: block; }
+.focuslog-float .flt-btn.flt-step { padding: 5px 11px; font-size: 16px; line-height: 1; }
+.focuslog-float .flt-btn.flt-icon { padding: 6px 11px; }
+.focuslog-float .flt-btn.flt-primary { background: #2b2723; color: #fdfbf6; border-color: #2b2723; padding: 6px 18px; }
 .focuslog-float .flt-btn.flt-primary:hover { background: #423b34; }
 
 .focuslog-float .flt-flash {

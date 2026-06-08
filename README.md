@@ -28,9 +28,9 @@ A tab bar across the top: **today · week · month · totals · log · break · 
 Your synced tasks, newest ranking first. Each row shows a coloured square for **ExecutionPower** (🟥 Must / 🟨 Aim, the default / 🟩 Bonus), a coloured **CognitiveLoad** letter (A high / B medium / C low), the task name, a 👑 for King tasks, and the tomato pips done / remaining. **Drag the grip handle** to reorder; the order is saved and carried into the next day — after a sync, already-ranked tasks keep their place (even if you edited them in Notion) and brand-new tasks float to the top. The header shows `done / goal` where the **goal is click-to-edit** inline. A legend at the top explains the colours.
 
 ### log
-Start a focus session here. The timer row is `[−] [start Nm] [+] [pause] [reset]`:
-- **− / +** adjust the pomodoro length from **5 to 30 minutes** (hold to change quickly); each session records its actual length, and **start** reads *resume* while paused. The length is **locked while a pomodoro is active** (running or paused) and unlocks once you reset or it finishes.
-- **start** runs the countdown; **pause** asks for a reason (see *Pauses*); **reset** discards the in-progress pomodoro, so it never reaches the totals.
+Start a focus session here. The timer row is `[−] [ start Nm · pause · resume Nm ] [+] [⟲]`:
+- **− / +** adjust the pomodoro length from **5 to 30 minutes** (hold to change quickly); each session records its actual length. The length is **locked while a pomodoro is active** (running or paused) and unlocks once you reset or it finishes.
+- One **merged button** runs the timer: it reads **start Nm** when idle, **pause** while running, and **resume Nm** while paused (pausing asks for a reason — see *Pauses*). The **⟲** button resets, discarding the in-progress pomodoro so it never reaches the totals.
 - **floating timer window** — a toggle under the timer pops out a small always-on-top timer (see *Floating timer window* below).
 
 Pick the task (Act +1 writes to that page), rate expected and actual enjoyment, add an optional note, and press **log pomodoro + write Act**. Two toggles sit above the button: **set this task's status to Done in Notion**, and **pick the next task now** (default on) — choose what's next, and after your break the log view reopens already set to it.
@@ -47,7 +47,7 @@ Optional. Turn on **Settings → Break → "Take a break after logging"**, and l
 Manage **pause tags**, each one **internal** (your own impulse — yellow) or **external** (from outside — blue). Tags are grouped under those two headings in the break-view row style (add / edit / delete, set the category, and **drag to reorder** within a group). Pause stats: counts this week and this month, the top tag for each, **internal-vs-external pie charts for the past 7 days / 30 days / 12 months**, a by-tag pie, and — per tag, across all history — the **typical time of day** (morning / afternoon / evening). An **All pauses** list logs each pause (time, duration, tag); edit reassigns the tag or fixes the time, and delete removes it.
 
 ## Floating timer window
-A small **always-on-top** window that shows the countdown over your other apps — drag it to move, drag an edge to resize (the digits scale to fit). It mirrors the panel timer and shares **one clock**, so you can **start, pause, resume, or reset from either** and they stay in sync; the timer keeps running even if the panel is closed.
+A small, **chrome-free always-on-top** window (~300×170, with its tab bar and view header hidden) that shows the countdown over your other apps — **drag the body to move it**, drag an edge to resize (the digits scale to fit). Its controls are a **play/pause** toggle and a **⟲** reset. It mirrors the panel timer and shares **one clock**, so you can **start, pause, resume, or reset from either** and they stay in sync; the timer keeps running even if the panel is closed.
 
 Turn it on with the **floating timer window** toggle in the *log* tab, the ribbon clock, or the **Toggle floating timer** command. While it's on it stays up across pause/resume and auto-opens when a pomodoro starts. The 15-/5-minute prompts and the finish fire as **system notifications** (so they reach you over any app), and the window itself celebrates when the timer hits zero.
 

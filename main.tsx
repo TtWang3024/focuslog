@@ -1,4 +1,4 @@
-import { App, ItemView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath, requestUrl } from "obsidian";
+import { App, ItemView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath, requestUrl, setIcon } from "obsidian";
 import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
 import FocusLogApp from "./FocusLogApp";
@@ -551,8 +551,8 @@ export default class FocusLogPlugin extends Plugin {
           const screen = remote.screen;
           const wa = screen && screen.getPrimaryDisplay ? screen.getPrimaryDisplay().workArea : null;
           // animate:false → instant, no Electron resize/move animation.
-          win.setSize(320, 300, false);
-          if (wa) win.setPosition(Math.round(wa.x + wa.width - 340), Math.round(wa.y + 40), false);
+          win.setSize(300, 170, false);
+          if (wa) win.setPosition(Math.round(wa.x + wa.width - 320), Math.round(wa.y + 40), false);
         } catch {}
       }
       this.floatWin = win;
@@ -959,6 +959,7 @@ class FloatTimerView extends ItemView {
   private flashT = 0;
   private celebrateT = 0;
   private localTick = 0;
+  private lastIcon = ""; // avoid re-rendering the play/pause svg every tick
   private fwin: any = null; // this popout's own window object (its timers aren't throttled while it's visible)
   constructor(leaf: WorkspaceLeaf, plugin: FocusLogPlugin) {
     super(leaf);
@@ -973,23 +974,26 @@ class FloatTimerView extends ItemView {
     root.empty();
     root.addClass("focuslog-float");
     this.fwin = (root as any).win || window;
+    // Tag this popout's window so the CSS can hide its tab bar + view header for a
+    // clean, frameless timer — without touching the main window or other popouts.
+    try { this.fwin.document.body.classList.add("focuslog-float-window"); } catch {}
     const wrap = root.createDiv({ cls: "flt-wrap" });
     this.els.task = wrap.createDiv({ cls: "flt-task" });
     this.els.time = wrap.createDiv({ cls: "flt-time" });
-    const row1 = wrap.createDiv({ cls: "flt-row" });
-    this.els.minus = row1.createEl("button", { cls: "flt-btn flt-step", text: "−" });
-    this.els.primary = row1.createEl("button", { cls: "flt-btn flt-primary" });
-    this.els.plus = row1.createEl("button", { cls: "flt-btn flt-step", text: "+" });
-    const row2 = wrap.createDiv({ cls: "flt-row" });
-    this.els.pause = row2.createEl("button", { cls: "flt-btn", text: "pause" });
-    this.els.reset = row2.createEl("button", { cls: "flt-btn", text: "reset" });
+    // One row: − , a play/pause toggle (icon), + , and reset (rotate-ccw icon).
+    const row = wrap.createDiv({ cls: "flt-row" });
+    this.els.minus = row.createEl("button", { cls: "flt-btn flt-step", text: "−" });
+    this.els.primary = row.createEl("button", { cls: "flt-btn flt-primary" });
+    this.els.plus = row.createEl("button", { cls: "flt-btn flt-step", text: "+" });
+    this.els.reset = row.createEl("button", { cls: "flt-btn flt-icon" });
+    setIcon(this.els.reset, "rotate-ccw");
+    this.els.reset.setAttribute("aria-label", "reset");
     this.els.flash = wrap.createDiv({ cls: "flt-flash" });
     this.els.celebrate = wrap.createDiv({ cls: "flt-celebrate" });
 
     this.els.minus.onclick = () => this.plugin.timer.step(-1);
     this.els.plus.onclick = () => this.plugin.timer.step(1);
-    this.els.primary.onclick = () => this.plugin.timer.start();
-    this.els.pause.onclick = () => this.plugin.timer.pause();
+    this.els.primary.onclick = () => { const st = this.plugin.timer.getState(); if (st.running) this.plugin.timer.pause(); else this.plugin.timer.start(); };
     this.els.reset.onclick = () => this.plugin.timer.reset();
 
     this.unsub = this.plugin.timer.subscribe(() => this.render());
@@ -1009,12 +1013,13 @@ class FloatTimerView extends ItemView {
     this.els.time.setText(mm + ":" + ss);
     this.els.time.toggleClass("is-done", s.secs === 0);
     this.els.task.setText(s.taskName || "Focus");
-    this.els.primary.setText((s.paused ? "resume" : "start") + " " + s.lengthMin + "m");
+    const wantIcon = s.running ? "pause" : "play";
+    if (this.lastIcon !== wantIcon) { setIcon(this.els.primary, wantIcon); this.lastIcon = wantIcon; }
+    this.els.primary.setAttribute("aria-label", s.running ? "pause" : (s.paused ? "resume" : "start"));
     this.els.primary.toggleClass("is-running", s.running);
     const locked = s.running || s.paused; // length is frozen while a pomodoro is active
     this.els.minus.disabled = locked || s.lengthMin <= 5;
     this.els.plus.disabled = locked || s.lengthMin >= 30;
-    this.els.pause.disabled = !s.running;
   }
 
   flash(msg: string) {
@@ -1056,6 +1061,7 @@ class FloatTimerView extends ItemView {
       w.clearTimeout(this.flashT);
       w.clearTimeout(this.celebrateT);
     } catch {}
+    try { this.fwin && this.fwin.document.body.classList.remove("focuslog-float-window"); } catch {}
     this.fwin = null;
     // Let the panel toggle catch up once the leaf is fully gone.
     try { window.setTimeout(() => this.plugin.notifyFloatChange(), 0); } catch {}

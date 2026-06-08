@@ -391,6 +391,16 @@ const catOf = (cat: any): string => (cat === "external" ? "external" : "internal
 const catColor = (cat: any) => PAUSE_CAT[catOf(cat)].fill;
 const catBorder = (cat: any) => PAUSE_CAT[catOf(cat)].border;
 
+// Lucide "rotate-ccw", inline so it renders inside the React panel (used for reset).
+function RotateCcwIcon({ size = 16 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
+  );
+}
+
 // A textarea that starts at one line and grows to fit its content as the text wraps.
 function AutoTextarea({ value, onChange, placeholder, style }: any) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
@@ -403,7 +413,7 @@ function AutoTextarea({ value, onChange, placeholder, style }: any) {
   return <textarea ref={ref} value={value} onChange={onChange} placeholder={placeholder} rows={1} style={style} />;
 }
 
-function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked }: any) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked }: any) {
   const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
@@ -438,10 +448,9 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, po
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <button disabled={lenLocked || pomoMin <= 5} onMouseDown={() => beginHold(-1)} onMouseUp={endHold} onMouseLeave={endHold} title={lenLocked ? "length is locked while a pomodoro is running" : "shorter — hold to speed up (min 5)"} style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: (lenLocked || pomoMin <= 5) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}>{"−"}</button>
-          <button onClick={() => onStart(task)} style={btn(C.ink)}>{pauseActive ? "resume" : "start"} {pomoMin}m</button>
+          <button onClick={running ? onPause : () => onStart(task)} style={{ ...btn(C.ink), minWidth: 104 }}>{running ? "pause" : `${(paused || pauseActive) ? "resume" : "start"} ${pomoMin}m`}</button>
           <button disabled={lenLocked || pomoMin >= 30} onMouseDown={() => beginHold(1)} onMouseUp={endHold} onMouseLeave={endHold} title={lenLocked ? "length is locked while a pomodoro is running" : "longer — hold to speed up (max 30)"} style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: (lenLocked || pomoMin >= 30) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}>{"+"}</button>
-          <button onClick={onPause} style={btn(C.muted, true)}>pause</button>
-          <button onClick={resetTimer} style={btn(C.muted, true)}>reset</button>
+          <button onClick={resetTimer} title="reset" aria-label="reset" style={{ ...btn(C.muted, true), padding: "7px 11px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><RotateCcwIcon size={15} /></button>
         </div>
       </div>
       <label style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 14, fontSize: 12.5, color: C.muted, cursor: "pointer" }}>
@@ -1162,7 +1171,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} />}
+        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} />}
 
         {view === "break" && (
           <div>
