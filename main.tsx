@@ -4,7 +4,28 @@ import { createRoot, Root } from "react-dom/client";
 import FocusLogApp from "./FocusLogApp";
 
 export const VIEW_TYPE = "focuslog-view";
+export const VIEW_TYPE_FLOAT = "focuslog-float";
 const NOTION_VERSION = "2022-06-28";
+
+// Best-effort access to Electron's remote module so we can pin a popout window
+// on top of every other app. The module is deprecated and its availability
+// varies by Obsidian/Electron version, so every path is guarded and the feature
+// degrades gracefully (the window still opens, just not always-on-top).
+function getElectronRemote(): any {
+  const req = (mod: string) => {
+    try {
+      const r = (window as any).require;
+      return r ? r(mod) : null;
+    } catch {
+      return null;
+    }
+  };
+  const electron = req("electron");
+  if (electron && electron.remote) return electron.remote;
+  const remote = req("@electron/remote");
+  if (remote) return remote;
+  return null;
+}
 
 export interface FocusLogSettings {
   notionToken: string;
@@ -38,6 +59,8 @@ export interface FocusLogSettings {
   pomodoroMinutes: number;
   chooseNextTask: boolean;
   pauseTemplate: string;
+  floatOnStart: boolean;
+  floatAlwaysOnTop: boolean;
 }
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
@@ -73,6 +96,8 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   pomodoroMinutes: 25,
   chooseNextTask: true,
   pauseTemplate: "- [ ] <mark class=\"hltr-pink\">{date}</mark> {pause-start} - {pause-end} ⏸️ {pause-tag}",
+  floatOnStart: true,
+  floatAlwaysOnTop: true,
 };
 
 const DEFAULT_PAUSE_TAGS = [
@@ -212,8 +237,149 @@ function updateCounterLine(data: string, prefix: string, count: number): { text:
   return { text: lines.join("\n"), status: "added" };
 }
 
+// The authoritative pomodoro timer. It lives on the plugin (not in any view) so
+// it survives the panel closing and drives both the main panel and the floating
+// window. Both are thin clients: they read getState() and call the control
+// methods; a subscriber list re-renders them on every change.
+interface TimerState {
+  secs: number;
+  total: number;
+  running: boolean;
+  paused: boolean;
+  lengthMin: number;
+  taskName: string;
+  startedAt: number | null;
+}
+class TimerEngine {
+  private lengthMin: number;
+  private total: number;          // full length of the current pomodoro, in seconds
+  private endTs = 0;              // wall-clock target while running (ms epoch)
+  private frozenSecs: number;     // remaining seconds while paused/idle
+  private running = false;
+  private paused = false;
+  private taskName = "";
+  private startedAt: number | null = null;
+  private iv: number | null = null;
+  private fired: Record<number, boolean> = {};
+  private subs = new Set<() => void>();
+
+  constructor(private plugin: FocusLogPlugin, lengthMin: number) {
+    this.lengthMin = Math.max(5, Math.min(30, Math.round(lengthMin) || 25));
+    this.total = this.lengthMin * 60;
+    this.frozenSecs = this.total;
+  }
+
+  // Remaining seconds derived from the wall clock — never a decremented counter,
+  // so a throttled/late tick (or returning from another app) always shows the
+  // correct time. ceil() keeps the displayed second from over-counting at start.
+  private secsNow(): number {
+    if (this.running) return Math.max(0, Math.ceil((this.endTs - Date.now()) / 1000));
+    return Math.max(0, this.frozenSecs);
+  }
+
+  getState(): TimerState {
+    return { secs: this.secsNow(), total: this.total, running: this.running, paused: this.paused, lengthMin: this.lengthMin, taskName: this.taskName, startedAt: this.startedAt };
+  }
+  subscribe(fn: () => void): () => void {
+    this.subs.add(fn);
+    return () => this.subs.delete(fn);
+  }
+  private emit() {
+    this.subs.forEach((fn) => { try { fn(); } catch {} });
+  }
+
+  setLength(min: number) {
+    const m = Math.max(5, Math.min(30, Math.round(min) || 25));
+    if (m === this.lengthMin) return;
+    this.lengthMin = m;
+    if (!this.running && !this.paused) { this.total = m * 60; this.frozenSecs = m * 60; this.fired = {}; }
+    this.plugin.data.settings.pomodoroMinutes = m;
+    this.plugin.persist();
+    this.emit();
+  }
+  step(delta: number) { this.setLength(this.lengthMin + delta); }
+
+  start(taskName?: string) {
+    if (typeof taskName === "string" && taskName.trim()) this.taskName = taskName.trim();
+    const fresh = !this.running && !this.paused; // brand-new pomodoro vs. a resume
+    let secs = this.secsNow();
+    if (fresh) { this.startedAt = Date.now(); this.total = this.lengthMin * 60; this.fired = {}; secs = this.total; }
+    else if (secs <= 0) { secs = this.lengthMin * 60; this.fired = {}; }
+    this.endTs = Date.now() + secs * 1000;
+    this.running = true;
+    this.paused = false;
+    this.ensureTick();
+    this.emit();
+    if (fresh) this.plugin.onTimerStarted();
+  }
+  pause() {
+    if (!this.running) return;
+    this.frozenSecs = this.secsNow();
+    this.running = false;
+    this.paused = true;
+    this.stopTick();
+    this.emit();
+  }
+  resume() { this.start(); }
+  reset() {
+    this.running = false;
+    this.paused = false;
+    this.total = this.lengthMin * 60;
+    this.frozenSecs = this.total;
+    this.endTs = 0;
+    this.startedAt = null;
+    this.taskName = "";
+    this.fired = {};
+    this.stopTick();
+    this.emit();
+  }
+  dispose() {
+    this.stopTick();
+    this.subs.clear();
+  }
+
+  private ensureTick() {
+    // Tell Electron not to throttle this window's timers while a pomodoro runs,
+    // otherwise a backgrounded window's setInterval is clamped to ~1/minute and the
+    // countdown jumps a minute at a time. Restored to normal when the timer stops.
+    this.plugin.setBackgroundThrottle(false);
+    if (this.iv != null) return;
+    this.iv = window.setInterval(() => this.poll(), 500);
+  }
+  private stopTick() {
+    if (this.iv != null) { window.clearInterval(this.iv); this.iv = null; }
+    this.plugin.setBackgroundThrottle(true);
+  }
+  // Recompute from the wall clock and fire the alerts / finish. Idempotent and
+  // safe to call from several drivers: the engine's own interval (runs while the
+  // main window is focused) and the floating window's interval (runs while that
+  // always-on-top window is visible, even when the main window is hidden and its
+  // timers are throttled). Milestones use "<=" threshold-crossing, so a tick that
+  // jumps past a mark still fires it. The 15/5-min marks only apply if the
+  // pomodoro is actually longer than that.
+  poll() {
+    if (!this.running) return;
+    const s = this.secsNow();
+    if (this.total > 900 && s <= 900 && !this.fired[900]) { this.fired[900] = true; this.plugin.timerNotify("15 minutes left. Still on this task?"); }
+    if (this.total > 300 && s <= 300 && !this.fired[300]) { this.fired[300] = true; this.plugin.timerNotify("5 minutes left. Stay with it."); }
+    if (s <= 0 && !this.fired[0]) {
+      this.fired[0] = true;
+      this.frozenSecs = 0;
+      this.running = false;
+      this.paused = false;
+      this.stopTick();
+      this.emit();
+      this.plugin.timerDone();
+      return;
+    }
+    this.emit();
+  }
+}
+
 export default class FocusLogPlugin extends Plugin {
   data: PluginData;
+  timer: TimerEngine;
+  floatWin: any = null;
   private doneStatusCache: string | null = null;
 
   async onload() {
@@ -229,13 +395,125 @@ export default class FocusLogPlugin extends Plugin {
       breaks: loaded.breaks || [],
     };
 
+    this.timer = new TimerEngine(this, this.data.settings.pomodoroMinutes);
+    // When the main window is revealed again, recompute at once so any alert or
+    // finish that came due while it was hidden (and its timers throttled) fires.
+    this.registerDomEvent(document, "visibilitychange", () => { if (!document.hidden) this.timer.poll(); });
+
     this.registerView(VIEW_TYPE, (leaf) => new FocusLogView(leaf, this));
+    this.registerView(VIEW_TYPE_FLOAT, (leaf) => new FloatTimerView(leaf, this));
     this.addRibbonIcon("bird", "Open Focus Log", () => this.activateView());
+    this.addRibbonIcon("timer", "Toggle floating timer", () => this.toggleFloating());
     this.addCommand({ id: "open-focus-log", name: "Open Focus Log", callback: () => this.activateView() });
+    this.addCommand({ id: "toggle-floating-timer", name: "Toggle floating timer", callback: () => this.toggleFloating() });
     this.addSettingTab(new FocusLogSettingTab(this.app, this));
   }
 
-  onunload() {}
+  onunload() {
+    this.timer?.dispose();
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_FLOAT);
+  }
+
+  // Enable/disable Electron's background timer throttling on the MAIN window. We
+  // turn it OFF while a pomodoro counts (so the interval keeps firing every second
+  // even when Obsidian is behind another app) and back ON when it stops, to be
+  // battery-friendly the rest of the time.
+  setBackgroundThrottle(allowed: boolean) {
+    try {
+      const remote = getElectronRemote();
+      const win = remote && remote.getCurrentWindow ? remote.getCurrentWindow() : null;
+      if (win && win.webContents && win.webContents.setBackgroundThrottling) win.webContents.setBackgroundThrottling(allowed);
+    } catch {}
+  }
+
+  // ---------- floating timer window ----------
+  private floatView(): FloatTimerView | null {
+    const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT)[0];
+    return leaf ? (leaf.view as FloatTimerView) : null;
+  }
+
+  // Called by the engine whenever a pomodoro starts; pop the window into view.
+  onTimerStarted() {
+    if (this.data.settings.floatOnStart !== false) this.openFloating();
+  }
+
+  async openFloating() {
+    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT);
+    if (existing.length) {
+      this.app.workspace.revealLeaf(existing[0]);
+      this.pinFloatWindow(false);
+      return;
+    }
+    const ws: any = this.app.workspace;
+    let leaf: WorkspaceLeaf;
+    try {
+      leaf = ws.openPopoutLeaf ? ws.openPopoutLeaf() : ws.getLeaf("window");
+    } catch {
+      leaf = ws.getLeaf("window");
+    }
+    await leaf.setViewState({ type: VIEW_TYPE_FLOAT, active: true });
+    // The OS window needs a moment to exist before Electron can see it.
+    window.setTimeout(() => this.pinFloatWindow(true), 80);
+  }
+
+  closeFloating() {
+    this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT).forEach((l) => l.detach());
+  }
+  toggleFloating() {
+    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT);
+    if (existing.length) existing.forEach((l) => l.detach());
+    else this.openFloating();
+  }
+
+  // Pin the most-recently-opened popout above other apps (best-effort). Only size
+  // and place it on first open, so a later user resize/move is respected.
+  pinFloatWindow(initial: boolean) {
+    if (this.data.settings.floatAlwaysOnTop === false) return;
+    try {
+      const remote = getElectronRemote();
+      if (!remote || !remote.BrowserWindow) {
+        if (initial) new Notice("Focus Log: the timer opened, but couldn't be pinned on top (Electron API unavailable in this Obsidian).", 7000);
+        return;
+      }
+      const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
+      const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
+      const others = all.filter((w: any) => !cur || w.id !== cur.id);
+      const win = others[others.length - 1];
+      if (!win) return;
+      win.setAlwaysOnTop(true, "floating");
+      try { win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch {}
+      try { if (win.webContents && win.webContents.setBackgroundThrottling) win.webContents.setBackgroundThrottling(false); } catch {}
+      if (initial) {
+        try {
+          const screen = remote.screen;
+          const wa = screen && screen.getPrimaryDisplay ? screen.getPrimaryDisplay().workArea : null;
+          win.setSize(320, 300);
+          if (wa) win.setPosition(wa.x + wa.width - 340, wa.y + 40);
+        } catch {}
+      }
+      this.floatWin = win;
+    } catch {}
+  }
+
+  // ---------- timer alerts (work over other apps) ----------
+  private osNotify(title: string, body: string) {
+    try {
+      const N: any = (window as any).Notification;
+      if (!N) return;
+      if (N.permission === "granted") { new N(title, { body, silent: false }); }
+      else if (N.permission !== "denied") { N.requestPermission().then((p: string) => { if (p === "granted") new N(title, { body }); }); }
+    } catch {}
+  }
+  timerNotify(msg: string) {
+    new Notice(msg, 6000);
+    this.osNotify("Focus Log", msg);
+    this.floatView()?.flash(msg);
+  }
+  timerDone() {
+    new CelebrateModal(this.app).open();
+    this.osNotify("Pomodoro complete \u{1F389}", "One block done — log how enjoyable it actually was.");
+    this.floatView()?.celebrate();
+  }
 
   async persist() {
     await this.saveData(this.data);
@@ -545,6 +823,20 @@ export default class FocusLogPlugin extends Plugin {
       appendDaily: (p: any) => self.appendToDailyNote(p),
       notify: (msg: string, duration?: number) => new Notice(msg, duration),
       celebrate: () => new CelebrateModal(self.app).open(),
+      timer: {
+        getState: () => self.timer.getState(),
+        subscribe: (fn: () => void) => self.timer.subscribe(fn),
+        start: (taskName?: string) => self.timer.start(taskName),
+        pause: () => self.timer.pause(),
+        resume: () => self.timer.resume(),
+        reset: () => self.timer.reset(),
+        setLength: (m: number) => self.timer.setLength(m),
+        step: (d: number) => self.timer.step(d),
+      },
+      openFloating: () => self.openFloating(),
+      closeFloating: () => self.closeFloating(),
+      toggleFloating: () => self.toggleFloating(),
+      floatingOpen: () => self.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT).length > 0,
     };
   }
 }
@@ -589,6 +881,110 @@ class FocusLogView extends ItemView {
   }
   async onClose() {
     this.root?.unmount();
+  }
+}
+
+// A compact, plain-DOM timer rendered into a popout window. It owns no timer
+// state — it reads the plugin's TimerEngine and re-renders on every change, so
+// it stays in lock-step with the main panel.
+class FloatTimerView extends ItemView {
+  plugin: FocusLogPlugin;
+  private unsub: (() => void) | null = null;
+  private els: any = {};
+  private flashT = 0;
+  private celebrateT = 0;
+  private localTick = 0;
+  private fwin: any = null; // this popout's own window object (its timers aren't throttled while it's visible)
+  constructor(leaf: WorkspaceLeaf, plugin: FocusLogPlugin) {
+    super(leaf);
+    this.plugin = plugin;
+  }
+  getViewType() { return VIEW_TYPE_FLOAT; }
+  getDisplayText() { return "Focus timer"; }
+  getIcon() { return "timer"; }
+
+  async onOpen() {
+    const root = this.contentEl;
+    root.empty();
+    root.addClass("focuslog-float");
+    this.fwin = (root as any).win || window;
+    const wrap = root.createDiv({ cls: "flt-wrap" });
+    this.els.task = wrap.createDiv({ cls: "flt-task" });
+    this.els.time = wrap.createDiv({ cls: "flt-time" });
+    const row1 = wrap.createDiv({ cls: "flt-row" });
+    this.els.minus = row1.createEl("button", { cls: "flt-btn flt-step", text: "−" });
+    this.els.primary = row1.createEl("button", { cls: "flt-btn flt-primary" });
+    this.els.plus = row1.createEl("button", { cls: "flt-btn flt-step", text: "+" });
+    const row2 = wrap.createDiv({ cls: "flt-row" });
+    this.els.pause = row2.createEl("button", { cls: "flt-btn", text: "pause" });
+    this.els.reset = row2.createEl("button", { cls: "flt-btn", text: "reset" });
+    this.els.flash = wrap.createDiv({ cls: "flt-flash" });
+    this.els.celebrate = wrap.createDiv({ cls: "flt-celebrate" });
+
+    this.els.minus.onclick = () => this.plugin.timer.step(-1);
+    this.els.plus.onclick = () => this.plugin.timer.step(1);
+    this.els.primary.onclick = () => this.plugin.timer.start();
+    this.els.pause.onclick = () => this.plugin.timer.pause();
+    this.els.reset.onclick = () => this.plugin.timer.reset();
+
+    this.unsub = this.plugin.timer.subscribe(() => this.render());
+    this.render();
+
+    // Drive the engine from THIS window's timeline. Because this popout stays
+    // visible (always-on-top), its timers keep firing at full rate even when the
+    // main Obsidian window is hidden and throttled — so the countdown never stalls.
+    this.localTick = this.fwin.setInterval(() => { this.plugin.timer.poll(); this.render(); }, 500);
+  }
+
+  render() {
+    const s = this.plugin.timer.getState();
+    const mm = String(Math.floor(s.secs / 60)).padStart(2, "0");
+    const ss = String(s.secs % 60).padStart(2, "0");
+    this.els.time.setText(mm + ":" + ss);
+    this.els.time.toggleClass("is-done", s.secs === 0);
+    this.els.task.setText(s.taskName || "Focus");
+    this.els.primary.setText((s.paused ? "resume" : "start") + " " + s.lengthMin + "m");
+    this.els.primary.toggleClass("is-running", s.running);
+    this.els.minus.disabled = s.lengthMin <= 5;
+    this.els.plus.disabled = s.lengthMin >= 30;
+    this.els.pause.disabled = !s.running;
+  }
+
+  flash(msg: string) {
+    if (!this.els.flash) return;
+    const w = this.fwin || window;
+    this.els.flash.setText(msg);
+    this.els.flash.addClass("show");
+    w.clearTimeout(this.flashT);
+    this.flashT = w.setTimeout(() => this.els.flash && this.els.flash.removeClass("show"), 5000);
+  }
+
+  celebrate() {
+    const el = this.els.celebrate;
+    if (!el) return;
+    el.empty();
+    el.addClass("show");
+    el.createDiv({ cls: "flt-pop", text: "\u{1F389}" });
+    el.createDiv({ cls: "flt-clabel", text: "complete" });
+    const colors = ["#d98324", "#2f6f8f", "#5b8c5a", "#b4533a", "#c9a227"];
+    for (let i = 0; i < 24; i++) {
+      const piece = el.createSpan({ cls: "fl-piece" });
+      piece.style.left = Math.random() * 100 + "%";
+      piece.style.background = colors[i % colors.length];
+      piece.style.animationDelay = (Math.random() * 0.4).toFixed(2) + "s";
+    }
+    const w = this.fwin || window;
+    w.clearTimeout(this.celebrateT);
+    this.celebrateT = w.setTimeout(() => { if (this.els.celebrate) { this.els.celebrate.removeClass("show"); this.els.celebrate.empty(); } }, 4500);
+  }
+
+  async onClose() {
+    this.unsub?.();
+    this.unsub = null;
+    const w = this.fwin || window;
+    w.clearInterval(this.localTick);
+    w.clearTimeout(this.flashT);
+    w.clearTimeout(this.celebrateT);
   }
 }
 
@@ -903,6 +1299,28 @@ class FocusLogSettingTab extends PluginSettingTab {
       .addText((t) =>
         t.setValue(String(this.plugin.data.settings.breakMinutes)).onChange(async (v) => {
           this.plugin.data.settings.breakMinutes = Math.max(1, Math.min(60, parseInt(v, 10) || 5));
+          await this.plugin.persist();
+        })
+      );
+
+    containerEl.createEl("h3", { text: "Floating timer" });
+
+    new Setting(containerEl)
+      .setName("Open the floating window when a pomodoro starts")
+      .setDesc("A small always-on-top window that shows the countdown over your other apps. You can also toggle it any time from the ribbon clock or the “Toggle floating timer” command. It stays in sync with the panel — start, pause, or reset from either.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.floatOnStart).onChange(async (v) => {
+          this.plugin.data.settings.floatOnStart = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Keep it above other apps")
+      .setDesc("Pin the floating window on top of every other window. If your Obsidian build doesn't allow this, the window still opens — it just won't stay in front.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.floatAlwaysOnTop).onChange(async (v) => {
+          this.plugin.data.settings.floatAlwaysOnTop = v;
           await this.plugin.persist();
         })
       );

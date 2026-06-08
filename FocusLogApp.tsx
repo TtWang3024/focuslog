@@ -2,9 +2,21 @@ import * as React from "react";
 const { useState, useEffect, useRef, useCallback } = React;
 
 // Focus Log UI. `api` bridge from the plugin:
-//   settings, getInitial(), saveSessions, savePending, saveTasks, sync, writeAct, notify(msg,ms), celebrate()
+//   settings, getInitial(), saveSessions, savePending, saveTasks, sync, writeAct, notify(msg,ms), celebrate(), timer
 // Scoring is enjoyment-based: expected enjoyment BEFORE, actual enjoyment AFTER.
 // A higher actual is the good outcome (green); a lower actual is worse (red).
+
+// Subscribe to the plugin-level timer engine. The engine is the single source of
+// truth (it survives this panel closing and is shared with the floating window),
+// so this panel just re-renders whenever the engine emits a change.
+function useTimer(api: any) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (!api.timer) return;
+    return api.timer.subscribe(() => force((x: number) => x + 1));
+  }, []);
+  return api.timer ? api.timer.getState() : { secs: 0, total: 0, running: false, paused: false, lengthMin: 25, taskName: "", startedAt: null };
+}
 
 // CognitiveLoad letter shown before the task name: A red (high), B yellow (medium), C green (low).
 const LOAD_COLOR: any = { A: "#b4533a", B: "#c79a2e", C: "#5b8c5a" };
@@ -380,7 +392,7 @@ function AutoTextarea({ value, onChange, placeholder, style }: any) {
   return <textarea ref={ref} value={value} onChange={onChange} placeholder={placeholder} rows={1} style={style} />;
 }
 
-function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder }: any) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn }: any) {
   const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
@@ -415,12 +427,16 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, po
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <button onMouseDown={() => beginHold(-1)} onMouseUp={endHold} onMouseLeave={endHold} title="shorter — hold to speed up (min 5)" style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin <= 5 ? 0.4 : 1 }}>{"−"}</button>
-          <button onClick={onStart} style={btn(C.ink)}>{pauseActive ? "resume" : "start"} {pomoMin}m</button>
+          <button onClick={() => onStart(task)} style={btn(C.ink)}>{pauseActive ? "resume" : "start"} {pomoMin}m</button>
           <button onMouseDown={() => beginHold(1)} onMouseUp={endHold} onMouseLeave={endHold} title="longer — hold to speed up (max 30)" style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin >= 30 ? 0.4 : 1 }}>{"+"}</button>
           <button onClick={onPause} style={btn(C.muted, true)}>pause</button>
           <button onClick={resetTimer} style={btn(C.muted, true)}>reset</button>
         </div>
       </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 14, fontSize: 12.5, color: C.muted, cursor: "pointer" }}>
+        <input type="checkbox" checked={!!floatOn} onChange={(e) => setFloatOn(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.ink, cursor: "pointer" }} />
+        floating timer window — a small window that stays on top of your other apps
+      </label>
       {pauseActive && (
         <div style={{ marginBottom: 14, padding: 10, borderRadius: 8, background: C.paper, border: `1px solid ${C.faint}` }}>
           <p style={{ margin: "0 0 6px", fontSize: 12, color: C.muted }}>Paused — why? Pick a tag; it's written to your note when you resume.</p>
@@ -518,12 +534,22 @@ export default function FocusLogApp({ api }: any) {
   const [editingGoal, setEditingGoal] = useState(false);
   const saveGoal = (n: number) => { const g = Math.max(1, Math.min(99, Math.round(n) || 1)); setGoal(g); api.patchSettings && api.patchSettings({ dailyGoal: g }); setEditingGoal(false); };
 
-  // Pomodoro length (15–25 min), and the "pick the next task before a break" option.
-  const [pomoMin, setPomoMin] = useState<number>(Math.max(5, Math.min(30, Number(settings.pomodoroMinutes) || 25)));
+  // The "pick the next task before a break" option. (Pomodoro length now lives in
+  // the plugin-level timer engine — see useTimer below.)
   const [chooseNext, setChooseNextState] = useState<boolean>(settings.chooseNextTask !== false);
   const setChooseNext = (v: boolean) => { setChooseNextState(v); api.patchSettings && api.patchSettings({ chooseNextTask: v }); };
   const [nextTask, setNextTask] = useState<string>("");
-  const [pomoStart, setPomoStart] = useState<number | null>(null);
+
+  // Floating-window on/off, controllable right from the log view. Toggling it
+  // opens or closes the always-on-top window immediately and, while on, the
+  // window stays up across pause/resume (and auto-opens on a fresh start).
+  const [floatOn, setFloatOnState] = useState<boolean>(settings.floatOnStart !== false);
+  const setFloatOn = (v: boolean) => {
+    setFloatOnState(v);
+    api.patchSettings && api.patchSettings({ floatOnStart: v });
+    if (v) { api.openFloating && api.openFloating(); }
+    else { api.closeFloating && api.closeFloating(); }
+  };
   const [pauseStart, setPauseStart] = useState<number | null>(null);
   const [pauseTag, setPauseTag] = useState<string>("");
 
@@ -632,54 +658,49 @@ export default function FocusLogApp({ api }: any) {
   };
   const deleteBreak = (id: string) => { saveBreaks(breaks.filter((b) => b.id !== id)); if (editBreakId === id) setEditBreakId(null); };
 
-  // Timer state lives here so it survives tab switches (LogForm mounts/unmounts).
-  const [secs, setSecs] = useState(pomoMin * 60);
-  const [running, setRunning] = useState(false);
-  const tick = useRef<any>(null);
-  const fired = useRef<any>({});
+  // The timer is owned by the plugin-level engine (it survives this panel closing
+  // and is shared, live, with the floating window). This panel reads its state and
+  // drives it through the api — the milestone alerts and the finish celebration now
+  // fire from the engine, so they happen no matter which window is in front.
+  const timer = useTimer(api);
+  const secs = timer.secs;
+  const running = timer.running;
+  const pomoMin = timer.lengthMin;
 
-  useEffect(() => {
-    if (!running) return;
-    tick.current = setInterval(() => {
-      setSecs((x: number) => {
-        const nx = x > 0 ? x - 1 : 0;
-        if (nx === 900 && !fired.current[900]) { fired.current[900] = true; api.notify("15 minutes left. Still on this task?", 6000); }
-        if (nx === 300 && !fired.current[300]) { fired.current[300] = true; api.notify("5 minutes left. Stay with it.", 6000); }
-        if (nx === 0 && !fired.current[0]) { fired.current[0] = true; api.celebrate(); }
-        return nx;
-      });
-    }, 1000);
-    return () => clearInterval(tick.current);
-  }, [running]);
-  useEffect(() => { if (secs === 0) setRunning(false); }, [secs]);
+  const resetTimer = () => { api.timer.reset(); setPauseStart(null); setPauseTag(""); };
+  const changePomo = (n: number) => api.timer.setLength(n);
+  const stepPomo = (delta: number) => api.timer.step(delta);
 
-  const resetTimer = () => { setRunning(false); setSecs(pomoMin * 60); fired.current = {}; setPomoStart(null); setPauseStart(null); setPauseTag(""); };
-  const changePomo = (n: number) => {
-    const m = Math.max(5, Math.min(30, Math.round(n) || 25));
-    setPomoMin(m);
-    if (!running) { setSecs(m * 60); fired.current = {}; }
-    api.patchSettings && api.patchSettings({ pomodoroMinutes: m });
-  };
-  const pomoMinRef = useRef(pomoMin);
-  pomoMinRef.current = pomoMin;
-  const stepPomo = (delta: number) => changePomo(pomoMinRef.current + delta);
-  // Pause/resume with a recorded reason.
+  // Pause/resume with a recorded reason. The focus-start timestamp comes from the
+  // engine (timer.startedAt) so a pause is dated correctly even when the pomodoro
+  // was started from the floating window.
   const commitPause = (end: number) => {
     if (pauseStart != null && pauseTag) {
       savePauses([...pauses, { id: "pa" + Date.now(), ts: pauseStart, end, mins: Math.max(0, Math.round((end - pauseStart) / 60000)), tag: pauseTag }]);
-      if (api.appendPause) Promise.resolve(api.appendPause({ pomodoroStart: pomoStart, pauseStart, pauseEnd: end, tag: pauseTag })).catch(() => {});
+      if (api.appendPause) Promise.resolve(api.appendPause({ pomodoroStart: timer.startedAt, pauseStart, pauseEnd: end, tag: pauseTag })).catch(() => {});
     }
     setPauseStart(null); setPauseTag("");
   };
-  const onStart = () => {
+  const onStart = (taskName?: string) => {
     if (pauseStart != null) commitPause(Date.now());
-    if (pomoStart == null) setPomoStart(Date.now());
-    setRunning(true);
+    api.timer.start(typeof taskName === "string" ? taskName : undefined);
   };
   const onPause = () => {
-    setRunning(false);
+    api.timer.pause();
     if (pauseStart == null) { setPauseStart(Date.now()); setPauseTag(""); }
   };
+
+  // If the timer resumes (possibly from the floating window) while a tagged pause
+  // is still pending here, record/clear it so the panel and the window agree.
+  const pauseStartRef = useRef(pauseStart);
+  pauseStartRef.current = pauseStart;
+  const commitPauseRef = useRef(commitPause);
+  commitPauseRef.current = commitPause;
+  const prevRunning = useRef(running);
+  useEffect(() => {
+    if (running && !prevRunning.current && pauseStartRef.current != null) commitPauseRef.current(Date.now());
+    prevRunning.current = running;
+  }, [running]);
 
   // Session edit/delete state for Totals view.
   const [editingId, setEditingId] = useState<any>(null);
@@ -732,7 +753,7 @@ export default function FocusLogApp({ api }: any) {
   const logPomodoro = async (s: any, markDone?: boolean) => {
     persist([...sessions, s]);
     if (pauseStart != null) commitPause(Date.now());
-    setPomoStart(null);
+    resetTimer();
     const key = s.pageId || s.task;
     setDoneSess((m: any) => ({ ...m, [key]: (m[key] || 0) + 1 }));
     if (settings.breakEnabled) { startBreak(); setView("break"); } else { setView("today"); }
@@ -1072,7 +1093,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} />}
+        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} />}
 
         {view === "break" && (
           <div>

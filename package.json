@@ -1,6 +1,6 @@
 {
   "name": "focuslog",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Pomodoro logging against a Notion Pressure-to-Progress database, with rating, heatmap, and Act write-back.",
   "private": true,
   "main": "main.js",

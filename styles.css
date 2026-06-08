@@ -1,3 +1,8 @@
+/* Baloo 2 — imported here (not only in the React <style>) so the popout floating
+   timer window, which is a separate document, also gets the display font.
+   @import must precede every style rule, so it stays at the very top. */
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&display=swap');
+
 /* Focus Log: the view renders a self-contained React panel, so most styling is inline.
    This file only ensures the content element has no extra padding. */
 .workspace-leaf-content[data-type="focuslog-view"] .view-content {
@@ -27,6 +32,94 @@
 .workspace-leaf-content[data-type="focuslog-view"] .fl-del:hover {
   background: #F6E4DF !important;
 }
+
+/* ---------- Floating timer (popout window) ---------- */
+.workspace-leaf-content[data-type="focuslog-float"] .view-content { padding: 0; }
+.focuslog-float {
+  height: 100%;
+  display: flex;
+}
+.focuslog-float .flt-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 14px;
+  background: #fdfbf6;
+  color: #2b2723;
+  overflow: hidden;
+}
+.focuslog-float .flt-task {
+  max-width: 100%;
+  font-size: 12px;
+  color: #8a8175;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.02em;
+}
+.focuslog-float .flt-time {
+  font-family: 'Baloo 2', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-weight: 600;
+  /* Scale with the window so the digits always fit, however it's resized. */
+  font-size: clamp(26px, min(16vw, 16vh), 60px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #2b2723;
+}
+.focuslog-float .flt-time.is-done { color: #5b8c5a; }
+.focuslog-float .flt-row { display: flex; gap: 6px; align-items: center; justify-content: center; }
+.focuslog-float .flt-btn {
+  font-family: 'Baloo 2', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  border: 1px solid #e4ddcf;
+  background: #fffefc;
+  color: #2b2723;
+  border-radius: 7px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.12s ease, opacity 0.12s ease;
+}
+.focuslog-float .flt-btn:hover { background: #f3eee3; }
+.focuslog-float .flt-btn:disabled { opacity: 0.4; cursor: default; }
+.focuslog-float .flt-btn.flt-step { padding: 5px 10px; font-size: 15px; line-height: 1; }
+.focuslog-float .flt-btn.flt-primary { background: #2b2723; color: #fdfbf6; border-color: #2b2723; min-width: 92px; }
+.focuslog-float .flt-btn.flt-primary:hover { background: #423b34; }
+
+.focuslog-float .flt-flash {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: #b4533a;
+  background: #f6e4df;
+  border-radius: 6px;
+  padding: 4px 8px;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.focuslog-float .flt-flash.show { opacity: 1; transform: translateY(0); }
+
+.focuslog-float .flt-celebrate {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(253, 251, 246, 0.94);
+  overflow: hidden;
+}
+.focuslog-float .flt-celebrate.show { display: flex; }
+.focuslog-float .flt-celebrate .flt-pop { font-size: clamp(30px, 13vh, 52px); animation: fl-pop 0.5s cubic-bezier(.2,1.4,.4,1) both; }
+.focuslog-float .flt-celebrate .flt-clabel { font-family: 'Baloo 2', sans-serif; font-weight: 600; font-size: 18px; color: #5b8c5a; margin-top: 2px; }
 
 /* Celebration modal */
 .focuslog-celebrate { text-align: center; position: relative; overflow: hidden; }

@@ -2,7 +2,7 @@
 
 Logs pomodoros against your Notion **⛅ Pressure to Progress** database. Each pomodoro carries two scores — expected enjoyment *before* and actual enjoyment *after* — so you can watch the gap (starting is usually less bad than feared). It writes **Act +1** back to the exact task page, collapses recurring work by top-level parent, and turns the data into weekly charts, totals, a contributions heatmap, and calibration insights.
 
-On top of the core logger it adds a flexible timer, optional breaks with tracked activities, pauses logged with a reason, a daily-note writer, and a per-day pomodoro counter.
+On top of the core logger it adds a flexible timer with an optional **always-on-top floating window**, optional breaks with tracked activities, pauses logged with a reason, a daily-note writer, and a per-day pomodoro counter.
 
 ## What it borrows from existing plugins
 - One-property write-back: logging a pomodoro sends `PATCH /v1/pages/{id}` with only the `Act` number, leaving everything else untouched.
@@ -31,6 +31,7 @@ Your synced tasks, newest ranking first. Each row shows a coloured square for **
 Start a focus session here. The timer row is `[−] [start Nm] [+] [pause] [reset]`:
 - **− / +** adjust the pomodoro length from **5 to 30 minutes** (hold to change quickly); each session records its actual length, and **start** reads *resume* while paused.
 - **start** runs the countdown; **pause** asks for a reason (see *Pauses*); **reset** discards the in-progress pomodoro, so it never reaches the totals.
+- **floating timer window** — a toggle under the timer pops out a small always-on-top timer (see *Floating timer window* below).
 
 Pick the task (Act +1 writes to that page), rate expected and actual enjoyment, add an optional note, and press **log pomodoro + write Act**. Two toggles sit above the button: **set this task's status to Done in Notion**, and **pick the next task now** (default on) — choose what's next, and after your break the log view reopens already set to it.
 
@@ -44,6 +45,13 @@ Optional. Turn on **Settings → Break → "Take a break after logging"**, and l
 
 ### pause
 Manage **pause tags** (add / edit / delete, and **drag to reorder**) and see your pause stats: counts this week and this month, the top tag for each, a by-tag pie, and — per tag, across all history — the **typical time of day** (morning / afternoon / evening). An **All pauses** list logs each pause (time, duration, tag); edit reassigns the tag or fixes the time, and delete removes it.
+
+## Floating timer window
+A small **always-on-top** window that shows the countdown over your other apps — drag it to move, drag an edge to resize (the digits scale to fit). It mirrors the panel timer and shares **one clock**, so you can **start, pause, resume, or reset from either** and they stay in sync; the timer keeps running even if the panel is closed.
+
+Turn it on with the **floating timer window** toggle in the *log* tab, the ribbon clock, or the **Toggle floating timer** command. While it's on it stays up across pause/resume and auto-opens when a pomodoro starts. The 15-/5-minute prompts and the finish fire as **system notifications** (so they reach you over any app), and the window itself celebrates when the timer hits zero.
+
+The clock is **wall-clock based**, and while a pomodoro runs the window's background timer throttling is disabled, so the countdown stays smooth and accurate even when Obsidian is hidden behind another app. Settings → Focus Log → **Floating timer** has *Open the floating window when a pomodoro starts* and *Keep it above other apps* — staying on top uses an Electron API, and if your Obsidian build doesn't allow it the window still opens, it just won't pin.
 
 ## Pauses
 When you click **pause**, the timer stops and a reason picker appears. Choose a tag; when you **resume** (or when you log), a block is written to the daily note from a configurable template. Placeholders: `{date} {pomodoro-start} {pause-start} {pause-end} {pomodoro-resume} {pause-tag}` — `{pause-start}–{pause-end}` is the pause interval, and `{pomodoro-start}` lets you also show the focus-before-pause. An untagged pause just resumes (nothing written); a reset discards it.
