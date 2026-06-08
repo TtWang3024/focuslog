@@ -23880,7 +23880,7 @@ function AutoTextarea({ value, onChange, placeholder, style }) {
   }, [value]);
   return /* @__PURE__ */ React.createElement("textarea", { ref, value, onChange, placeholder, rows: 1, style });
 }
-function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn }) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked }) {
   const [task, setTask] = useState(preset || tasks[0] && tasks[0].task || "");
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
@@ -23916,7 +23916,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, po
     setMarkDone(false);
   };
   const inputStyle = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
-  return /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink } }, mm, ":", ss), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("button", { onMouseDown: () => beginHold(-1), onMouseUp: endHold, onMouseLeave: endHold, title: "shorter \u2014 hold to speed up (min 5)", style: { ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin <= 5 ? 0.4 : 1 } }, "\u2212"), /* @__PURE__ */ React.createElement("button", { onClick: () => onStart(task), style: btn(C.ink) }, pauseActive ? "resume" : "start", " ", pomoMin, "m"), /* @__PURE__ */ React.createElement("button", { onMouseDown: () => beginHold(1), onMouseUp: endHold, onMouseLeave: endHold, title: "longer \u2014 hold to speed up (max 30)", style: { ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin >= 30 ? 0.4 : 1 } }, "+"), /* @__PURE__ */ React.createElement("button", { onClick: onPause, style: btn(C.muted, true) }, "pause"), /* @__PURE__ */ React.createElement("button", { onClick: resetTimer, style: btn(C.muted, true) }, "reset"))), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 14, fontSize: 12.5, color: C.muted, cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: !!floatOn, onChange: (e) => setFloatOn(e.target.checked), style: { width: 15, height: 15, accentColor: C.ink, cursor: "pointer" } }), "floating timer window \u2014 a small window that stays on top of your other apps"), pauseActive && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, background: C.paper, border: `1px solid ${C.faint}` } }, /* @__PURE__ */ React.createElement("p", { style: { margin: "0 0 6px", fontSize: 12, color: C.muted } }, "Paused \u2014 why? Pick a tag; it's written to your note when you resume."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, pauseTags.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: C.muted } }, "No pause tags \u2014 add some in the Pause tab.") : pauseTags.map((pt) => {
+  return /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink } }, mm, ":", ss), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("button", { disabled: lenLocked || pomoMin <= 5, onMouseDown: () => beginHold(-1), onMouseUp: endHold, onMouseLeave: endHold, title: lenLocked ? "length is locked while a pomodoro is running" : "shorter \u2014 hold to speed up (min 5)", style: { ...btn(C.muted, true), padding: "6px 10px", opacity: lenLocked || pomoMin <= 5 ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" } }, "\u2212"), /* @__PURE__ */ React.createElement("button", { onClick: () => onStart(task), style: btn(C.ink) }, pauseActive ? "resume" : "start", " ", pomoMin, "m"), /* @__PURE__ */ React.createElement("button", { disabled: lenLocked || pomoMin >= 30, onMouseDown: () => beginHold(1), onMouseUp: endHold, onMouseLeave: endHold, title: lenLocked ? "length is locked while a pomodoro is running" : "longer \u2014 hold to speed up (max 30)", style: { ...btn(C.muted, true), padding: "6px 10px", opacity: lenLocked || pomoMin >= 30 ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" } }, "+"), /* @__PURE__ */ React.createElement("button", { onClick: onPause, style: btn(C.muted, true) }, "pause"), /* @__PURE__ */ React.createElement("button", { onClick: resetTimer, style: btn(C.muted, true) }, "reset"))), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 14, fontSize: 12.5, color: C.muted, cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: !!floatOn, onChange: (e) => setFloatOn(e.target.checked), style: { width: 15, height: 15, accentColor: C.ink, cursor: "pointer" } }), "floating timer window \u2014 a small window that stays on top of your other apps"), pauseActive && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, background: C.paper, border: `1px solid ${C.faint}` } }, /* @__PURE__ */ React.createElement("p", { style: { margin: "0 0 6px", fontSize: 12, color: C.muted } }, "Paused \u2014 why? Pick a tag; it's written to your note when you resume."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, pauseTags.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: C.muted } }, "No pause tags \u2014 add some in the Pause tab.") : pauseTags.map((pt) => {
     const on = pauseTag === pt.name;
     const fill = tagColor(pt.name);
     return /* @__PURE__ */ React.createElement("button", { key: pt.id, onClick: () => setPauseTag(on ? "" : pt.name), style: { padding: "5px 11px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${tagBorder(pt.name)}`, background: fill, color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", maxWidth: "100%" } }, on ? "\u2713 " : "", pt.name);
@@ -23957,7 +23957,12 @@ function FocusLogApp({ api }) {
     api.patchSettings && api.patchSettings({ chooseNextTask: v });
   };
   const [nextTask, setNextTask] = useState("");
-  const [floatOn, setFloatOnState] = useState(settings.floatOnStart !== false);
+  const [floatOn, setFloatOnState] = useState(!!(api.floatingOpen && api.floatingOpen()));
+  useEffect(() => {
+    if (!api.onFloatChange)
+      return;
+    return api.onFloatChange(() => setFloatOnState(!!(api.floatingOpen && api.floatingOpen())));
+  }, []);
   const setFloatOn = (v) => {
     setFloatOnState(v);
     api.patchSettings && api.patchSettings({ floatOnStart: v });
@@ -24133,6 +24138,7 @@ function FocusLogApp({ api }) {
   const secs = timer.secs;
   const running = timer.running;
   const pomoMin = timer.lengthMin;
+  const lenLocked = timer.running || timer.paused;
   const resetTimer = () => {
     api.timer.reset();
     setPauseStart(null);
@@ -24453,7 +24459,7 @@ ${s.task}`))
     const pct = b.avg != null ? b.avg / 5 * 100 : 0;
     const isBest = bestBand && b.band === bestBand.band;
     return /* @__PURE__ */ React.createElement("div", { key: b.band, style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 70, fontSize: 12, color: C.muted, textTransform: "capitalize" } }, b.name), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("div", { style: { width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral } })), /* @__PURE__ */ React.createElement("span", { style: { width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted } }, b.avg != null ? b.avg.toFixed(1) : "\u2014", " \xB7 ", b.count, "\u{1F345}"));
-  })))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "All sessions"), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), sessions.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion."))), view === "log" && /* @__PURE__ */ React.createElement(LogForm, { tasks, preset, onAdd: logPomodoro, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive: pauseStart != null, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn }), view === "break" && /* @__PURE__ */ React.createElement("div", null, brk.active && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink } }, String(Math.floor(brk.secs / 60)).padStart(2, "0"), ":", String(brk.secs % 60).padStart(2, "0")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, !brk.finished && /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 4, marginRight: 4 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, secs: Math.max(60, b.secs - 60), finished: false })), style: { ...btn(C.muted, true), padding: "4px 9px" } }, "\u2212"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, minWidth: 34, textAlign: "center" } }, Math.round(brk.secs / 60), "m"), /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, secs: Math.min(30 * 60, b.secs + 60), finished: false })), style: { ...btn(C.muted, true), padding: "4px 9px" } }, "+")), !brk.finished && /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, running: !b.running })), style: btn(C.ink) }, brk.running ? "pause" : "start"), /* @__PURE__ */ React.createElement("button", { onClick: endBreak, style: btn(C.muted, true) }, brk.finished ? "go back to my task" : "end break"))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, margin: "0 0 8px" } }, "Pick up to 3 things to do on this break (", brk.picked.length, "/3):"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 8 } }, activities.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "No activities yet \u2014 add some below.") : activities.map((a) => {
+  })))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "All sessions"), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), sessions.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion."))), view === "log" && /* @__PURE__ */ React.createElement(LogForm, { tasks, preset, onAdd: logPomodoro, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive: pauseStart != null, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked }), view === "break" && /* @__PURE__ */ React.createElement("div", null, brk.active && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink } }, String(Math.floor(brk.secs / 60)).padStart(2, "0"), ":", String(brk.secs % 60).padStart(2, "0")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, !brk.finished && /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 4, marginRight: 4 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, secs: Math.max(60, b.secs - 60), finished: false })), style: { ...btn(C.muted, true), padding: "4px 9px" } }, "\u2212"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, minWidth: 34, textAlign: "center" } }, Math.round(brk.secs / 60), "m"), /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, secs: Math.min(30 * 60, b.secs + 60), finished: false })), style: { ...btn(C.muted, true), padding: "4px 9px" } }, "+")), !brk.finished && /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, running: !b.running })), style: btn(C.ink) }, brk.running ? "pause" : "start"), /* @__PURE__ */ React.createElement("button", { onClick: endBreak, style: btn(C.muted, true) }, brk.finished ? "go back to my task" : "end break"))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, margin: "0 0 8px" } }, "Pick up to 3 things to do on this break (", brk.picked.length, "/3):"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 8 } }, activities.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "No activities yet \u2014 add some below.") : activities.map((a) => {
     const on = brk.picked.includes(a.id);
     const fill = areaColor(a.area);
     return /* @__PURE__ */ React.createElement("button", { key: a.id, onClick: () => togglePick(a.id), style: { padding: "6px 12px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${areaBorder(a.area)}`, background: fill, color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", textAlign: "left", maxWidth: "100%" } }, on ? "\u2713 " : "", a.name);
@@ -24749,15 +24755,15 @@ var TimerEngine = class {
     });
   }
   setLength(min) {
+    if (this.running || this.paused)
+      return;
     const m = Math.max(5, Math.min(30, Math.round(min) || 25));
     if (m === this.lengthMin)
       return;
     this.lengthMin = m;
-    if (!this.running && !this.paused) {
-      this.total = m * 60;
-      this.frozenSecs = m * 60;
-      this.fired = {};
-    }
+    this.total = m * 60;
+    this.frozenSecs = m * 60;
+    this.fired = {};
     this.plugin.data.settings.pomodoroMinutes = m;
     this.plugin.persist();
     this.emit();
@@ -24864,6 +24870,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
   constructor() {
     super(...arguments);
     this.floatWin = null;
+    this.floatSubs = /* @__PURE__ */ new Set();
     this.doneStatusCache = null;
   }
   async onload() {
@@ -24914,18 +24921,45 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT)[0];
     return leaf ? leaf.view : null;
   }
+  // Lets the panel keep its "floating timer window" toggle in step with whether
+  // the window is actually open (e.g. after it's closed with its own X button).
+  onFloatChange(fn) {
+    this.floatSubs.add(fn);
+    return () => this.floatSubs.delete(fn);
+  }
+  notifyFloatChange() {
+    this.floatSubs.forEach((fn) => {
+      try {
+        fn();
+      } catch (e) {
+      }
+    });
+  }
+  isFloatingOpen() {
+    return this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT).some((l) => {
+      var _a, _b;
+      const w = (_b = (_a = l.view) == null ? void 0 : _a.containerEl) == null ? void 0 : _b.win;
+      return w && !w.closed;
+    });
+  }
   // Called by the engine whenever a pomodoro starts; pop the window into view.
   onTimerStarted() {
     if (this.data.settings.floatOnStart !== false)
       this.openFloating();
   }
   async openFloating() {
-    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT);
-    if (existing.length) {
-      this.app.workspace.revealLeaf(existing[0]);
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT);
+    const live = leaves.find((l) => {
+      var _a, _b;
+      const w = (_b = (_a = l.view) == null ? void 0 : _a.containerEl) == null ? void 0 : _b.win;
+      return w && !w.closed;
+    });
+    if (live) {
+      this.app.workspace.revealLeaf(live);
       this.pinFloatWindow(false);
       return;
     }
+    leaves.forEach((l) => l.detach());
     const ws = this.app.workspace;
     let leaf;
     try {
@@ -25347,7 +25381,8 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       openFloating: () => self.openFloating(),
       closeFloating: () => self.closeFloating(),
       toggleFloating: () => self.toggleFloating(),
-      floatingOpen: () => self.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT).length > 0
+      floatingOpen: () => self.isFloatingOpen(),
+      onFloatChange: (fn) => self.onFloatChange(fn)
     };
   }
 };
@@ -25447,6 +25482,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
       this.plugin.timer.poll();
       this.render();
     }, 500);
+    this.plugin.notifyFloatChange();
   }
   render() {
     const s = this.plugin.timer.getState();
@@ -25457,8 +25493,9 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     this.els.task.setText(s.taskName || "Focus");
     this.els.primary.setText((s.paused ? "resume" : "start") + " " + s.lengthMin + "m");
     this.els.primary.toggleClass("is-running", s.running);
-    this.els.minus.disabled = s.lengthMin <= 5;
-    this.els.plus.disabled = s.lengthMin >= 30;
+    const locked = s.running || s.paused;
+    this.els.minus.disabled = locked || s.lengthMin <= 5;
+    this.els.plus.disabled = locked || s.lengthMin >= 30;
     this.els.pause.disabled = !s.running;
   }
   flash(msg) {
@@ -25496,12 +25533,23 @@ var FloatTimerView = class extends import_obsidian.ItemView {
   }
   async onClose() {
     var _a;
-    (_a = this.unsub) == null ? void 0 : _a.call(this);
+    try {
+      (_a = this.unsub) == null ? void 0 : _a.call(this);
+    } catch (e) {
+    }
     this.unsub = null;
-    const w = this.fwin || window;
-    w.clearInterval(this.localTick);
-    w.clearTimeout(this.flashT);
-    w.clearTimeout(this.celebrateT);
+    try {
+      const w = this.fwin || window;
+      w.clearInterval(this.localTick);
+      w.clearTimeout(this.flashT);
+      w.clearTimeout(this.celebrateT);
+    } catch (e) {
+    }
+    this.fwin = null;
+    try {
+      window.setTimeout(() => this.plugin.notifyFloatChange(), 0);
+    } catch (e) {
+    }
   }
 };
 var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {

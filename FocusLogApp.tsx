@@ -392,7 +392,7 @@ function AutoTextarea({ value, onChange, placeholder, style }: any) {
   return <textarea ref={ref} value={value} onChange={onChange} placeholder={placeholder} rows={1} style={style} />;
 }
 
-function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn }: any) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked }: any) {
   const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
@@ -426,9 +426,9 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, resetTimer, po
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          <button onMouseDown={() => beginHold(-1)} onMouseUp={endHold} onMouseLeave={endHold} title="shorter — hold to speed up (min 5)" style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin <= 5 ? 0.4 : 1 }}>{"−"}</button>
+          <button disabled={lenLocked || pomoMin <= 5} onMouseDown={() => beginHold(-1)} onMouseUp={endHold} onMouseLeave={endHold} title={lenLocked ? "length is locked while a pomodoro is running" : "shorter — hold to speed up (min 5)"} style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: (lenLocked || pomoMin <= 5) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}>{"−"}</button>
           <button onClick={() => onStart(task)} style={btn(C.ink)}>{pauseActive ? "resume" : "start"} {pomoMin}m</button>
-          <button onMouseDown={() => beginHold(1)} onMouseUp={endHold} onMouseLeave={endHold} title="longer — hold to speed up (max 30)" style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: pomoMin >= 30 ? 0.4 : 1 }}>{"+"}</button>
+          <button disabled={lenLocked || pomoMin >= 30} onMouseDown={() => beginHold(1)} onMouseUp={endHold} onMouseLeave={endHold} title={lenLocked ? "length is locked while a pomodoro is running" : "longer — hold to speed up (max 30)"} style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: (lenLocked || pomoMin >= 30) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}>{"+"}</button>
           <button onClick={onPause} style={btn(C.muted, true)}>pause</button>
           <button onClick={resetTimer} style={btn(C.muted, true)}>reset</button>
         </div>
@@ -540,10 +540,15 @@ export default function FocusLogApp({ api }: any) {
   const setChooseNext = (v: boolean) => { setChooseNextState(v); api.patchSettings && api.patchSettings({ chooseNextTask: v }); };
   const [nextTask, setNextTask] = useState<string>("");
 
-  // Floating-window on/off, controllable right from the log view. Toggling it
-  // opens or closes the always-on-top window immediately and, while on, the
-  // window stays up across pause/resume (and auto-opens on a fresh start).
-  const [floatOn, setFloatOnState] = useState<boolean>(settings.floatOnStart !== false);
+  // Floating-window on/off, controllable right from the log view. The checkbox
+  // tracks whether the window is actually open (synced via onFloatChange), so it
+  // never gets stuck "on" after the window is closed with its own X — one click
+  // always reopens it. Toggling on also enables auto-open on a fresh start.
+  const [floatOn, setFloatOnState] = useState<boolean>(!!(api.floatingOpen && api.floatingOpen()));
+  useEffect(() => {
+    if (!api.onFloatChange) return;
+    return api.onFloatChange(() => setFloatOnState(!!(api.floatingOpen && api.floatingOpen())));
+  }, []);
   const setFloatOn = (v: boolean) => {
     setFloatOnState(v);
     api.patchSettings && api.patchSettings({ floatOnStart: v });
@@ -666,6 +671,7 @@ export default function FocusLogApp({ api }: any) {
   const secs = timer.secs;
   const running = timer.running;
   const pomoMin = timer.lengthMin;
+  const lenLocked = timer.running || timer.paused; // freeze −/+ while a pomodoro is active
 
   const resetTimer = () => { api.timer.reset(); setPauseStart(null); setPauseTag(""); };
   const changePomo = (n: number) => api.timer.setLength(n);
@@ -1093,7 +1099,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} />}
+        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} />}
 
         {view === "break" && (
           <div>

@@ -289,10 +289,13 @@ class TimerEngine {
   }
 
   setLength(min: number) {
+    if (this.running || this.paused) return; // length is locked while a pomodoro is active
     const m = Math.max(5, Math.min(30, Math.round(min) || 25));
     if (m === this.lengthMin) return;
     this.lengthMin = m;
-    if (!this.running && !this.paused) { this.total = m * 60; this.frozenSecs = m * 60; this.fired = {}; }
+    this.total = m * 60;
+    this.frozenSecs = m * 60;
+    this.fired = {};
     this.plugin.data.settings.pomodoroMinutes = m;
     this.plugin.persist();
     this.emit();
@@ -380,6 +383,7 @@ export default class FocusLogPlugin extends Plugin {
   data: PluginData;
   timer: TimerEngine;
   floatWin: any = null;
+  private floatSubs = new Set<() => void>();
   private doneStatusCache: string | null = null;
 
   async onload() {
@@ -432,18 +436,36 @@ export default class FocusLogPlugin extends Plugin {
     return leaf ? (leaf.view as FloatTimerView) : null;
   }
 
+  // Lets the panel keep its "floating timer window" toggle in step with whether
+  // the window is actually open (e.g. after it's closed with its own X button).
+  onFloatChange(fn: () => void): () => void {
+    this.floatSubs.add(fn);
+    return () => this.floatSubs.delete(fn);
+  }
+  notifyFloatChange() {
+    this.floatSubs.forEach((fn) => { try { fn(); } catch {} });
+  }
+  isFloatingOpen(): boolean {
+    return this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT).some((l) => { const w = (l.view as any)?.containerEl?.win; return w && !w.closed; });
+  }
+
   // Called by the engine whenever a pomodoro starts; pop the window into view.
   onTimerStarted() {
     if (this.data.settings.floatOnStart !== false) this.openFloating();
   }
 
   async openFloating() {
-    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT);
-    if (existing.length) {
-      this.app.workspace.revealLeaf(existing[0]);
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT);
+    // A previously-closed popout can leave a leaf behind whose window is already
+    // gone. Reveal one only if its window is genuinely still open; otherwise drop
+    // the stale leaves and create a fresh window.
+    const live = leaves.find((l) => { const w = (l.view as any)?.containerEl?.win; return w && !w.closed; });
+    if (live) {
+      this.app.workspace.revealLeaf(live);
       this.pinFloatWindow(false);
       return;
     }
+    leaves.forEach((l) => l.detach());
     const ws: any = this.app.workspace;
     let leaf: WorkspaceLeaf;
     try {
@@ -836,7 +858,8 @@ export default class FocusLogPlugin extends Plugin {
       openFloating: () => self.openFloating(),
       closeFloating: () => self.closeFloating(),
       toggleFloating: () => self.toggleFloating(),
-      floatingOpen: () => self.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT).length > 0,
+      floatingOpen: () => self.isFloatingOpen(),
+      onFloatChange: (fn: () => void) => self.onFloatChange(fn),
     };
   }
 }
@@ -934,6 +957,7 @@ class FloatTimerView extends ItemView {
     // visible (always-on-top), its timers keep firing at full rate even when the
     // main Obsidian window is hidden and throttled — so the countdown never stalls.
     this.localTick = this.fwin.setInterval(() => { this.plugin.timer.poll(); this.render(); }, 500);
+    this.plugin.notifyFloatChange();
   }
 
   render() {
@@ -945,8 +969,9 @@ class FloatTimerView extends ItemView {
     this.els.task.setText(s.taskName || "Focus");
     this.els.primary.setText((s.paused ? "resume" : "start") + " " + s.lengthMin + "m");
     this.els.primary.toggleClass("is-running", s.running);
-    this.els.minus.disabled = s.lengthMin <= 5;
-    this.els.plus.disabled = s.lengthMin >= 30;
+    const locked = s.running || s.paused; // length is frozen while a pomodoro is active
+    this.els.minus.disabled = locked || s.lengthMin <= 5;
+    this.els.plus.disabled = locked || s.lengthMin >= 30;
     this.els.pause.disabled = !s.running;
   }
 
@@ -979,12 +1004,19 @@ class FloatTimerView extends ItemView {
   }
 
   async onClose() {
-    this.unsub?.();
+    // Guard every teardown step: when the popout is closing, its window may already
+    // be gone, and a throw here could leave a phantom leaf that blocks reopening.
+    try { this.unsub?.(); } catch {}
     this.unsub = null;
-    const w = this.fwin || window;
-    w.clearInterval(this.localTick);
-    w.clearTimeout(this.flashT);
-    w.clearTimeout(this.celebrateT);
+    try {
+      const w = this.fwin || window;
+      w.clearInterval(this.localTick);
+      w.clearTimeout(this.flashT);
+      w.clearTimeout(this.celebrateT);
+    } catch {}
+    this.fwin = null;
+    // Let the panel toggle catch up once the leaf is fully gone.
+    try { window.setTimeout(() => this.plugin.notifyFloatChange(), 0); } catch {}
   }
 }
 

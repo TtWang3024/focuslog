@@ -29,7 +29,7 @@ Your synced tasks, newest ranking first. Each row shows a coloured square for **
 
 ### log
 Start a focus session here. The timer row is `[−] [start Nm] [+] [pause] [reset]`:
-- **− / +** adjust the pomodoro length from **5 to 30 minutes** (hold to change quickly); each session records its actual length, and **start** reads *resume* while paused.
+- **− / +** adjust the pomodoro length from **5 to 30 minutes** (hold to change quickly); each session records its actual length, and **start** reads *resume* while paused. The length is **locked while a pomodoro is active** (running or paused) and unlocks once you reset or it finishes.
 - **start** runs the countdown; **pause** asks for a reason (see *Pauses*); **reset** discards the in-progress pomodoro, so it never reaches the totals.
 - **floating timer window** — a toggle under the timer pops out a small always-on-top timer (see *Floating timer window* below).
 
