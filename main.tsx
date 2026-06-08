@@ -100,14 +100,18 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   floatAlwaysOnTop: true,
 };
 
+// Pause tags carry a category: "internal" (the impulse came from you) or
+// "external" (something outside interrupted you).
 const DEFAULT_PAUSE_TAGS = [
-  { id: "p-bathroom", name: "bathroom" },
-  { id: "p-water", name: "water / snack" },
-  { id: "p-distracted", name: "got distracted" },
-  { id: "p-phone", name: "phone" },
-  { id: "p-tired", name: "tired" },
-  { id: "p-interrupted", name: "interrupted" },
+  { id: "p-bathroom", name: "bathroom", category: "internal" },
+  { id: "p-water", name: "water / snack", category: "internal" },
+  { id: "p-distracted", name: "got distracted", category: "internal" },
+  { id: "p-tired", name: "tired", category: "internal" },
+  { id: "p-phone", name: "phone", category: "external" },
+  { id: "p-interrupted", name: "interrupted", category: "external" },
 ];
+// Used to backfill a category onto tags saved before this field existed.
+const PAUSE_TAG_DEFAULT_CAT: Record<string, string> = { phone: "external", interrupted: "external" };
 
 const DEFAULT_ACTIVITIES = [
   { id: "a-stretch", name: "Stretch", area: "Body", count: 0, lastUsed: null },
@@ -395,7 +399,7 @@ export default class FocusLogPlugin extends Plugin {
       pending: loaded.pending || [],
       tasks: loaded.tasks || [],
       activities: loaded.activities || DEFAULT_ACTIVITIES.map((a) => ({ ...a })),
-      pauseTags: loaded.pauseTags || DEFAULT_PAUSE_TAGS.map((a) => ({ ...a })),
+      pauseTags: (loaded.pauseTags || DEFAULT_PAUSE_TAGS.map((a) => ({ ...a }))).map((t: any) => ({ ...t, category: t.category || PAUSE_TAG_DEFAULT_CAT[t.name] || "internal" })),
       pauses: loaded.pauses || [],
       breaks: loaded.breaks || [],
     };

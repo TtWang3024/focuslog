@@ -348,9 +348,9 @@ function polarPt(cx: number, cy: number, r: number, deg: number) {
   const a = (deg * Math.PI) / 180;
   return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
 }
-function PieChart({ data }: any) {
+function PieChart({ data, empty }: any) {
   const total = data.reduce((a: number, d: any) => a + d.value, 0);
-  if (!total) return <p style={{ color: C.muted, fontSize: 13 }}>No break activities logged yet.</p>;
+  if (!total) return <p style={{ color: C.muted, fontSize: 13 }}>{empty || "Nothing logged yet."}</p>;
   const cx = 80, cy = 80, r = 70;
   let angle = -90;
   const slices = data.map((d: any) => {
@@ -379,6 +379,17 @@ function PieChart({ data }: any) {
     </div>
   );
 }
+
+// Pause-tag categories: internal = the impulse came from you (yellow); external =
+// something outside interrupted you (blue). Fills are soft; borders are the strong
+// hue used for the left bar, the pill, and the pie slices.
+const PAUSE_CAT: any = {
+  internal: { fill: "#FBEFC9", border: "#D9A521" },
+  external: { fill: "#DCEAF6", border: "#3E78B2" },
+};
+const catOf = (cat: any): string => (cat === "external" ? "external" : "internal");
+const catColor = (cat: any) => PAUSE_CAT[catOf(cat)].fill;
+const catBorder = (cat: any) => PAUSE_CAT[catOf(cat)].border;
 
 // A textarea that starts at one line and grows to fit its content as the text wraps.
 function AutoTextarea({ value, onChange, placeholder, style }: any) {
@@ -629,17 +640,51 @@ export default function FocusLogApp({ api }: any) {
   const [pauses, setPauses] = useState<any[]>(init.pauses || []);
   const savePauses = (next: any[]) => { setPauses(next); api.savePauses && api.savePauses(next); };
   const [newPauseTag, setNewPauseTag] = useState("");
+  const [newPauseCat, setNewPauseCat] = useState("internal");
   const [editTagId, setEditTagId] = useState<any>(null);
   const [editTagName, setEditTagName] = useState("");
-  const addPauseTag = () => { const n = newPauseTag.trim(); if (!n) return; savePauseTags([...pauseTags, { id: "pt" + Date.now(), name: n }]); setNewPauseTag(""); };
+  const [editTagCat, setEditTagCat] = useState("internal");
+  const addPauseTag = () => { const n = newPauseTag.trim(); if (!n) return; savePauseTags([...pauseTags, { id: "pt" + Date.now(), name: n, category: catOf(newPauseCat) }]); setNewPauseTag(""); };
   const removePauseTag = (id: string) => savePauseTags(pauseTags.filter((t) => t.id !== id));
-  const saveEditTag = () => { const n = editTagName.trim(); if (!n) return; savePauseTags(pauseTags.map((t) => t.id === editTagId ? { ...t, name: n } : t)); setEditTagId(null); };
+  const saveEditTag = () => { const n = editTagName.trim(); if (!n) return; savePauseTags(pauseTags.map((t) => t.id === editTagId ? { ...t, name: n, category: catOf(editTagCat) } : t)); setEditTagId(null); };
   const [tagDrag, setTagDrag] = useState<number | null>(null);
   const [tagOver, setTagOver] = useState<number | null>(null);
   const moveTag = (from: number | null, to: number) => {
     if (from == null || from === to) return;
     const a = [...pauseTags]; const [m] = a.splice(from, 1); a.splice(to, 0, m);
     savePauseTags(a);
+  };
+  // One pause-tag row, shared by both category groups. `i` is the index in the full
+  // pauseTags array so drag-reorder still works; drops are limited to same category.
+  const renderTagRow = (t: any, i: number) => {
+    const cat = catOf(t.category);
+    if (editTagId === t.id) {
+      return (
+        <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
+          <input value={editTagName} onChange={(e) => setEditTagName(e.target.value)} style={{ flex: 1, minWidth: 120, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
+          <select value={editTagCat} onChange={(e) => setEditTagCat(e.target.value)} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }}>
+            <option value="internal">internal</option>
+            <option value="external">external</option>
+          </select>
+          <button onClick={saveEditTag} style={{ ...btn(C.ink), padding: "4px 10px" }}>save</button>
+          <button onClick={() => setEditTagId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
+        </div>
+      );
+    }
+    return (
+      <div key={t.id}
+        onDragOver={(e) => { e.preventDefault(); if (tagOver !== i) setTagOver(i); }}
+        onDrop={(e) => { e.preventDefault(); if (tagDrag != null && catOf(pauseTags[tagDrag] && pauseTags[tagDrag].category) === cat) moveTag(tagDrag, i); setTagDrag(null); setTagOver(null); }}
+        style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: "#fbf8f1", border: `1px solid ${C.line}`, borderLeft: `4px solid ${catBorder(cat)}`, borderRadius: 6, color: C.ink, opacity: tagDrag === i ? 0.4 : 1, boxShadow: tagOver === i && tagDrag !== null && tagDrag !== i ? `inset 0 2px 0 ${C.ink}` : "none" }}>
+        <span draggable onDragStart={(e) => { setTagDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }} onDragEnd={() => { setTagDrag(null); setTagOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
+          {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
+        </span>
+        <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
+        <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", padding: "1px 8px", borderRadius: 999, background: catColor(cat), border: `1px solid ${catBorder(cat)}`, color: darken(catBorder(cat), 0.5), whiteSpace: "nowrap" }}>{cat}</span>
+        <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); setEditTagCat(cat); }} style={EDIT_BTN}>edit</button>
+        <button onClick={() => removePauseTag(t.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
+      </div>
+    );
   };
 
   // Edit/delete for logged pause and break events (the "all sessions" lists).
@@ -856,6 +901,24 @@ export default function FocusLogApp({ api }: any) {
   const tagColor = (n: any) => MACARON[tagIdx(n)].fill;
   const tagBorder = (n: any) => MACARON[tagIdx(n)].border;
   const pausePie = tagBands.filter((t: any) => t.total > 0).map((t: any) => ({ label: t.name, value: t.total, color: tagColor(t.name) }));
+  // Internal vs external split over rolling windows. A pause inherits its tag's category.
+  const tagCatByName = (name: string) => { const t = pauseTags.find((x: any) => x.name === name); return t && t.category === "external" ? "external" : "internal"; };
+  const catSplit = (sinceMs: number) => {
+    let internal = 0, external = 0;
+    pauses.forEach((p: any) => {
+      const ts = typeof p.ts === "number" ? p.ts : +new Date(p.ts);
+      if (ts >= sinceMs) { if (tagCatByName(p.tag) === "external") external++; else internal++; }
+    });
+    return [
+      { label: "internal", value: internal, color: PAUSE_CAT.internal.border },
+      { label: "external", value: external, color: PAUSE_CAT.external.border },
+    ];
+  };
+  const catPies = [
+    { lbl: "past 7 days", data: catSplit(Date.now() - 7 * DAY) },
+    { lbl: "past 30 days", data: catSplit(Date.now() - 30 * DAY) },
+    { lbl: "past 12 months", data: catSplit(Date.now() - 365 * DAY) },
+  ];
 
   const openLog = (leafTask: string) => { setPreset(leafTask); setView("log"); };
 
@@ -1224,33 +1287,27 @@ export default function FocusLogApp({ api }: any) {
           <div>
             <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
               <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 6px" }}>Pause tags</h3>
-              <p style={{ color: C.muted, fontSize: 12, margin: "0 0 10px" }}>Reasons you can tag a pause with. Picked from the log view when you pause.</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
-                {pauseTags.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>None yet. Add one below.</p>}
-                {pauseTags.map((t, i) => (
-                  editTagId === t.id ? (
-                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
-                      <input value={editTagName} onChange={(e) => setEditTagName(e.target.value)} style={{ flex: 1, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
-                      <button onClick={saveEditTag} style={{ ...btn(C.ink), padding: "4px 10px" }}>save</button>
-                      <button onClick={() => setEditTagId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
+              <p style={{ color: C.muted, fontSize: 12, margin: "0 0 10px" }}>Reasons you can tag a pause with, grouped by whether the interruption was <b style={{ color: PAUSE_CAT.internal.border }}>internal</b> (your own impulse) or <b style={{ color: PAUSE_CAT.external.border }}>external</b> (from outside). Picked from the log view when you pause.</p>
+              {pauseTags.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: "0 0 12px" }}>None yet. Add one below.</p>}
+              {(["internal", "external"] as const).map((cat) => {
+                const rows = pauseTags.map((t: any, i: number) => ({ t, i })).filter((x: any) => catOf(x.t.category) === cat);
+                return (
+                  <div key={cat} style={{ marginBottom: 12 }}>
+                    <p style={{ fontSize: 11, color: catBorder(cat), textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700, margin: "0 0 6px", display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--fl-display)" }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 3, background: catBorder(cat), display: "inline-block" }} />{cat} interrupt
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {rows.length === 0 ? <p style={{ color: C.muted, fontSize: 12, margin: 0 }}>None.</p> : rows.map((x: any) => renderTagRow(x.t, x.i))}
                     </div>
-                  ) : (
-                    <div key={t.id}
-                      onDragOver={(e) => { e.preventDefault(); if (tagOver !== i) setTagOver(i); }}
-                      onDrop={(e) => { e.preventDefault(); moveTag(tagDrag, i); setTagDrag(null); setTagOver(null); }}
-                      style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: "#fbf8f1", border: `1px solid ${C.line}`, borderLeft: `4px solid ${tagBorder(t.name)}`, borderRadius: 6, color: C.ink, opacity: tagDrag === i ? 0.4 : 1, boxShadow: tagOver === i && tagDrag !== null && tagDrag !== i ? `inset 0 2px 0 ${C.ink}` : "none" }}>
-                      <span draggable onDragStart={(e) => { setTagDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }} onDragEnd={() => { setTagDrag(null); setTagOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
-                        {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
-                      </span>
-                      <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
-                      <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); }} style={EDIT_BTN}>edit</button>
-                      <button onClick={() => removePauseTag(t.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
-                    </div>
-                  )
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input value={newPauseTag} onChange={(e) => setNewPauseTag(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addPauseTag(); }} placeholder="new pause reason" style={{ flex: 1, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" }} />
+                  </div>
+                );
+              })}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                <input value={newPauseTag} onChange={(e) => setNewPauseTag(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addPauseTag(); }} placeholder="new pause reason" style={{ flex: 1, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" }} />
+                <select value={newPauseCat} onChange={(e) => setNewPauseCat(e.target.value)} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)" }}>
+                  <option value="internal">internal</option>
+                  <option value="external">external</option>
+                </select>
                 <button onClick={addPauseTag} style={ADD_BTN}>add</button>
               </div>
             </div>
@@ -1268,8 +1325,17 @@ export default function FocusLogApp({ api }: any) {
                   <div style={{ fontSize: 14, color: C.ink }}>{topPauseMonth ? `${topPauseMonth.tag} (${topPauseMonth.n})` : "—"}</div>
                 </div>
               </div>
+              <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Internal vs external interrupt</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 18, marginBottom: 16 }}>
+                {catPies.map(({ lbl, data }: any) => (
+                  <div key={lbl}>
+                    <p style={{ fontSize: 11, color: C.muted, margin: "0 0 4px", fontFamily: "var(--fl-mono)" }}>{lbl}</p>
+                    <PieChart data={data} empty={`No pauses in the ${lbl}.`} />
+                  </div>
+                ))}
+              </div>
               <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>By tag</p>
-              <div style={{ marginBottom: 16 }}><PieChart data={pausePie} /></div>
+              <div style={{ marginBottom: 16 }}><PieChart data={pausePie} empty="No pauses recorded yet." /></div>
               <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Typical time of day (all history)</p>
               {tagBands.filter((t: any) => t.total > 0).length === 0 ? (
                 <p style={{ color: C.muted, fontSize: 13 }}>No pauses recorded yet.</p>
