@@ -24615,7 +24615,8 @@ var DEFAULT_SETTINGS = {
   chooseNextTask: true,
   pauseTemplate: '- [ ] <mark class="hltr-pink">{date}</mark> {pause-start} - {pause-end} \u23F8\uFE0F {pause-tag}',
   floatOnStart: true,
-  floatAlwaysOnTop: true
+  floatAlwaysOnTop: true,
+  floatBounds: null
 };
 var DEFAULT_PAUSE_TAGS = [
   { id: "p-bathroom", name: "bathroom", category: "internal" },
@@ -25167,7 +25168,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       if (this.data.settings.floatAlwaysOnTop !== false) {
         win.setAlwaysOnTop(true, "floating");
         try {
-          win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+          win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
         } catch (e) {
         }
       }
@@ -25178,17 +25179,27 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       }
       if (initial) {
         try {
-          const screen = remote.screen;
-          const wa = screen && screen.getPrimaryDisplay ? screen.getPrimaryDisplay().workArea : null;
-          win.setSize(300, 170, false);
-          if (wa)
-            win.setPosition(Math.round(wa.x + wa.width - 320), Math.round(wa.y + 40), false);
+          const b = this.data.settings.floatBounds;
+          if (b && b.w && b.h) {
+            win.setBounds({ x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h) });
+          } else {
+            const screen = remote.screen;
+            const wa = screen && screen.getPrimaryDisplay ? screen.getPrimaryDisplay().workArea : null;
+            win.setSize(300, 170, false);
+            if (wa)
+              win.setPosition(Math.round(wa.x + wa.width - 320), Math.round(wa.y + 40), false);
+          }
         } catch (e) {
         }
       }
       this.floatWin = win;
     } catch (e) {
     }
+  }
+  // Remember the float window's geometry so next time it opens where you left it.
+  saveFloatBounds(b) {
+    this.data.settings.floatBounds = { x: b.x, y: b.y, w: b.width, h: b.height };
+    this.persist();
   }
   // ---------- timer alerts (work over other apps) ----------
   osNotify(title, body) {
@@ -25623,6 +25634,12 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     // whether the pause reason picker is currently expanded
     this.pkey = "";
     // chips rebuild only when this (tag list / selection) changes
+    this.boundsKey = "";
+    // last seen window geometry (to detect user move/resize)
+    this.boundsDirty = false;
+    // geometry changed; save once it settles
+    this.pauseBaseH = 0;
+    // window height before the pause picker grew it
     this.fwin = null;
     this.plugin = plugin;
   }
@@ -25672,6 +25689,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     this.localTick = this.fwin.setInterval(() => {
       this.plugin.timer.poll();
       this.render();
+      this.maybeSaveBounds();
     }, 500);
     this.plugin.notifyFloatChange();
   }
@@ -25712,11 +25730,44 @@ var FloatTimerView = class extends import_obsidian.ItemView {
       this.els.celebrate.empty();
     }
   }
+  // Grow the window downward to fit the pause picker, then restore the prior height —
+  // relative to whatever size the window currently is, so a remembered/custom size is kept.
   resizeForPause(paused) {
     try {
       const win = this.plugin.floatWin;
-      if (win && win.setSize)
-        win.setSize(300, paused ? 320 : 170, false);
+      if (!win || !win.getSize)
+        return;
+      const [w, h] = win.getSize();
+      if (paused) {
+        this.pauseBaseH = h;
+        win.setSize(w, h + 150, false);
+      } else if (this.pauseBaseH) {
+        win.setSize(w, this.pauseBaseH, false);
+        this.pauseBaseH = 0;
+      }
+    } catch (e) {
+    }
+  }
+  // Persist the window geometry shortly after the user stops moving/resizing it.
+  // Skipped while paused (the picker has grown the window — not the real size).
+  maybeSaveBounds() {
+    try {
+      const win = this.plugin.floatWin;
+      if (!win || !win.getBounds)
+        return;
+      if (this.plugin.timer.getState().paused)
+        return;
+      const b = win.getBounds();
+      const key = b.x + "," + b.y + "," + b.width + "," + b.height;
+      if (key !== this.boundsKey) {
+        this.boundsKey = key;
+        this.boundsDirty = true;
+        return;
+      }
+      if (this.boundsDirty) {
+        this.boundsDirty = false;
+        this.plugin.saveFloatBounds(b);
+      }
     } catch (e) {
     }
   }
@@ -25780,6 +25831,12 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     } catch (e) {
     }
     this.unsub = null;
+    try {
+      const win = this.plugin.floatWin;
+      if (win && win.getBounds && !this.plugin.timer.getState().paused)
+        this.plugin.saveFloatBounds(win.getBounds());
+    } catch (e) {
+    }
     try {
       const w = this.fwin || window;
       w.clearInterval(this.localTick);

@@ -67,6 +67,7 @@ export interface FocusLogSettings {
   pauseTemplate: string;
   floatOnStart: boolean;
   floatAlwaysOnTop: boolean;
+  floatBounds: { x: number; y: number; w: number; h: number } | null;
 }
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
@@ -104,6 +105,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   pauseTemplate: "- [ ] <mark class=\"hltr-pink\">{date}</mark> {pause-start} - {pause-end} ⏸️ {pause-tag}",
   floatOnStart: true,
   floatAlwaysOnTop: true,
+  floatBounds: null,
 };
 
 // Pause tags carry a category: "internal" (the impulse came from you) or
@@ -601,20 +603,34 @@ export default class FocusLogPlugin extends Plugin {
       if (!win) return;
       if (this.data.settings.floatAlwaysOnTop !== false) {
         win.setAlwaysOnTop(true, "floating");
-        try { win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch {}
+        // skipTransformProcessType:true keeps macOS from changing Obsidian's process
+        // type here — without it, "visible on all workspaces" makes Obsidian drop its
+        // dock dot and lose focus (the menu bar jumps to another app) when the float opens.
+        try { win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); } catch {}
       }
       try { if (win.webContents && win.webContents.setBackgroundThrottling) win.webContents.setBackgroundThrottling(false); } catch {}
       if (initial) {
         try {
-          const screen = remote.screen;
-          const wa = screen && screen.getPrimaryDisplay ? screen.getPrimaryDisplay().workArea : null;
-          // animate:false → instant, no Electron resize/move animation.
-          win.setSize(300, 170, false);
-          if (wa) win.setPosition(Math.round(wa.x + wa.width - 320), Math.round(wa.y + 40), false);
+          const b = this.data.settings.floatBounds;
+          if (b && b.w && b.h) {
+            // Restore the size + position from last time.
+            win.setBounds({ x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h) });
+          } else {
+            const screen = remote.screen;
+            const wa = screen && screen.getPrimaryDisplay ? screen.getPrimaryDisplay().workArea : null;
+            win.setSize(300, 170, false); // first-time default: small, top-right
+            if (wa) win.setPosition(Math.round(wa.x + wa.width - 320), Math.round(wa.y + 40), false);
+          }
         } catch {}
       }
       this.floatWin = win;
     } catch {}
+  }
+
+  // Remember the float window's geometry so next time it opens where you left it.
+  saveFloatBounds(b: { x: number; y: number; width: number; height: number }) {
+    this.data.settings.floatBounds = { x: b.x, y: b.y, w: b.width, h: b.height };
+    this.persist();
   }
 
   // ---------- timer alerts (work over other apps) ----------
@@ -1027,6 +1043,9 @@ class FloatTimerView extends ItemView {
   private lastIcon = ""; // avoid re-rendering the play/pause svg every tick
   private pickerShown = false; // whether the pause reason picker is currently expanded
   private pkey = "";           // chips rebuild only when this (tag list / selection) changes
+  private boundsKey = "";      // last seen window geometry (to detect user move/resize)
+  private boundsDirty = false; // geometry changed; save once it settles
+  private pauseBaseH = 0;      // window height before the pause picker grew it
   private fwin: any = null; // this popout's own window object (its timers aren't throttled while it's visible)
   constructor(leaf: WorkspaceLeaf, plugin: FocusLogPlugin) {
     super(leaf);
@@ -1070,7 +1089,7 @@ class FloatTimerView extends ItemView {
     // Drive the engine from THIS window's timeline. Because this popout stays
     // visible (always-on-top), its timers keep firing at full rate even when the
     // main Obsidian window is hidden and throttled — so the countdown never stalls.
-    this.localTick = this.fwin.setInterval(() => { this.plugin.timer.poll(); this.render(); }, 500);
+    this.localTick = this.fwin.setInterval(() => { this.plugin.timer.poll(); this.render(); this.maybeSaveBounds(); }, 500);
     this.plugin.notifyFloatChange();
   }
 
@@ -1107,10 +1126,29 @@ class FloatTimerView extends ItemView {
     }
   }
 
+  // Grow the window downward to fit the pause picker, then restore the prior height —
+  // relative to whatever size the window currently is, so a remembered/custom size is kept.
   resizeForPause(paused: boolean) {
     try {
       const win = this.plugin.floatWin;
-      if (win && win.setSize) win.setSize(300, paused ? 320 : 170, false);
+      if (!win || !win.getSize) return;
+      const [w, h] = win.getSize();
+      if (paused) { this.pauseBaseH = h; win.setSize(w, h + 150, false); }
+      else if (this.pauseBaseH) { win.setSize(w, this.pauseBaseH, false); this.pauseBaseH = 0; }
+    } catch {}
+  }
+
+  // Persist the window geometry shortly after the user stops moving/resizing it.
+  // Skipped while paused (the picker has grown the window — not the real size).
+  maybeSaveBounds() {
+    try {
+      const win = this.plugin.floatWin;
+      if (!win || !win.getBounds) return;
+      if (this.plugin.timer.getState().paused) return;
+      const b = win.getBounds();
+      const key = b.x + "," + b.y + "," + b.width + "," + b.height;
+      if (key !== this.boundsKey) { this.boundsKey = key; this.boundsDirty = true; return; }
+      if (this.boundsDirty) { this.boundsDirty = false; this.plugin.saveFloatBounds(b); }
     } catch {}
   }
 
@@ -1165,6 +1203,11 @@ class FloatTimerView extends ItemView {
     // be gone, and a throw here could leave a phantom leaf that blocks reopening.
     try { this.unsub?.(); } catch {}
     this.unsub = null;
+    // Capture the final geometry so it reopens here next time.
+    try {
+      const win = this.plugin.floatWin;
+      if (win && win.getBounds && !this.plugin.timer.getState().paused) this.plugin.saveFloatBounds(win.getBounds());
+    } catch {}
     try {
       const w = this.fwin || window;
       w.clearInterval(this.localTick);

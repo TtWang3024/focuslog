@@ -1,7 +1,7 @@
 {
   "id": "focuslog",
   "name": "Focus Log",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "minAppVersion": "1.4.0",
   "description": "Pomodoro logging against a Notion 'Pressure to Progress' database: expected-resistance vs actual-difficulty scoring, a weekday/time heatmap, weekly/monthly/yearly totals, and one-property Act write-back.",
   "author": "Tingting Wang",
