@@ -43,7 +43,9 @@
 body.focuslog-float-window .workspace-tab-header-container,
 body.focuslog-float-window .view-header { display: none !important; }
 body.focuslog-float-window .focuslog-float .flt-wrap { -webkit-app-region: drag; padding-top: 18px; }
-body.focuslog-float-window .focuslog-float .flt-btn { -webkit-app-region: no-drag; }
+body.focuslog-float-window .focuslog-float .flt-btn,
+body.focuslog-float-window .focuslog-float .flt-chip,
+body.focuslog-float-window .focuslog-float .flt-celebrate { -webkit-app-region: no-drag; }
 .focuslog-float {
   height: 100%;
   display: flex;
@@ -73,8 +75,9 @@ body.focuslog-float-window .focuslog-float .flt-btn { -webkit-app-region: no-dra
 .focuslog-float .flt-time {
   font-family: 'Baloo 2', system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-weight: 600;
-  /* Scale with the window so the digits always fit, however it's resized. */
-  font-size: clamp(26px, min(16vw, 16vh), 60px);
+  /* Width-based so the digits stay a stable size when the window grows downward
+     for the pause picker (only the height changes); still scales if you widen it. */
+  font-size: clamp(24px, 13vw, 46px);
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: #2b2723;
@@ -121,6 +124,24 @@ body.focuslog-float-window .focuslog-float .flt-btn { -webkit-app-region: no-dra
 }
 .focuslog-float .flt-flash.show { opacity: 1; transform: translateY(0); }
 
+/* Pause reason picker (shown when paused; the window grows to fit it) */
+.focuslog-float .flt-picker { width: 100%; padding: 2px 2px 0; }
+.focuslog-float .flt-picker:empty { display: none; }
+.focuslog-float .flt-picker-q { font-size: 11px; color: #8a8175; margin-bottom: 6px; text-align: center; }
+.focuslog-float .flt-picker-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.focuslog-float .flt-chip {
+  font-family: 'Baloo 2', system-ui, sans-serif;
+  font-size: 12px;
+  border: 1.5px solid #e4ddcf;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: #2b2723;
+  opacity: 0.55;
+}
+.focuslog-float .flt-chip.is-on { opacity: 1; font-weight: 700; }
+.focuslog-float .flt-picker-empty { font-size: 11px; color: #8a8175; }
+
 .focuslog-float .flt-celebrate {
   position: absolute;
   inset: 0;
@@ -130,8 +151,10 @@ body.focuslog-float-window .focuslog-float .flt-btn { -webkit-app-region: no-dra
   justify-content: center;
   background: rgba(253, 251, 246, 0.94);
   overflow: hidden;
+  cursor: pointer;
 }
 .focuslog-float .flt-celebrate.show { display: flex; }
+.focuslog-float .flt-celebrate .flt-chint { font-size: 11px; color: #8a8175; margin-top: 8px; }
 .focuslog-float .flt-celebrate .flt-pop { font-size: clamp(30px, 13vh, 52px); animation: fl-pop 0.5s cubic-bezier(.2,1.4,.4,1) both; }
 .focuslog-float .flt-celebrate .flt-clabel { font-family: 'Baloo 2', sans-serif; font-weight: 600; font-size: 18px; color: #5b8c5a; margin-top: 2px; }
 

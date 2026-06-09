@@ -27,6 +27,12 @@ function getElectronRemote(): any {
   return null;
 }
 
+// Pause-category colours for the floating window's reason chips (internal=yellow, external=blue).
+const FLOAT_CAT: any = {
+  internal: { fill: "#FBEFC9", border: "#D9A521" },
+  external: { fill: "#DCEAF6", border: "#3E78B2" },
+};
+
 export interface FocusLogSettings {
   notionToken: string;
   databaseId: string;
@@ -253,6 +259,8 @@ interface TimerState {
   lengthMin: number;
   taskName: string;
   startedAt: number | null;
+  pauseStart: number | null; // when the current pause began (null if not paused)
+  pauseTag: string;          // the reason chosen for the current pause
 }
 class TimerEngine {
   private lengthMin: number;
@@ -263,6 +271,8 @@ class TimerEngine {
   private paused = false;
   private taskName = "";
   private startedAt: number | null = null;
+  private pauseStart: number | null = null; // pause-with-reason: when this pause began
+  private pauseTag = "";                     // pause-with-reason: chosen reason
   private iv: number | null = null;
   private fired: Record<number, boolean> = {};
   private subs = new Set<() => void>();
@@ -282,7 +292,17 @@ class TimerEngine {
   }
 
   getState(): TimerState {
-    return { secs: this.secsNow(), total: this.total, running: this.running, paused: this.paused, lengthMin: this.lengthMin, taskName: this.taskName, startedAt: this.startedAt };
+    return { secs: this.secsNow(), total: this.total, running: this.running, paused: this.paused, lengthMin: this.lengthMin, taskName: this.taskName, startedAt: this.startedAt, pauseStart: this.pauseStart, pauseTag: this.pauseTag };
+  }
+  setPauseTag(tag: string) { this.pauseTag = tag || ""; this.emit(); }
+  // Write the pending pause (its event + daily-note block) if one is open, then clear
+  // it. Called when resuming, and when logging a pomodoro mid-pause.
+  commitPendingPause() {
+    if (this.pauseStart != null) {
+      this.plugin.writePauseEvent(this.startedAt, this.pauseStart, Date.now(), this.pauseTag);
+    }
+    this.pauseStart = null;
+    this.pauseTag = "";
   }
   subscribe(fn: () => void): () => void {
     this.subs.add(fn);
@@ -309,8 +329,10 @@ class TimerEngine {
   start(taskName?: string) {
     if (typeof taskName === "string" && taskName.trim()) this.taskName = taskName.trim();
     const fresh = !this.running && !this.paused; // brand-new pomodoro vs. a resume
+    // Resuming from a pause → write that pause (event + note) and clear it.
+    if (this.paused) this.commitPendingPause();
     let secs = this.secsNow();
-    if (fresh) { this.startedAt = Date.now(); this.total = this.lengthMin * 60; this.fired = {}; secs = this.total; }
+    if (fresh) { this.startedAt = Date.now(); this.total = this.lengthMin * 60; this.fired = {}; secs = this.total; this.pauseStart = null; this.pauseTag = ""; }
     else if (secs <= 0) { secs = this.lengthMin * 60; this.fired = {}; }
     this.endTs = Date.now() + secs * 1000;
     this.running = true;
@@ -324,6 +346,8 @@ class TimerEngine {
     this.frozenSecs = this.secsNow();
     this.running = false;
     this.paused = true;
+    this.pauseStart = Date.now(); // open a pause; reason picker appears in both windows
+    this.pauseTag = "";
     this.stopTick();
     this.emit();
   }
@@ -336,6 +360,8 @@ class TimerEngine {
     this.endTs = 0;
     this.startedAt = null;
     this.taskName = "";
+    this.pauseStart = null; // discard any open pause without writing it
+    this.pauseTag = "";
     this.fired = {};
     this.stopTick();
     this.emit();
@@ -388,6 +414,8 @@ export default class FocusLogPlugin extends Plugin {
   timer: TimerEngine;
   floatWin: any = null;
   private floatSubs = new Set<() => void>();
+  private pauseSubs = new Set<() => void>();   // panel re-syncs its pauses list when these fire
+  private logViewSubs = new Set<() => void>(); // panel switches to the log tab when these fire
   private openingFloat = false; // true between asking for a float popout and the window-open handler claiming it
   private doneStatusCache: string | null = null;
 
@@ -436,6 +464,36 @@ export default class FocusLogPlugin extends Plugin {
       const win = remote && remote.getCurrentWindow ? remote.getCurrentWindow() : null;
       if (win && win.webContents && win.webContents.setBackgroundThrottling) win.webContents.setBackgroundThrottling(allowed);
     } catch {}
+  }
+
+  // ---------- pause events (written from either window via the engine) ----------
+  onPausesChange(fn: () => void): () => void { this.pauseSubs.add(fn); return () => this.pauseSubs.delete(fn); }
+  private notifyPausesChange() { this.pauseSubs.forEach((fn) => { try { fn(); } catch {} }); }
+  getPauses(): any[] { return this.data.pauses || []; }
+  // Record a finished pause: a stored event + a daily-note block. An untagged pause
+  // writes nothing. Called by the engine on resume / log, so it works even when the
+  // main panel is closed (e.g. you paused from the floating window).
+  writePauseEvent(pomodoroStart: number | null, pauseStart: number, pauseEnd: number, tag: string) {
+    if (!tag) return;
+    const ev = { id: "pa" + Date.now(), ts: pauseStart, end: pauseEnd, mins: Math.max(0, Math.round((pauseEnd - pauseStart) / 60000)), tag };
+    this.data.pauses = [...(this.data.pauses || []), ev];
+    this.persist();
+    this.appendPauseToDailyNote({ pomodoroStart, pauseStart, pauseEnd, tag }).catch(() => {});
+    this.notifyPausesChange();
+  }
+
+  // ---------- bring the user into the log view (from the float celebration) ----------
+  onRequestLogView(fn: () => void): () => void { this.logViewSubs.add(fn); return () => this.logViewSubs.delete(fn); }
+  async focusAndLog() {
+    try {
+      const remote = getElectronRemote();
+      const win = remote && remote.getCurrentWindow ? remote.getCurrentWindow() : null;
+      if (win) { try { win.show(); } catch {} try { win.focus(); } catch {} }
+      try { if (remote && remote.app && remote.app.focus) remote.app.focus({ steal: true }); } catch {}
+    } catch {}
+    await this.activateView();
+    // Give a freshly-created panel a moment to subscribe before asking for the log tab.
+    window.setTimeout(() => this.logViewSubs.forEach((fn) => { try { fn(); } catch {} }), 60);
   }
 
   // ---------- floating timer window ----------
@@ -574,9 +632,11 @@ export default class FocusLogPlugin extends Plugin {
     this.floatView()?.flash(msg);
   }
   timerDone() {
-    new CelebrateModal(this.app).open();
     this.osNotify("Pomodoro complete \u{1F389}", "One block done — log how enjoyable it actually was.");
-    this.floatView()?.celebrate();
+    // When the floating window is up, it owns the celebration (tap it to jump to the
+    // log view) — no extra modal. Fall back to the modal only if there's no float.
+    if (this.isFloatingOpen()) this.floatView()?.celebrate();
+    else new CelebrateModal(this.app).open();
   }
 
   async persist() {
@@ -896,7 +956,12 @@ export default class FocusLogPlugin extends Plugin {
         reset: () => self.timer.reset(),
         setLength: (m: number) => self.timer.setLength(m),
         step: (d: number) => self.timer.step(d),
+        setPauseTag: (tag: string) => self.timer.setPauseTag(tag),
+        commitPendingPause: () => self.timer.commitPendingPause(),
       },
+      getPauses: () => self.getPauses(),
+      onPausesChange: (fn: () => void) => self.onPausesChange(fn),
+      onRequestLogView: (fn: () => void) => self.onRequestLogView(fn),
       openFloating: () => self.openFloating(),
       closeFloating: () => self.closeFloating(),
       toggleFloating: () => self.toggleFloating(),
@@ -960,6 +1025,8 @@ class FloatTimerView extends ItemView {
   private celebrateT = 0;
   private localTick = 0;
   private lastIcon = ""; // avoid re-rendering the play/pause svg every tick
+  private pickerShown = false; // whether the pause reason picker is currently expanded
+  private pkey = "";           // chips rebuild only when this (tag list / selection) changes
   private fwin: any = null; // this popout's own window object (its timers aren't throttled while it's visible)
   constructor(leaf: WorkspaceLeaf, plugin: FocusLogPlugin) {
     super(leaf);
@@ -988,6 +1055,7 @@ class FloatTimerView extends ItemView {
     this.els.reset = row.createEl("button", { cls: "flt-btn flt-icon" });
     setIcon(this.els.reset, "rotate-ccw");
     this.els.reset.setAttribute("aria-label", "reset");
+    this.els.picker = wrap.createDiv({ cls: "flt-picker" });
     this.els.flash = wrap.createDiv({ cls: "flt-flash" });
     this.els.celebrate = wrap.createDiv({ cls: "flt-celebrate" });
 
@@ -1020,6 +1088,48 @@ class FloatTimerView extends ItemView {
     const locked = s.running || s.paused; // length is frozen while a pomodoro is active
     this.els.minus.disabled = locked || s.lengthMin <= 5;
     this.els.plus.disabled = locked || s.lengthMin >= 30;
+
+    // Pause reason picker: grow the window and show the chips while paused.
+    if (s.paused !== this.pickerShown) {
+      this.pickerShown = s.paused;
+      this.resizeForPause(s.paused);
+      if (!s.paused && this.els.picker) { this.els.picker.empty(); this.pkey = ""; }
+    }
+    if (s.paused) {
+      const pkey = "P:" + s.pauseTag + ":" + ((this.plugin.data.pauseTags || []).length);
+      if (this.pkey !== pkey) { this.pkey = pkey; this.buildPicker(s.pauseTag); }
+    }
+
+    // The celebration stays until tapped; clear it once a new pomodoro starts or resets.
+    if ((s.running || s.startedAt == null) && this.els.celebrate && this.els.celebrate.hasClass("show")) {
+      this.els.celebrate.removeClass("show");
+      this.els.celebrate.empty();
+    }
+  }
+
+  resizeForPause(paused: boolean) {
+    try {
+      const win = this.plugin.floatWin;
+      if (win && win.setSize) win.setSize(300, paused ? 320 : 170, false);
+    } catch {}
+  }
+
+  buildPicker(selected: string) {
+    const el = this.els.picker;
+    if (!el) return;
+    el.empty();
+    el.createDiv({ cls: "flt-picker-q", text: "Paused — why? Pick a reason." });
+    const chips = el.createDiv({ cls: "flt-picker-chips" });
+    const tags = this.plugin.data.pauseTags || [];
+    if (!tags.length) { chips.createDiv({ cls: "flt-picker-empty", text: "No tags — add some in the Pause tab." }); return; }
+    tags.forEach((t: any) => {
+      const cat = t.category === "external" ? "external" : "internal";
+      const on = selected === t.name;
+      const chip = chips.createEl("button", { cls: "flt-chip" + (on ? " is-on" : ""), text: (on ? "✓ " : "") + t.name });
+      chip.style.background = FLOAT_CAT[cat].fill;
+      chip.style.borderColor = FLOAT_CAT[cat].border;
+      chip.onclick = () => this.plugin.timer.setPauseTag(on ? "" : t.name);
+    });
   }
 
   flash(msg: string) {
@@ -1038,6 +1148,7 @@ class FloatTimerView extends ItemView {
     el.addClass("show");
     el.createDiv({ cls: "flt-pop", text: "\u{1F389}" });
     el.createDiv({ cls: "flt-clabel", text: "complete" });
+    el.createDiv({ cls: "flt-chint", text: "tap to log in Obsidian" });
     const colors = ["#d98324", "#2f6f8f", "#5b8c5a", "#b4533a", "#c9a227"];
     for (let i = 0; i < 24; i++) {
       const piece = el.createSpan({ cls: "fl-piece" });
@@ -1045,9 +1156,8 @@ class FloatTimerView extends ItemView {
       piece.style.background = colors[i % colors.length];
       piece.style.animationDelay = (Math.random() * 0.4).toFixed(2) + "s";
     }
-    const w = this.fwin || window;
-    w.clearTimeout(this.celebrateT);
-    this.celebrateT = w.setTimeout(() => { if (this.els.celebrate) { this.els.celebrate.removeClass("show"); this.els.celebrate.empty(); } }, 4500);
+    // Stays put until tapped; tapping brings Obsidian to the front and opens the log view.
+    el.onclick = () => { el.removeClass("show"); el.empty(); el.onclick = null; this.plugin.focusAndLog(); };
   }
 
   async onClose() {

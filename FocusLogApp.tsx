@@ -464,8 +464,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
             {pauseTags.length === 0 ? <span style={{ fontSize: 12, color: C.muted }}>No pause tags — add some in the Pause tab.</span> :
               pauseTags.map((pt: any) => {
                 const on = pauseTag === pt.name;
-                const fill = tagColor(pt.name);
-                return <button key={pt.id} onClick={() => setPauseTag(on ? "" : pt.name)} style={{ padding: "5px 11px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${tagBorder(pt.name)}`, background: fill, color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", maxWidth: "100%" }}>{on ? "✓ " : ""}{pt.name}</button>;
+                return <button key={pt.id} onClick={() => setPauseTag(on ? "" : pt.name)} style={{ padding: "5px 11px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${catBorder(pt.category)}`, background: catColor(pt.category), color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", maxWidth: "100%" }}>{on ? "✓ " : ""}{pt.name}</button>;
               })}
           </div>
         </div>
@@ -575,8 +574,8 @@ export default function FocusLogApp({ api }: any) {
     if (v) { api.openFloating && api.openFloating(); }
     else { api.closeFloating && api.closeFloating(); }
   };
-  const [pauseStart, setPauseStart] = useState<number | null>(null);
-  const [pauseTag, setPauseTag] = useState<string>("");
+  // Pause state (pauseStart / pauseTag) now lives in the plugin-level timer engine,
+  // shared with the floating window — see the timer block below.
 
   // Break activities + the post-log break timer.
   const [activities, setActivities] = useState<any[]>(init.activities || []);
@@ -726,41 +725,29 @@ export default function FocusLogApp({ api }: any) {
   const running = timer.running;
   const pomoMin = timer.lengthMin;
   const lenLocked = timer.running || timer.paused; // freeze −/+ while a pomodoro is active
+  // Pause-with-reason state is owned by the engine (shared with the floating window);
+  // the engine writes the pause event + daily-note block itself on resume/log/reset.
+  const pauseActive = timer.pauseStart != null;
+  const pauseTag = timer.pauseTag || "";
+  const setPauseTag = (t: string) => api.timer.setPauseTag(t);
 
-  const resetTimer = () => { api.timer.reset(); setPauseStart(null); setPauseTag(""); };
+  const resetTimer = () => api.timer.reset();
   const changePomo = (n: number) => api.timer.setLength(n);
   const stepPomo = (delta: number) => api.timer.step(delta);
+  const onStart = (taskName?: string) => api.timer.start(typeof taskName === "string" ? taskName : undefined);
+  const onPause = () => api.timer.pause();
 
-  // Pause/resume with a recorded reason. The focus-start timestamp comes from the
-  // engine (timer.startedAt) so a pause is dated correctly even when the pomodoro
-  // was started from the floating window.
-  const commitPause = (end: number) => {
-    if (pauseStart != null && pauseTag) {
-      savePauses([...pauses, { id: "pa" + Date.now(), ts: pauseStart, end, mins: Math.max(0, Math.round((end - pauseStart) / 60000)), tag: pauseTag }]);
-      if (api.appendPause) Promise.resolve(api.appendPause({ pomodoroStart: timer.startedAt, pauseStart, pauseEnd: end, tag: pauseTag })).catch(() => {});
-    }
-    setPauseStart(null); setPauseTag("");
-  };
-  const onStart = (taskName?: string) => {
-    if (pauseStart != null) commitPause(Date.now());
-    api.timer.start(typeof taskName === "string" ? taskName : undefined);
-  };
-  const onPause = () => {
-    api.timer.pause();
-    if (pauseStart == null) { setPauseStart(Date.now()); setPauseTag(""); }
-  };
-
-  // If the timer resumes (possibly from the floating window) while a tagged pause
-  // is still pending here, record/clear it so the panel and the window agree.
-  const pauseStartRef = useRef(pauseStart);
-  pauseStartRef.current = pauseStart;
-  const commitPauseRef = useRef(commitPause);
-  commitPauseRef.current = commitPause;
-  const prevRunning = useRef(running);
+  // Keep the local pauses list in sync when the engine writes one (e.g. paused +
+  // resumed from the floating window while this panel was open), and let the float
+  // celebration pull us to the log tab.
   useEffect(() => {
-    if (running && !prevRunning.current && pauseStartRef.current != null) commitPauseRef.current(Date.now());
-    prevRunning.current = running;
-  }, [running]);
+    if (!api.onPausesChange) return;
+    return api.onPausesChange(() => setPauses([...(api.getPauses ? api.getPauses() : [])]));
+  }, []);
+  useEffect(() => {
+    if (!api.onRequestLogView) return;
+    return api.onRequestLogView(() => setView("log"));
+  }, []);
 
   // Session edit/delete state for Totals view.
   const [editingId, setEditingId] = useState<any>(null);
@@ -812,7 +799,7 @@ export default function FocusLogApp({ api }: any) {
 
   const logPomodoro = async (s: any, markDone?: boolean) => {
     persist([...sessions, s]);
-    if (pauseStart != null) commitPause(Date.now());
+    api.timer.commitPendingPause(); // write any open pause before clearing the timer
     resetTimer();
     const key = s.pageId || s.task;
     setDoneSess((m: any) => ({ ...m, [key]: (m[key] || 0) + 1 }));
@@ -1171,7 +1158,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseStart != null} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} />}
+        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} />}
 
         {view === "break" && (
           <div>
