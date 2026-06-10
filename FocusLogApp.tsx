@@ -464,7 +464,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
             {pauseTags.length === 0 ? <span style={{ fontSize: 12, color: C.muted }}>No pause tags — add some in the Pause tab.</span> :
               pauseTags.map((pt: any) => {
                 const on = pauseTag === pt.name;
-                return <button key={pt.id} onClick={() => setPauseTag(on ? "" : pt.name)} style={{ padding: "5px 11px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${catBorder(pt.category)}`, background: catColor(pt.category), color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", maxWidth: "100%" }}>{on ? "✓ " : ""}{pt.name}</button>;
+                return <button key={pt.id} onClick={() => setPauseTag(on ? "" : pt.name)} style={{ padding: "5px 11px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${catBorder(pt.category)}`, background: catColor(pt.category), color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", maxWidth: "100%", height: "auto", minHeight: 0, lineHeight: 1.35 }}>{on ? "✓ " : ""}{pt.name}</button>;
               })}
           </div>
         </div>
@@ -688,7 +688,7 @@ export default function FocusLogApp({ api }: any) {
           {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
         </span>
         <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
-        <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", padding: "1px 8px", borderRadius: 999, background: catColor(cat), border: `1px solid ${catBorder(cat)}`, color: darken(catBorder(cat), 0.5), whiteSpace: "nowrap" }}>{cat}</span>
+        {!tinyPanel && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", padding: "1px 8px", borderRadius: 999, background: catColor(cat), border: `1px solid ${catBorder(cat)}`, color: darken(catBorder(cat), 0.5), whiteSpace: "nowrap" }}>{cat}</span>}
         <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); setEditTagCat(cat); }} style={EDIT_BTN}>edit</button>
         <button onClick={() => removePauseTag(t.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
       </div>
@@ -918,10 +918,25 @@ export default function FocusLogApp({ api }: any) {
 
   const openLog = (leafTask: string) => { setPreset(leafTask); setView("log"); };
 
+  // Panel width, so manager rows can shed metadata on narrow panels: below 520px
+  // drop the count and last-used date; below 400px drop the tag pill too — the
+  // activity name always keeps enough room to read.
+  const rootRef = useRef<any>(null);
+  const [panelW, setPanelW] = useState(0);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => { for (const e of entries) setPanelW(e.contentRect.width); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const narrowPanel = panelW > 0 && panelW < 520;
+  const tinyPanel = panelW > 0 && panelW < 400;
+
   const seg = (on: boolean): any => ({ padding: "6px 14px", borderRadius: 9, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", textTransform: "capitalize", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.14)" : "none", fontFamily: "var(--fl-display)", whiteSpace: "nowrap" });
 
   return (
-    <div style={{ background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums" }}>
+    <div ref={rootRef} style={{ background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&display=swap');
         :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:'Baloo 2',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
@@ -1164,9 +1179,9 @@ export default function FocusLogApp({ api }: any) {
           <div>
             {brk.active && (
               <div style={{ background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 }}>
                   <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink }}>{String(Math.floor(brk.secs / 60)).padStart(2, "0")}:{String(brk.secs % 60).padStart(2, "0")}</span>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
                     {!brk.finished && (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4, marginRight: 4 }}>
                         <button onClick={() => setBrk((b: any) => ({ ...b, secs: Math.max(60, b.secs - 60), finished: false }))} style={{ ...btn(C.muted, true), padding: "4px 9px" }}>{"−"}</button>
@@ -1184,7 +1199,7 @@ export default function FocusLogApp({ api }: any) {
                     activities.map((a) => {
                       const on = brk.picked.includes(a.id);
                       const fill = areaColor(a.area);
-                      return <button key={a.id} onClick={() => togglePick(a.id)} style={{ padding: "6px 12px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${areaBorder(a.area)}`, background: fill, color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", textAlign: "left", maxWidth: "100%" }}>{on ? "✓ " : ""}{a.name}</button>;
+                      return <button key={a.id} onClick={() => togglePick(a.id)} style={{ padding: "6px 12px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${areaBorder(a.area)}`, background: fill, color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", textAlign: "left", maxWidth: "100%", height: "auto", minHeight: 0, lineHeight: 1.35 }}>{on ? "✓ " : ""}{a.name}</button>;
                     })}
                 </div>
               </div>
@@ -1211,9 +1226,9 @@ export default function FocusLogApp({ api }: any) {
                         {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
                       </span>
                       <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{a.name}</span>
-                      <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", padding: "1px 8px", borderRadius: 999, background: areaColor(a.area), border: `1px solid ${areaBorder(a.area)}`, color: darken(areaBorder(a.area), 0.62), whiteSpace: "nowrap" }}>#{a.area}</span>
-                      <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted }}>{a.count || 0}{"×"}</span>
-                      <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>
+                      {!tinyPanel && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", padding: "1px 8px", borderRadius: 999, background: areaColor(a.area), border: `1px solid ${areaBorder(a.area)}`, color: darken(areaBorder(a.area), 0.62), whiteSpace: "nowrap" }}>#{a.area}</span>}
+                      {!narrowPanel && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted }}>{a.count || 0}{"×"}</span>}
+                      {!narrowPanel && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>}
                       <button onClick={() => startEditAct(a)} style={EDIT_BTN}>edit</button>
                       <button onClick={() => removeActivity(a.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
                     </div>

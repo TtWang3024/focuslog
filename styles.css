@@ -144,6 +144,12 @@ body.focuslog-float-window .notice { display: none !important; }
   cursor: pointer;
   color: #2b2723;
   opacity: 0.55;
+  /* Long tag names: wrap inside the chip instead of overflowing a fixed-height button. */
+  height: auto;
+  min-height: 0;
+  white-space: normal;
+  line-height: 1.35;
+  max-width: 100%;
 }
 .focuslog-float .flt-chip.is-on { opacity: 1; font-weight: 700; }
 .focuslog-float .flt-picker-empty { font-size: 11px; color: #8a8175; }
