@@ -1264,10 +1264,10 @@ export default function FocusLogApp({ api }: any) {
                         <button onClick={() => setEditBreakId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
                       </div>
                     ) : (
-                      <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                      <div key={b.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(b.start)} {fmtTime(b.start)}{"–"}{fmtTime(b.end)}</span>
-                        <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{(b.activities && b.activities.length) ? b.activities.join(", ") : "—"}</span>
-                        <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap" }}>{(b.areas && b.areas.length) ? b.areas.join(" · ") : ""}</span>
+                        <span style={{ flex: 1, minWidth: 120, overflowWrap: "anywhere" }}>{(b.activities && b.activities.length) ? b.activities.join(", ") : "—"}</span>
+                        <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>{(b.areas && b.areas.length) ? b.areas.join(" · ") : ""}</span>
                         <button onClick={() => startEditBreak(b)} style={EDIT_BTN}>edit</button>
                         <button onClick={() => deleteBreak(b.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
                       </div>
@@ -1373,7 +1373,7 @@ export default function FocusLogApp({ api }: any) {
                         <button onClick={() => setEditPauseId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
                       </div>
                     ) : (
-                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                      <div key={p.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(p.ts)} {fmtTime(p.ts)}</span>
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, minWidth: 34 }}>{p.mins != null ? p.mins + "m" : "—"}</span>
                         <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{p.tag}</span>

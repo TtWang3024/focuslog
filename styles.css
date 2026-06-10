@@ -46,6 +46,12 @@ body.focuslog-float-window .focuslog-float .flt-wrap { -webkit-app-region: drag;
 body.focuslog-float-window .focuslog-float .flt-btn,
 body.focuslog-float-window .focuslog-float .flt-chip,
 body.focuslog-float-window .focuslog-float .flt-celebrate { -webkit-app-region: no-drag; }
+
+/* Obsidian mirrors Notice toasts into every window; in the tiny float they appear
+   as a dark box over the timer, and the float has its own flash banner for the
+   same message — so hide the toasts in this window only. */
+body.focuslog-float-window .notice-container,
+body.focuslog-float-window .notice { display: none !important; }
 .focuslog-float {
   height: 100%;
   display: flex;
