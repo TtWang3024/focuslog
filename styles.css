@@ -113,8 +113,9 @@ body.focuslog-float-window .notice { display: none !important; }
 .focuslog-float .flt-btn.flt-primary:hover { background: #423b34; }
 
 .focuslog-float .flt-flash {
+  /* Bottom of the window — the top is where the macOS traffic lights sit. */
   position: absolute;
-  top: 8px;
+  bottom: 8px;
   left: 8px;
   right: 8px;
   text-align: center;
@@ -124,7 +125,7 @@ body.focuslog-float-window .notice { display: none !important; }
   border-radius: 6px;
   padding: 4px 8px;
   opacity: 0;
-  transform: translateY(-6px);
+  transform: translateY(6px);
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
