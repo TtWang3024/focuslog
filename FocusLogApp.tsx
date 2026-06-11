@@ -437,7 +437,12 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   const meta: any = tasks.find((t: any) => t.task === task) || {};
   const submit = () => {
     if (!task.trim()) return;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: pomoMin }, markDone);
+    // Minutes actually worked, from the countdown's progress (pauses freeze it, so
+    // elapsed = work time): stopping a 25-min pomodoro with 10:00 left logs 15 min.
+    // An untouched timer (a manual log) still records the full length.
+    const workedSecs = pomoMin * 60 - secs;
+    const workedMin = workedSecs > 0 ? Math.max(1, Math.round(workedSecs / 60)) : pomoMin;
+    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: workedMin }, markDone);
     setNote("");
     setMarkDone(false);
   };

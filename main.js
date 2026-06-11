@@ -23921,7 +23921,9 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   const submit = () => {
     if (!task.trim())
       return;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: (/* @__PURE__ */ new Date()).toISOString(), expected: exp, actual: act, note: note.trim(), minutes: pomoMin }, markDone);
+    const workedSecs = pomoMin * 60 - secs;
+    const workedMin = workedSecs > 0 ? Math.max(1, Math.round(workedSecs / 60)) : pomoMin;
+    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: (/* @__PURE__ */ new Date()).toISOString(), expected: exp, actual: act, note: note.trim(), minutes: workedMin }, markDone);
     setNote("");
     setMarkDone(false);
   };
