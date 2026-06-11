@@ -24877,6 +24877,7 @@ var TimerEngine = class {
     this.start();
   }
   reset() {
+    this.commitPendingPause();
     this.running = false;
     this.paused = false;
     this.total = this.lengthMin * 60;
@@ -26092,7 +26093,7 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
       })
     );
     containerEl.createEl("h3", { text: "Pause" });
-    new import_obsidian.Setting(containerEl).setName("Pause block template").setDesc("Written to the daily note when you tag a pause. Placeholders: {date} {pomodoro-start} {pause-start} {pause-end} {pomodoro-resume} {pause-tag}. ({pause-end} and {pomodoro-resume} are both the moment you resumed.) Manage pause tags in the panel's Pause tab.").addTextArea((t) => {
+    new import_obsidian.Setting(containerEl).setName("Pause block template").setDesc("Written to the daily note when you tag a pause. Placeholders: {date} {pomodoro-start} {pause-start} {pause-end} {pomodoro-resume} {pause-tag}. ({pause-end} and {pomodoro-resume} are both the moment you resumed or reset.) Manage pause tags in the panel's Pause tab.").addTextArea((t) => {
       t.setValue(this.plugin.data.settings.pauseTemplate).onChange(async (v) => {
         this.plugin.data.settings.pauseTemplate = v;
         await this.plugin.persist();

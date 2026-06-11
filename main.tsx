@@ -355,6 +355,10 @@ class TimerEngine {
   }
   resume() { this.start(); }
   reset() {
+    // A tagged pause is written (event + daily-note block) just like on resume,
+    // so tagging and then restarting doesn't lose the pause. An untagged pause
+    // is still discarded silently. Must run before startedAt is cleared.
+    this.commitPendingPause();
     this.running = false;
     this.paused = false;
     this.total = this.lengthMin * 60;
@@ -362,7 +366,7 @@ class TimerEngine {
     this.endTs = 0;
     this.startedAt = null;
     this.taskName = "";
-    this.pauseStart = null; // discard any open pause without writing it
+    this.pauseStart = null;
     this.pauseTag = "";
     this.fired = {};
     this.stopTick();
@@ -1562,7 +1566,7 @@ class FocusLogSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Pause block template")
-      .setDesc("Written to the daily note when you tag a pause. Placeholders: {date} {pomodoro-start} {pause-start} {pause-end} {pomodoro-resume} {pause-tag}. ({pause-end} and {pomodoro-resume} are both the moment you resumed.) Manage pause tags in the panel's Pause tab.")
+      .setDesc("Written to the daily note when you tag a pause. Placeholders: {date} {pomodoro-start} {pause-start} {pause-end} {pomodoro-resume} {pause-tag}. ({pause-end} and {pomodoro-resume} are both the moment you resumed or reset.) Manage pause tags in the panel's Pause tab.")
       .addTextArea((t) => {
         t.setValue(this.plugin.data.settings.pauseTemplate).onChange(async (v) => {
           this.plugin.data.settings.pauseTemplate = v;
