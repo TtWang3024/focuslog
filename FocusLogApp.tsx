@@ -587,7 +587,7 @@ export default function FocusLogApp({ api }: any) {
   const saveActivities = (next: any[]) => { setActivities(next); api.saveActivities && api.saveActivities(next); };
   const [breaks, setBreaks] = useState<any[]>(init.breaks || []);
   const saveBreaks = (next: any[]) => { setBreaks(next); api.saveBreaks && api.saveBreaks(next); };
-  const [brk, setBrk] = useState<any>({ active: false, secs: 0, running: false, picked: [], finished: false });
+  const [brk, setBrk] = useState<any>({ active: false, secs: 0, running: false, picked: [], finished: false, feeling: null });
   const brkTick = useRef<any>(null);
   const [newAct, setNewAct] = useState<any>({ name: "", area: "" });
   useEffect(() => {
@@ -602,7 +602,7 @@ export default function FocusLogApp({ api }: any) {
     }, 1000);
     return () => clearInterval(brkTick.current);
   }, [brk.active, brk.running]);
-  const startBreak = () => setBrk({ active: true, start: Date.now(), secs: (Number(settings.breakMinutes) || 5) * 60, running: settings.breakAutoStart !== false, picked: [], finished: false });
+  const startBreak = () => setBrk({ active: true, start: Date.now(), secs: (Number(settings.breakMinutes) || 5) * 60, running: settings.breakAutoStart !== false, picked: [], finished: false, feeling: null });
   const togglePick = (id: string) => setBrk((b: any) => {
     if (b.picked.includes(id)) return { ...b, picked: b.picked.filter((x: string) => x !== id) };
     if (b.picked.length >= 3) return b;
@@ -617,9 +617,9 @@ export default function FocusLogApp({ api }: any) {
       const picked = brk.picked.map((id: string) => activities.find((x) => x.id === id)).filter(Boolean);
       const names = picked.map((a: any) => a.name);
       const areas = Array.from(new Set(picked.map((a: any) => a.area || "Other")));
-      saveBreaks([...breaks, { id: "br" + Date.now(), start: brk.start, end: now, activities: names, areas }]);
+      saveBreaks([...breaks, { id: "br" + Date.now(), start: brk.start, end: now, activities: names, areas, feeling: brk.feeling ?? null }]);
     }
-    setBrk({ active: false, secs: 0, running: false, picked: [], finished: false });
+    setBrk({ active: false, secs: 0, running: false, picked: [], finished: false, feeling: null });
     if (chooseNext && nextTask) { setPreset(nextTask); setNextTask(""); resetTimer(); setView("log"); }
     else setView("today");
   };
@@ -711,12 +711,12 @@ export default function FocusLogApp({ api }: any) {
   };
   const deletePause = (id: string) => { savePauses(pauses.filter((p) => p.id !== id)); if (editPauseId === id) setEditPauseId(null); };
   const [editBreakId, setEditBreakId] = useState<any>(null);
-  const [breakDraft, setBreakDraft] = useState<any>({ start: "", end: "" });
-  const startEditBreak = (b: any) => { setEditBreakId(b.id); setBreakDraft({ start: toLocalDatetime(b.start), end: toLocalDatetime(b.end) }); };
+  const [breakDraft, setBreakDraft] = useState<any>({ start: "", end: "", feeling: null });
+  const startEditBreak = (b: any) => { setEditBreakId(b.id); setBreakDraft({ start: toLocalDatetime(b.start), end: toLocalDatetime(b.end), feeling: b.feeling ?? null }); };
   const saveEditBreak = () => {
     const s = breakDraft.start ? new Date(breakDraft.start).getTime() : NaN;
     const e = breakDraft.end ? new Date(breakDraft.end).getTime() : NaN;
-    saveBreaks(breaks.map((b) => b.id === editBreakId ? { ...b, start: isNaN(s) ? b.start : s, end: isNaN(e) ? b.end : e } : b));
+    saveBreaks(breaks.map((b) => b.id === editBreakId ? { ...b, start: isNaN(s) ? b.start : s, end: isNaN(e) ? b.end : e, feeling: breakDraft.feeling ?? null } : b));
     setEditBreakId(null);
   };
   const deleteBreak = (id: string) => { saveBreaks(breaks.filter((b) => b.id !== id)); if (editBreakId === id) setEditBreakId(null); };
@@ -875,6 +875,42 @@ export default function FocusLogApp({ api }: any) {
   });
   const bestBand = bandStats.filter((b) => b.avg != null).sort((a: any, b: any) => b.avg - a.avg)[0];
 
+  // Break-feeling insights: only rated breaks (feeling 1-5) feed these; legacy/unrated breaks
+  // (feeling null/undefined) are excluded everywhere.
+  const ratedBreaks = breaks.filter((b: any) => b.feeling != null);
+  // Per-activity restorative score: average feeling across every break whose activities include it.
+  const actScore = activities.map((a: any) => {
+    const list = ratedBreaks.filter((b: any) => (b.activities || []).includes(a.name));
+    const n = list.length;
+    return { id: a.id, name: a.name, area: a.area || "Other", n, avg: n ? list.reduce((x: number, b: any) => x + b.feeling, 0) / n : null };
+  }).filter((x: any) => x.n > 0).sort((p: any, q: any) => (q.avg as number) - (p.avg as number) || q.n - p.n);
+  // Best time of day for breaks — mirrors the pomodoro bandStats above.
+  const breakBandStats = [0, 1, 2].map((b) => {
+    const list = ratedBreaks.filter((x: any) => bandOf(x.start, settings) === b);
+    return { band: b, name: BAND_NAME[b], count: list.length, avg: list.length ? list.reduce((a: number, x: any) => a + x.feeling, 0) / list.length : null };
+  });
+  const bestBreakBand = breakBandStats.filter((b) => b.avg != null).sort((a: any, b: any) => b.avg - a.avg)[0];
+  // Best pomodoro position: bucket each break by how many sessions ran in the same logical day
+  // after the previous break ended and before this break started.
+  const posBuckets: any = {};
+  ratedBreaks.forEach((b: any) => {
+    const prevBreakEnd = Math.max(0, ...breaks.filter((o: any) => o.end < b.start && sameLogicalDay(o.end, b.start, settings)).map((o: any) => o.end));
+    const before = sessions.filter((s: any) => { const t = +new Date(s.ts); return sameLogicalDay(t, b.start, settings) && t < b.start && t > prevBreakEnd; }).length;
+    (posBuckets[before] = posBuckets[before] || { sum: 0, n: 0 });
+    posBuckets[before].sum += b.feeling; posBuckets[before].n += 1;
+  });
+  const posStats = Object.keys(posBuckets).map((k: any) => ({ count: Number(k), n: posBuckets[k].n, avg: posBuckets[k].sum / posBuckets[k].n })).sort((a, b) => a.count - b.count);
+  const bestPos = [...posStats].sort((a, b) => b.avg - a.avg)[0];
+  // Falling-enjoyment nudge: average actual of today's last two pomodoros dropped >=1 vs the prior two.
+  const todaySess = sessions.filter((s: any) => sameLogicalDay(s.ts, Date.now(), settings)).sort((a: any, b: any) => +new Date(a.ts) - +new Date(b.ts));
+  const fallingEnjoyment = (() => {
+    const n = todaySess.length;
+    if (n < 4) return false;
+    const last2 = (todaySess[n - 1].actual + todaySess[n - 2].actual) / 2;
+    const prev2 = (todaySess[n - 3].actual + todaySess[n - 4].actual) / 2;
+    return last2 <= prev2 - 1;
+  })();
+
   // Break activity stats: most-reached-for (top 3), least (bottom 2), and the Area distribution.
   const actByCount = [...activities].sort((a, b) => (b.count || 0) - (a.count || 0));
   const favs = actByCount.filter((a) => (a.count || 0) > 0).slice(0, 3);
@@ -999,6 +1035,12 @@ export default function FocusLogApp({ api }: any) {
               </span>
               <button onClick={doSync} style={btn(C.ink, true)} disabled={sync === "loading"}>{sync === "loading" ? "syncing\u2026" : "sync from Notion"}</button>
             </div>
+            {fallingEnjoyment && (
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                <span style={{ flex: 1, minWidth: 200 }}>Enjoyment is dipping over your last few pomodoros \u2014 consider an extra break.</span>
+                <button onClick={() => { startBreak(); setView("break"); }} style={{ ...btn(C.ink, true), padding: "3px 10px" }}>take a break</button>
+              </div>
+            )}
             {tasks.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No tasks yet. Set your Notion token in settings, then press sync.</p>}
             {tasks.length > 1 && <p style={{ color: C.muted, fontSize: 11, margin: "0 0 8px" }}>Drag the grip to reorder. The order is kept for tomorrow; new tasks from Notion appear on top.</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1210,6 +1252,9 @@ export default function FocusLogApp({ api }: any) {
                       return <button key={a.id} onClick={() => togglePick(a.id)} style={{ padding: "6px 12px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${areaBorder(a.area)}`, background: fill, color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", textAlign: "left", maxWidth: "100%", height: "auto", minHeight: 0, lineHeight: 1.35 }}>{on ? "✓ " : ""}{a.name}</button>;
                     })}
                 </div>
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                  <Scale label="how do you feel now? (1 worse than no rest … 5 a lot better)" value={brk.feeling} onChange={(v: number) => setBrk((b: any) => ({ ...b, feeling: v }))} color={settings.endColor} />
+                </div>
               </div>
             )}
 
@@ -1271,6 +1316,69 @@ export default function FocusLogApp({ api }: any) {
               <PieChart data={pieData} />
             </div>
 
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
+              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" }}>Break insights</h3>
+              <p style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>What actually leaves you feeling restored.</p>
+              {ratedBreaks.length === 0 ? (
+                <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>Rate a few breaks to see what restores you best.</p>
+              ) : (
+                <>
+                  <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" }}>Most restorative activities</p>
+                  {actScore.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No rated breaks had activities yet.</p> : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+                      {actScore.map((x: any) => {
+                        const low = x.n < 3;
+                        return (
+                          <div key={x.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ width: 110, fontSize: 12, color: C.muted, overflowWrap: "anywhere" }}>{x.name}{low && <span style={{ fontSize: 10 }}> (low sample)</span>}</span>
+                            <div style={{ flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` }}>
+                              <div style={{ width: (x.avg / 5) * 100 + "%", height: "100%", background: low ? C.neutral : C.better }} />
+                            </div>
+                            <span style={{ width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{x.avg.toFixed(1)} · {x.n}{"\u{1F345}"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" }}>Best time for breaks</p>
+                  {bestBreakBand && <div style={{ fontSize: 13, marginBottom: 8 }}>Breaks feel best in the <b style={{ color: C.ink }}>{bestBreakBand.name}</b> <span style={{ color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 12 }}>({(bestBreakBand.avg as number).toFixed(1)} / 5)</span>.</div>}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+                    {breakBandStats.map((b) => {
+                      const pct = b.avg != null ? ((b.avg as number) / 5) * 100 : 0;
+                      const isBest = bestBreakBand && b.band === bestBreakBand.band;
+                      return (
+                        <div key={b.band} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ width: 70, fontSize: 12, color: C.muted, textTransform: "capitalize" }}>{b.name}</span>
+                          <div style={{ flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` }}>
+                            <div style={{ width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral }} />
+                          </div>
+                          <span style={{ width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{b.avg != null ? (b.avg as number).toFixed(1) : "—"} · {b.count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" }}>Best pomodoro position</p>
+                  {bestPos && <div style={{ fontSize: 13, marginBottom: 8 }}>Breaks {bestPos.count === 0 ? "before any pomodoro" : <>after <b style={{ color: C.ink }}>{bestPos.count}</b> pomodoro{bestPos.count === 1 ? "" : "s"}</>} feel best <span style={{ color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 12 }}>({bestPos.avg.toFixed(1)} / 5)</span>.</div>}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {posStats.map((p) => {
+                      const isBest = bestPos && p.count === bestPos.count;
+                      return (
+                        <div key={p.count} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ width: 90, fontSize: 12, color: C.muted }}>{p.count === 0 ? "before any" : `after ${p.count}\u{1F345}`}</span>
+                          <div style={{ flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` }}>
+                            <div style={{ width: (p.avg / 5) * 100 + "%", height: "100%", background: isBest ? C.better : C.neutral }} />
+                          </div>
+                          <span style={{ width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{p.avg.toFixed(1)} · {p.n}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
             <div style={{ marginTop: 20 }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
                 <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>All breaks</h3>
@@ -1283,6 +1391,10 @@ export default function FocusLogApp({ api }: any) {
                       <div key={b.id} style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
                         <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>start<input type="datetime-local" value={breakDraft.start} onChange={(e) => setBreakDraft({ ...breakDraft, start: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
                         <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>end<input type="datetime-local" value={breakDraft.end} onChange={(e) => setBreakDraft({ ...breakDraft, end: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
+                        <div style={{ flexBasis: "100%", display: "flex", alignItems: "flex-end", gap: 8 }}>
+                          <Scale label="feeling" value={breakDraft.feeling} onChange={(v: number) => setBreakDraft({ ...breakDraft, feeling: v })} color={settings.endColor} />
+                          <button onClick={() => setBreakDraft({ ...breakDraft, feeling: null })} style={{ ...btn(C.muted, true), padding: "2px 8px", fontSize: 11, marginBottom: 12 }}>clear</button>
+                        </div>
                         <button onClick={saveEditBreak} style={{ ...btn(C.ink), padding: "4px 10px" }}>save</button>
                         <button onClick={() => setEditBreakId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
                       </div>
@@ -1291,6 +1403,7 @@ export default function FocusLogApp({ api }: any) {
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(b.start)} {fmtTime(b.start)}{"–"}{fmtTime(b.end)}</span>
                         <span style={{ flex: 1, minWidth: 120, overflowWrap: "anywhere" }}>{(b.activities && b.activities.length) ? b.activities.join(", ") : "—"}</span>
                         <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>{(b.areas && b.areas.length) ? b.areas.join(" · ") : ""}</span>
+                        {b.feeling != null && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: settings.endColor, whiteSpace: "nowrap" }}>{b.feeling}/5</span>}
                         <button onClick={() => startEditBreak(b)} style={EDIT_BTN}>edit</button>
                         <button onClick={() => deleteBreak(b.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
                       </div>
