@@ -840,7 +840,10 @@ export default function FocusLogApp({ api }: any) {
   const weekStart = new Date(logicalWeekStart(Date.now(), settings).getTime() + weekOff * 7 * DAY);
   const weekEnd = new Date(weekStart.getTime() + 7 * DAY);
   const weekSessions = sessions.filter((s) => { const d = logicalDay(s.ts, settings); return d >= weekStart && d < weekEnd; });
-  const weekGroups = Array.from(new Set(weekSessions.map((s) => s.group || s.task)));
+  // Week view groups by Area (the Notion select), merging every task that shares an
+  // area into one chart. Sessions with no area are left out, so empty areas never
+  // get a plot. First-seen order is kept.
+  const weekAreas = Array.from(new Set(weekSessions.map((s) => s.category).filter(Boolean)));
 
   const nowLD = logicalDay(Date.now(), settings);
   const wkStartNow = logicalWeekStart(Date.now(), settings);
@@ -1051,8 +1054,8 @@ export default function FocusLogApp({ api }: any) {
               <span style={{ fontFamily: "var(--fl-mono)", fontSize: 13 }}>{fmtDate(weekStart)} {"\u2013"} {fmtDate(new Date(+weekEnd - DAY))}</span>
               <button onClick={() => setWeekOff((w) => Math.min(0, w + 1))} style={btn(C.muted, true)}>{"\u2192"}</button>
             </div>
-            {weekGroups.length === 0 ? <p style={{ color: C.muted, textAlign: "center", padding: "40px 0" }}>No pomodoros this week.</p> :
-              weekGroups.map((g) => (<GroupChart key={g} group={g} sessions={weekSessions.filter((x) => (x.group || x.task) === g)} settings={settings} />))}
+            {weekAreas.length === 0 ? <p style={{ color: C.muted, textAlign: "center", padding: "40px 0" }}>{weekSessions.length ? "No pomodoros with an Area this week." : "No pomodoros this week."}</p> :
+              weekAreas.map((a) => (<GroupChart key={a} group={a} sessions={weekSessions.filter((x) => x.category === a)} settings={settings} />))}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted }}>
               <span><span style={{ color: settings.beginColor }}>{"\u25CF"}</span> expected</span>
               <span><span style={{ color: settings.endColor }}>{"\u25CF"}</span> actual</span>
