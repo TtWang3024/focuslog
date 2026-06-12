@@ -23971,6 +23971,7 @@ function SessionEditRow({ draft, setDraft, settings, onSave, onCancel }) {
   return /* @__PURE__ */ React.createElement("div", { style: { padding: 12, borderRadius: 6, background: C.card, border: `1.5px solid ${C.ink}`, display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" } }, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 } }, "time", /* @__PURE__ */ React.createElement("input", { type: "datetime-local", value: draft.ts, onChange: (e) => setDraft({ ...draft, ts: e.target.value }), style: { ...inputStyle, paddingLeft: 14, minWidth: 220 } })), /* @__PURE__ */ React.createElement("label", { style: { fontSize: 11, color: C.muted, flex: 1, minWidth: 200, display: "flex", flexDirection: "column", gap: 2 } }, "task", /* @__PURE__ */ React.createElement("input", { type: "text", value: draft.task, onChange: (e) => setDraft({ ...draft, task: e.target.value }), style: { ...inputStyle, width: "100%" } }))), /* @__PURE__ */ React.createElement(Scale, { label: "expected (before)", value: draft.expected, onChange: (v) => setDraft({ ...draft, expected: v }), color: settings.beginColor }), /* @__PURE__ */ React.createElement(Scale, { label: "actual (after)", value: draft.actual, onChange: (v) => setDraft({ ...draft, actual: v }), color: settings.endColor }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: onCancel, style: btn(C.muted, true) }, "cancel"), /* @__PURE__ */ React.createElement("button", { onClick: onSave, style: btn(C.ink) }, "save")));
 }
 function FocusLogApp({ api }) {
+  var _a;
   const init = api.getInitial();
   const [sessions, setSessions] = useState(init.sessions);
   const [tasks, setTasks] = useState(init.tasks);
@@ -24037,47 +24038,11 @@ function FocusLogApp({ api }) {
     setBreaks(next);
     api.saveBreaks && api.saveBreaks(next);
   };
-  const [brk, setBrk] = useState({ active: false, secs: 0, running: false, picked: [], finished: false, feeling: null });
-  const brkTick = useRef(null);
   const [newAct, setNewAct] = useState({ name: "", area: "" });
-  useEffect(() => {
-    if (!brk.active || !brk.running)
-      return;
-    brkTick.current = setInterval(() => {
-      setBrk((b) => {
-        if (!b.active || !b.running)
-          return b;
-        const nx = b.secs > 0 ? b.secs - 1 : 0;
-        if (nx === 0 && !b.finished) {
-          api.notify("Break over \u2014 ready for the next pomodoro?", 6e3);
-          return { ...b, secs: 0, running: false, finished: true };
-        }
-        return { ...b, secs: nx };
-      });
-    }, 1e3);
-    return () => clearInterval(brkTick.current);
-  }, [brk.active, brk.running]);
-  const startBreak = () => setBrk({ active: true, start: Date.now(), secs: (Number(settings.breakMinutes) || 5) * 60, running: settings.breakAutoStart !== false, picked: [], finished: false, feeling: null });
-  const togglePick = (id) => setBrk((b) => {
-    if (b.picked.includes(id))
-      return { ...b, picked: b.picked.filter((x) => x !== id) };
-    if (b.picked.length >= 3)
-      return b;
-    return { ...b, picked: [...b.picked, id] };
-  });
+  const startBreak = () => api.timer.startBreak && api.timer.startBreak();
+  const togglePick = (id) => api.timer.toggleBreakPick && api.timer.toggleBreakPick(id);
   const endBreak = () => {
-    var _a;
-    const now = Date.now();
-    if (brk.picked.length) {
-      saveActivities(activities.map((a) => brk.picked.includes(a.id) ? { ...a, count: (a.count || 0) + 1, lastUsed: now } : a));
-    }
-    if (brk.active && brk.start) {
-      const picked = brk.picked.map((id) => activities.find((x) => x.id === id)).filter(Boolean);
-      const names = picked.map((a) => a.name);
-      const areas = Array.from(new Set(picked.map((a) => a.area || "Other")));
-      saveBreaks([...breaks, { id: "br" + Date.now(), start: brk.start, end: now, activities: names, areas, feeling: (_a = brk.feeling) != null ? _a : null }]);
-    }
-    setBrk({ active: false, secs: 0, running: false, picked: [], finished: false, feeling: null });
+    api.timer.endBreak && api.timer.endBreak();
     if (chooseNext && nextTask) {
       setPreset(nextTask);
       setNextTask("");
@@ -24217,16 +24182,16 @@ function FocusLogApp({ api }) {
   const [editBreakId, setEditBreakId] = useState(null);
   const [breakDraft, setBreakDraft] = useState({ start: "", end: "", feeling: null });
   const startEditBreak = (b) => {
-    var _a;
+    var _a2;
     setEditBreakId(b.id);
-    setBreakDraft({ start: toLocalDatetime(b.start), end: toLocalDatetime(b.end), feeling: (_a = b.feeling) != null ? _a : null });
+    setBreakDraft({ start: toLocalDatetime(b.start), end: toLocalDatetime(b.end), feeling: (_a2 = b.feeling) != null ? _a2 : null });
   };
   const saveEditBreak = () => {
     const s = breakDraft.start ? new Date(breakDraft.start).getTime() : NaN;
     const e = breakDraft.end ? new Date(breakDraft.end).getTime() : NaN;
     saveBreaks(breaks.map((b) => {
-      var _a;
-      return b.id === editBreakId ? { ...b, start: isNaN(s) ? b.start : s, end: isNaN(e) ? b.end : e, feeling: (_a = breakDraft.feeling) != null ? _a : null } : b;
+      var _a2;
+      return b.id === editBreakId ? { ...b, start: isNaN(s) ? b.start : s, end: isNaN(e) ? b.end : e, feeling: (_a2 = breakDraft.feeling) != null ? _a2 : null } : b;
     }));
     setEditBreakId(null);
   };
@@ -24250,6 +24215,27 @@ function FocusLogApp({ api }) {
   const onPause = () => api.timer.pause();
   const setExpectedRating = (n) => api.timer.setExpected && api.timer.setExpected(n);
   const finished = timer.startedAt != null && !timer.running && !timer.paused && timer.secs === 0;
+  const brk = {
+    active: !!timer.breakActive,
+    secs: timer.breakSecs || 0,
+    running: !!timer.breakRunning,
+    finished: !!timer.breakFinished,
+    picked: timer.breakPicked || [],
+    feeling: (_a = timer.breakFeeling) != null ? _a : null
+  };
+  useEffect(() => {
+    if (brk.active)
+      setView("break");
+  }, [brk.active]);
+  useEffect(() => {
+    if (!api.onBreaksChange)
+      return;
+    return api.onBreaksChange(() => {
+      const fresh = api.getInitial();
+      setActivities([...fresh.activities || []]);
+      setBreaks([...fresh.breaks || []]);
+    });
+  }, []);
   useEffect(() => {
     if (!api.onPausesChange)
       return;
@@ -24650,11 +24636,11 @@ ${s.task}`))
     const pct = b.avg != null ? b.avg / 5 * 100 : 0;
     const isBest = bestBand && b.band === bestBand.band;
     return /* @__PURE__ */ React.createElement("div", { key: b.band, style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 70, fontSize: 12, color: C.muted, textTransform: "capitalize" } }, b.name), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("div", { style: { width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral } })), /* @__PURE__ */ React.createElement("span", { style: { width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted } }, b.avg != null ? b.avg.toFixed(1) : "\u2014", " \xB7 ", b.count, "\u{1F345}"));
-  })))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "All sessions"), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), sessions.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion."))), view === "log" && /* @__PURE__ */ React.createElement(LogForm, { tasks: orderedTasks, preset, onAdd: logPomodoro, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, paused: timer.paused, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, onSetExpected: setExpectedRating, autoLogDefault: settings.autoLogOnRate !== false, onAutoLogChange: (v) => api.patchSettings && api.patchSettings({ autoLogOnRate: v }) }), view === "break" && /* @__PURE__ */ React.createElement("div", null, brk.active && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink } }, String(Math.floor(brk.secs / 60)).padStart(2, "0"), ":", String(brk.secs % 60).padStart(2, "0")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "flex-end" } }, !brk.finished && /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 4, marginRight: 4 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, secs: Math.max(60, b.secs - 60), finished: false })), style: { ...btn(C.muted, true), padding: "4px 9px" } }, "\u2212"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, minWidth: 34, textAlign: "center" } }, Math.round(brk.secs / 60), "m"), /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, secs: Math.min(30 * 60, b.secs + 60), finished: false })), style: { ...btn(C.muted, true), padding: "4px 9px" } }, "+")), !brk.finished && /* @__PURE__ */ React.createElement("button", { onClick: () => setBrk((b) => ({ ...b, running: !b.running })), style: btn(C.ink) }, brk.running ? "pause" : "start"), /* @__PURE__ */ React.createElement("button", { onClick: endBreak, style: btn(C.muted, true) }, brk.finished ? "go back to my task" : "end break"))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, margin: "0 0 8px" } }, "Pick up to 3 things to do on this break (", brk.picked.length, "/3):"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 8 } }, activities.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "No activities yet \u2014 add some below.") : activities.map((a) => {
+  })))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "All sessions"), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), sessions.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion."))), view === "log" && /* @__PURE__ */ React.createElement(LogForm, { tasks: orderedTasks, preset, onAdd: logPomodoro, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, paused: timer.paused, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, onSetExpected: setExpectedRating, autoLogDefault: settings.autoLogOnRate !== false, onAutoLogChange: (v) => api.patchSettings && api.patchSettings({ autoLogOnRate: v }) }), view === "break" && /* @__PURE__ */ React.createElement("div", null, brk.active && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink } }, String(Math.floor(brk.secs / 60)).padStart(2, "0"), ":", String(brk.secs % 60).padStart(2, "0")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "flex-end" } }, !brk.finished && /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 4, marginRight: 4 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => api.timer.stepBreak(-1), style: { ...btn(C.muted, true), padding: "4px 9px" } }, "\u2212"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, minWidth: 34, textAlign: "center" } }, Math.round(brk.secs / 60), "m"), /* @__PURE__ */ React.createElement("button", { onClick: () => api.timer.stepBreak(1), style: { ...btn(C.muted, true), padding: "4px 9px" } }, "+")), !brk.finished && /* @__PURE__ */ React.createElement("button", { onClick: () => api.timer.toggleBreakRun(), style: btn(C.ink) }, brk.running ? "pause" : "start"), /* @__PURE__ */ React.createElement("button", { onClick: endBreak, style: btn(C.muted, true) }, brk.finished ? "go back to my task" : "end break"))), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, margin: "0 0 8px" } }, "Pick up to 3 things to do on this break (", brk.picked.length, "/3):"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 8 } }, activities.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "No activities yet \u2014 add some below.") : activities.map((a) => {
     const on = brk.picked.includes(a.id);
     const fill = areaColor(a.area);
     return /* @__PURE__ */ React.createElement("button", { key: a.id, onClick: () => togglePick(a.id), style: { padding: "6px 12px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${areaBorder(a.area)}`, background: fill, color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", textAlign: "left", maxWidth: "100%", height: "auto", minHeight: 0, lineHeight: 1.35 } }, on ? "\u2713 " : "", a.name);
-  })), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement(Scale, { label: "how do you feel now? (1 worse than no rest \u2026 5 a lot better)", value: brk.feeling, onChange: (v) => setBrk((b) => ({ ...b, feeling: v })), color: settings.endColor }))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Break activities"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 } }, activities.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "None yet. Add an activity and an area below."), activities.map((a, i) => editActId === a.id ? /* @__PURE__ */ React.createElement("div", { key: a.id, style: { display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap", padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 } }, /* @__PURE__ */ React.createElement(AutoTextarea, { value: editActDraft.name, onChange: (e) => setEditActDraft({ ...editActDraft, name: e.target.value }), style: { flex: 2, minWidth: 110, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" } }), /* @__PURE__ */ React.createElement("input", { value: editActDraft.area, onChange: (e) => setEditActDraft({ ...editActDraft, area: e.target.value }), placeholder: "area", style: { flex: 1, minWidth: 70, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } }), /* @__PURE__ */ React.createElement("button", { onClick: saveEditAct, style: { ...btn(C.ink), padding: "4px 10px" } }, "save"), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditActId(null), style: { ...btn(C.muted, true), padding: "4px 10px" } }, "cancel")) : /* @__PURE__ */ React.createElement(
+  })), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement(Scale, { label: "how do you feel now? (1 worse than no rest \u2026 5 a lot better)", value: brk.feeling, onChange: (v) => api.timer.setBreakFeeling(v), color: settings.endColor }))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Break activities"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 } }, activities.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "None yet. Add an activity and an area below."), activities.map((a, i) => editActId === a.id ? /* @__PURE__ */ React.createElement("div", { key: a.id, style: { display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap", padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 } }, /* @__PURE__ */ React.createElement(AutoTextarea, { value: editActDraft.name, onChange: (e) => setEditActDraft({ ...editActDraft, name: e.target.value }), style: { flex: 2, minWidth: 110, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" } }), /* @__PURE__ */ React.createElement("input", { value: editActDraft.area, onChange: (e) => setEditActDraft({ ...editActDraft, area: e.target.value }), placeholder: "area", style: { flex: 1, minWidth: 70, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } }), /* @__PURE__ */ React.createElement("button", { onClick: saveEditAct, style: { ...btn(C.ink), padding: "4px 10px" } }, "save"), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditActId(null), style: { ...btn(C.muted, true), padding: "4px 10px" } }, "cancel")) : /* @__PURE__ */ React.createElement(
     "div",
     {
       key: a.id,
@@ -24766,7 +24752,8 @@ var DEFAULT_SETTINGS = {
   pauseTemplate: '- [ ] <mark class="hltr-pink">{date}</mark> {pause-start} - {pause-end} \u23F8\uFE0F {pause-tag}',
   floatOnStart: true,
   floatAlwaysOnTop: true,
-  floatBounds: null
+  floatBounds: null,
+  floatBreakBounds: null
 };
 var DEFAULT_PAUSE_TAGS = [
   { id: "p-bathroom", name: "bathroom", category: "internal" },
@@ -24911,6 +24898,20 @@ var TimerEngine = class {
     // pause-with-reason: chosen reason
     this.expected = 3;
     // "before" enjoyment rating; set from the panel, read at log time
+    // ----- break phase: a second, wall-clock countdown owned by the same engine so the
+    // panel and the floating window share one source of truth for the rest-and-resume loop.
+    this.breakActive = false;
+    this.breakRunning = false;
+    this.breakFinished = false;
+    this.breakTotal = 0;
+    // full break length in seconds
+    this.breakEndTs = 0;
+    // wall-clock target while the break runs (ms epoch)
+    this.breakFrozen = 0;
+    // remaining break seconds while paused
+    this.breakStart = null;
+    this.breakPicked = [];
+    this.breakFeeling = null;
     this.iv = null;
     this.fired = {};
     this.subs = /* @__PURE__ */ new Set();
@@ -24926,8 +24927,33 @@ var TimerEngine = class {
       return Math.max(0, Math.ceil((this.endTs - Date.now()) / 1e3));
     return Math.max(0, this.frozenSecs);
   }
+  // Break seconds derived from the wall clock too, so a throttled/late tick stays correct.
+  breakSecsNow() {
+    if (this.breakRunning)
+      return Math.max(0, Math.ceil((this.breakEndTs - Date.now()) / 1e3));
+    return Math.max(0, this.breakFrozen);
+  }
   getState() {
-    return { secs: this.secsNow(), total: this.total, running: this.running, paused: this.paused, lengthMin: this.lengthMin, taskName: this.taskName, startedAt: this.startedAt, pauseStart: this.pauseStart, pauseTag: this.pauseTag, expected: this.expected };
+    return {
+      secs: this.secsNow(),
+      total: this.total,
+      running: this.running,
+      paused: this.paused,
+      lengthMin: this.lengthMin,
+      taskName: this.taskName,
+      startedAt: this.startedAt,
+      pauseStart: this.pauseStart,
+      pauseTag: this.pauseTag,
+      expected: this.expected,
+      breakActive: this.breakActive,
+      breakRunning: this.breakRunning,
+      breakFinished: this.breakFinished,
+      breakSecs: this.breakSecsNow(),
+      breakTotal: this.breakTotal,
+      breakStart: this.breakStart,
+      breakPicked: this.breakPicked.slice(),
+      breakFeeling: this.breakFeeling
+    };
   }
   setPauseTag(tag) {
     this.pauseTag = tag || "";
@@ -24986,6 +25012,8 @@ var TimerEngine = class {
     if (typeof taskName === "string" && taskName.trim())
       this.taskName = taskName.trim();
     const fresh = !this.running && !this.paused;
+    if (fresh && this.breakActive)
+      this.endBreak();
     if (this.paused)
       this.commitPendingPause();
     let secs = this.secsNow();
@@ -25038,8 +25066,83 @@ var TimerEngine = class {
     this.emit();
   }
   dispose() {
+    this.running = false;
+    this.breakRunning = false;
     this.stopTick();
     this.subs.clear();
+  }
+  // ---------- break phase (the rest half of the closed loop) ----------
+  // Begin (or restart) the rest timer using the configured break length. Honors the
+  // break-auto-start setting; either way the break phase becomes active so the panel
+  // and float can show its controls + activity picker.
+  startBreak() {
+    const mins = Math.max(1, Math.min(60, Math.round(this.plugin.data.settings.breakMinutes) || 5));
+    this.breakTotal = mins * 60;
+    this.breakFrozen = this.breakTotal;
+    this.breakStart = Date.now();
+    this.breakPicked = [];
+    this.breakFeeling = null;
+    this.breakFinished = false;
+    this.breakActive = true;
+    if (this.plugin.data.settings.breakAutoStart !== false) {
+      this.breakRunning = true;
+      this.breakEndTs = Date.now() + this.breakFrozen * 1e3;
+      this.ensureTick();
+    } else {
+      this.breakRunning = false;
+    }
+    this.emit();
+  }
+  toggleBreakRun() {
+    if (!this.breakActive || this.breakFinished)
+      return;
+    if (this.breakRunning) {
+      this.breakFrozen = this.breakSecsNow();
+      this.breakRunning = false;
+      this.stopTick();
+    } else {
+      this.breakEndTs = Date.now() + Math.max(1, this.breakFrozen) * 1e3;
+      this.breakRunning = true;
+      this.ensureTick();
+    }
+    this.emit();
+  }
+  stepBreak(deltaMin) {
+    if (!this.breakActive)
+      return;
+    const next = Math.max(60, Math.min(30 * 60, this.breakSecsNow() + deltaMin * 60));
+    this.breakFrozen = next;
+    this.breakFinished = false;
+    if (this.breakRunning)
+      this.breakEndTs = Date.now() + next * 1e3;
+    this.emit();
+  }
+  toggleBreakPick(id) {
+    if (this.breakPicked.includes(id))
+      this.breakPicked = this.breakPicked.filter((x) => x !== id);
+    else if (this.breakPicked.length < 3)
+      this.breakPicked = [...this.breakPicked, id];
+    this.emit();
+  }
+  setBreakFeeling(n) {
+    this.breakFeeling = Math.max(1, Math.min(5, Math.round(n) || 3));
+    this.emit();
+  }
+  // Commit the break (activities + feeling → the breaks log via the plugin) and clear
+  // the phase. Called when the user ends/skips the break, closing the loop back to setup.
+  endBreak() {
+    if (this.breakActive && this.breakStart)
+      this.plugin.commitBreak(this.breakStart, Date.now(), this.breakPicked.slice(), this.breakFeeling);
+    this.breakActive = false;
+    this.breakRunning = false;
+    this.breakFinished = false;
+    this.breakStart = null;
+    this.breakPicked = [];
+    this.breakFeeling = null;
+    this.breakFrozen = 0;
+    this.breakEndTs = 0;
+    this.stopTick();
+    this.emit();
   }
   ensureTick() {
     this.plugin.setBackgroundThrottle(false);
@@ -25048,6 +25151,8 @@ var TimerEngine = class {
     this.iv = window.setInterval(() => this.poll(), 500);
   }
   stopTick() {
+    if (this.running || this.breakRunning)
+      return;
     if (this.iv != null) {
       window.clearInterval(this.iv);
       this.iv = null;
@@ -25062,28 +25167,43 @@ var TimerEngine = class {
   // jumps past a mark still fires it. The 15/5-min marks only apply if the
   // pomodoro is actually longer than that.
   poll() {
-    if (!this.running)
-      return;
-    const s = this.secsNow();
-    if (this.total > 900 && s <= 900 && !this.fired[900]) {
-      this.fired[900] = true;
-      this.plugin.timerNotify("15 minutes left. Still on this task?");
+    let changed = false;
+    if (this.running) {
+      const s = this.secsNow();
+      if (this.total > 900 && s <= 900 && !this.fired[900]) {
+        this.fired[900] = true;
+        this.plugin.timerNotify("15 minutes left. Still on this task?");
+      }
+      if (this.total > 300 && s <= 300 && !this.fired[300]) {
+        this.fired[300] = true;
+        this.plugin.timerNotify("5 minutes left. Stay with it.");
+      }
+      if (s <= 0 && !this.fired[0]) {
+        this.fired[0] = true;
+        this.frozenSecs = 0;
+        this.running = false;
+        this.paused = false;
+        this.stopTick();
+        this.emit();
+        this.plugin.timerDone();
+        return;
+      }
+      changed = true;
     }
-    if (this.total > 300 && s <= 300 && !this.fired[300]) {
-      this.fired[300] = true;
-      this.plugin.timerNotify("5 minutes left. Stay with it.");
+    if (this.breakRunning) {
+      if (this.breakSecsNow() <= 0) {
+        this.breakFrozen = 0;
+        this.breakRunning = false;
+        this.breakFinished = true;
+        this.stopTick();
+        this.emit();
+        this.plugin.breakDone();
+        return;
+      }
+      changed = true;
     }
-    if (s <= 0 && !this.fired[0]) {
-      this.fired[0] = true;
-      this.frozenSecs = 0;
-      this.running = false;
-      this.paused = false;
-      this.stopTick();
+    if (changed)
       this.emit();
-      this.plugin.timerDone();
-      return;
-    }
-    this.emit();
   }
 };
 var FocusLogPlugin = class extends import_obsidian.Plugin {
@@ -25095,6 +25215,8 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     // panel re-syncs its pauses list when these fire
     this.sessionSubs = /* @__PURE__ */ new Set();
     // panel re-reads its sessions when these fire (e.g. a float quick-log)
+    this.breakSubs = /* @__PURE__ */ new Set();
+    // panel re-reads activities + breaks when the engine commits a break
     this.logViewSubs = /* @__PURE__ */ new Set();
     // panel switches to the log tab when these fire
     this.openingFloat = false;
@@ -25187,6 +25309,40 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       }
     });
   }
+  // ---------- breaks changed outside the panel (the engine committed one) ----------
+  onBreaksChange(fn) {
+    this.breakSubs.add(fn);
+    return () => this.breakSubs.delete(fn);
+  }
+  notifyBreaksChange() {
+    this.breakSubs.forEach((fn) => {
+      try {
+        fn();
+      } catch (e) {
+      }
+    });
+  }
+  // Fired by the engine when a break finishes its countdown on its own.
+  breakDone() {
+    this.timerNotify("Break over \u2014 ready for the next pomodoro?");
+  }
+  // Write a finished break to the log: bump the chosen activities' counts and record the
+  // break (activities, areas, feeling). Called by the engine's endBreak so it works from
+  // either window, even when the panel is closed. The panel re-reads via notifyBreaksChange.
+  commitBreak(start, end, pickedIds, feeling) {
+    const acts = this.data.activities || [];
+    if (pickedIds.length) {
+      this.data.activities = acts.map((a) => pickedIds.includes(a.id) ? { ...a, count: (a.count || 0) + 1, lastUsed: end } : a);
+    }
+    if (start) {
+      const picked = pickedIds.map((id) => (this.data.activities || []).find((a) => a.id === id)).filter(Boolean);
+      const names = picked.map((a) => a.name);
+      const areas = Array.from(new Set(picked.map((a) => a.area || "Other")));
+      this.data.breaks = [...this.data.breaks || [], { id: "br" + Date.now(), start, end, activities: names, areas, feeling: feeling != null ? feeling : null }];
+    }
+    this.persist();
+    this.notifyBreaksChange();
+  }
   // Log the just-finished pomodoro straight from the floating window: build the session
   // from the engine's task + the matching task meta, record the rating, write Act and the
   // daily note (best-effort), then clear the timer. Optionally mark the task Done in
@@ -25221,6 +25377,8 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     this.timer.reset();
     if (nextTask)
       this.timer.setTask(nextTask);
+    if (this.data.settings.breakEnabled)
+      this.timer.startBreak();
     this.notifySessionsChange();
     let msg = "Logged \u201C" + taskName + "\u201D \u2014 felt " + s.actual + "/5.";
     if (s.pageId) {
@@ -25426,7 +25584,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
           } else {
             const screen = remote.screen;
             const wa = screen && screen.getPrimaryDisplay ? screen.getPrimaryDisplay().workArea : null;
-            win.setSize(300, 170, false);
+            win.setSize(300, 240, false);
             if (wa)
               win.setPosition(Math.round(wa.x + wa.width - 320), Math.round(wa.y + 40), false);
           }
@@ -25440,6 +25598,12 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
   // Remember the float window's geometry so next time it opens where you left it.
   saveFloatBounds(b) {
     this.data.settings.floatBounds = { x: b.x, y: b.y, w: b.width, h: b.height };
+    this.persist();
+  }
+  // The break phase gets its own remembered geometry (larger, for the activity picker),
+  // so the focus and break sizes don't overwrite each other.
+  saveFloatBreakBounds(b) {
+    this.data.settings.floatBreakBounds = { x: b.x, y: b.y, w: b.width, h: b.height };
     this.persist();
   }
   // ---------- timer alerts (work over other apps) ----------
@@ -25806,12 +25970,20 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         step: (d) => self.timer.step(d),
         setPauseTag: (tag) => self.timer.setPauseTag(tag),
         setExpected: (n) => self.timer.setExpected(n),
-        commitPendingPause: () => self.timer.commitPendingPause()
+        setTask: (name) => self.timer.setTask(name),
+        commitPendingPause: () => self.timer.commitPendingPause(),
+        startBreak: () => self.timer.startBreak(),
+        toggleBreakRun: () => self.timer.toggleBreakRun(),
+        stepBreak: (d) => self.timer.stepBreak(d),
+        toggleBreakPick: (id) => self.timer.toggleBreakPick(id),
+        setBreakFeeling: (n) => self.timer.setBreakFeeling(n),
+        endBreak: () => self.timer.endBreak()
       },
       quickLog: (actual, markDone, nextTask) => self.quickLog(actual, markDone, nextTask),
       getPauses: () => self.getPauses(),
       onPausesChange: (fn) => self.onPausesChange(fn),
       onSessionsChange: (fn) => self.onSessionsChange(fn),
+      onBreaksChange: (fn) => self.onBreaksChange(fn),
       onRequestLogView: (fn) => self.onRequestLogView(fn),
       openFloating: () => self.openFloating(),
       closeFloating: () => self.closeFloating(),
@@ -25891,6 +26063,12 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     // window height before the pause picker grew it
     this.celebrateBaseH = 0;
     // window height before the celebration grew it
+    this.curPhase = "";
+    // "setup" | "focus" | "break" — which screen of the loop is showing
+    this.skey = "";
+    // setup task-picker rebuilds only when the task list / selection changes
+    this.bkey = "";
+    // break activity chips rebuild only when the list / picked set changes
     this.fwin = null;
     this.plugin = plugin;
   }
@@ -25913,26 +26091,36 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     } catch (e) {
     }
     const wrap = root.createDiv({ cls: "flt-wrap" });
+    this.els.setupSel = wrap.createEl("select", { cls: "flt-setsel" });
+    this.els.setupSel.onchange = () => this.plugin.timer.setTask(this.els.setupSel.value);
     this.els.task = wrap.createDiv({ cls: "flt-task" });
     this.els.time = wrap.createDiv({ cls: "flt-time" });
     const row = wrap.createDiv({ cls: "flt-row" });
+    this.els.row = row;
     this.els.minus = row.createEl("button", { cls: "flt-btn flt-step", text: "\u2212" });
     this.els.primary = row.createEl("button", { cls: "flt-btn flt-primary" });
     this.els.plus = row.createEl("button", { cls: "flt-btn flt-step", text: "+" });
     this.els.reset = row.createEl("button", { cls: "flt-btn flt-icon" });
     (0, import_obsidian.setIcon)(this.els.reset, "rotate-ccw");
     this.els.reset.setAttribute("aria-label", "reset");
+    this.els.setupRate = wrap.createDiv({ cls: "flt-setrate" });
     this.els.picker = wrap.createDiv({ cls: "flt-picker" });
+    this.els.break = wrap.createDiv({ cls: "flt-break" });
     this.els.flash = wrap.createDiv({ cls: "flt-flash" });
     this.els.celebrate = wrap.createDiv({ cls: "flt-celebrate" });
     this.els.minus.onclick = () => this.plugin.timer.step(-1);
     this.els.plus.onclick = () => this.plugin.timer.step(1);
     this.els.primary.onclick = () => {
       const st = this.plugin.timer.getState();
-      if (st.running)
+      if (st.running) {
         this.plugin.timer.pause();
-      else
-        this.plugin.timer.start();
+        return;
+      }
+      if (!st.paused && !(st.taskName || "").trim() && (this.plugin.data.tasks || []).length) {
+        this.flash("Pick a task first.");
+        return;
+      }
+      this.plugin.timer.start();
     };
     this.els.reset.onclick = () => this.plugin.timer.reset();
     this.unsub = this.plugin.timer.subscribe(() => this.render());
@@ -25944,42 +26132,199 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     }, 500);
     this.plugin.notifyFloatChange();
   }
+  // The closed loop has three screens: setup (pick task + rate, idle), focus (the
+  // countdown, running/paused/finished), and break (the rest timer + activities).
+  phaseOf(s) {
+    if (s.breakActive)
+      return "break";
+    if (!s.running && !s.paused && s.startedAt == null)
+      return "setup";
+    return "focus";
+  }
   render() {
     const s = this.plugin.timer.getState();
-    const mm = String(Math.floor(s.secs / 60)).padStart(2, "0");
-    const ss = String(s.secs % 60).padStart(2, "0");
-    this.els.time.setText(mm + ":" + ss);
-    this.els.time.toggleClass("is-done", s.secs === 0);
-    this.els.task.setText(s.taskName || "Focus");
-    const wantIcon = s.running ? "pause" : "play";
-    if (this.lastIcon !== wantIcon) {
-      (0, import_obsidian.setIcon)(this.els.primary, wantIcon);
-      this.lastIcon = wantIcon;
+    const phase = this.phaseOf(s);
+    if (phase !== this.curPhase) {
+      this.onPhaseChange(this.curPhase, phase);
+      this.curPhase = phase;
     }
-    this.els.primary.setAttribute("aria-label", s.running ? "pause" : s.paused ? "resume" : "start");
-    this.els.primary.toggleClass("is-running", s.running);
-    const locked = s.running || s.paused;
-    this.els.minus.disabled = locked || s.lengthMin <= 5;
-    this.els.plus.disabled = locked || s.lengthMin >= 30;
-    if (s.paused !== this.pickerShown) {
-      this.pickerShown = s.paused;
-      this.resizeForPause(s.paused);
-      if (!s.paused && this.els.picker) {
-        this.els.picker.empty();
-        this.pkey = "";
+    this.setPhaseVisibility(phase);
+    if (phase === "break") {
+      this.renderBreak(s);
+    } else {
+      const mm = String(Math.floor(s.secs / 60)).padStart(2, "0");
+      const ss = String(s.secs % 60).padStart(2, "0");
+      this.els.time.setText(mm + ":" + ss);
+      this.els.time.toggleClass("is-done", s.secs === 0);
+      this.els.task.setText(s.taskName || "Focus");
+      const wantIcon = s.running ? "pause" : "play";
+      if (this.lastIcon !== wantIcon) {
+        (0, import_obsidian.setIcon)(this.els.primary, wantIcon);
+        this.lastIcon = wantIcon;
+      }
+      this.els.primary.setAttribute("aria-label", s.running ? "pause" : s.paused ? "resume" : "start");
+      this.els.primary.toggleClass("is-running", s.running);
+      const locked = s.running || s.paused;
+      this.els.minus.disabled = locked || s.lengthMin <= 5;
+      this.els.plus.disabled = locked || s.lengthMin >= 30;
+      if (phase === "setup")
+        this.refreshSetup(s);
+      if (s.paused !== this.pickerShown) {
+        this.pickerShown = s.paused;
+        this.resizeForPause(s.paused);
+        if (!s.paused && this.els.picker) {
+          this.els.picker.empty();
+          this.pkey = "";
+        }
+      }
+      if (s.paused) {
+        const pkey = "P:" + s.pauseTag + ":" + (this.plugin.data.pauseTags || []).length;
+        if (this.pkey !== pkey) {
+          this.pkey = pkey;
+          this.buildPicker(s.pauseTag);
+        }
       }
     }
-    if (s.paused) {
-      const pkey = "P:" + s.pauseTag + ":" + (this.plugin.data.pauseTags || []).length;
-      if (this.pkey !== pkey) {
-        this.pkey = pkey;
-        this.buildPicker(s.pauseTag);
-      }
-    }
-    if ((s.running || s.startedAt == null) && this.els.celebrate && this.els.celebrate.hasClass("show")) {
+    if ((s.running || s.breakActive || s.startedAt == null) && this.els.celebrate && this.els.celebrate.hasClass("show")) {
       this.els.celebrate.removeClass("show");
       this.els.celebrate.empty();
       this.resizeForCelebrate(false);
+    }
+  }
+  // Show only the controls for the active screen.
+  setPhaseVisibility(phase) {
+    const setup = phase === "setup";
+    const brk = phase === "break";
+    this.els.setupSel.style.display = setup ? "" : "none";
+    this.els.setupRate.style.display = setup ? "" : "none";
+    this.els.task.style.display = !setup && !brk ? "" : "none";
+    this.els.time.style.display = brk ? "none" : "";
+    this.els.row.style.display = brk ? "none" : "";
+    this.els.reset.style.display = setup ? "none" : "";
+    this.els.break.style.display = brk ? "" : "none";
+  }
+  // Switch the window between the small focus size and the larger break size, and
+  // (re)build the break DOM on entry.
+  onPhaseChange(prev, next) {
+    if (next === "break") {
+      this.buildBreak();
+      this.applyBreakWindow(true);
+    } else if (prev === "break") {
+      this.applyBreakWindow(false);
+      this.els.break.empty();
+      this.els.brkTime = null;
+    }
+  }
+  // ---------- setup screen (pick task + rate before starting) ----------
+  refreshSetup(s) {
+    const tasks = this.plugin.data.tasks || [];
+    const skey = "S:" + tasks.map((t) => t.task).join("|") + "::" + (s.taskName || "");
+    if (this.skey !== skey) {
+      this.skey = skey;
+      const sel = this.els.setupSel;
+      sel.empty();
+      sel.createEl("option", { text: tasks.length ? "\u2014 pick a task \u2014" : "\u2014 no tasks (sync first) \u2014", value: "" });
+      tasks.forEach((t) => sel.createEl("option", { text: t.task, value: t.task }));
+      sel.value = s.taskName || "";
+    }
+    if (!this.els.setupRate.childElementCount)
+      this.buildSetupRate();
+    (this.els.setupRateBtns || []).forEach((b, i) => b.toggleClass("is-on", i + 1 === s.expected));
+  }
+  buildSetupRate() {
+    const el = this.els.setupRate;
+    el.empty();
+    el.createDiv({ cls: "flt-setlabel", text: "how enjoyable do you expect this to be?" });
+    const r = el.createDiv({ cls: "flt-rate" });
+    this.els.setupRateBtns = [1, 2, 3, 4, 5].map((n) => {
+      const b = r.createEl("button", { cls: "flt-rbtn", text: String(n) });
+      b.onclick = () => this.plugin.timer.setExpected(n);
+      return b;
+    });
+  }
+  // ---------- break screen (rest timer + activities + feeling) ----------
+  buildBreak() {
+    const el = this.els.break;
+    el.empty();
+    const head = el.createDiv({ cls: "flt-brk-head" });
+    this.els.brkTime = head.createDiv({ cls: "flt-brktime" });
+    const ctrls = head.createDiv({ cls: "flt-brk-ctrls" });
+    this.els.brkMinus = ctrls.createEl("button", { cls: "flt-btn flt-step", text: "\u2212" });
+    this.els.brkToggle = ctrls.createEl("button", { cls: "flt-btn flt-brk-toggle" });
+    this.els.brkPlus = ctrls.createEl("button", { cls: "flt-btn flt-step", text: "+" });
+    this.els.brkEnd = ctrls.createEl("button", { cls: "flt-btn flt-brk-end" });
+    this.els.brkMinus.onclick = () => this.plugin.timer.stepBreak(-1);
+    this.els.brkPlus.onclick = () => this.plugin.timer.stepBreak(1);
+    this.els.brkToggle.onclick = () => this.plugin.timer.toggleBreakRun();
+    this.els.brkEnd.onclick = () => this.plugin.timer.endBreak();
+    this.els.brkLbl = el.createDiv({ cls: "flt-brk-lbl" });
+    this.els.brkActs = el.createDiv({ cls: "flt-brk-acts" });
+    const feel = el.createDiv({ cls: "flt-brk-feel" });
+    feel.createDiv({ cls: "flt-setlabel", text: "how do you feel now? (1 worse \u2026 5 a lot better)" });
+    const fr = feel.createDiv({ cls: "flt-rate" });
+    this.els.brkFeelBtns = [1, 2, 3, 4, 5].map((n) => {
+      const b = fr.createEl("button", { cls: "flt-rbtn", text: String(n) });
+      b.onclick = () => this.plugin.timer.setBreakFeeling(n);
+      return b;
+    });
+    this.bkey = "";
+  }
+  renderBreak(s) {
+    if (!this.els.brkTime)
+      this.buildBreak();
+    const mm = String(Math.floor(s.breakSecs / 60)).padStart(2, "0");
+    const ss = String(s.breakSecs % 60).padStart(2, "0");
+    this.els.brkTime.setText(mm + ":" + ss);
+    this.els.brkTime.toggleClass("is-done", s.breakFinished);
+    this.els.brkToggle.setText(s.breakFinished ? "done" : s.breakRunning ? "pause" : "start");
+    this.els.brkToggle.disabled = s.breakFinished;
+    this.els.brkMinus.disabled = s.breakSecs <= 60;
+    this.els.brkPlus.disabled = s.breakSecs >= 30 * 60;
+    this.els.brkEnd.setText(s.breakFinished ? "next task \u2192" : "end break");
+    const acts = this.plugin.data.activities || [];
+    const picked = s.breakPicked || [];
+    const bkey = "B:" + acts.map((a) => a.id).join("|") + "::" + picked.join(",");
+    if (this.bkey !== bkey) {
+      this.bkey = bkey;
+      this.buildBreakChips(acts, picked);
+    }
+    this.els.brkLbl.setText("pick up to 3 for this break (" + picked.length + "/3):");
+    (this.els.brkFeelBtns || []).forEach((b, i) => b.toggleClass("is-on", i + 1 === s.breakFeeling));
+  }
+  buildBreakChips(acts, picked) {
+    const el = this.els.brkActs;
+    el.empty();
+    if (!acts.length) {
+      el.createDiv({ cls: "flt-brk-empty", text: "No activities yet \u2014 add some in the panel's Break tab." });
+      return;
+    }
+    acts.forEach((a) => {
+      const on = picked.includes(a.id);
+      const chip = el.createEl("button", { cls: "flt-chip flt-brk-chip" + (on ? " is-on" : ""), text: (on ? "\u2713 " : "") + a.name });
+      chip.onclick = () => this.plugin.timer.toggleBreakPick(a.id);
+    });
+  }
+  // Save the focus geometry and grow to the remembered (or default 380×400) break size;
+  // on the way out, restore the focus geometry. The break has its own remembered bounds.
+  applyBreakWindow(toBreak) {
+    try {
+      const win = this.plugin.floatWin;
+      if (!win || !win.getBounds || !win.setBounds)
+        return;
+      if (toBreak) {
+        const b = win.getBounds();
+        this.plugin.saveFloatBounds(b);
+        const bb = this.plugin.data.settings.floatBreakBounds;
+        if (bb && bb.w && bb.h)
+          win.setBounds({ x: Math.round(bb.x), y: Math.round(bb.y), width: Math.round(bb.w), height: Math.round(bb.h) });
+        else
+          win.setBounds({ x: b.x, y: b.y, width: 380, height: 400 });
+      } else {
+        const fb = this.plugin.data.settings.floatBounds;
+        if (fb && fb.w && fb.h)
+          win.setBounds({ x: Math.round(fb.x), y: Math.round(fb.y), width: Math.round(fb.w), height: Math.round(fb.h) });
+      }
+    } catch (e) {
     }
   }
   // Grow the window downward to fit the pause picker, then restore the prior height —
@@ -26002,13 +26347,14 @@ var FloatTimerView = class extends import_obsidian.ItemView {
   }
   // Persist the window geometry shortly after the user stops moving/resizing it.
   // Skipped while paused or celebrating (the picker/celebration has grown the
-  // window — not the real size).
+  // window — not the real size). The break phase remembers its own larger bounds.
   maybeSaveBounds() {
     try {
       const win = this.plugin.floatWin;
       if (!win || !win.getBounds)
         return;
-      if (this.plugin.timer.getState().paused)
+      const st = this.plugin.timer.getState();
+      if (st.paused)
         return;
       if (this.celebrateBaseH)
         return;
@@ -26021,7 +26367,10 @@ var FloatTimerView = class extends import_obsidian.ItemView {
       }
       if (this.boundsDirty) {
         this.boundsDirty = false;
-        this.plugin.saveFloatBounds(b);
+        if (st.breakActive)
+          this.plugin.saveFloatBreakBounds(b);
+        else
+          this.plugin.saveFloatBounds(b);
       }
     } catch (e) {
     }
@@ -26143,8 +26492,13 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     this.unsub = null;
     try {
       const win = this.plugin.floatWin;
-      if (win && win.getBounds && !this.plugin.timer.getState().paused && !this.celebrateBaseH)
-        this.plugin.saveFloatBounds(win.getBounds());
+      const st = this.plugin.timer.getState();
+      if (win && win.getBounds && !st.paused && !this.celebrateBaseH) {
+        if (st.breakActive)
+          this.plugin.saveFloatBreakBounds(win.getBounds());
+        else
+          this.plugin.saveFloatBounds(win.getBounds());
+      }
     } catch (e) {
     }
     try {

@@ -203,6 +203,50 @@ body.focuslog-float-window .notice { display: none !important; }
   background: #fffefc; color: #2b2723; padding: 4px 6px;
 }
 
+/* Floating window — setup screen (pick a task + rate before starting) */
+.focuslog-float .flt-setsel {
+  -webkit-app-region: no-drag;
+  max-width: 100%; width: 100%; font-size: 12px;
+  border: 1px solid #cfc7b8; border-radius: 7px;
+  background: #fffefc; color: #2b2723; padding: 6px 8px; cursor: pointer;
+}
+.focuslog-float .flt-setrate { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 100%; }
+.focuslog-float .flt-setlabel { font-size: 11px; color: #8a8175; text-align: center; }
+.focuslog-float .flt-rate { display: flex; gap: 6px; }
+.focuslog-float .flt-rbtn {
+  -webkit-app-region: no-drag;
+  font-family: 'Baloo 2', sans-serif; font-size: 13px; min-width: 30px;
+  border: 1px solid #cfc7b8; background: #fffefc; color: #2b2723;
+  border-radius: 7px; padding: 4px 9px; cursor: pointer; transition: background 0.12s ease;
+}
+.focuslog-float .flt-rbtn:hover { background: #5b8c5a; border-color: #5b8c5a; color: #fff; }
+.focuslog-float .flt-rbtn.is-on { background: #5b8c5a; border-color: #5b8c5a; color: #fff; font-weight: 700; }
+
+/* Floating window — break screen (rest timer + activities + feeling) */
+.focuslog-float .flt-break {
+  -webkit-app-region: no-drag;
+  width: 100%; flex: 1; display: flex; flex-direction: column; gap: 10px;
+  overflow-y: auto; padding: 2px;
+}
+.focuslog-float .flt-brk-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.focuslog-float .flt-brktime {
+  font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 600; font-size: 30px;
+  line-height: 1; font-variant-numeric: tabular-nums; color: #2b2723;
+}
+.focuslog-float .flt-brktime.is-done { color: #5b8c5a; }
+.focuslog-float .flt-brk-ctrls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.focuslog-float .flt-btn.flt-brk-toggle { background: #2b2723; color: #fdfbf6; border-color: #2b2723; }
+.focuslog-float .flt-btn.flt-brk-toggle:hover { background: #423b34; }
+.focuslog-float .flt-brk-lbl { font-size: 11px; color: #8a8175; }
+.focuslog-float .flt-brk-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.focuslog-float .flt-chip.flt-brk-chip {
+  background: #f4efe4; border-color: #d8cfbd; opacity: 0.55;
+  text-align: left; white-space: normal; height: auto; line-height: 1.3;
+}
+.focuslog-float .flt-chip.flt-brk-chip.is-on { opacity: 1; font-weight: 700; border-color: #5b8c5a; background: #e7efe4; }
+.focuslog-float .flt-brk-empty { font-size: 11px; color: #8a8175; }
+.focuslog-float .flt-brk-feel { display: flex; flex-direction: column; gap: 5px; align-items: center; padding-top: 8px; border-top: 1px solid #ece5d6; }
+
 /* Celebration modal */
 .focuslog-celebrate { text-align: center; position: relative; overflow: hidden; }
 .focuslog-celebrate .fl-popper { font-size: 56px; animation: fl-pop 0.5s cubic-bezier(.2,1.4,.4,1) both; }

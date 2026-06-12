@@ -665,39 +665,15 @@ export default function FocusLogApp({ api }: any) {
   const saveActivities = (next: any[]) => { setActivities(next); api.saveActivities && api.saveActivities(next); };
   const [breaks, setBreaks] = useState<any[]>(init.breaks || []);
   const saveBreaks = (next: any[]) => { setBreaks(next); api.saveBreaks && api.saveBreaks(next); };
-  const [brk, setBrk] = useState<any>({ active: false, secs: 0, running: false, picked: [], finished: false, feeling: null });
-  const brkTick = useRef<any>(null);
+  // The break is now owned by the shared timer engine (so the panel and the floating
+  // window stay in lock-step). `brk` below is derived from the engine state; these
+  // handlers just drive it through the api. The engine writes the finished break to the
+  // log itself (commitBreak), and the panel re-reads activities/breaks via onBreaksChange.
   const [newAct, setNewAct] = useState<any>({ name: "", area: "" });
-  useEffect(() => {
-    if (!brk.active || !brk.running) return;
-    brkTick.current = setInterval(() => {
-      setBrk((b: any) => {
-        if (!b.active || !b.running) return b;
-        const nx = b.secs > 0 ? b.secs - 1 : 0;
-        if (nx === 0 && !b.finished) { api.notify("Break over — ready for the next pomodoro?", 6000); return { ...b, secs: 0, running: false, finished: true }; }
-        return { ...b, secs: nx };
-      });
-    }, 1000);
-    return () => clearInterval(brkTick.current);
-  }, [brk.active, brk.running]);
-  const startBreak = () => setBrk({ active: true, start: Date.now(), secs: (Number(settings.breakMinutes) || 5) * 60, running: settings.breakAutoStart !== false, picked: [], finished: false, feeling: null });
-  const togglePick = (id: string) => setBrk((b: any) => {
-    if (b.picked.includes(id)) return { ...b, picked: b.picked.filter((x: string) => x !== id) };
-    if (b.picked.length >= 3) return b;
-    return { ...b, picked: [...b.picked, id] };
-  });
+  const startBreak = () => api.timer.startBreak && api.timer.startBreak();
+  const togglePick = (id: string) => api.timer.toggleBreakPick && api.timer.toggleBreakPick(id);
   const endBreak = () => {
-    const now = Date.now();
-    if (brk.picked.length) {
-      saveActivities(activities.map((a) => brk.picked.includes(a.id) ? { ...a, count: (a.count || 0) + 1, lastUsed: now } : a));
-    }
-    if (brk.active && brk.start) {
-      const picked = brk.picked.map((id: string) => activities.find((x) => x.id === id)).filter(Boolean);
-      const names = picked.map((a: any) => a.name);
-      const areas = Array.from(new Set(picked.map((a: any) => a.area || "Other")));
-      saveBreaks([...breaks, { id: "br" + Date.now(), start: brk.start, end: now, activities: names, areas, feeling: brk.feeling ?? null }]);
-    }
-    setBrk({ active: false, secs: 0, running: false, picked: [], finished: false, feeling: null });
+    api.timer.endBreak && api.timer.endBreak();
     if (chooseNext && nextTask) { setPreset(nextTask); setNextTask(""); resetTimer(); setView("log"); }
     else setView("today");
   };
@@ -823,6 +799,23 @@ export default function FocusLogApp({ api }: any) {
   // A finished, not-yet-logged pomodoro: the countdown hit 0 but the timer hasn't been
   // reset (logging or reset clears startedAt). This drives the "after" rating section.
   const finished = timer.startedAt != null && !timer.running && !timer.paused && timer.secs === 0;
+
+  // Break state, read straight off the engine (shared with the floating window).
+  const brk = {
+    active: !!timer.breakActive, secs: timer.breakSecs || 0, running: !!timer.breakRunning,
+    finished: !!timer.breakFinished, picked: timer.breakPicked || [], feeling: timer.breakFeeling ?? null,
+  };
+  // Follow the engine into the break view whenever a break begins (e.g. one started from
+  // the floating window), and refresh activities/breaks when the engine commits one.
+  useEffect(() => { if (brk.active) setView("break"); }, [brk.active]);
+  useEffect(() => {
+    if (!api.onBreaksChange) return;
+    return api.onBreaksChange(() => {
+      const fresh = api.getInitial();
+      setActivities([...(fresh.activities || [])]);
+      setBreaks([...(fresh.breaks || [])]);
+    });
+  }, []);
 
   // Keep the local pauses list in sync when the engine writes one (e.g. paused +
   // resumed from the floating window while this panel was open), and let the float
@@ -1353,12 +1346,12 @@ export default function FocusLogApp({ api }: any) {
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
                     {!brk.finished && (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4, marginRight: 4 }}>
-                        <button onClick={() => setBrk((b: any) => ({ ...b, secs: Math.max(60, b.secs - 60), finished: false }))} style={{ ...btn(C.muted, true), padding: "4px 9px" }}>{"−"}</button>
+                        <button onClick={() => api.timer.stepBreak(-1)} style={{ ...btn(C.muted, true), padding: "4px 9px" }}>{"−"}</button>
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, minWidth: 34, textAlign: "center" }}>{Math.round(brk.secs / 60)}m</span>
-                        <button onClick={() => setBrk((b: any) => ({ ...b, secs: Math.min(30 * 60, b.secs + 60), finished: false }))} style={{ ...btn(C.muted, true), padding: "4px 9px" }}>{"+"}</button>
+                        <button onClick={() => api.timer.stepBreak(1)} style={{ ...btn(C.muted, true), padding: "4px 9px" }}>{"+"}</button>
                       </span>
                     )}
-                    {!brk.finished && <button onClick={() => setBrk((b: any) => ({ ...b, running: !b.running }))} style={btn(C.ink)}>{brk.running ? "pause" : "start"}</button>}
+                    {!brk.finished && <button onClick={() => api.timer.toggleBreakRun()} style={btn(C.ink)}>{brk.running ? "pause" : "start"}</button>}
                     <button onClick={endBreak} style={btn(C.muted, true)}>{brk.finished ? "go back to my task" : "end break"}</button>
                   </div>
                 </div>
@@ -1372,7 +1365,7 @@ export default function FocusLogApp({ api }: any) {
                     })}
                 </div>
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
-                  <Scale label="how do you feel now? (1 worse than no rest … 5 a lot better)" value={brk.feeling} onChange={(v: number) => setBrk((b: any) => ({ ...b, feeling: v }))} color={settings.endColor} />
+                  <Scale label="how do you feel now? (1 worse than no rest … 5 a lot better)" value={brk.feeling} onChange={(v: number) => api.timer.setBreakFeeling(v)} color={settings.endColor} />
                 </div>
               </div>
             )}

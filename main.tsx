@@ -70,6 +70,7 @@ export interface FocusLogSettings {
   floatOnStart: boolean;
   floatAlwaysOnTop: boolean;
   floatBounds: { x: number; y: number; w: number; h: number } | null;
+  floatBreakBounds: { x: number; y: number; w: number; h: number } | null;
 }
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
@@ -110,6 +111,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   floatOnStart: true,
   floatAlwaysOnTop: true,
   floatBounds: null,
+  floatBreakBounds: null,
 };
 
 // Pause tags carry a category: "internal" (the impulse came from you) or
@@ -268,6 +270,15 @@ interface TimerState {
   pauseStart: number | null; // when the current pause began (null if not paused)
   pauseTag: string;          // the reason chosen for the current pause
   expected: number;          // the "before" enjoyment rating (1-5), carried so a quick-log has it
+  // ----- break phase (shared with the panel + the floating window's closed loop) -----
+  breakActive: boolean;      // a break is in progress (running, paused, or finished-awaiting-dismiss)
+  breakRunning: boolean;     // the break countdown is ticking
+  breakFinished: boolean;    // the break hit 0 (kept up so its activities/feeling can still be set)
+  breakSecs: number;         // seconds left on the break
+  breakTotal: number;        // full break length in seconds
+  breakStart: number | null; // wall-clock moment the break began (for the breaks log)
+  breakPicked: string[];     // activity ids chosen for this break (max 3)
+  breakFeeling: number | null; // the "how do you feel now" rating (1-5)
 }
 class TimerEngine {
   private lengthMin: number;
@@ -281,6 +292,17 @@ class TimerEngine {
   private pauseStart: number | null = null; // pause-with-reason: when this pause began
   private pauseTag = "";                     // pause-with-reason: chosen reason
   private expected = 3;                      // "before" enjoyment rating; set from the panel, read at log time
+  // ----- break phase: a second, wall-clock countdown owned by the same engine so the
+  // panel and the floating window share one source of truth for the rest-and-resume loop.
+  private breakActive = false;
+  private breakRunning = false;
+  private breakFinished = false;
+  private breakTotal = 0;            // full break length in seconds
+  private breakEndTs = 0;            // wall-clock target while the break runs (ms epoch)
+  private breakFrozen = 0;           // remaining break seconds while paused
+  private breakStart: number | null = null;
+  private breakPicked: string[] = [];
+  private breakFeeling: number | null = null;
   private iv: number | null = null;
   private fired: Record<number, boolean> = {};
   private subs = new Set<() => void>();
@@ -299,8 +321,17 @@ class TimerEngine {
     return Math.max(0, this.frozenSecs);
   }
 
+  // Break seconds derived from the wall clock too, so a throttled/late tick stays correct.
+  private breakSecsNow(): number {
+    if (this.breakRunning) return Math.max(0, Math.ceil((this.breakEndTs - Date.now()) / 1000));
+    return Math.max(0, this.breakFrozen);
+  }
+
   getState(): TimerState {
-    return { secs: this.secsNow(), total: this.total, running: this.running, paused: this.paused, lengthMin: this.lengthMin, taskName: this.taskName, startedAt: this.startedAt, pauseStart: this.pauseStart, pauseTag: this.pauseTag, expected: this.expected };
+    return {
+      secs: this.secsNow(), total: this.total, running: this.running, paused: this.paused, lengthMin: this.lengthMin, taskName: this.taskName, startedAt: this.startedAt, pauseStart: this.pauseStart, pauseTag: this.pauseTag, expected: this.expected,
+      breakActive: this.breakActive, breakRunning: this.breakRunning, breakFinished: this.breakFinished, breakSecs: this.breakSecsNow(), breakTotal: this.breakTotal, breakStart: this.breakStart, breakPicked: this.breakPicked.slice(), breakFeeling: this.breakFeeling,
+    };
   }
   setPauseTag(tag: string) { this.pauseTag = tag || ""; this.emit(); }
   // The panel's "before" rating; kept on the engine so a quick-log from the float window
@@ -343,6 +374,8 @@ class TimerEngine {
   start(taskName?: string) {
     if (typeof taskName === "string" && taskName.trim()) this.taskName = taskName.trim();
     const fresh = !this.running && !this.paused; // brand-new pomodoro vs. a resume
+    // Starting a fresh pomodoro out of an open break closes (and records) the break first.
+    if (fresh && this.breakActive) this.endBreak();
     // Resuming from a pause → write that pause (event + note) and clear it.
     if (this.paused) this.commitPendingPause();
     let secs = this.secsNow();
@@ -385,19 +418,82 @@ class TimerEngine {
     this.emit();
   }
   dispose() {
+    // Force the clock down regardless of phase (stopTick keeps ticking while running).
+    this.running = false;
+    this.breakRunning = false;
     this.stopTick();
     this.subs.clear();
   }
 
+  // ---------- break phase (the rest half of the closed loop) ----------
+  // Begin (or restart) the rest timer using the configured break length. Honors the
+  // break-auto-start setting; either way the break phase becomes active so the panel
+  // and float can show its controls + activity picker.
+  startBreak() {
+    const mins = Math.max(1, Math.min(60, Math.round(this.plugin.data.settings.breakMinutes) || 5));
+    this.breakTotal = mins * 60;
+    this.breakFrozen = this.breakTotal;
+    this.breakStart = Date.now();
+    this.breakPicked = [];
+    this.breakFeeling = null;
+    this.breakFinished = false;
+    this.breakActive = true;
+    if (this.plugin.data.settings.breakAutoStart !== false) {
+      this.breakRunning = true;
+      this.breakEndTs = Date.now() + this.breakFrozen * 1000;
+      this.ensureTick();
+    } else {
+      this.breakRunning = false;
+    }
+    this.emit();
+  }
+  toggleBreakRun() {
+    if (!this.breakActive || this.breakFinished) return;
+    if (this.breakRunning) { this.breakFrozen = this.breakSecsNow(); this.breakRunning = false; this.stopTick(); }
+    else { this.breakEndTs = Date.now() + Math.max(1, this.breakFrozen) * 1000; this.breakRunning = true; this.ensureTick(); }
+    this.emit();
+  }
+  stepBreak(deltaMin: number) {
+    if (!this.breakActive) return;
+    const next = Math.max(60, Math.min(30 * 60, this.breakSecsNow() + deltaMin * 60));
+    this.breakFrozen = next;
+    this.breakFinished = false;
+    if (this.breakRunning) this.breakEndTs = Date.now() + next * 1000;
+    this.emit();
+  }
+  toggleBreakPick(id: string) {
+    if (this.breakPicked.includes(id)) this.breakPicked = this.breakPicked.filter((x) => x !== id);
+    else if (this.breakPicked.length < 3) this.breakPicked = [...this.breakPicked, id];
+    this.emit();
+  }
+  setBreakFeeling(n: number) { this.breakFeeling = Math.max(1, Math.min(5, Math.round(n) || 3)); this.emit(); }
+  // Commit the break (activities + feeling → the breaks log via the plugin) and clear
+  // the phase. Called when the user ends/skips the break, closing the loop back to setup.
+  endBreak() {
+    if (this.breakActive && this.breakStart) this.plugin.commitBreak(this.breakStart, Date.now(), this.breakPicked.slice(), this.breakFeeling);
+    this.breakActive = false;
+    this.breakRunning = false;
+    this.breakFinished = false;
+    this.breakStart = null;
+    this.breakPicked = [];
+    this.breakFeeling = null;
+    this.breakFrozen = 0;
+    this.breakEndTs = 0;
+    this.stopTick();
+    this.emit();
+  }
+
   private ensureTick() {
-    // Tell Electron not to throttle this window's timers while a pomodoro runs,
+    // Tell Electron not to throttle this window's timers while a pomodoro or break runs,
     // otherwise a backgrounded window's setInterval is clamped to ~1/minute and the
-    // countdown jumps a minute at a time. Restored to normal when the timer stops.
+    // countdown jumps a minute at a time. Restored to normal when nothing is ticking.
     this.plugin.setBackgroundThrottle(false);
     if (this.iv != null) return;
     this.iv = window.setInterval(() => this.poll(), 500);
   }
   private stopTick() {
+    // Keep the clock alive while either the pomodoro or a break still needs it.
+    if (this.running || this.breakRunning) return;
     if (this.iv != null) { window.clearInterval(this.iv); this.iv = null; }
     this.plugin.setBackgroundThrottle(true);
   }
@@ -409,21 +505,36 @@ class TimerEngine {
   // jumps past a mark still fires it. The 15/5-min marks only apply if the
   // pomodoro is actually longer than that.
   poll() {
-    if (!this.running) return;
-    const s = this.secsNow();
-    if (this.total > 900 && s <= 900 && !this.fired[900]) { this.fired[900] = true; this.plugin.timerNotify("15 minutes left. Still on this task?"); }
-    if (this.total > 300 && s <= 300 && !this.fired[300]) { this.fired[300] = true; this.plugin.timerNotify("5 minutes left. Stay with it."); }
-    if (s <= 0 && !this.fired[0]) {
-      this.fired[0] = true;
-      this.frozenSecs = 0;
-      this.running = false;
-      this.paused = false;
-      this.stopTick();
-      this.emit();
-      this.plugin.timerDone();
-      return;
+    let changed = false;
+    if (this.running) {
+      const s = this.secsNow();
+      if (this.total > 900 && s <= 900 && !this.fired[900]) { this.fired[900] = true; this.plugin.timerNotify("15 minutes left. Still on this task?"); }
+      if (this.total > 300 && s <= 300 && !this.fired[300]) { this.fired[300] = true; this.plugin.timerNotify("5 minutes left. Stay with it."); }
+      if (s <= 0 && !this.fired[0]) {
+        this.fired[0] = true;
+        this.frozenSecs = 0;
+        this.running = false;
+        this.paused = false;
+        this.stopTick();
+        this.emit();
+        this.plugin.timerDone();
+        return;
+      }
+      changed = true;
     }
-    this.emit();
+    if (this.breakRunning) {
+      if (this.breakSecsNow() <= 0) {
+        this.breakFrozen = 0;
+        this.breakRunning = false;
+        this.breakFinished = true;
+        this.stopTick();
+        this.emit();
+        this.plugin.breakDone();
+        return;
+      }
+      changed = true;
+    }
+    if (changed) this.emit();
   }
 }
 
@@ -434,6 +545,7 @@ export default class FocusLogPlugin extends Plugin {
   private floatSubs = new Set<() => void>();
   private pauseSubs = new Set<() => void>();   // panel re-syncs its pauses list when these fire
   private sessionSubs = new Set<() => void>(); // panel re-reads its sessions when these fire (e.g. a float quick-log)
+  private breakSubs = new Set<() => void>();   // panel re-reads activities + breaks when the engine commits a break
   private logViewSubs = new Set<() => void>(); // panel switches to the log tab when these fire
   private openingFloat = false; // true between asking for a float popout and the window-open handler claiming it
   private doneStatusCache: string | null = null;
@@ -505,6 +617,31 @@ export default class FocusLogPlugin extends Plugin {
   onSessionsChange(fn: () => void): () => void { this.sessionSubs.add(fn); return () => this.sessionSubs.delete(fn); }
   private notifySessionsChange() { this.sessionSubs.forEach((fn) => { try { fn(); } catch {} }); }
 
+  // ---------- breaks changed outside the panel (the engine committed one) ----------
+  onBreaksChange(fn: () => void): () => void { this.breakSubs.add(fn); return () => this.breakSubs.delete(fn); }
+  private notifyBreaksChange() { this.breakSubs.forEach((fn) => { try { fn(); } catch {} }); }
+  // Fired by the engine when a break finishes its countdown on its own.
+  breakDone() {
+    this.timerNotify("Break over — ready for the next pomodoro?");
+  }
+  // Write a finished break to the log: bump the chosen activities' counts and record the
+  // break (activities, areas, feeling). Called by the engine's endBreak so it works from
+  // either window, even when the panel is closed. The panel re-reads via notifyBreaksChange.
+  commitBreak(start: number, end: number, pickedIds: string[], feeling: number | null) {
+    const acts = this.data.activities || [];
+    if (pickedIds.length) {
+      this.data.activities = acts.map((a: any) => pickedIds.includes(a.id) ? { ...a, count: (a.count || 0) + 1, lastUsed: end } : a);
+    }
+    if (start) {
+      const picked = pickedIds.map((id) => (this.data.activities || []).find((a: any) => a.id === id)).filter(Boolean) as any[];
+      const names = picked.map((a) => a.name);
+      const areas = Array.from(new Set(picked.map((a) => a.area || "Other")));
+      this.data.breaks = [...(this.data.breaks || []), { id: "br" + Date.now(), start, end, activities: names, areas, feeling: feeling ?? null }];
+    }
+    this.persist();
+    this.notifyBreaksChange();
+  }
+
   // Log the just-finished pomodoro straight from the floating window: build the session
   // from the engine's task + the matching task meta, record the rating, write Act and the
   // daily note (best-effort), then clear the timer. Optionally mark the task Done in
@@ -529,6 +666,8 @@ export default class FocusLogPlugin extends Plugin {
     // The chosen next task rides on the engine: the float shows it as the upcoming task
     // and the panel picks it up as its preset.
     if (nextTask) this.timer.setTask(nextTask);
+    // Closed loop: roll straight into the shared break phase (the float renders it next).
+    if (this.data.settings.breakEnabled) this.timer.startBreak();
     this.notifySessionsChange();
     let msg = "Logged “" + taskName + "” — felt " + s.actual + "/5.";
     if (s.pageId) {
@@ -682,7 +821,7 @@ export default class FocusLogPlugin extends Plugin {
           } else {
             const screen = remote.screen;
             const wa = screen && screen.getPrimaryDisplay ? screen.getPrimaryDisplay().workArea : null;
-            win.setSize(300, 170, false); // first-time default: small, top-right
+            win.setSize(300, 240, false); // first-time default: small, top-right (fits the setup picker)
             if (wa) win.setPosition(Math.round(wa.x + wa.width - 320), Math.round(wa.y + 40), false);
           }
         } catch {}
@@ -694,6 +833,12 @@ export default class FocusLogPlugin extends Plugin {
   // Remember the float window's geometry so next time it opens where you left it.
   saveFloatBounds(b: { x: number; y: number; width: number; height: number }) {
     this.data.settings.floatBounds = { x: b.x, y: b.y, w: b.width, h: b.height };
+    this.persist();
+  }
+  // The break phase gets its own remembered geometry (larger, for the activity picker),
+  // so the focus and break sizes don't overwrite each other.
+  saveFloatBreakBounds(b: { x: number; y: number; width: number; height: number }) {
+    this.data.settings.floatBreakBounds = { x: b.x, y: b.y, w: b.width, h: b.height };
     this.persist();
   }
 
@@ -1043,12 +1188,20 @@ export default class FocusLogPlugin extends Plugin {
         step: (d: number) => self.timer.step(d),
         setPauseTag: (tag: string) => self.timer.setPauseTag(tag),
         setExpected: (n: number) => self.timer.setExpected(n),
+        setTask: (name: string) => self.timer.setTask(name),
         commitPendingPause: () => self.timer.commitPendingPause(),
+        startBreak: () => self.timer.startBreak(),
+        toggleBreakRun: () => self.timer.toggleBreakRun(),
+        stepBreak: (d: number) => self.timer.stepBreak(d),
+        toggleBreakPick: (id: string) => self.timer.toggleBreakPick(id),
+        setBreakFeeling: (n: number) => self.timer.setBreakFeeling(n),
+        endBreak: () => self.timer.endBreak(),
       },
       quickLog: (actual: number, markDone?: boolean, nextTask?: string) => self.quickLog(actual, markDone, nextTask),
       getPauses: () => self.getPauses(),
       onPausesChange: (fn: () => void) => self.onPausesChange(fn),
       onSessionsChange: (fn: () => void) => self.onSessionsChange(fn),
+      onBreaksChange: (fn: () => void) => self.onBreaksChange(fn),
       onRequestLogView: (fn: () => void) => self.onRequestLogView(fn),
       openFloating: () => self.openFloating(),
       closeFloating: () => self.closeFloating(),
@@ -1119,6 +1272,9 @@ class FloatTimerView extends ItemView {
   private boundsDirty = false; // geometry changed; save once it settles
   private pauseBaseH = 0;      // window height before the pause picker grew it
   private celebrateBaseH = 0;  // window height before the celebration grew it
+  private curPhase = "";       // "setup" | "focus" | "break" — which screen of the loop is showing
+  private skey = "";           // setup task-picker rebuilds only when the task list / selection changes
+  private bkey = "";           // break activity chips rebuild only when the list / picked set changes
   private fwin: any = null; // this popout's own window object (its timers aren't throttled while it's visible)
   constructor(leaf: WorkspaceLeaf, plugin: FocusLogPlugin) {
     super(leaf);
@@ -1137,23 +1293,39 @@ class FloatTimerView extends ItemView {
     // clean, frameless timer — without touching the main window or other popouts.
     try { this.fwin.document.body.classList.add("focuslog-float-window"); } catch {}
     const wrap = root.createDiv({ cls: "flt-wrap" });
+    // Setup (pre-pomodoro) task picker — shown only when idle, so you choose what's next
+    // before the countdown begins.
+    this.els.setupSel = wrap.createEl("select", { cls: "flt-setsel" }) as HTMLSelectElement;
+    this.els.setupSel.onchange = () => this.plugin.timer.setTask((this.els.setupSel as HTMLSelectElement).value);
     this.els.task = wrap.createDiv({ cls: "flt-task" });
     this.els.time = wrap.createDiv({ cls: "flt-time" });
     // One row: − , a play/pause toggle (icon), + , and reset (rotate-ccw icon).
     const row = wrap.createDiv({ cls: "flt-row" });
+    this.els.row = row;
     this.els.minus = row.createEl("button", { cls: "flt-btn flt-step", text: "−" });
     this.els.primary = row.createEl("button", { cls: "flt-btn flt-primary" });
     this.els.plus = row.createEl("button", { cls: "flt-btn flt-step", text: "+" });
     this.els.reset = row.createEl("button", { cls: "flt-btn flt-icon" });
     setIcon(this.els.reset, "rotate-ccw");
     this.els.reset.setAttribute("aria-label", "reset");
+    // Setup before-rating — the "how enjoyable do I expect this to be" set before starting.
+    this.els.setupRate = wrap.createDiv({ cls: "flt-setrate" });
     this.els.picker = wrap.createDiv({ cls: "flt-picker" });
+    this.els.break = wrap.createDiv({ cls: "flt-break" }); // the rest phase of the loop
     this.els.flash = wrap.createDiv({ cls: "flt-flash" });
     this.els.celebrate = wrap.createDiv({ cls: "flt-celebrate" });
 
     this.els.minus.onclick = () => this.plugin.timer.step(-1);
     this.els.plus.onclick = () => this.plugin.timer.step(1);
-    this.els.primary.onclick = () => { const st = this.plugin.timer.getState(); if (st.running) this.plugin.timer.pause(); else this.plugin.timer.start(); };
+    // Start gates on a chosen task when fresh (the closed loop wants a task picked first);
+    // pause/resume behave as before once a pomodoro is active.
+    this.els.primary.onclick = () => {
+      const st = this.plugin.timer.getState();
+      if (st.running) { this.plugin.timer.pause(); return; }
+      // Fresh start wants a task chosen first — but only nag when there are tasks to pick.
+      if (!st.paused && !(st.taskName || "").trim() && (this.plugin.data.tasks || []).length) { this.flash("Pick a task first."); return; }
+      this.plugin.timer.start();
+    };
     this.els.reset.onclick = () => this.plugin.timer.reset();
 
     this.unsub = this.plugin.timer.subscribe(() => this.render());
@@ -1166,38 +1338,180 @@ class FloatTimerView extends ItemView {
     this.plugin.notifyFloatChange();
   }
 
+  // The closed loop has three screens: setup (pick task + rate, idle), focus (the
+  // countdown, running/paused/finished), and break (the rest timer + activities).
+  private phaseOf(s: TimerState): string {
+    if (s.breakActive) return "break";
+    if (!s.running && !s.paused && s.startedAt == null) return "setup";
+    return "focus";
+  }
+
   render() {
     const s = this.plugin.timer.getState();
-    const mm = String(Math.floor(s.secs / 60)).padStart(2, "0");
-    const ss = String(s.secs % 60).padStart(2, "0");
-    this.els.time.setText(mm + ":" + ss);
-    this.els.time.toggleClass("is-done", s.secs === 0);
-    this.els.task.setText(s.taskName || "Focus");
-    const wantIcon = s.running ? "pause" : "play";
-    if (this.lastIcon !== wantIcon) { setIcon(this.els.primary, wantIcon); this.lastIcon = wantIcon; }
-    this.els.primary.setAttribute("aria-label", s.running ? "pause" : (s.paused ? "resume" : "start"));
-    this.els.primary.toggleClass("is-running", s.running);
-    const locked = s.running || s.paused; // length is frozen while a pomodoro is active
-    this.els.minus.disabled = locked || s.lengthMin <= 5;
-    this.els.plus.disabled = locked || s.lengthMin >= 30;
+    const phase = this.phaseOf(s);
+    if (phase !== this.curPhase) { this.onPhaseChange(this.curPhase, phase); this.curPhase = phase; }
+    this.setPhaseVisibility(phase);
 
-    // Pause reason picker: grow the window and show the chips while paused.
-    if (s.paused !== this.pickerShown) {
-      this.pickerShown = s.paused;
-      this.resizeForPause(s.paused);
-      if (!s.paused && this.els.picker) { this.els.picker.empty(); this.pkey = ""; }
-    }
-    if (s.paused) {
-      const pkey = "P:" + s.pauseTag + ":" + ((this.plugin.data.pauseTags || []).length);
-      if (this.pkey !== pkey) { this.pkey = pkey; this.buildPicker(s.pauseTag); }
+    if (phase === "break") {
+      this.renderBreak(s);
+    } else {
+      // setup + focus share the countdown + the −/play/+ row.
+      const mm = String(Math.floor(s.secs / 60)).padStart(2, "0");
+      const ss = String(s.secs % 60).padStart(2, "0");
+      this.els.time.setText(mm + ":" + ss);
+      this.els.time.toggleClass("is-done", s.secs === 0);
+      this.els.task.setText(s.taskName || "Focus");
+      const wantIcon = s.running ? "pause" : "play";
+      if (this.lastIcon !== wantIcon) { setIcon(this.els.primary, wantIcon); this.lastIcon = wantIcon; }
+      this.els.primary.setAttribute("aria-label", s.running ? "pause" : (s.paused ? "resume" : "start"));
+      this.els.primary.toggleClass("is-running", s.running);
+      const locked = s.running || s.paused; // length is frozen while a pomodoro is active
+      this.els.minus.disabled = locked || s.lengthMin <= 5;
+      this.els.plus.disabled = locked || s.lengthMin >= 30;
+
+      if (phase === "setup") this.refreshSetup(s);
+
+      // Pause reason picker: grow the window and show the chips while paused.
+      if (s.paused !== this.pickerShown) {
+        this.pickerShown = s.paused;
+        this.resizeForPause(s.paused);
+        if (!s.paused && this.els.picker) { this.els.picker.empty(); this.pkey = ""; }
+      }
+      if (s.paused) {
+        const pkey = "P:" + s.pauseTag + ":" + ((this.plugin.data.pauseTags || []).length);
+        if (this.pkey !== pkey) { this.pkey = pkey; this.buildPicker(s.pauseTag); }
+      }
     }
 
-    // The celebration stays until tapped; clear it once a new pomodoro starts or resets.
-    if ((s.running || s.startedAt == null) && this.els.celebrate && this.els.celebrate.hasClass("show")) {
+    // The celebration stays until tapped; clear it once a new pomodoro starts, a break
+    // begins, or the timer resets.
+    if ((s.running || s.breakActive || s.startedAt == null) && this.els.celebrate && this.els.celebrate.hasClass("show")) {
       this.els.celebrate.removeClass("show");
       this.els.celebrate.empty();
       this.resizeForCelebrate(false);
     }
+  }
+
+  // Show only the controls for the active screen.
+  setPhaseVisibility(phase: string) {
+    const setup = phase === "setup";
+    const brk = phase === "break";
+    this.els.setupSel.style.display = setup ? "" : "none";
+    this.els.setupRate.style.display = setup ? "" : "none";
+    this.els.task.style.display = (!setup && !brk) ? "" : "none";
+    this.els.time.style.display = brk ? "none" : "";
+    this.els.row.style.display = brk ? "none" : "";
+    this.els.reset.style.display = setup ? "none" : "";
+    this.els.break.style.display = brk ? "" : "none";
+  }
+
+  // Switch the window between the small focus size and the larger break size, and
+  // (re)build the break DOM on entry.
+  onPhaseChange(prev: string, next: string) {
+    if (next === "break") { this.buildBreak(); this.applyBreakWindow(true); }
+    else if (prev === "break") { this.applyBreakWindow(false); this.els.break.empty(); this.els.brkTime = null; }
+  }
+
+  // ---------- setup screen (pick task + rate before starting) ----------
+  refreshSetup(s: TimerState) {
+    const tasks = this.plugin.data.tasks || [];
+    const skey = "S:" + tasks.map((t: any) => t.task).join("|") + "::" + (s.taskName || "");
+    if (this.skey !== skey) {
+      this.skey = skey;
+      const sel = this.els.setupSel as HTMLSelectElement;
+      sel.empty();
+      sel.createEl("option", { text: tasks.length ? "— pick a task —" : "— no tasks (sync first) —", value: "" });
+      tasks.forEach((t: any) => sel.createEl("option", { text: t.task, value: t.task }));
+      sel.value = s.taskName || "";
+    }
+    if (!this.els.setupRate.childElementCount) this.buildSetupRate();
+    (this.els.setupRateBtns || []).forEach((b: any, i: number) => b.toggleClass("is-on", i + 1 === s.expected));
+  }
+  buildSetupRate() {
+    const el = this.els.setupRate;
+    el.empty();
+    el.createDiv({ cls: "flt-setlabel", text: "how enjoyable do you expect this to be?" });
+    const r = el.createDiv({ cls: "flt-rate" });
+    this.els.setupRateBtns = [1, 2, 3, 4, 5].map((n) => {
+      const b = r.createEl("button", { cls: "flt-rbtn", text: String(n) });
+      b.onclick = () => this.plugin.timer.setExpected(n);
+      return b;
+    });
+  }
+
+  // ---------- break screen (rest timer + activities + feeling) ----------
+  buildBreak() {
+    const el = this.els.break;
+    el.empty();
+    const head = el.createDiv({ cls: "flt-brk-head" });
+    this.els.brkTime = head.createDiv({ cls: "flt-brktime" });
+    const ctrls = head.createDiv({ cls: "flt-brk-ctrls" });
+    this.els.brkMinus = ctrls.createEl("button", { cls: "flt-btn flt-step", text: "−" });
+    this.els.brkToggle = ctrls.createEl("button", { cls: "flt-btn flt-brk-toggle" });
+    this.els.brkPlus = ctrls.createEl("button", { cls: "flt-btn flt-step", text: "+" });
+    this.els.brkEnd = ctrls.createEl("button", { cls: "flt-btn flt-brk-end" });
+    this.els.brkMinus.onclick = () => this.plugin.timer.stepBreak(-1);
+    this.els.brkPlus.onclick = () => this.plugin.timer.stepBreak(1);
+    this.els.brkToggle.onclick = () => this.plugin.timer.toggleBreakRun();
+    this.els.brkEnd.onclick = () => this.plugin.timer.endBreak(); // ends + loops back to setup
+    this.els.brkLbl = el.createDiv({ cls: "flt-brk-lbl" });
+    this.els.brkActs = el.createDiv({ cls: "flt-brk-acts" });
+    const feel = el.createDiv({ cls: "flt-brk-feel" });
+    feel.createDiv({ cls: "flt-setlabel", text: "how do you feel now? (1 worse … 5 a lot better)" });
+    const fr = feel.createDiv({ cls: "flt-rate" });
+    this.els.brkFeelBtns = [1, 2, 3, 4, 5].map((n) => {
+      const b = fr.createEl("button", { cls: "flt-rbtn", text: String(n) });
+      b.onclick = () => this.plugin.timer.setBreakFeeling(n);
+      return b;
+    });
+    this.bkey = "";
+  }
+  renderBreak(s: TimerState) {
+    if (!this.els.brkTime) this.buildBreak();
+    const mm = String(Math.floor(s.breakSecs / 60)).padStart(2, "0");
+    const ss = String(s.breakSecs % 60).padStart(2, "0");
+    this.els.brkTime.setText(mm + ":" + ss);
+    this.els.brkTime.toggleClass("is-done", s.breakFinished);
+    this.els.brkToggle.setText(s.breakFinished ? "done" : (s.breakRunning ? "pause" : "start"));
+    this.els.brkToggle.disabled = s.breakFinished;
+    this.els.brkMinus.disabled = s.breakSecs <= 60;
+    this.els.brkPlus.disabled = s.breakSecs >= 30 * 60;
+    this.els.brkEnd.setText(s.breakFinished ? "next task →" : "end break");
+    const acts = this.plugin.data.activities || [];
+    const picked = s.breakPicked || [];
+    const bkey = "B:" + acts.map((a: any) => a.id).join("|") + "::" + picked.join(",");
+    if (this.bkey !== bkey) { this.bkey = bkey; this.buildBreakChips(acts, picked); }
+    this.els.brkLbl.setText("pick up to 3 for this break (" + picked.length + "/3):");
+    (this.els.brkFeelBtns || []).forEach((b: any, i: number) => b.toggleClass("is-on", i + 1 === s.breakFeeling));
+  }
+  buildBreakChips(acts: any[], picked: string[]) {
+    const el = this.els.brkActs;
+    el.empty();
+    if (!acts.length) { el.createDiv({ cls: "flt-brk-empty", text: "No activities yet — add some in the panel's Break tab." }); return; }
+    acts.forEach((a: any) => {
+      const on = picked.includes(a.id);
+      const chip = el.createEl("button", { cls: "flt-chip flt-brk-chip" + (on ? " is-on" : ""), text: (on ? "✓ " : "") + a.name });
+      chip.onclick = () => this.plugin.timer.toggleBreakPick(a.id);
+    });
+  }
+
+  // Save the focus geometry and grow to the remembered (or default 380×400) break size;
+  // on the way out, restore the focus geometry. The break has its own remembered bounds.
+  applyBreakWindow(toBreak: boolean) {
+    try {
+      const win = this.plugin.floatWin;
+      if (!win || !win.getBounds || !win.setBounds) return;
+      if (toBreak) {
+        const b = win.getBounds();
+        this.plugin.saveFloatBounds(b); // remember where the focus window was
+        const bb = this.plugin.data.settings.floatBreakBounds;
+        if (bb && bb.w && bb.h) win.setBounds({ x: Math.round(bb.x), y: Math.round(bb.y), width: Math.round(bb.w), height: Math.round(bb.h) });
+        else win.setBounds({ x: b.x, y: b.y, width: 380, height: 400 });
+      } else {
+        const fb = this.plugin.data.settings.floatBounds;
+        if (fb && fb.w && fb.h) win.setBounds({ x: Math.round(fb.x), y: Math.round(fb.y), width: Math.round(fb.w), height: Math.round(fb.h) });
+      }
+    } catch {}
   }
 
   // Grow the window downward to fit the pause picker, then restore the prior height —
@@ -1214,17 +1528,18 @@ class FloatTimerView extends ItemView {
 
   // Persist the window geometry shortly after the user stops moving/resizing it.
   // Skipped while paused or celebrating (the picker/celebration has grown the
-  // window — not the real size).
+  // window — not the real size). The break phase remembers its own larger bounds.
   maybeSaveBounds() {
     try {
       const win = this.plugin.floatWin;
       if (!win || !win.getBounds) return;
-      if (this.plugin.timer.getState().paused) return;
+      const st = this.plugin.timer.getState();
+      if (st.paused) return;
       if (this.celebrateBaseH) return;
       const b = win.getBounds();
       const key = b.x + "," + b.y + "," + b.width + "," + b.height;
       if (key !== this.boundsKey) { this.boundsKey = key; this.boundsDirty = true; return; }
-      if (this.boundsDirty) { this.boundsDirty = false; this.plugin.saveFloatBounds(b); }
+      if (this.boundsDirty) { this.boundsDirty = false; if (st.breakActive) this.plugin.saveFloatBreakBounds(b); else this.plugin.saveFloatBounds(b); }
     } catch {}
   }
 
@@ -1320,10 +1635,14 @@ class FloatTimerView extends ItemView {
     // be gone, and a throw here could leave a phantom leaf that blocks reopening.
     try { this.unsub?.(); } catch {}
     this.unsub = null;
-    // Capture the final geometry so it reopens here next time.
+    // Capture the final geometry so it reopens here next time (to the right bucket).
     try {
       const win = this.plugin.floatWin;
-      if (win && win.getBounds && !this.plugin.timer.getState().paused && !this.celebrateBaseH) this.plugin.saveFloatBounds(win.getBounds());
+      const st = this.plugin.timer.getState();
+      if (win && win.getBounds && !st.paused && !this.celebrateBaseH) {
+        if (st.breakActive) this.plugin.saveFloatBreakBounds(win.getBounds());
+        else this.plugin.saveFloatBounds(win.getBounds());
+      }
     } catch {}
     try {
       const w = this.fwin || window;
