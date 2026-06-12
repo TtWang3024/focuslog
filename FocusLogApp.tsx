@@ -631,10 +631,10 @@ export default function FocusLogApp({ api }: any) {
     setFrozenNames(next);
     api.patchSettings && api.patchSettings({ frozenTaskNames: next });
   };
-  // Display order: frozen first (in the sequence they were locked), then king, then the
-  // rest by urgency Must → Aim → Bonus. The sort is stable, so dragging still fine-tunes
-  // the order within each tier.
-  const tierOf = (t: any) => (frozenNames.includes(t.task) ? 0 : t.king ? 1 : t.power === "P" ? 2 : t.power === "G" ? 4 : 3);
+  // Display order: frozen first (in the sequence they were locked), then king, then
+  // everyone else in the user's own drag order. Urgency (Must → Aim → Bonus) is only the
+  // DEFAULT rank applied to newly arrived tasks at sync time — it never fights a drag.
+  const tierOf = (t: any) => (frozenNames.includes(t.task) ? 0 : t.king ? 1 : 2);
   const orderedTasks = tasks.map((t, i) => ({ t, i })).sort((a, b) => {
     const ta = tierOf(a.t), tb = tierOf(b.t);
     if (ta !== tb) return ta - tb;
@@ -1151,7 +1151,7 @@ export default function FocusLogApp({ api }: any) {
               </div>
             )}
             {tasks.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No tasks yet. Set your Notion token in settings, then press sync.</p>}
-            {tasks.length > 1 && <p style={{ color: C.muted, fontSize: 11, margin: "0 0 8px" }}>Pinned tasks stay on top, then {"\u{1F451}"} King, then Must {"→"} Aim {"→"} Bonus. Drag the grip to fine-tune within a tier; hover a row to pin it.</p>}
+            {tasks.length > 1 && <p style={{ color: C.muted, fontSize: 11, margin: "0 0 8px" }}>Pinned tasks stay on top, then {"\u{1F451}"} King. New tasks arrive ranked Must {"→"} Aim {"→"} Bonus; drag the grip to reorder freely. Hover a row to pin it.</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {orderedTasks.map((t, i) => {
                 const key = t.id || t.task;

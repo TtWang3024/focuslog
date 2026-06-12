@@ -812,10 +812,14 @@ export default class FocusLogPlugin extends Plugin {
       });
     }
     // Preserve the user's manual ranking across syncs: tasks whose id we have not seen
-    // go to the top (in Notion order); already-ranked ids keep their saved position.
+    // go to the top, ranked by urgency Must → Aim → Bonus as their default order;
+    // already-ranked ids keep their saved position.
     const prevIndex: Record<string, number> = {};
     (this.data.tasks || []).forEach((t: any, i: number) => { if (t && t.id != null) prevIndex[t.id] = i; });
-    const fresh = tasks.filter((t) => prevIndex[t.id] === undefined);
+    const POWER_RANK: Record<string, number> = { P: 0, Y: 1, G: 2 };
+    const fresh = tasks
+      .filter((t) => prevIndex[t.id] === undefined)
+      .sort((a, b) => (POWER_RANK[a.power] ?? 1) - (POWER_RANK[b.power] ?? 1));
     const known = tasks
       .filter((t) => prevIndex[t.id] !== undefined)
       .sort((a, b) => prevIndex[a.id] - prevIndex[b.id]);

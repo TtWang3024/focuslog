@@ -24003,7 +24003,7 @@ function FocusLogApp({ api }) {
     setFrozenNames(next);
     api.patchSettings && api.patchSettings({ frozenTaskNames: next });
   };
-  const tierOf = (t) => frozenNames.includes(t.task) ? 0 : t.king ? 1 : t.power === "P" ? 2 : t.power === "G" ? 4 : 3;
+  const tierOf = (t) => frozenNames.includes(t.task) ? 0 : t.king ? 1 : 2;
   const orderedTasks = tasks.map((t, i) => ({ t, i })).sort((a, b) => {
     const ta = tierOf(a.t), tb = tierOf(b.t);
     if (ta !== tb)
@@ -24582,7 +24582,7 @@ ${s.task}`))
   ) : /* @__PURE__ */ React.createElement("button", { onClick: () => setEditingGoal(true), title: "click to set today's goal", style: { width: 32, height: 32, border: `1.5px solid ${C.faint}`, background: "transparent", color: C.ink, fontFamily: "var(--fl-mono)", fontSize: 16, fontWeight: 700, cursor: "pointer", borderRadius: 6, padding: 0, boxSizing: "border-box" } }, goal), "\u{1F345}", " today"), /* @__PURE__ */ React.createElement("button", { onClick: doSync, style: btn(C.ink, true), disabled: sync === "loading" }, sync === "loading" ? "syncing\u2026" : "sync from Notion")), fallingEnjoyment && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 200 } }, "Enjoyment is dipping over your last few pomodoros \\u2014 consider an extra break."), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     startBreak();
     setView("break");
-  }, style: { ...btn(C.ink, true), padding: "3px 10px" } }, "take a break")), tasks.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), tasks.length > 1 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, margin: "0 0 8px" } }, "Pinned tasks stay on top, then ", "\u{1F451}", " King, then Must ", "\u2192", " Aim ", "\u2192", " Bonus. Drag the grip to fine-tune within a tier; hover a row to pin it."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, orderedTasks.map((t, i) => {
+  }, style: { ...btn(C.ink, true), padding: "3px 10px" } }, "take a break")), tasks.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), tasks.length > 1 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, margin: "0 0 8px" } }, "Pinned tasks stay on top, then ", "\u{1F451}", " King. New tasks arrive ranked Must ", "\u2192", " Aim ", "\u2192", " Bonus; drag the grip to reorder freely. Hover a row to pin it."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, orderedTasks.map((t, i) => {
     const key = t.id || t.task;
     const done = doneSess[key] || 0;
     const est = t.pomodoros || 0;
@@ -25568,7 +25568,11 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       if (t && t.id != null)
         prevIndex[t.id] = i;
     });
-    const fresh = tasks.filter((t) => prevIndex[t.id] === void 0);
+    const POWER_RANK = { P: 0, Y: 1, G: 2 };
+    const fresh = tasks.filter((t) => prevIndex[t.id] === void 0).sort((a, b) => {
+      var _a, _b;
+      return ((_a = POWER_RANK[a.power]) != null ? _a : 1) - ((_b = POWER_RANK[b.power]) != null ? _b : 1);
+    });
     const known = tasks.filter((t) => prevIndex[t.id] !== void 0).sort((a, b) => prevIndex[a.id] - prevIndex[b.id]);
     const ordered = [...fresh, ...known];
     this.data.tasks = ordered;
