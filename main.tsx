@@ -304,6 +304,9 @@ class TimerEngine {
   // The panel's "before" rating; kept on the engine so a quick-log from the float window
   // (which never shows a before-section) still records the expectation the user set.
   setExpected(n: number) { this.expected = Math.max(1, Math.min(5, Math.round(n) || 3)); }
+  // Pre-select the task for the next pomodoro (e.g. chosen on the float celebration)
+  // without starting the timer; both windows show it as the upcoming task.
+  setTask(name: string) { this.taskName = (name || "").trim(); this.emit(); }
   // Write the pending pause (its event + daily-note block) if one is open, then clear
   // it. Called when resuming, and when logging a pomodoro mid-pause.
   commitPendingPause() {
@@ -502,9 +505,10 @@ export default class FocusLogPlugin extends Plugin {
 
   // Log the just-finished pomodoro straight from the floating window: build the session
   // from the engine's task + the matching task meta, record the rating, write Act and the
-  // daily note (best-effort), then clear the timer. Mirrors the panel's logPomodoro so an
-  // open panel stays in sync via notifySessionsChange().
-  async quickLog(actual: number) {
+  // daily note (best-effort), then clear the timer. Optionally mark the task Done in
+  // Notion and pre-select the next task. Mirrors the panel's logPomodoro so an open
+  // panel stays in sync via notifySessionsChange().
+  async quickLog(actual: number, markDone = false, nextTask = "") {
     const st = this.timer.getState();
     const taskName = (st.taskName || "").trim();
     if (!taskName) return;
@@ -520,13 +524,26 @@ export default class FocusLogPlugin extends Plugin {
     await this.persist();
     this.timer.commitPendingPause();
     this.timer.reset();
+    // The chosen next task rides on the engine: the float shows it as the upcoming task
+    // and the panel picks it up as its preset.
+    if (nextTask) this.timer.setTask(nextTask);
     this.notifySessionsChange();
+    let msg = "Logged “" + taskName + "” — felt " + s.actual + "/5.";
     if (s.pageId) {
       try { await this.incrementAct(s.pageId); }
-      catch (e) { this.data.pending = [...(this.data.pending || []), { sessionId: s.id, pageId: s.pageId, task: s.task }]; await this.persist(); }
+      catch (e) { this.data.pending = [...(this.data.pending || []), { sessionId: s.id, pageId: s.pageId, task: s.task }]; await this.persist(); msg += " Act write queued."; }
+    }
+    if (markDone && s.pageId) {
+      try {
+        const name = await this.setTaskDone(s.pageId);
+        this.data.tasks = (this.data.tasks || []).filter((t: any) => t.id !== s.pageId);
+        await this.persist();
+        this.notifySessionsChange(); // tasks changed too; the panel re-reads both
+        msg += " Status set to " + name + ".";
+      } catch (e: any) { msg += " Mark-done failed: " + (e?.message || e); }
     }
     try { await this.appendToDailyNote({ ts: +new Date(s.ts), minutes: s.minutes, task: s.task, hierarchy: s.hierarchy || "", note: "", category: s.category || null }); } catch (e) {}
-    new Notice("Logged “" + taskName + "” — felt " + s.actual + "/5.", 4000);
+    new Notice(msg, 5000);
   }
 
   // ---------- bring the user into the log view (from the float celebration) ----------
@@ -1022,7 +1039,7 @@ export default class FocusLogPlugin extends Plugin {
         setExpected: (n: number) => self.timer.setExpected(n),
         commitPendingPause: () => self.timer.commitPendingPause(),
       },
-      quickLog: (actual: number) => self.quickLog(actual),
+      quickLog: (actual: number, markDone?: boolean, nextTask?: string) => self.quickLog(actual, markDone, nextTask),
       getPauses: () => self.getPauses(),
       onPausesChange: (fn: () => void) => self.onPausesChange(fn),
       onSessionsChange: (fn: () => void) => self.onSessionsChange(fn),
@@ -1095,6 +1112,7 @@ class FloatTimerView extends ItemView {
   private boundsKey = "";      // last seen window geometry (to detect user move/resize)
   private boundsDirty = false; // geometry changed; save once it settles
   private pauseBaseH = 0;      // window height before the pause picker grew it
+  private celebrateBaseH = 0;  // window height before the celebration grew it
   private fwin: any = null; // this popout's own window object (its timers aren't throttled while it's visible)
   constructor(leaf: WorkspaceLeaf, plugin: FocusLogPlugin) {
     super(leaf);
@@ -1172,6 +1190,7 @@ class FloatTimerView extends ItemView {
     if ((s.running || s.startedAt == null) && this.els.celebrate && this.els.celebrate.hasClass("show")) {
       this.els.celebrate.removeClass("show");
       this.els.celebrate.empty();
+      this.resizeForCelebrate(false);
     }
   }
 
@@ -1188,12 +1207,14 @@ class FloatTimerView extends ItemView {
   }
 
   // Persist the window geometry shortly after the user stops moving/resizing it.
-  // Skipped while paused (the picker has grown the window — not the real size).
+  // Skipped while paused or celebrating (the picker/celebration has grown the
+  // window — not the real size).
   maybeSaveBounds() {
     try {
       const win = this.plugin.floatWin;
       if (!win || !win.getBounds) return;
       if (this.plugin.timer.getState().paused) return;
+      if (this.celebrateBaseH) return;
       const b = win.getBounds();
       const key = b.x + "," + b.y + "," + b.width + "," + b.height;
       if (key !== this.boundsKey) { this.boundsKey = key; this.boundsDirty = true; return; }
@@ -1228,23 +1249,51 @@ class FloatTimerView extends ItemView {
     this.flashT = w.setTimeout(() => this.els.flash && this.els.flash.removeClass("show"), 5000);
   }
 
+  // Grow the window downward while the celebration (rating + done + next-task) is up,
+  // restoring the prior height afterwards — same approach as resizeForPause.
+  resizeForCelebrate(open: boolean) {
+    try {
+      const win = this.plugin.floatWin;
+      if (!win || !win.getSize) return;
+      const [w, h] = win.getSize();
+      if (open && !this.celebrateBaseH) { this.celebrateBaseH = h; win.setSize(w, h + 120, false); }
+      else if (!open && this.celebrateBaseH) { win.setSize(w, this.celebrateBaseH, false); this.celebrateBaseH = 0; }
+    } catch {}
+  }
+
   celebrate() {
     const el = this.els.celebrate;
     if (!el) return;
     el.empty();
     el.addClass("show");
+    this.resizeForCelebrate(true);
+    const dismiss = () => { el.removeClass("show"); el.empty(); el.onclick = null; this.resizeForCelebrate(false); };
     el.createDiv({ cls: "flt-pop", text: "\u{1F389}" });
     el.createDiv({ cls: "flt-clabel", text: "complete" });
+    // Decisions first (Done? next task?), then the rating — tapping a number is the final
+    // act: it logs straight from here with whatever was chosen above.
+    let done = false;
+    const opts = el.createDiv({ cls: "flt-copts" });
+    const doneChip = opts.createEl("button", { cls: "flt-chip flt-done", text: "set task to Done" });
+    doneChip.onclick = (ev: any) => {
+      if (ev && ev.stopPropagation) ev.stopPropagation();
+      done = !done;
+      doneChip.toggleClass("is-on", done);
+      doneChip.setText((done ? "✓ " : "") + "set task to Done");
+    };
+    const sel = opts.createEl("select", { cls: "flt-next" }) as HTMLSelectElement;
+    sel.createEl("option", { text: "— next task: decide later —", value: "" });
+    (this.plugin.data.tasks || []).forEach((t: any) => { sel.createEl("option", { text: t.task, value: t.task }); });
+    sel.onclick = (ev: any) => { if (ev && ev.stopPropagation) ev.stopPropagation(); };
     el.createDiv({ cls: "flt-cask", text: "how enjoyable was it?" });
-    // 1-5 quick rating: tapping a number logs the pomodoro straight from here (no need to
-    // switch to Obsidian), recording the rating + writing Act and the daily note.
     const rate = el.createDiv({ cls: "flt-rate" });
     [1, 2, 3, 4, 5].forEach((n) => {
       const b = rate.createEl("button", { cls: "flt-rbtn", text: String(n) });
       b.onclick = (ev: any) => {
         if (ev && ev.stopPropagation) ev.stopPropagation();
-        el.removeClass("show"); el.empty(); el.onclick = null;
-        this.plugin.quickLog(n);
+        const nextTask = sel.value || "";
+        dismiss();
+        this.plugin.quickLog(n, done, nextTask);
         this.flash("Logged " + n + "/5 ✓");
       };
     });
@@ -1256,8 +1305,8 @@ class FloatTimerView extends ItemView {
       piece.style.background = colors[i % colors.length];
       piece.style.animationDelay = (Math.random() * 0.4).toFixed(2) + "s";
     }
-    // Tapping the background (not a rating) brings Obsidian to the front and opens the log view.
-    el.onclick = () => { el.removeClass("show"); el.empty(); el.onclick = null; this.plugin.focusAndLog(); };
+    // Tapping the background (not a control) brings Obsidian to the front and opens the log view.
+    el.onclick = () => { dismiss(); this.plugin.focusAndLog(); };
   }
 
   async onClose() {
@@ -1268,7 +1317,7 @@ class FloatTimerView extends ItemView {
     // Capture the final geometry so it reopens here next time.
     try {
       const win = this.plugin.floatWin;
-      if (win && win.getBounds && !this.plugin.timer.getState().paused) this.plugin.saveFloatBounds(win.getBounds());
+      if (win && win.getBounds && !this.plugin.timer.getState().paused && !this.celebrateBaseH) this.plugin.saveFloatBounds(win.getBounds());
     } catch {}
     try {
       const w = this.fwin || window;

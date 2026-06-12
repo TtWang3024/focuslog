@@ -498,17 +498,12 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
       </select>
 
       {finished ? (
-        /* ---------- AFTER the pomodoro: rate how it actually went, then (auto-)log ---------- */
+        /* ---------- AFTER the pomodoro: decide Done + next task first; the rating is the
+             final tap — with auto-log on, it logs the moment you pick it. ---------- */
         <div style={{ marginTop: 4, padding: 14, borderRadius: 8, background: C.paper, border: `1px solid ${C.better}` }}>
           <p style={{ margin: "0 0 10px", fontSize: 15, fontFamily: "var(--fl-display)", color: C.ink }}>{"\u{1F389}"} Pomodoro done — how did it go?</p>
-          <Scale label="after: how enjoyable was it actually? (1 dull ... 5 great)" value={act} onChange={rateActual} color={settings.endColor} />
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
-          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
-            <input type="checkbox" checked={autoLog} onChange={(e) => toggleAuto(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.better, cursor: "pointer" }} />
-            log to Obsidian automatically when I pick a rating
-          </label>
           {markDoneLabel}
-          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: chooseNext ? 8 : 4, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: chooseNext ? 8 : 14, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
             <input type="checkbox" checked={chooseNext} onChange={(e) => setChooseNext(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.ink, cursor: "pointer" }} />
             pick the next task now (the log reopens to it after the break)
           </label>
@@ -518,8 +513,14 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
               {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
             </select>
           )}
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
+          <Scale label="after: how enjoyable was it actually? (1 dull ... 5 great)" value={act} onChange={rateActual} color={settings.endColor} />
+          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
+            <input type="checkbox" checked={autoLog} onChange={(e) => toggleAuto(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.better, cursor: "pointer" }} />
+            log to Obsidian automatically when I pick a rating
+          </label>
           {autoLog
-            ? <p style={{ fontSize: 12, color: C.muted, margin: "4px 0 0" }}>Pick a rating above and it logs straight to Obsidian — no button needed.</p>
+            ? <p style={{ fontSize: 12, color: C.muted, margin: "4px 0 0" }}>Set the options above first — picking a rating logs straight to Obsidian, no button needed.</p>
             : logBtn}
         </div>
       ) : (
@@ -799,10 +800,19 @@ export default function FocusLogApp({ api }: any) {
     if (!api.onRequestLogView) return;
     return api.onRequestLogView(() => setView("log"));
   }, []);
-  // A float quick-log adds a session outside React; re-read the list so counts/charts update.
+  // A float quick-log adds a session (and may mark a task Done or choose the next task)
+  // outside React; re-read everything it can touch, and adopt its next-task pick as the
+  // log form's preset (the quick-log parks it on the engine's taskName).
   useEffect(() => {
     if (!api.onSessionsChange) return;
-    return api.onSessionsChange(() => setSessions([...(api.getSessions ? api.getSessions() : [])]));
+    return api.onSessionsChange(() => {
+      const fresh = api.getInitial();
+      setSessions([...(fresh.sessions || [])]);
+      setTasks([...(fresh.tasks || [])]);
+      setPending([...(fresh.pending || [])]);
+      const tn = api.timer ? (api.timer.getState().taskName || "") : "";
+      if (tn) setPreset(tn);
+    });
   }, []);
   // When a pomodoro completes, pull the panel to the log tab so its "how did it go?" rating
   // is right there to fill in.

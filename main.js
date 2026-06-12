@@ -23950,8 +23950,9 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
     const on = pauseTag === pt.name;
     return /* @__PURE__ */ React.createElement("button", { key: pt.id, onClick: () => setPauseTag(on ? "" : pt.name), style: { padding: "5px 11px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${catBorder(pt.category)}`, background: catColor(pt.category), color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", maxWidth: "100%", height: "auto", minHeight: 0, lineHeight: 1.35 } }, on ? "\u2713 " : "", pt.name);
   }))), /* @__PURE__ */ React.createElement("label", { style: { color: C.muted, fontSize: 12 } }, "task (Act +1 writes to this page)"), /* @__PURE__ */ React.createElement("select", { value: task, onChange: (e) => setTask(e.target.value), style: { ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 } }, tasks.map((t) => /* @__PURE__ */ React.createElement("option", { key: t.task, value: t.task }, t.task, t.king ? " \u{1F451}" : ""))), finished ? (
-    /* ---------- AFTER the pomodoro: rate how it actually went, then (auto-)log ---------- */
-    /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4, padding: 14, borderRadius: 8, background: C.paper, border: `1px solid ${C.better}` } }, /* @__PURE__ */ React.createElement("p", { style: { margin: "0 0 10px", fontSize: 15, fontFamily: "var(--fl-display)", color: C.ink } }, "\u{1F389}", " Pomodoro done \u2014 how did it go?"), /* @__PURE__ */ React.createElement(Scale, { label: "after: how enjoyable was it actually? (1 dull ... 5 great)", value: act, onChange: rateActual, color: settings.endColor }), /* @__PURE__ */ React.createElement("input", { value: note, onChange: (e) => setNote(e.target.value), placeholder: "quick note (optional)", style: { ...inputStyle, marginBottom: 14, marginTop: 4 } }), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12.5, color: C.ink, cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: autoLog, onChange: (e) => toggleAuto(e.target.checked), style: { width: 15, height: 15, accentColor: C.better, cursor: "pointer" } }), "log to Obsidian automatically when I pick a rating"), markDoneLabel, /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: chooseNext ? 8 : 4, fontSize: 12.5, color: C.ink, cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: chooseNext, onChange: (e) => setChooseNext(e.target.checked), style: { width: 15, height: 15, accentColor: C.ink, cursor: "pointer" } }), "pick the next task now (the log reopens to it after the break)"), chooseNext && /* @__PURE__ */ React.createElement("select", { value: nextTask, onChange: (e) => setNextTask(e.target.value), style: { ...inputStyle, marginBottom: 14, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 next pomodoro: decide later \u2014"), tasks.map((t) => /* @__PURE__ */ React.createElement("option", { key: t.task, value: t.task }, t.task, t.king ? " \u{1F451}" : ""))), autoLog ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 12, color: C.muted, margin: "4px 0 0" } }, "Pick a rating above and it logs straight to Obsidian \u2014 no button needed.") : logBtn)
+    /* ---------- AFTER the pomodoro: decide Done + next task first; the rating is the
+         final tap — with auto-log on, it logs the moment you pick it. ---------- */
+    /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4, padding: 14, borderRadius: 8, background: C.paper, border: `1px solid ${C.better}` } }, /* @__PURE__ */ React.createElement("p", { style: { margin: "0 0 10px", fontSize: 15, fontFamily: "var(--fl-display)", color: C.ink } }, "\u{1F389}", " Pomodoro done \u2014 how did it go?"), markDoneLabel, /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: chooseNext ? 8 : 14, fontSize: 12.5, color: C.ink, cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: chooseNext, onChange: (e) => setChooseNext(e.target.checked), style: { width: 15, height: 15, accentColor: C.ink, cursor: "pointer" } }), "pick the next task now (the log reopens to it after the break)"), chooseNext && /* @__PURE__ */ React.createElement("select", { value: nextTask, onChange: (e) => setNextTask(e.target.value), style: { ...inputStyle, marginBottom: 14, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 next pomodoro: decide later \u2014"), tasks.map((t) => /* @__PURE__ */ React.createElement("option", { key: t.task, value: t.task }, t.task, t.king ? " \u{1F451}" : ""))), /* @__PURE__ */ React.createElement("input", { value: note, onChange: (e) => setNote(e.target.value), placeholder: "quick note (optional)", style: { ...inputStyle, marginBottom: 14, marginTop: 4 } }), /* @__PURE__ */ React.createElement(Scale, { label: "after: how enjoyable was it actually? (1 dull ... 5 great)", value: act, onChange: rateActual, color: settings.endColor }), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12.5, color: C.ink, cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: autoLog, onChange: (e) => toggleAuto(e.target.checked), style: { width: 15, height: 15, accentColor: C.better, cursor: "pointer" } }), "log to Obsidian automatically when I pick a rating"), autoLog ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 12, color: C.muted, margin: "4px 0 0" } }, "Set the options above first \u2014 picking a rating logs straight to Obsidian, no button needed.") : logBtn)
   ) : (
     /* ---------- BEFORE the pomodoro: set the expectation, then start the timer ---------- */
     /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(Scale, { label: "before: how enjoyable do I expect this to be? (1 dull ... 5 great)", value: exp, onChange: setExpected, color: settings.beginColor }), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 12, color: C.muted, margin: "0 0 12px" } }, "Start the timer; when it finishes you'll be asked to rate how it actually went."), /* @__PURE__ */ React.createElement("button", { onClick: () => setShowManual((s) => !s), style: { ...btn(C.muted, true), fontSize: 12.5, padding: "6px 10px" } }, showManual ? "\u2212 hide manual log" : "+ log a pomodoro manually"), showManual && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement(Scale, { label: "after: how enjoyable was it actually? (1 dull ... 5 great)", value: act, onChange: setAct, color: settings.endColor }), /* @__PURE__ */ React.createElement("input", { value: note, onChange: (e) => setNote(e.target.value), placeholder: "quick note (optional)", style: { ...inputStyle, marginBottom: 14, marginTop: 4 } }), markDoneLabel, logBtn))
@@ -24243,7 +24244,15 @@ function FocusLogApp({ api }) {
   useEffect(() => {
     if (!api.onSessionsChange)
       return;
-    return api.onSessionsChange(() => setSessions([...api.getSessions ? api.getSessions() : []]));
+    return api.onSessionsChange(() => {
+      const fresh = api.getInitial();
+      setSessions([...fresh.sessions || []]);
+      setTasks([...fresh.tasks || []]);
+      setPending([...fresh.pending || []]);
+      const tn = api.timer ? api.timer.getState().taskName || "" : "";
+      if (tn)
+        setPreset(tn);
+    });
   }, []);
   useEffect(() => {
     if (finished)
@@ -24892,6 +24901,12 @@ var TimerEngine = class {
   setExpected(n) {
     this.expected = Math.max(1, Math.min(5, Math.round(n) || 3));
   }
+  // Pre-select the task for the next pomodoro (e.g. chosen on the float celebration)
+  // without starting the timer; both windows show it as the upcoming task.
+  setTask(name) {
+    this.taskName = (name || "").trim();
+    this.emit();
+  }
   // Write the pending pause (its event + daily-note block) if one is open, then clear
   // it. Called when resuming, and when logging a pomodoro mid-pause.
   commitPendingPause() {
@@ -25137,9 +25152,10 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
   }
   // Log the just-finished pomodoro straight from the floating window: build the session
   // from the engine's task + the matching task meta, record the rating, write Act and the
-  // daily note (best-effort), then clear the timer. Mirrors the panel's logPomodoro so an
-  // open panel stays in sync via notifySessionsChange().
-  async quickLog(actual) {
+  // daily note (best-effort), then clear the timer. Optionally mark the task Done in
+  // Notion and pre-select the next task. Mirrors the panel's logPomodoro so an open
+  // panel stays in sync via notifySessionsChange().
+  async quickLog(actual, markDone = false, nextTask = "") {
     const st = this.timer.getState();
     const taskName = (st.taskName || "").trim();
     if (!taskName)
@@ -25166,20 +25182,35 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     await this.persist();
     this.timer.commitPendingPause();
     this.timer.reset();
+    if (nextTask)
+      this.timer.setTask(nextTask);
     this.notifySessionsChange();
+    let msg = "Logged \u201C" + taskName + "\u201D \u2014 felt " + s.actual + "/5.";
     if (s.pageId) {
       try {
         await this.incrementAct(s.pageId);
       } catch (e) {
         this.data.pending = [...this.data.pending || [], { sessionId: s.id, pageId: s.pageId, task: s.task }];
         await this.persist();
+        msg += " Act write queued.";
+      }
+    }
+    if (markDone && s.pageId) {
+      try {
+        const name = await this.setTaskDone(s.pageId);
+        this.data.tasks = (this.data.tasks || []).filter((t) => t.id !== s.pageId);
+        await this.persist();
+        this.notifySessionsChange();
+        msg += " Status set to " + name + ".";
+      } catch (e) {
+        msg += " Mark-done failed: " + ((e == null ? void 0 : e.message) || e);
       }
     }
     try {
       await this.appendToDailyNote({ ts: +new Date(s.ts), minutes: s.minutes, task: s.task, hierarchy: s.hierarchy || "", note: "", category: s.category || null });
     } catch (e) {
     }
-    new import_obsidian.Notice("Logged \u201C" + taskName + "\u201D \u2014 felt " + s.actual + "/5.", 4e3);
+    new import_obsidian.Notice(msg, 5e3);
   }
   // ---------- bring the user into the log view (from the float celebration) ----------
   onRequestLogView(fn) {
@@ -25736,7 +25767,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         setExpected: (n) => self.timer.setExpected(n),
         commitPendingPause: () => self.timer.commitPendingPause()
       },
-      quickLog: (actual) => self.quickLog(actual),
+      quickLog: (actual, markDone, nextTask) => self.quickLog(actual, markDone, nextTask),
       getPauses: () => self.getPauses(),
       onPausesChange: (fn) => self.onPausesChange(fn),
       onSessionsChange: (fn) => self.onSessionsChange(fn),
@@ -25817,6 +25848,8 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     // geometry changed; save once it settles
     this.pauseBaseH = 0;
     // window height before the pause picker grew it
+    this.celebrateBaseH = 0;
+    // window height before the celebration grew it
     this.fwin = null;
     this.plugin = plugin;
   }
@@ -25905,6 +25938,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     if ((s.running || s.startedAt == null) && this.els.celebrate && this.els.celebrate.hasClass("show")) {
       this.els.celebrate.removeClass("show");
       this.els.celebrate.empty();
+      this.resizeForCelebrate(false);
     }
   }
   // Grow the window downward to fit the pause picker, then restore the prior height —
@@ -25926,13 +25960,16 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     }
   }
   // Persist the window geometry shortly after the user stops moving/resizing it.
-  // Skipped while paused (the picker has grown the window — not the real size).
+  // Skipped while paused or celebrating (the picker/celebration has grown the
+  // window — not the real size).
   maybeSaveBounds() {
     try {
       const win = this.plugin.floatWin;
       if (!win || !win.getBounds)
         return;
       if (this.plugin.timer.getState().paused)
+        return;
+      if (this.celebrateBaseH)
         return;
       const b = win.getBounds();
       const key = b.x + "," + b.y + "," + b.width + "," + b.height;
@@ -25978,14 +26015,58 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     w.clearTimeout(this.flashT);
     this.flashT = w.setTimeout(() => this.els.flash && this.els.flash.removeClass("show"), 5e3);
   }
+  // Grow the window downward while the celebration (rating + done + next-task) is up,
+  // restoring the prior height afterwards — same approach as resizeForPause.
+  resizeForCelebrate(open) {
+    try {
+      const win = this.plugin.floatWin;
+      if (!win || !win.getSize)
+        return;
+      const [w, h] = win.getSize();
+      if (open && !this.celebrateBaseH) {
+        this.celebrateBaseH = h;
+        win.setSize(w, h + 120, false);
+      } else if (!open && this.celebrateBaseH) {
+        win.setSize(w, this.celebrateBaseH, false);
+        this.celebrateBaseH = 0;
+      }
+    } catch (e) {
+    }
+  }
   celebrate() {
     const el = this.els.celebrate;
     if (!el)
       return;
     el.empty();
     el.addClass("show");
+    this.resizeForCelebrate(true);
+    const dismiss = () => {
+      el.removeClass("show");
+      el.empty();
+      el.onclick = null;
+      this.resizeForCelebrate(false);
+    };
     el.createDiv({ cls: "flt-pop", text: "\u{1F389}" });
     el.createDiv({ cls: "flt-clabel", text: "complete" });
+    let done = false;
+    const opts = el.createDiv({ cls: "flt-copts" });
+    const doneChip = opts.createEl("button", { cls: "flt-chip flt-done", text: "set task to Done" });
+    doneChip.onclick = (ev) => {
+      if (ev && ev.stopPropagation)
+        ev.stopPropagation();
+      done = !done;
+      doneChip.toggleClass("is-on", done);
+      doneChip.setText((done ? "\u2713 " : "") + "set task to Done");
+    };
+    const sel = opts.createEl("select", { cls: "flt-next" });
+    sel.createEl("option", { text: "\u2014 next task: decide later \u2014", value: "" });
+    (this.plugin.data.tasks || []).forEach((t) => {
+      sel.createEl("option", { text: t.task, value: t.task });
+    });
+    sel.onclick = (ev) => {
+      if (ev && ev.stopPropagation)
+        ev.stopPropagation();
+    };
     el.createDiv({ cls: "flt-cask", text: "how enjoyable was it?" });
     const rate = el.createDiv({ cls: "flt-rate" });
     [1, 2, 3, 4, 5].forEach((n) => {
@@ -25993,10 +26074,9 @@ var FloatTimerView = class extends import_obsidian.ItemView {
       b.onclick = (ev) => {
         if (ev && ev.stopPropagation)
           ev.stopPropagation();
-        el.removeClass("show");
-        el.empty();
-        el.onclick = null;
-        this.plugin.quickLog(n);
+        const nextTask = sel.value || "";
+        dismiss();
+        this.plugin.quickLog(n, done, nextTask);
         this.flash("Logged " + n + "/5 \u2713");
       };
     });
@@ -26009,9 +26089,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
       piece.style.animationDelay = (Math.random() * 0.4).toFixed(2) + "s";
     }
     el.onclick = () => {
-      el.removeClass("show");
-      el.empty();
-      el.onclick = null;
+      dismiss();
       this.plugin.focusAndLog();
     };
   }
@@ -26024,7 +26102,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     this.unsub = null;
     try {
       const win = this.plugin.floatWin;
-      if (win && win.getBounds && !this.plugin.timer.getState().paused)
+      if (win && win.getBounds && !this.plugin.timer.getState().paused && !this.celebrateBaseH)
         this.plugin.saveFloatBounds(win.getBounds());
     } catch (e) {
     }

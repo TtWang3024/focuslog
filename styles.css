@@ -178,6 +178,13 @@ body.focuslog-float-window .notice { display: none !important; }
   font-size: 14px; cursor: pointer; padding: 0;
 }
 .focuslog-float .flt-celebrate .flt-rbtn:hover { background: #5b8c5a; border-color: #5b8c5a; color: #fff; }
+.focuslog-float .flt-celebrate .flt-copts { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 8px; z-index: 1; width: 88%; }
+.focuslog-float .flt-celebrate .flt-done { font-size: 11px; padding: 4px 10px; opacity: 0.6; }
+.focuslog-float .flt-celebrate .flt-done.is-on { opacity: 1; font-weight: 700; border-color: #5b8c5a; background: #e7efe4; }
+.focuslog-float .flt-celebrate .flt-next {
+  width: 100%; font-size: 11px; border: 1px solid #cfc7b8; border-radius: 6px;
+  background: #fffefc; color: #2b2723; padding: 4px 6px;
+}
 
 /* Celebration modal */
 .focuslog-celebrate { text-align: center; position: relative; overflow: hidden; }
