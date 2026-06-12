@@ -413,12 +413,14 @@ function AutoTextarea({ value, onChange, placeholder, style }: any) {
   return <textarea ref={ref} value={value} onChange={onChange} placeholder={placeholder} rows={1} style={style} />;
 }
 
-function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked }: any) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, onSetExpected, autoLogDefault, onAutoLogChange }: any) {
   const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
   const [exp, setExp] = useState(3);
   const [act, setAct] = useState(3);
   const [note, setNote] = useState("");
   const [markDone, setMarkDone] = useState(false);
+  const [autoLog, setAutoLog] = useState(autoLogDefault !== false);
+  const [showManual, setShowManual] = useState(false);
   // Press-and-hold the −/+ length buttons to repeat, accelerating the longer you hold.
   const holdRef = useRef<any>(null);
   const beginHold = (delta: number) => {
@@ -435,18 +437,32 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   const mm = String(Math.floor(secs / 60)).padStart(2, "0");
   const ss = String(secs % 60).padStart(2, "0");
   const meta: any = tasks.find((t: any) => t.task === task) || {};
-  const submit = () => {
+  // Build and log the session with explicit ratings (so a tap-to-log doesn't race React state).
+  const buildAndAdd = (actualVal: number, expectedVal: number) => {
     if (!task.trim()) return;
     // Minutes actually worked, from the countdown's progress (pauses freeze it, so
     // elapsed = work time): stopping a 25-min pomodoro with 10:00 left logs 15 min.
     // An untouched timer (a manual log) still records the full length.
     const workedSecs = pomoMin * 60 - secs;
     const workedMin = workedSecs > 0 ? Math.max(1, Math.round(workedSecs / 60)) : pomoMin;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: exp, actual: act, note: note.trim(), minutes: workedMin }, markDone);
+    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: expectedVal, actual: actualVal, note: note.trim(), minutes: workedMin }, markDone);
     setNote("");
     setMarkDone(false);
   };
+  const submit = () => buildAndAdd(act, exp);
+  // The "before" rating also rides on the timer engine, so a float quick-log carries it.
+  const setExpected = (v: number) => { setExp(v); onSetExpected && onSetExpected(v); };
+  // The "after" rating: with auto-log on, picking a number logs immediately — no button press.
+  const rateActual = (v: number) => { setAct(v); if (autoLog) buildAndAdd(v, exp); };
+  const toggleAuto = (v: boolean) => { setAutoLog(v); onAutoLogChange && onAutoLogChange(v); };
   const inputStyle: any = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
+  const logBtn = <button onClick={submit} style={{ ...btn(C.ink), width: "100%", padding: "10px" }}>log pomodoro + write Act</button>;
+  const markDoneLabel = (
+    <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13, color: C.ink, cursor: "pointer" }}>
+      <input type="checkbox" checked={markDone} onChange={(e) => setMarkDone(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.better, cursor: "pointer" }} />
+      also set this task's status to Done in Notion
+    </label>
+  );
   return (
     <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
@@ -474,28 +490,54 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
           </div>
         </div>
       )}
+
+      {/* The task picker stays visible in both phases — it's the page Act +1 writes to. */}
       <label style={{ color: C.muted, fontSize: 12 }}>task (Act +1 writes to this page)</label>
       <select value={task} onChange={(e) => setTask(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
         {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
       </select>
-      <Scale label="before: how enjoyable do I expect this to be? (1 dull ... 5 great)" value={exp} onChange={setExp} color={settings.beginColor} />
-      <Scale label="after: how enjoyable was it actually? (1 dull ... 5 great)" value={act} onChange={setAct} color={settings.endColor} />
-      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
-      <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13, color: C.ink, cursor: "pointer" }}>
-        <input type="checkbox" checked={markDone} onChange={(e) => setMarkDone(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.better, cursor: "pointer" }} />
-        also set this task's status to Done in Notion
-      </label>
-      <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: chooseNext ? 8 : 14, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
-        <input type="checkbox" checked={chooseNext} onChange={(e) => setChooseNext(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.ink, cursor: "pointer" }} />
-        pick the next task now (the log reopens to it after the break)
-      </label>
-      {chooseNext && (
-        <select value={nextTask} onChange={(e) => setNextTask(e.target.value)} style={{ ...inputStyle, marginBottom: 14, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
-          <option value="">{"— next pomodoro: decide later —"}</option>
-          {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
-        </select>
+
+      {finished ? (
+        /* ---------- AFTER the pomodoro: rate how it actually went, then (auto-)log ---------- */
+        <div style={{ marginTop: 4, padding: 14, borderRadius: 8, background: C.paper, border: `1px solid ${C.better}` }}>
+          <p style={{ margin: "0 0 10px", fontSize: 15, fontFamily: "var(--fl-display)", color: C.ink }}>{"\u{1F389}"} Pomodoro done — how did it go?</p>
+          <Scale label="after: how enjoyable was it actually? (1 dull ... 5 great)" value={act} onChange={rateActual} color={settings.endColor} />
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
+          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
+            <input type="checkbox" checked={autoLog} onChange={(e) => toggleAuto(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.better, cursor: "pointer" }} />
+            log to Obsidian automatically when I pick a rating
+          </label>
+          {markDoneLabel}
+          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: chooseNext ? 8 : 4, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
+            <input type="checkbox" checked={chooseNext} onChange={(e) => setChooseNext(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.ink, cursor: "pointer" }} />
+            pick the next task now (the log reopens to it after the break)
+          </label>
+          {chooseNext && (
+            <select value={nextTask} onChange={(e) => setNextTask(e.target.value)} style={{ ...inputStyle, marginBottom: 14, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
+              <option value="">{"— next pomodoro: decide later —"}</option>
+              {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
+            </select>
+          )}
+          {autoLog
+            ? <p style={{ fontSize: 12, color: C.muted, margin: "4px 0 0" }}>Pick a rating above and it logs straight to Obsidian — no button needed.</p>
+            : logBtn}
+        </div>
+      ) : (
+        /* ---------- BEFORE the pomodoro: set the expectation, then start the timer ---------- */
+        <div>
+          <Scale label="before: how enjoyable do I expect this to be? (1 dull ... 5 great)" value={exp} onChange={setExpected} color={settings.beginColor} />
+          <p style={{ fontSize: 12, color: C.muted, margin: "0 0 12px" }}>Start the timer; when it finishes you'll be asked to rate how it actually went.</p>
+          <button onClick={() => setShowManual((s) => !s)} style={{ ...btn(C.muted, true), fontSize: 12.5, padding: "6px 10px" }}>{showManual ? "− hide manual log" : "+ log a pomodoro manually"}</button>
+          {showManual && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+              <Scale label="after: how enjoyable was it actually? (1 dull ... 5 great)" value={act} onChange={setAct} color={settings.endColor} />
+              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
+              {markDoneLabel}
+              {logBtn}
+            </div>
+          )}
+        </div>
       )}
-      <button onClick={submit} style={{ ...btn(C.ink), width: "100%", padding: "10px" }}>log pomodoro + write Act</button>
     </div>
   );
 }
@@ -741,6 +783,10 @@ export default function FocusLogApp({ api }: any) {
   const stepPomo = (delta: number) => api.timer.step(delta);
   const onStart = (taskName?: string) => api.timer.start(typeof taskName === "string" ? taskName : undefined);
   const onPause = () => api.timer.pause();
+  const setExpectedRating = (n: number) => api.timer.setExpected && api.timer.setExpected(n);
+  // A finished, not-yet-logged pomodoro: the countdown hit 0 but the timer hasn't been
+  // reset (logging or reset clears startedAt). This drives the "after" rating section.
+  const finished = timer.startedAt != null && !timer.running && !timer.paused && timer.secs === 0;
 
   // Keep the local pauses list in sync when the engine writes one (e.g. paused +
   // resumed from the floating window while this panel was open), and let the float
@@ -753,6 +799,14 @@ export default function FocusLogApp({ api }: any) {
     if (!api.onRequestLogView) return;
     return api.onRequestLogView(() => setView("log"));
   }, []);
+  // A float quick-log adds a session outside React; re-read the list so counts/charts update.
+  useEffect(() => {
+    if (!api.onSessionsChange) return;
+    return api.onSessionsChange(() => setSessions([...(api.getSessions ? api.getSessions() : [])]));
+  }, []);
+  // When a pomodoro completes, pull the panel to the log tab so its "how did it go?" rating
+  // is right there to fill in.
+  useEffect(() => { if (finished) setView("log"); }, [finished]);
 
   // Session edit/delete state for Totals view.
   const [editingId, setEditingId] = useState<any>(null);
@@ -1223,7 +1277,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} />}
+        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} finished={finished} onSetExpected={setExpectedRating} autoLogDefault={settings.autoLogOnRate !== false} onAutoLogChange={(v: boolean) => api.patchSettings && api.patchSettings({ autoLogOnRate: v })} />}
 
         {view === "break" && (
           <div>

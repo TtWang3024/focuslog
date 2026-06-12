@@ -62,6 +62,7 @@ export interface FocusLogSettings {
   breakEnabled: boolean;
   breakAutoStart: boolean;
   breakMinutes: number;
+  autoLogOnRate: boolean;
   pomodoroMinutes: number;
   chooseNextTask: boolean;
   pauseTemplate: string;
@@ -100,6 +101,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   breakEnabled: false,
   breakAutoStart: true,
   breakMinutes: 5,
+  autoLogOnRate: true,
   pomodoroMinutes: 25,
   chooseNextTask: true,
   pauseTemplate: "- [ ] <mark class=\"hltr-pink\">{date}</mark> {pause-start} - {pause-end} ⏸️ {pause-tag}",
@@ -263,6 +265,7 @@ interface TimerState {
   startedAt: number | null;
   pauseStart: number | null; // when the current pause began (null if not paused)
   pauseTag: string;          // the reason chosen for the current pause
+  expected: number;          // the "before" enjoyment rating (1-5), carried so a quick-log has it
 }
 class TimerEngine {
   private lengthMin: number;
@@ -275,6 +278,7 @@ class TimerEngine {
   private startedAt: number | null = null;
   private pauseStart: number | null = null; // pause-with-reason: when this pause began
   private pauseTag = "";                     // pause-with-reason: chosen reason
+  private expected = 3;                      // "before" enjoyment rating; set from the panel, read at log time
   private iv: number | null = null;
   private fired: Record<number, boolean> = {};
   private subs = new Set<() => void>();
@@ -294,9 +298,12 @@ class TimerEngine {
   }
 
   getState(): TimerState {
-    return { secs: this.secsNow(), total: this.total, running: this.running, paused: this.paused, lengthMin: this.lengthMin, taskName: this.taskName, startedAt: this.startedAt, pauseStart: this.pauseStart, pauseTag: this.pauseTag };
+    return { secs: this.secsNow(), total: this.total, running: this.running, paused: this.paused, lengthMin: this.lengthMin, taskName: this.taskName, startedAt: this.startedAt, pauseStart: this.pauseStart, pauseTag: this.pauseTag, expected: this.expected };
   }
   setPauseTag(tag: string) { this.pauseTag = tag || ""; this.emit(); }
+  // The panel's "before" rating; kept on the engine so a quick-log from the float window
+  // (which never shows a before-section) still records the expectation the user set.
+  setExpected(n: number) { this.expected = Math.max(1, Math.min(5, Math.round(n) || 3)); }
   // Write the pending pause (its event + daily-note block) if one is open, then clear
   // it. Called when resuming, and when logging a pomodoro mid-pause.
   commitPendingPause() {
@@ -421,6 +428,7 @@ export default class FocusLogPlugin extends Plugin {
   floatWin: any = null;
   private floatSubs = new Set<() => void>();
   private pauseSubs = new Set<() => void>();   // panel re-syncs its pauses list when these fire
+  private sessionSubs = new Set<() => void>(); // panel re-reads its sessions when these fire (e.g. a float quick-log)
   private logViewSubs = new Set<() => void>(); // panel switches to the log tab when these fire
   private openingFloat = false; // true between asking for a float popout and the window-open handler claiming it
   private doneStatusCache: string | null = null;
@@ -486,6 +494,39 @@ export default class FocusLogPlugin extends Plugin {
     this.persist();
     this.appendPauseToDailyNote({ pomodoroStart, pauseStart, pauseEnd, tag }).catch(() => {});
     this.notifyPausesChange();
+  }
+
+  // ---------- sessions changed outside the panel (a float quick-log) ----------
+  onSessionsChange(fn: () => void): () => void { this.sessionSubs.add(fn); return () => this.sessionSubs.delete(fn); }
+  private notifySessionsChange() { this.sessionSubs.forEach((fn) => { try { fn(); } catch {} }); }
+
+  // Log the just-finished pomodoro straight from the floating window: build the session
+  // from the engine's task + the matching task meta, record the rating, write Act and the
+  // daily note (best-effort), then clear the timer. Mirrors the panel's logPomodoro so an
+  // open panel stays in sync via notifySessionsChange().
+  async quickLog(actual: number) {
+    const st = this.timer.getState();
+    const taskName = (st.taskName || "").trim();
+    if (!taskName) return;
+    const meta: any = (this.data.tasks || []).find((t: any) => t.task === taskName) || {};
+    const workedSecs = st.total - st.secs;
+    const minutes = workedSecs > 0 ? Math.max(1, Math.round(workedSecs / 60)) : st.lengthMin;
+    const s: any = {
+      id: Date.now(), task: taskName, group: meta.group || taskName, hierarchy: meta.hierarchy || "",
+      load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null,
+      ts: new Date().toISOString(), expected: st.expected, actual: Math.max(1, Math.min(5, Math.round(actual) || 3)), note: "", minutes,
+    };
+    this.data.sessions = [...(this.data.sessions || []), s];
+    await this.persist();
+    this.timer.commitPendingPause();
+    this.timer.reset();
+    this.notifySessionsChange();
+    if (s.pageId) {
+      try { await this.incrementAct(s.pageId); }
+      catch (e) { this.data.pending = [...(this.data.pending || []), { sessionId: s.id, pageId: s.pageId, task: s.task }]; await this.persist(); }
+    }
+    try { await this.appendToDailyNote({ ts: +new Date(s.ts), minutes: s.minutes, task: s.task, hierarchy: s.hierarchy || "", note: "", category: s.category || null }); } catch (e) {}
+    new Notice("Logged “" + taskName + "” — felt " + s.actual + "/5.", 4000);
   }
 
   // ---------- bring the user into the log view (from the float celebration) ----------
@@ -943,6 +984,7 @@ export default class FocusLogPlugin extends Plugin {
     const self = this;
     return {
       settings: self.data.settings,
+      getSessions: () => self.data.sessions || [],
       getInitial: () => ({
         sessions: self.data.sessions || [],
         pending: self.data.pending || [],
@@ -977,10 +1019,13 @@ export default class FocusLogPlugin extends Plugin {
         setLength: (m: number) => self.timer.setLength(m),
         step: (d: number) => self.timer.step(d),
         setPauseTag: (tag: string) => self.timer.setPauseTag(tag),
+        setExpected: (n: number) => self.timer.setExpected(n),
         commitPendingPause: () => self.timer.commitPendingPause(),
       },
+      quickLog: (actual: number) => self.quickLog(actual),
       getPauses: () => self.getPauses(),
       onPausesChange: (fn: () => void) => self.onPausesChange(fn),
+      onSessionsChange: (fn: () => void) => self.onSessionsChange(fn),
       onRequestLogView: (fn: () => void) => self.onRequestLogView(fn),
       openFloating: () => self.openFloating(),
       closeFloating: () => self.closeFloating(),
@@ -1190,7 +1235,20 @@ class FloatTimerView extends ItemView {
     el.addClass("show");
     el.createDiv({ cls: "flt-pop", text: "\u{1F389}" });
     el.createDiv({ cls: "flt-clabel", text: "complete" });
-    el.createDiv({ cls: "flt-chint", text: "tap to log in Obsidian" });
+    el.createDiv({ cls: "flt-cask", text: "how enjoyable was it?" });
+    // 1-5 quick rating: tapping a number logs the pomodoro straight from here (no need to
+    // switch to Obsidian), recording the rating + writing Act and the daily note.
+    const rate = el.createDiv({ cls: "flt-rate" });
+    [1, 2, 3, 4, 5].forEach((n) => {
+      const b = rate.createEl("button", { cls: "flt-rbtn", text: String(n) });
+      b.onclick = (ev: any) => {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        el.removeClass("show"); el.empty(); el.onclick = null;
+        this.plugin.quickLog(n);
+        this.flash("Logged " + n + "/5 ✓");
+      };
+    });
+    el.createDiv({ cls: "flt-chint", text: "tap a rating to log · tap background for the full form" });
     const colors = ["#d98324", "#2f6f8f", "#5b8c5a", "#b4533a", "#c9a227"];
     for (let i = 0; i < 24; i++) {
       const piece = el.createSpan({ cls: "fl-piece" });
@@ -1198,7 +1256,7 @@ class FloatTimerView extends ItemView {
       piece.style.background = colors[i % colors.length];
       piece.style.animationDelay = (Math.random() * 0.4).toFixed(2) + "s";
     }
-    // Stays put until tapped; tapping brings Obsidian to the front and opens the log view.
+    // Tapping the background (not a rating) brings Obsidian to the front and opens the log view.
     el.onclick = () => { el.removeClass("show"); el.empty(); el.onclick = null; this.plugin.focusAndLog(); };
   }
 

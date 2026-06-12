@@ -170,6 +170,14 @@ body.focuslog-float-window .notice { display: none !important; }
 .focuslog-float .flt-celebrate .flt-chint { font-size: 11px; color: #8a8175; margin-top: 8px; }
 .focuslog-float .flt-celebrate .flt-pop { font-size: clamp(30px, 13vh, 52px); animation: fl-pop 0.5s cubic-bezier(.2,1.4,.4,1) both; }
 .focuslog-float .flt-celebrate .flt-clabel { font-family: 'Baloo 2', sans-serif; font-weight: 600; font-size: 18px; color: #5b8c5a; margin-top: 2px; }
+.focuslog-float .flt-celebrate .flt-cask { font-size: 12px; color: #8a8175; margin-top: 6px; }
+.focuslog-float .flt-celebrate .flt-rate { display: flex; gap: 6px; margin-top: 8px; z-index: 1; }
+.focuslog-float .flt-celebrate .flt-rbtn {
+  width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid #cfc7b8;
+  background: #fffefc; color: #2b2723; font-family: 'JetBrains Mono', monospace;
+  font-size: 14px; cursor: pointer; padding: 0;
+}
+.focuslog-float .flt-celebrate .flt-rbtn:hover { background: #5b8c5a; border-color: #5b8c5a; color: #fff; }
 
 /* Celebration modal */
 .focuslog-celebrate { text-align: center; position: relative; overflow: hidden; }
