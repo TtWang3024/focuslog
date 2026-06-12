@@ -631,10 +631,16 @@ export default function FocusLogApp({ api }: any) {
     setFrozenNames(next);
     api.patchSettings && api.patchSettings({ frozenTaskNames: next });
   };
-  // Display order: frozen first, then king, then the rest by urgency Must → Aim → Bonus.
-  // The sort is stable, so dragging still fine-tunes the order within each tier.
+  // Display order: frozen first (in the sequence they were locked), then king, then the
+  // rest by urgency Must → Aim → Bonus. The sort is stable, so dragging still fine-tunes
+  // the order within each tier.
   const tierOf = (t: any) => (frozenNames.includes(t.task) ? 0 : t.king ? 1 : t.power === "P" ? 2 : t.power === "G" ? 4 : 3);
-  const orderedTasks = tasks.map((t, i) => ({ t, i })).sort((a, b) => tierOf(a.t) - tierOf(b.t) || a.i - b.i).map((x) => x.t);
+  const orderedTasks = tasks.map((t, i) => ({ t, i })).sort((a, b) => {
+    const ta = tierOf(a.t), tb = tierOf(b.t);
+    if (ta !== tb) return ta - tb;
+    if (ta === 0) return frozenNames.indexOf(a.t.task) - frozenNames.indexOf(b.t.task);
+    return a.i - b.i;
+  }).map((x) => x.t);
 
   // Floating-window on/off, controllable right from the log view. The checkbox
   // tracks whether the window is actually open (synced via onFloatChange), so it
@@ -865,6 +871,13 @@ export default function FocusLogApp({ api }: any) {
     a.splice(to, 0, m);
     setTasks(a);
     api.saveTasks(a);
+    // Frozen tasks display in lock order, so a drag within the frozen group re-records
+    // that sequence too.
+    const nf = Array.from(new Set(a.filter((t) => frozenNames.includes(t.task)).map((t) => t.task)));
+    if (nf.join(" ") !== frozenNames.join(" ")) {
+      setFrozenNames(nf);
+      api.patchSettings && api.patchSettings({ frozenTaskNames: nf });
+    }
   };
 
   const persist = useCallback((next: any[]) => { setSessions(next); api.saveSessions(next); }, [api]);
