@@ -24639,7 +24639,7 @@ ${s.task}`))
           onClick: () => toggleFreeze(t.task),
           className: "fl-lock" + (isFrozen ? " is-locked" : ""),
           title: isFrozen ? "unpin from the top" : "pin to the top (by name, so it survives daily re-created Notion tasks)",
-          style: { background: "transparent", border: "none", cursor: "pointer", padding: 2, color: isFrozen ? C.ink : C.muted, flexShrink: 0, display: "inline-flex" }
+          style: { background: "transparent", border: "none", boxShadow: "none", height: "auto", cursor: "pointer", padding: 2, color: isFrozen ? C.ink : C.muted, flexShrink: 0, display: "inline-flex" }
         },
         /* @__PURE__ */ React.createElement(LockIcon, { size: 13, open: !isFrozen })
       ),

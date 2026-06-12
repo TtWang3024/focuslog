@@ -34,7 +34,13 @@
 }
 
 /* Pin-to-top lock in the Today list: hidden until the row is hovered, but always
-   visible on tasks that are pinned. */
+   visible on tasks that are pinned. Bare glyph — no button chrome. */
+.workspace-leaf-content[data-type="focuslog-view"] .fl-lock,
+.workspace-leaf-content[data-type="focuslog-view"] .fl-lock:hover {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
 .workspace-leaf-content[data-type="focuslog-view"] .fl-lock {
   opacity: 0;
   transition: opacity 0.12s ease;
