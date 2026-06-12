@@ -401,6 +401,15 @@ function RotateCcwIcon({ size = 16 }: any) {
   );
 }
 
+function LockIcon({ size = 13, open = false }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+      {open ? <path d="M7 11V7a5 5 0 0 1 9.9-1" /> : <path d="M7 11V7a5 5 0 0 1 10 0v4" />}
+    </svg>
+  );
+}
+
 // A textarea that starts at one line and grows to fit its content as the text wraps.
 function AutoTextarea({ value, onChange, placeholder, style }: any) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
@@ -613,6 +622,19 @@ export default function FocusLogApp({ api }: any) {
   const [chooseNext, setChooseNextState] = useState<boolean>(settings.chooseNextTask !== false);
   const setChooseNext = (v: boolean) => { setChooseNextState(v); api.patchSettings && api.patchSettings({ chooseNextTask: v }); };
   const [nextTask, setNextTask] = useState<string>("");
+
+  // Frozen (pinned) tasks, matched by NAME — Notion daily tasks are re-created with a
+  // fresh id each day, so the name is the only stable handle.
+  const [frozenNames, setFrozenNames] = useState<string[]>(Array.isArray(settings.frozenTaskNames) ? settings.frozenTaskNames : []);
+  const toggleFreeze = (name: string) => {
+    const next = frozenNames.includes(name) ? frozenNames.filter((n) => n !== name) : [...frozenNames, name];
+    setFrozenNames(next);
+    api.patchSettings && api.patchSettings({ frozenTaskNames: next });
+  };
+  // Display order: frozen first, then king, then the rest by urgency Must → Aim → Bonus.
+  // The sort is stable, so dragging still fine-tunes the order within each tier.
+  const tierOf = (t: any) => (frozenNames.includes(t.task) ? 0 : t.king ? 1 : t.power === "P" ? 2 : t.power === "G" ? 4 : 3);
+  const orderedTasks = tasks.map((t, i) => ({ t, i })).sort((a, b) => tierOf(a.t) - tierOf(b.t) || a.i - b.i).map((x) => x.t);
 
   // Floating-window on/off, controllable right from the log view. The checkbox
   // tracks whether the window is actually open (synced via onFloatChange), so it
@@ -835,7 +857,10 @@ export default function FocusLogApp({ api }: any) {
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const moveTask = (from: number | null, to: number) => {
     if (from == null || from === to) return;
-    const a = [...tasks];
+    // Indices refer to the displayed (tier-sorted) list; the result is saved as the new
+    // base order. The tier sort re-applies on render, so a drag across tiers snaps back
+    // while a drag within a tier sticks.
+    const a = [...orderedTasks];
     const [m] = a.splice(from, 1);
     a.splice(to, 0, m);
     setTasks(a);
@@ -1113,9 +1138,9 @@ export default function FocusLogApp({ api }: any) {
               </div>
             )}
             {tasks.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No tasks yet. Set your Notion token in settings, then press sync.</p>}
-            {tasks.length > 1 && <p style={{ color: C.muted, fontSize: 11, margin: "0 0 8px" }}>Drag the grip to reorder. The order is kept for tomorrow; new tasks from Notion appear on top.</p>}
+            {tasks.length > 1 && <p style={{ color: C.muted, fontSize: 11, margin: "0 0 8px" }}>Pinned tasks stay on top, then {"\u{1F451}"} King, then Must {"→"} Aim {"→"} Bonus. Drag the grip to fine-tune within a tier; hover a row to pin it.</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {tasks.map((t, i) => {
+              {orderedTasks.map((t, i) => {
                 const key = t.id || t.task;
                 const done = doneSess[key] || 0;
                 const est = t.pomodoros || 0;
@@ -1127,9 +1152,11 @@ export default function FocusLogApp({ api }: any) {
                 const titleText = showCat ? stripLeadingTag(t.task) : t.task;
                 const isDragging = dragIndex === i;
                 const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
+                const isFrozen = frozenNames.includes(t.task);
                 return (
                   <div
                     key={key}
+                    className="fl-task-row"
                     onDragOver={(e) => { e.preventDefault(); if (overIndex !== i) setOverIndex(i); }}
                     onDrop={(e) => { e.preventDefault(); moveTask(dragIndex, i); setDragIndex(null); setOverIndex(null); }}
                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${isOver ? C.ink : C.line}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }}
@@ -1148,6 +1175,14 @@ export default function FocusLogApp({ api }: any) {
                       <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}><span style={{ color: LOAD_COLOR[t.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, marginRight: 6 }} title={LOAD_LABEL[t.load] || LOAD_LABEL.B}>{t.load || "B"}</span>{cat && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "1px 5px", marginRight: 6, whiteSpace: "nowrap" }}>{cat}</span>}{titleText}{t.king ? " \u{1F451}" : ""}</div>
                       {hier && <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hier}</div>}
                     </div>
+                    <button
+                      onClick={() => toggleFreeze(t.task)}
+                      className={"fl-lock" + (isFrozen ? " is-locked" : "")}
+                      title={isFrozen ? "unpin from the top" : "pin to the top (by name, so it survives daily re-created Notion tasks)"}
+                      style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2, color: isFrozen ? C.ink : C.muted, flexShrink: 0, display: "inline-flex" }}
+                    >
+                      <LockIcon size={13} open={!isFrozen} />
+                    </button>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
                       <TomatoPips vivid={done} grey={remaining} />
                       <span style={{ fontSize: 10.5, color: C.muted, fontFamily: "var(--fl-mono)" }}>{completed} done</span>
@@ -1294,7 +1329,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={tasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} finished={finished} onSetExpected={setExpectedRating} autoLogDefault={settings.autoLogOnRate !== false} onAutoLogChange={(v: boolean) => api.patchSettings && api.patchSettings({ autoLogOnRate: v })} />}
+        {view === "log" && <LogForm tasks={orderedTasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} finished={finished} onSetExpected={setExpectedRating} autoLogDefault={settings.autoLogOnRate !== false} onAutoLogChange={(v: boolean) => api.patchSettings && api.patchSettings({ autoLogOnRate: v })} />}
 
         {view === "break" && (
           <div>

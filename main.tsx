@@ -63,6 +63,7 @@ export interface FocusLogSettings {
   breakAutoStart: boolean;
   breakMinutes: number;
   autoLogOnRate: boolean;
+  frozenTaskNames: string[];
   pomodoroMinutes: number;
   chooseNextTask: boolean;
   pauseTemplate: string;
@@ -102,6 +103,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   breakAutoStart: true,
   breakMinutes: 5,
   autoLogOnRate: true,
+  frozenTaskNames: [],
   pomodoroMinutes: 25,
   chooseNextTask: true,
   pauseTemplate: "- [ ] <mark class=\"hltr-pink\">{date}</mark> {pause-start} - {pause-end} ⏸️ {pause-tag}",

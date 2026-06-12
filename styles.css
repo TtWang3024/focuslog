@@ -33,6 +33,17 @@
   background: #F6E4DF !important;
 }
 
+/* Pin-to-top lock in the Today list: hidden until the row is hovered, but always
+   visible on tasks that are pinned. */
+.workspace-leaf-content[data-type="focuslog-view"] .fl-lock {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.workspace-leaf-content[data-type="focuslog-view"] .fl-task-row:hover .fl-lock,
+.workspace-leaf-content[data-type="focuslog-view"] .fl-lock.is-locked {
+  opacity: 1;
+}
+
 /* ---------- Floating timer (popout window) ---------- */
 .workspace-leaf-content[data-type="focuslog-float"] .view-content { padding: 0; }
 
