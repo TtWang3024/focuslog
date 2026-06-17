@@ -268,7 +268,16 @@ function Scale({ value, onChange, color, label }: any) {
 
 // Last-6-months contributions heatmap: weeks as columns, Mon–Sun as rows, coloured by the day's
 // pomodoro count. Computed from sessions grouped by logical day (so it respects the day-start).
-const HEAT = ["#f3d9bf", "#eab784", "#df8a4e", "#c9603a", "#a23b22"];
+const HEAT = ["#f3d9bf", "#ecbf8e", "#e09a55", "#d0703e", "#b94a2e", "#9a3420"]; // 6 levels, light → deep
+const HEAT_EMPTY = "#e8e0cf"; // a day with 0 pomodoros
+const DEFAULT_HEAT_TH = [1, 2, 4, 6, 9, 11]; // min pomodoros for each of the 6 colours
+// Parse the settings string into six ascending positive thresholds (else the default).
+function parseHeatTh(s: string): number[] {
+  const nums = (s || "").split(/[^0-9]+/).map((x) => parseInt(x, 10)).filter((n) => Number.isFinite(n) && n > 0);
+  if (nums.length !== 6) return DEFAULT_HEAT_TH.slice();
+  for (let i = 1; i < 6; i++) if (nums[i] <= nums[i - 1]) return DEFAULT_HEAT_TH.slice();
+  return nums;
+}
 function ContribHeatmap({ sessions, settings }: any) {
   const CELL = 13, GAP = 3, MONTH_H = 14, HEAD_GAP = 4;
   const ymd = (d: any) => { const p = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
@@ -280,7 +289,9 @@ function ContribHeatmap({ sessions, settings }: any) {
   const sun = !!settings.weekStartsSunday;
   const gridStart = weekStartOf(startMonth, sun);
   const weeks = Math.round((+weekStartOf(end, sun) - +gridStart) / (7 * DAY)) + 1;
-  const heat = (n: number) => { if (!n) return "#e8e0cf"; const cap = Math.min(n, 8); return HEAT[Math.min(HEAT.length - 1, Math.floor(((cap - 1) / 8) * HEAT.length))]; };
+  const TH = parseHeatTh(settings.heatThresholds);
+  const heat = (n: number) => { if (!n) return HEAT_EMPTY; let lvl = 0; for (let i = 0; i < TH.length; i++) if (n >= TH[i]) lvl = i; return HEAT[lvl]; };
+  const lvlLabel = (i: number) => { const lo = TH[i]; if (i === TH.length - 1) return lo + "+"; const hi = TH[i + 1] - 1; return hi <= lo ? String(lo) : lo + "-" + hi; };
 
   const cells: any[] = [];
   for (let dow = 0; dow < 7; dow++) for (let w = 0; w < weeks; w++) {
@@ -309,8 +320,13 @@ function ContribHeatmap({ sessions, settings }: any) {
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${weeks}, ${CELL}px)`, gridTemplateRows: `repeat(7, ${CELL}px)`, gap: GAP, gridAutoFlow: "row" }}>{cells}</div>
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end", marginTop: 8, fontSize: 10, color: C.muted }}>
-        less {["#e8e0cf", ...HEAT].map((c, i) => (<span key={i} style={{ width: CELL, height: CELL, borderRadius: 2, background: c, border: `1px solid ${C.line}`, boxSizing: "border-box" }} />))} more
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+        {[{ c: HEAT_EMPTY, label: "0" }, ...HEAT.map((c, i) => ({ c, label: lvlLabel(i) }))].map((it: any, i: number) => (
+          <span key={i} title={`${it.label} pomodoro${it.label === "1" ? "" : "s"}`} style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+            <span style={{ width: CELL, height: CELL, borderRadius: 2, background: it.c, border: `1px solid ${C.line}`, boxSizing: "border-box" }} />
+            <span style={{ fontSize: 9, color: C.muted, fontFamily: "var(--fl-mono)" }}>{it.label}</span>
+          </span>
+        ))}
       </div>
     </div>
   );

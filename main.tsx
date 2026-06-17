@@ -46,6 +46,7 @@ export interface FocusLogSettings {
   weekStartsSunday: boolean;
   morningEnd: number;
   afternoonEnd: number;
+  heatThresholds: string;
   beginColor: string;
   endColor: string;
   dailyNoteWrite: boolean;
@@ -86,6 +87,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   weekStartsSunday: false,
   morningEnd: 12,
   afternoonEnd: 18,
+  heatThresholds: "1,2,4,6,8,10",
   beginColor: "#d98324",
   endColor: "#2f6f8f",
   dailyNoteWrite: true,
@@ -1759,6 +1761,16 @@ class FocusLogSettingTab extends PluginSettingTab {
       .addToggle((t) =>
         t.setValue(this.plugin.data.settings.weekStartsSunday).onChange(async (v) => {
           this.plugin.data.settings.weekStartsSunday = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Heatmap colour thresholds")
+      .setDesc("Six-month heatmap: six ascending pomodoro counts — the minimum for each of the 6 colour levels (0 stays blank). Default \"1,2,4,6,8,10\" colours days as 1 · 2–3 · 4–5 · 6–7 · 8–9 · 10+. The legend under the heatmap shows the resulting ranges.")
+      .addText((t) =>
+        t.setPlaceholder("1,2,4,6,8,10").setValue(this.plugin.data.settings.heatThresholds).onChange(async (v) => {
+          this.plugin.data.settings.heatThresholds = v.trim();
           await this.plugin.persist();
         })
       );

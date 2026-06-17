@@ -23770,7 +23770,18 @@ function Heatmap({ sessions, monthRef, settings }) {
 function Scale({ value, onChange, color, label }) {
   return /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("label", { style: { color: C.muted, fontSize: 12 } }, label), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 4 } }, [1, 2, 3, 4, 5].map((s) => /* @__PURE__ */ React.createElement("button", { key: s, onClick: () => onChange(s), style: { width: 38, height: 38, borderRadius: 8, border: `1.5px solid ${value === s ? color : C.faint}`, background: value === s ? color : "transparent", color: value === s ? "#fff" : C.ink, fontFamily: "var(--fl-mono)", cursor: "pointer" } }, s))));
 }
-var HEAT = ["#f3d9bf", "#eab784", "#df8a4e", "#c9603a", "#a23b22"];
+var HEAT = ["#f3d9bf", "#ecbf8e", "#e09a55", "#d0703e", "#b94a2e", "#9a3420"];
+var HEAT_EMPTY = "#e8e0cf";
+var DEFAULT_HEAT_TH = [1, 2, 4, 6, 9, 11];
+function parseHeatTh(s) {
+  const nums = (s || "").split(/[^0-9]+/).map((x) => parseInt(x, 10)).filter((n) => Number.isFinite(n) && n > 0);
+  if (nums.length !== 6)
+    return DEFAULT_HEAT_TH.slice();
+  for (let i = 1; i < 6; i++)
+    if (nums[i] <= nums[i - 1])
+      return DEFAULT_HEAT_TH.slice();
+  return nums;
+}
 function ContribHeatmap({ sessions, settings }) {
   const CELL = 13, GAP = 3, MONTH_H = 14, HEAD_GAP = 4;
   const ymd = (d) => {
@@ -23788,11 +23799,22 @@ function ContribHeatmap({ sessions, settings }) {
   const sun = !!settings.weekStartsSunday;
   const gridStart = weekStartOf(startMonth, sun);
   const weeks = Math.round((+weekStartOf(end, sun) - +gridStart) / (7 * DAY)) + 1;
+  const TH = parseHeatTh(settings.heatThresholds);
   const heat = (n) => {
     if (!n)
-      return "#e8e0cf";
-    const cap = Math.min(n, 8);
-    return HEAT[Math.min(HEAT.length - 1, Math.floor((cap - 1) / 8 * HEAT.length))];
+      return HEAT_EMPTY;
+    let lvl = 0;
+    for (let i = 0; i < TH.length; i++)
+      if (n >= TH[i])
+        lvl = i;
+    return HEAT[lvl];
+  };
+  const lvlLabel = (i) => {
+    const lo = TH[i];
+    if (i === TH.length - 1)
+      return lo + "+";
+    const hi = TH[i + 1] - 1;
+    return hi <= lo ? String(lo) : lo + "-" + hi;
   };
   const cells = [];
   for (let dow = 0; dow < 7; dow++)
@@ -23812,7 +23834,7 @@ function ContribHeatmap({ sessions, settings }) {
   }
   const wdNames = sun ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const wd = wdNames.map((n, i) => i === 0 || i === 2 || i === 4 ? n : "");
-  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 6, overflowX: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", paddingTop: MONTH_H + HEAD_GAP, gap: GAP, flexShrink: 0 } }, wd.map((label, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { height: CELL, lineHeight: CELL + "px", fontSize: 9, color: C.muted, fontFamily: "var(--fl-mono)", textAlign: "right" } }, label))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: HEAD_GAP } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: MONTH_H, width: weeks * (CELL + GAP) } }, monthLabels), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: `repeat(${weeks}, ${CELL}px)`, gridTemplateRows: `repeat(7, ${CELL}px)`, gap: GAP, gridAutoFlow: "row" } }, cells))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end", marginTop: 8, fontSize: 10, color: C.muted } }, "less ", ["#e8e0cf", ...HEAT].map((c, i) => /* @__PURE__ */ React.createElement("span", { key: i, style: { width: CELL, height: CELL, borderRadius: 2, background: c, border: `1px solid ${C.line}`, boxSizing: "border-box" } })), " more"));
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 6, overflowX: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", paddingTop: MONTH_H + HEAD_GAP, gap: GAP, flexShrink: 0 } }, wd.map((label, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { height: CELL, lineHeight: CELL + "px", fontSize: 9, color: C.muted, fontFamily: "var(--fl-mono)", textAlign: "right" } }, label))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: HEAD_GAP } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: MONTH_H, width: weeks * (CELL + GAP) } }, monthLabels), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: `repeat(${weeks}, ${CELL}px)`, gridTemplateRows: `repeat(7, ${CELL}px)`, gap: GAP, gridAutoFlow: "row" } }, cells))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 8, justifyContent: "flex-end", marginTop: 8 } }, [{ c: HEAT_EMPTY, label: "0" }, ...HEAT.map((c, i) => ({ c, label: lvlLabel(i) }))].map((it, i) => /* @__PURE__ */ React.createElement("span", { key: i, title: `${it.label} pomodoro${it.label === "1" ? "" : "s"}`, style: { display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { width: CELL, height: CELL, borderRadius: 2, background: it.c, border: `1px solid ${C.line}`, boxSizing: "border-box" } }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: C.muted, fontFamily: "var(--fl-mono)" } }, it.label)))));
 }
 var MACARON = [
   { fill: "rgb(238, 201, 201)", border: "rgb(213, 144, 144)" },
@@ -24729,6 +24751,7 @@ var DEFAULT_SETTINGS = {
   weekStartsSunday: false,
   morningEnd: 12,
   afternoonEnd: 18,
+  heatThresholds: "1,2,4,6,8,10",
   beginColor: "#d98324",
   endColor: "#2f6f8f",
   dailyNoteWrite: true,
@@ -26584,6 +26607,12 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
     new import_obsidian.Setting(containerEl).setName("Start the week on Sunday").setDesc("Off (default): weeks run Monday\u2013Sunday. On: weeks run Sunday\u2013Saturday. Affects the week view range, the weekly grouping, and the weekday headers on both heatmaps.").addToggle(
       (t) => t.setValue(this.plugin.data.settings.weekStartsSunday).onChange(async (v) => {
         this.plugin.data.settings.weekStartsSunday = v;
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Heatmap colour thresholds").setDesc('Six-month heatmap: six ascending pomodoro counts \u2014 the minimum for each of the 6 colour levels (0 stays blank). Default "1,2,4,6,8,10" colours days as 1 \xB7 2\u20133 \xB7 4\u20135 \xB7 6\u20137 \xB7 8\u20139 \xB7 10+. The legend under the heatmap shows the resulting ranges.').addText(
+      (t) => t.setPlaceholder("1,2,4,6,8,10").setValue(this.plugin.data.settings.heatThresholds).onChange(async (v) => {
+        this.plugin.data.settings.heatThresholds = v.trim();
         await this.plugin.persist();
       })
     );
