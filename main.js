@@ -24752,6 +24752,18 @@ var FLOAT_CAT = {
   internal: { fill: "#FBEFC9", border: "#D9A521" },
   external: { fill: "#DCEAF6", border: "#3E78B2" }
 };
+var FLOAT_PHASE_DEFAULTS = {
+  setup: { w: 300, h: 240 },
+  // pick a task + before-rating
+  focus: { w: 300, h: 170 },
+  // the pomodoro countdown
+  pause: { w: 300, h: 320 },
+  // countdown + reason chips
+  break: { w: 380, h: 400 },
+  // rest timer + activities + feeling
+  celebrate: { w: 320, h: 440 }
+  // done + next-task + rating
+};
 var DEFAULT_SETTINGS = {
   notionToken: "",
   databaseId: "24f3423255b680ce9dd5eb8eeece3ca0",
@@ -24791,7 +24803,8 @@ var DEFAULT_SETTINGS = {
   floatOnStart: true,
   floatAlwaysOnTop: true,
   floatBounds: null,
-  floatBreakBounds: null
+  floatBreakBounds: null,
+  floatPhaseBounds: {}
 };
 var DEFAULT_PAUSE_TAGS = [
   { id: "p-bathroom", name: "bathroom", category: "internal" },
@@ -25260,6 +25273,11 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     this.openingFloat = false;
     // true between asking for a float popout and the window-open handler claiming it
     this.doneStatusCache = null;
+    // ---------- per-phase float window geometry ----------
+    // Each phase (setup / focus / pause / break / celebrate) remembers its own size and
+    // position. This replaces the old patchwork (one focus size, one break size, plus
+    // ad-hoc +Npx grows for pause/celebration) that fought each other when phases switched.
+    this.floatSizePhase = "";
   }
   async onload() {
     const loaded = await this.loadData() || {};
@@ -25273,6 +25291,14 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       pauses: loaded.pauses || [],
       breaks: loaded.breaks || []
     };
+    if (!this.data.settings.floatPhaseBounds || Object.keys(this.data.settings.floatPhaseBounds).length === 0) {
+      const m = {};
+      if (this.data.settings.floatBounds)
+        m.focus = this.data.settings.floatBounds;
+      if (this.data.settings.floatBreakBounds)
+        m.break = this.data.settings.floatBreakBounds;
+      this.data.settings.floatPhaseBounds = m;
+    }
     this.timer = new TimerEngine(this, this.data.settings.pomodoroMinutes);
     this.registerDomEvent(document, "visibilitychange", () => {
       if (!document.hidden)
@@ -25525,6 +25551,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     leaves.forEach((l) => l.detach());
     const ws = this.app.workspace;
     this.openingFloat = true;
+    this.floatSizePhase = "";
     let leaf;
     try {
       leaf = ws.openPopoutLeaf ? ws.openPopoutLeaf() : ws.getLeaf("window");
@@ -25614,35 +25641,65 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
           win.webContents.setBackgroundThrottling(false);
       } catch (e) {
       }
-      if (initial) {
-        try {
-          const b = this.data.settings.floatBounds;
-          if (b && b.w && b.h) {
-            win.setBounds({ x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h) });
-          } else {
-            const screen = remote.screen;
-            const wa = screen && screen.getPrimaryDisplay ? screen.getPrimaryDisplay().workArea : null;
-            win.setSize(300, 240, false);
-            if (wa)
-              win.setPosition(Math.round(wa.x + wa.width - 320), Math.round(wa.y + 40), false);
-          }
-        } catch (e) {
-        }
-      }
       this.floatWin = win;
+      if (initial)
+        this.syncFloatPhase(false);
     } catch (e) {
     }
   }
-  // Remember the float window's geometry so next time it opens where you left it.
-  saveFloatBounds(b) {
-    this.data.settings.floatBounds = { x: b.x, y: b.y, w: b.width, h: b.height };
+  getFloatPhaseBounds(phase) {
+    return (this.data.settings.floatPhaseBounds || {})[phase] || null;
+  }
+  saveFloatPhaseBounds(phase, b) {
+    if (!phase)
+      return;
+    const m = Object.assign({}, this.data.settings.floatPhaseBounds || {});
+    m[phase] = { x: b.x, y: b.y, w: b.width, h: b.height };
+    this.data.settings.floatPhaseBounds = m;
     this.persist();
   }
-  // The break phase gets its own remembered geometry (larger, for the activity picker),
-  // so the focus and break sizes don't overwrite each other.
-  saveFloatBreakBounds(b) {
-    this.data.settings.floatBreakBounds = { x: b.x, y: b.y, w: b.width, h: b.height };
-    this.persist();
+  floatPhaseFor(celebrating) {
+    if (celebrating)
+      return "celebrate";
+    const s = this.timer.getState();
+    if (s.breakActive)
+      return "break";
+    if (s.paused)
+      return "pause";
+    if (!s.running && s.startedAt == null)
+      return "setup";
+    return "focus";
+  }
+  applyFloatPhaseBounds(phase) {
+    try {
+      const win = this.floatWin;
+      if (!win || !win.setBounds || !win.getBounds)
+        return;
+      const saved = this.getFloatPhaseBounds(phase);
+      if (saved && saved.w && saved.h) {
+        win.setBounds({ x: Math.round(saved.x), y: Math.round(saved.y), width: Math.round(saved.w), height: Math.round(saved.h) });
+        return;
+      }
+      const d = FLOAT_PHASE_DEFAULTS[phase] || FLOAT_PHASE_DEFAULTS.focus;
+      const cur = win.getBounds();
+      win.setBounds({ x: cur.x, y: cur.y, width: d.w, height: d.h });
+    } catch (e) {
+    }
+  }
+  // Switch the window to the active phase's geometry, saving where the previous phase was.
+  syncFloatPhase(celebrating) {
+    const want = this.floatPhaseFor(celebrating);
+    if (want === this.floatSizePhase)
+      return;
+    const prev = this.floatSizePhase;
+    this.floatSizePhase = want;
+    try {
+      const win = this.floatWin;
+      if (prev && win && win.getBounds)
+        this.saveFloatPhaseBounds(prev, win.getBounds());
+    } catch (e) {
+    }
+    this.applyFloatPhaseBounds(want);
   }
   // ---------- timer alerts (work over other apps) ----------
   osNotify(title, body) {
@@ -26101,10 +26158,8 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     // last seen window geometry (to detect user move/resize)
     this.boundsDirty = false;
     // geometry changed; save once it settles
-    this.pauseBaseH = 0;
-    // window height before the pause picker grew it
-    this.celebrateBaseH = 0;
-    // window height before the celebration grew it
+    this.celebrateShown = false;
+    // celebration overlay up → the "celebrate" size phase
     this.curPhase = "";
     // "setup" | "focus" | "break" — which screen of the loop is showing
     this.skey = "";
@@ -26213,7 +26268,6 @@ var FloatTimerView = class extends import_obsidian.ItemView {
         this.refreshSetup(s);
       if (s.paused !== this.pickerShown) {
         this.pickerShown = s.paused;
-        this.resizeForPause(s.paused);
         if (!s.paused && this.els.picker) {
           this.els.picker.empty();
           this.pkey = "";
@@ -26230,8 +26284,9 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     if ((s.running || s.breakActive || s.startedAt == null) && this.els.celebrate && this.els.celebrate.hasClass("show")) {
       this.els.celebrate.removeClass("show");
       this.els.celebrate.empty();
-      this.resizeForCelebrate(false);
+      this.celebrateShown = false;
     }
+    this.plugin.syncFloatPhase(this.celebrateShown);
   }
   // Show only the controls for the active screen.
   setPhaseVisibility(phase) {
@@ -26250,9 +26305,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
   onPhaseChange(prev, next) {
     if (next === "break") {
       this.buildBreak();
-      this.applyBreakWindow(true);
     } else if (prev === "break") {
-      this.applyBreakWindow(false);
       this.els.break.empty();
       this.els.brkTime = null;
     }
@@ -26360,47 +26413,6 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     });
     el.scrollTop = keepScroll;
   }
-  // Save the focus geometry and grow to the remembered (or default 380×400) break size;
-  // on the way out, restore the focus geometry. The break has its own remembered bounds.
-  applyBreakWindow(toBreak) {
-    try {
-      const win = this.plugin.floatWin;
-      if (!win || !win.getBounds || !win.setBounds)
-        return;
-      if (toBreak) {
-        const b = win.getBounds();
-        this.plugin.saveFloatBounds(b);
-        const bb = this.plugin.data.settings.floatBreakBounds;
-        if (bb && bb.w && bb.h)
-          win.setBounds({ x: Math.round(bb.x), y: Math.round(bb.y), width: Math.round(bb.w), height: Math.round(bb.h) });
-        else
-          win.setBounds({ x: b.x, y: b.y, width: 380, height: 400 });
-      } else {
-        const fb = this.plugin.data.settings.floatBounds;
-        if (fb && fb.w && fb.h)
-          win.setBounds({ x: Math.round(fb.x), y: Math.round(fb.y), width: Math.round(fb.w), height: Math.round(fb.h) });
-      }
-    } catch (e) {
-    }
-  }
-  // Grow the window downward to fit the pause picker, then restore the prior height —
-  // relative to whatever size the window currently is, so a remembered/custom size is kept.
-  resizeForPause(paused) {
-    try {
-      const win = this.plugin.floatWin;
-      if (!win || !win.getSize)
-        return;
-      const [w, h] = win.getSize();
-      if (paused) {
-        this.pauseBaseH = h;
-        win.setSize(w, h + 150, false);
-      } else if (this.pauseBaseH) {
-        win.setSize(w, this.pauseBaseH, false);
-        this.pauseBaseH = 0;
-      }
-    } catch (e) {
-    }
-  }
   // Persist the window geometry shortly after the user stops moving/resizing it.
   // Skipped while paused or celebrating (the picker/celebration has grown the
   // window — not the real size). The break phase remembers its own larger bounds.
@@ -26408,11 +26420,6 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     try {
       const win = this.plugin.floatWin;
       if (!win || !win.getBounds)
-        return;
-      const st = this.plugin.timer.getState();
-      if (st.paused)
-        return;
-      if (this.celebrateBaseH)
         return;
       const b = win.getBounds();
       const key = b.x + "," + b.y + "," + b.width + "," + b.height;
@@ -26423,10 +26430,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
       }
       if (this.boundsDirty) {
         this.boundsDirty = false;
-        if (st.breakActive)
-          this.plugin.saveFloatBreakBounds(b);
-        else
-          this.plugin.saveFloatBounds(b);
+        this.plugin.saveFloatPhaseBounds(this.plugin.floatSizePhase, b);
       }
     } catch (e) {
     }
@@ -26463,36 +26467,20 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     w.clearTimeout(this.flashT);
     this.flashT = w.setTimeout(() => this.els.flash && this.els.flash.removeClass("show"), 5e3);
   }
-  // Grow the window downward while the celebration (rating + done + next-task) is up,
-  // restoring the prior height afterwards — same approach as resizeForPause.
-  resizeForCelebrate(open) {
-    try {
-      const win = this.plugin.floatWin;
-      if (!win || !win.getSize)
-        return;
-      const [w, h] = win.getSize();
-      if (open && !this.celebrateBaseH) {
-        this.celebrateBaseH = h;
-        win.setSize(w, h + 120, false);
-      } else if (!open && this.celebrateBaseH) {
-        win.setSize(w, this.celebrateBaseH, false);
-        this.celebrateBaseH = 0;
-      }
-    } catch (e) {
-    }
-  }
   celebrate() {
     const el = this.els.celebrate;
     if (!el)
       return;
     el.empty();
     el.addClass("show");
-    this.resizeForCelebrate(true);
+    this.celebrateShown = true;
+    this.plugin.syncFloatPhase(true);
     const dismiss = () => {
       el.removeClass("show");
       el.empty();
       el.onclick = null;
-      this.resizeForCelebrate(false);
+      this.celebrateShown = false;
+      this.plugin.syncFloatPhase(false);
     };
     el.createDiv({ cls: "flt-pop", text: "\u{1F389}" });
     el.createDiv({ cls: "flt-clabel", text: "complete" });
@@ -26553,13 +26541,8 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     this.unsub = null;
     try {
       const win = this.plugin.floatWin;
-      const st = this.plugin.timer.getState();
-      if (win && win.getBounds && !st.paused && !this.celebrateBaseH) {
-        if (st.breakActive)
-          this.plugin.saveFloatBreakBounds(win.getBounds());
-        else
-          this.plugin.saveFloatBounds(win.getBounds());
-      }
+      if (win && win.getBounds)
+        this.plugin.saveFloatPhaseBounds(this.plugin.floatSizePhase, win.getBounds());
     } catch (e) {
     }
     try {

@@ -32,6 +32,15 @@ const FLOAT_CAT: any = {
   internal: { fill: "#FBEFC9", border: "#D9A521" },
   external: { fill: "#DCEAF6", border: "#3E78B2" },
 };
+// First-time size (px) for each float phase; once you move/resize a phase, that phase
+// remembers its own bounds (settings.floatPhaseBounds) and the default is ignored.
+const FLOAT_PHASE_DEFAULTS: any = {
+  setup: { w: 300, h: 240 },     // pick a task + before-rating
+  focus: { w: 300, h: 170 },     // the pomodoro countdown
+  pause: { w: 300, h: 320 },     // countdown + reason chips
+  break: { w: 380, h: 400 },     // rest timer + activities + feeling
+  celebrate: { w: 320, h: 440 }, // done + next-task + rating
+};
 
 export interface FocusLogSettings {
   notionToken: string;
@@ -72,6 +81,7 @@ export interface FocusLogSettings {
   floatAlwaysOnTop: boolean;
   floatBounds: { x: number; y: number; w: number; h: number } | null;
   floatBreakBounds: { x: number; y: number; w: number; h: number } | null;
+  floatPhaseBounds: { [phase: string]: { x: number; y: number; w: number; h: number } };
 }
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
@@ -114,6 +124,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   floatAlwaysOnTop: true,
   floatBounds: null,
   floatBreakBounds: null,
+  floatPhaseBounds: {},
 };
 
 // Pause tags carry a category: "internal" (the impulse came from you) or
@@ -564,6 +575,13 @@ export default class FocusLogPlugin extends Plugin {
       pauses: loaded.pauses || [],
       breaks: loaded.breaks || [],
     };
+    // Seed the per-phase float bounds from the old single focus/break bounds (one-time).
+    if (!this.data.settings.floatPhaseBounds || Object.keys(this.data.settings.floatPhaseBounds).length === 0) {
+      const m: any = {};
+      if (this.data.settings.floatBounds) m.focus = this.data.settings.floatBounds;
+      if (this.data.settings.floatBreakBounds) m.break = this.data.settings.floatBreakBounds;
+      this.data.settings.floatPhaseBounds = m;
+    }
 
     this.timer = new TimerEngine(this, this.data.settings.pomodoroMinutes);
     // When the main window is revealed again, recompute at once so any alert or
@@ -744,6 +762,7 @@ export default class FocusLogPlugin extends Plugin {
     // window is created and hides → sizes → reveals it, so the first visible frame
     // is already small and in the corner (no large-window-in-the-middle flash).
     this.openingFloat = true;
+    this.floatSizePhase = ""; // fresh window — force the phase sizing to apply on open
     let leaf: WorkspaceLeaf;
     try {
       leaf = ws.openPopoutLeaf ? ws.openPopoutLeaf() : ws.getLeaf("window");
@@ -814,34 +833,51 @@ export default class FocusLogPlugin extends Plugin {
         try { win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); } catch {}
       }
       try { if (win.webContents && win.webContents.setBackgroundThrottling) win.webContents.setBackgroundThrottling(false); } catch {}
-      if (initial) {
-        try {
-          const b = this.data.settings.floatBounds;
-          if (b && b.w && b.h) {
-            // Restore the size + position from last time.
-            win.setBounds({ x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.w), height: Math.round(b.h) });
-          } else {
-            const screen = remote.screen;
-            const wa = screen && screen.getPrimaryDisplay ? screen.getPrimaryDisplay().workArea : null;
-            win.setSize(300, 240, false); // first-time default: small, top-right (fits the setup picker)
-            if (wa) win.setPosition(Math.round(wa.x + wa.width - 320), Math.round(wa.y + 40), false);
-          }
-        } catch {}
-      }
       this.floatWin = win;
+      if (initial) this.syncFloatPhase(false); // size to the current phase (or its default)
     } catch {}
   }
 
-  // Remember the float window's geometry so next time it opens where you left it.
-  saveFloatBounds(b: { x: number; y: number; width: number; height: number }) {
-    this.data.settings.floatBounds = { x: b.x, y: b.y, w: b.width, h: b.height };
+  // ---------- per-phase float window geometry ----------
+  // Each phase (setup / focus / pause / break / celebrate) remembers its own size and
+  // position. This replaces the old patchwork (one focus size, one break size, plus
+  // ad-hoc +Npx grows for pause/celebration) that fought each other when phases switched.
+  floatSizePhase = "";
+  getFloatPhaseBounds(phase: string): any { return (this.data.settings.floatPhaseBounds || {})[phase] || null; }
+  saveFloatPhaseBounds(phase: string, b: { x: number; y: number; width: number; height: number }) {
+    if (!phase) return;
+    const m = Object.assign({}, this.data.settings.floatPhaseBounds || {});
+    m[phase] = { x: b.x, y: b.y, w: b.width, h: b.height };
+    this.data.settings.floatPhaseBounds = m;
     this.persist();
   }
-  // The break phase gets its own remembered geometry (larger, for the activity picker),
-  // so the focus and break sizes don't overwrite each other.
-  saveFloatBreakBounds(b: { x: number; y: number; width: number; height: number }) {
-    this.data.settings.floatBreakBounds = { x: b.x, y: b.y, w: b.width, h: b.height };
-    this.persist();
+  private floatPhaseFor(celebrating: boolean): string {
+    if (celebrating) return "celebrate";
+    const s = this.timer.getState();
+    if (s.breakActive) return "break";
+    if (s.paused) return "pause";
+    if (!s.running && s.startedAt == null) return "setup";
+    return "focus";
+  }
+  private applyFloatPhaseBounds(phase: string) {
+    try {
+      const win = this.floatWin;
+      if (!win || !win.setBounds || !win.getBounds) return;
+      const saved = this.getFloatPhaseBounds(phase);
+      if (saved && saved.w && saved.h) { win.setBounds({ x: Math.round(saved.x), y: Math.round(saved.y), width: Math.round(saved.w), height: Math.round(saved.h) }); return; }
+      const d = FLOAT_PHASE_DEFAULTS[phase] || FLOAT_PHASE_DEFAULTS.focus;
+      const cur = win.getBounds(); // first time in this phase: default size, keep current position
+      win.setBounds({ x: cur.x, y: cur.y, width: d.w, height: d.h });
+    } catch {}
+  }
+  // Switch the window to the active phase's geometry, saving where the previous phase was.
+  syncFloatPhase(celebrating: boolean) {
+    const want = this.floatPhaseFor(celebrating);
+    if (want === this.floatSizePhase) return;
+    const prev = this.floatSizePhase;
+    this.floatSizePhase = want;
+    try { const win = this.floatWin; if (prev && win && win.getBounds) this.saveFloatPhaseBounds(prev, win.getBounds()); } catch {}
+    this.applyFloatPhaseBounds(want);
   }
 
   // ---------- timer alerts (work over other apps) ----------
@@ -1274,8 +1310,7 @@ class FloatTimerView extends ItemView {
   private pkey = "";           // chips rebuild only when this (tag list / selection) changes
   private boundsKey = "";      // last seen window geometry (to detect user move/resize)
   private boundsDirty = false; // geometry changed; save once it settles
-  private pauseBaseH = 0;      // window height before the pause picker grew it
-  private celebrateBaseH = 0;  // window height before the celebration grew it
+  private celebrateShown = false; // celebration overlay up → the "celebrate" size phase
   private curPhase = "";       // "setup" | "focus" | "break" — which screen of the loop is showing
   private skey = "";           // setup task-picker rebuilds only when the task list / selection changes
   private bkey = "";           // break activity chips rebuild only when the list / picked set changes
@@ -1375,10 +1410,9 @@ class FloatTimerView extends ItemView {
 
       if (phase === "setup") this.refreshSetup(s);
 
-      // Pause reason picker: grow the window and show the chips while paused.
+      // Pause reason picker: show the chips while paused (the "pause" size phase grows the window).
       if (s.paused !== this.pickerShown) {
         this.pickerShown = s.paused;
-        this.resizeForPause(s.paused);
         if (!s.paused && this.els.picker) { this.els.picker.empty(); this.pkey = ""; }
       }
       if (s.paused) {
@@ -1392,8 +1426,10 @@ class FloatTimerView extends ItemView {
     if ((s.running || s.breakActive || s.startedAt == null) && this.els.celebrate && this.els.celebrate.hasClass("show")) {
       this.els.celebrate.removeClass("show");
       this.els.celebrate.empty();
-      this.resizeForCelebrate(false);
+      this.celebrateShown = false;
     }
+    // Size the window to whichever phase is active (setup / focus / pause / break / celebrate).
+    this.plugin.syncFloatPhase(this.celebrateShown);
   }
 
   // Show only the controls for the active screen.
@@ -1412,8 +1448,8 @@ class FloatTimerView extends ItemView {
   // Switch the window between the small focus size and the larger break size, and
   // (re)build the break DOM on entry.
   onPhaseChange(prev: string, next: string) {
-    if (next === "break") { this.buildBreak(); this.applyBreakWindow(true); }
-    else if (prev === "break") { this.applyBreakWindow(false); this.els.break.empty(); this.els.brkTime = null; }
+    if (next === "break") { this.buildBreak(); }
+    else if (prev === "break") { this.els.break.empty(); this.els.brkTime = null; }
   }
 
   // ---------- setup screen (pick task + rate before starting) ----------
@@ -1506,36 +1542,6 @@ class FloatTimerView extends ItemView {
     el.scrollTop = keepScroll;
   }
 
-  // Save the focus geometry and grow to the remembered (or default 380×400) break size;
-  // on the way out, restore the focus geometry. The break has its own remembered bounds.
-  applyBreakWindow(toBreak: boolean) {
-    try {
-      const win = this.plugin.floatWin;
-      if (!win || !win.getBounds || !win.setBounds) return;
-      if (toBreak) {
-        const b = win.getBounds();
-        this.plugin.saveFloatBounds(b); // remember where the focus window was
-        const bb = this.plugin.data.settings.floatBreakBounds;
-        if (bb && bb.w && bb.h) win.setBounds({ x: Math.round(bb.x), y: Math.round(bb.y), width: Math.round(bb.w), height: Math.round(bb.h) });
-        else win.setBounds({ x: b.x, y: b.y, width: 380, height: 400 });
-      } else {
-        const fb = this.plugin.data.settings.floatBounds;
-        if (fb && fb.w && fb.h) win.setBounds({ x: Math.round(fb.x), y: Math.round(fb.y), width: Math.round(fb.w), height: Math.round(fb.h) });
-      }
-    } catch {}
-  }
-
-  // Grow the window downward to fit the pause picker, then restore the prior height —
-  // relative to whatever size the window currently is, so a remembered/custom size is kept.
-  resizeForPause(paused: boolean) {
-    try {
-      const win = this.plugin.floatWin;
-      if (!win || !win.getSize) return;
-      const [w, h] = win.getSize();
-      if (paused) { this.pauseBaseH = h; win.setSize(w, h + 150, false); }
-      else if (this.pauseBaseH) { win.setSize(w, this.pauseBaseH, false); this.pauseBaseH = 0; }
-    } catch {}
-  }
 
   // Persist the window geometry shortly after the user stops moving/resizing it.
   // Skipped while paused or celebrating (the picker/celebration has grown the
@@ -1544,13 +1550,11 @@ class FloatTimerView extends ItemView {
     try {
       const win = this.plugin.floatWin;
       if (!win || !win.getBounds) return;
-      const st = this.plugin.timer.getState();
-      if (st.paused) return;
-      if (this.celebrateBaseH) return;
       const b = win.getBounds();
       const key = b.x + "," + b.y + "," + b.width + "," + b.height;
       if (key !== this.boundsKey) { this.boundsKey = key; this.boundsDirty = true; return; }
-      if (this.boundsDirty) { this.boundsDirty = false; if (st.breakActive) this.plugin.saveFloatBreakBounds(b); else this.plugin.saveFloatBounds(b); }
+      // Settled — remember this geometry for whichever phase is currently active.
+      if (this.boundsDirty) { this.boundsDirty = false; this.plugin.saveFloatPhaseBounds(this.plugin.floatSizePhase, b); }
     } catch {}
   }
 
@@ -1583,25 +1587,14 @@ class FloatTimerView extends ItemView {
     this.flashT = w.setTimeout(() => this.els.flash && this.els.flash.removeClass("show"), 5000);
   }
 
-  // Grow the window downward while the celebration (rating + done + next-task) is up,
-  // restoring the prior height afterwards — same approach as resizeForPause.
-  resizeForCelebrate(open: boolean) {
-    try {
-      const win = this.plugin.floatWin;
-      if (!win || !win.getSize) return;
-      const [w, h] = win.getSize();
-      if (open && !this.celebrateBaseH) { this.celebrateBaseH = h; win.setSize(w, h + 120, false); }
-      else if (!open && this.celebrateBaseH) { win.setSize(w, this.celebrateBaseH, false); this.celebrateBaseH = 0; }
-    } catch {}
-  }
-
   celebrate() {
     const el = this.els.celebrate;
     if (!el) return;
     el.empty();
     el.addClass("show");
-    this.resizeForCelebrate(true);
-    const dismiss = () => { el.removeClass("show"); el.empty(); el.onclick = null; this.resizeForCelebrate(false); };
+    this.celebrateShown = true;
+    this.plugin.syncFloatPhase(true); // grow to the celebrate size
+    const dismiss = () => { el.removeClass("show"); el.empty(); el.onclick = null; this.celebrateShown = false; this.plugin.syncFloatPhase(false); };
     el.createDiv({ cls: "flt-pop", text: "\u{1F389}" });
     el.createDiv({ cls: "flt-clabel", text: "complete" });
     // Decisions first (Done? next task?), then the rating — tapping a number is the final
@@ -1647,14 +1640,10 @@ class FloatTimerView extends ItemView {
     // be gone, and a throw here could leave a phantom leaf that blocks reopening.
     try { this.unsub?.(); } catch {}
     this.unsub = null;
-    // Capture the final geometry so it reopens here next time (to the right bucket).
+    // Capture the final geometry so it reopens here next time (to the active phase).
     try {
       const win = this.plugin.floatWin;
-      const st = this.plugin.timer.getState();
-      if (win && win.getBounds && !st.paused && !this.celebrateBaseH) {
-        if (st.breakActive) this.plugin.saveFloatBreakBounds(win.getBounds());
-        else this.plugin.saveFloatBounds(win.getBounds());
-      }
+      if (win && win.getBounds) this.plugin.saveFloatPhaseBounds(this.plugin.floatSizePhase, win.getBounds());
     } catch {}
     try {
       const w = this.fwin || window;
