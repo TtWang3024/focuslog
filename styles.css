@@ -50,6 +50,21 @@
   opacity: 1;
 }
 
+/* Break-activity edit/delete: bare pencil/trash icons, no box, shown only on row hover. */
+.workspace-leaf-content[data-type="focuslog-view"] .fl-rowact,
+.workspace-leaf-content[data-type="focuslog-view"] .fl-rowact:hover {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.workspace-leaf-content[data-type="focuslog-view"] .fl-rowact {
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.workspace-leaf-content[data-type="focuslog-view"] .fl-act-row:hover .fl-rowact { opacity: 0.65; }
+.workspace-leaf-content[data-type="focuslog-view"] .fl-rowact:hover { opacity: 1; }
+.workspace-leaf-content[data-type="focuslog-view"] .fl-rowdel:hover { color: #C06A57 !important; }
+
 /* ---------- Floating timer (popout window) ---------- */
 .workspace-leaf-content[data-type="focuslog-float"] .view-content { padding: 0; }
 
@@ -60,9 +75,14 @@
 body.focuslog-float-window .workspace-tab-header-container,
 body.focuslog-float-window .view-header { display: none !important; }
 body.focuslog-float-window .focuslog-float .flt-wrap { -webkit-app-region: drag; padding-top: 18px; }
+/* Anything interactive or scrollable must opt out of window-drag, or the OS treats a
+   press inside it as "move the window" and the scroll stutters / gets stuck. */
 body.focuslog-float-window .focuslog-float .flt-btn,
 body.focuslog-float-window .focuslog-float .flt-chip,
-body.focuslog-float-window .focuslog-float .flt-celebrate { -webkit-app-region: no-drag; }
+body.focuslog-float-window .focuslog-float .flt-celebrate,
+body.focuslog-float-window .focuslog-float .flt-picker,
+body.focuslog-float-window .focuslog-float .flt-break,
+body.focuslog-float-window .focuslog-float .flt-brk-acts { -webkit-app-region: no-drag; }
 
 /* Obsidian mirrors Notice toasts into every window; in the tiny float they appear
    as a dark box over the timer, and the float has its own flash banner for the
@@ -94,6 +114,7 @@ body.focuslog-float-window .notice { display: none !important; }
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: 0.02em;
+  flex-shrink: 0; /* stays pinned above the scrollable pause picker */
 }
 .focuslog-float .flt-time {
   font-family: 'Baloo 2', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -104,9 +125,10 @@ body.focuslog-float-window .notice { display: none !important; }
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: #2b2723;
+  flex-shrink: 0;
 }
 .focuslog-float .flt-time.is-done { color: #5b8c5a; }
-.focuslog-float .flt-row { display: flex; gap: 6px; align-items: center; justify-content: center; }
+.focuslog-float .flt-row { display: flex; gap: 6px; align-items: center; justify-content: center; flex-shrink: 0; }
 .focuslog-float .flt-btn {
   font-family: 'Baloo 2', system-ui, -apple-system, sans-serif;
   font-size: 13px;
@@ -148,8 +170,9 @@ body.focuslog-float-window .notice { display: none !important; }
 }
 .focuslog-float .flt-flash.show { opacity: 1; transform: translateY(0); }
 
-/* Pause reason picker (shown when paused; the window grows to fit it) */
-.focuslog-float .flt-picker { width: 100%; padding: 2px 2px 0; }
+/* Pause reason picker (shown when paused). Fills the space under the fixed
+   title/timer/buttons and scrolls on its own when the window is short. */
+.focuslog-float .flt-picker { width: 100%; padding: 2px 2px 0; flex: 1 1 auto; min-height: 0; overflow-y: auto; box-sizing: border-box; }
 .focuslog-float .flt-picker:empty { display: none; }
 .focuslog-float .flt-picker-q { font-size: 11px; color: #8a8175; margin-bottom: 6px; text-align: center; }
 .focuslog-float .flt-picker-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
@@ -233,10 +256,10 @@ body.focuslog-float-window .notice { display: none !important; }
 /* Floating window — break screen (rest timer + activities + feeling) */
 .focuslog-float .flt-break {
   -webkit-app-region: no-drag;
-  width: 100%; flex: 1; display: flex; flex-direction: column; gap: 10px;
-  overflow-y: auto; padding: 2px;
+  width: 100%; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px;
+  overflow: hidden; padding: 2px;
 }
-.focuslog-float .flt-brk-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.focuslog-float .flt-brk-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
 .focuslog-float .flt-brktime {
   font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 600; font-size: 30px;
   line-height: 1; font-variant-numeric: tabular-nums; color: #2b2723;
@@ -245,15 +268,15 @@ body.focuslog-float-window .notice { display: none !important; }
 .focuslog-float .flt-brk-ctrls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .focuslog-float .flt-btn.flt-brk-toggle { background: #2b2723; color: #fdfbf6; border-color: #2b2723; }
 .focuslog-float .flt-btn.flt-brk-toggle:hover { background: #423b34; }
-.focuslog-float .flt-brk-lbl { font-size: 11px; color: #8a8175; }
-.focuslog-float .flt-brk-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.focuslog-float .flt-brk-lbl { font-size: 11px; color: #8a8175; flex-shrink: 0; }
+.focuslog-float .flt-brk-acts { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .focuslog-float .flt-chip.flt-brk-chip {
   background: #f4efe4; border-color: #d8cfbd; opacity: 0.55;
   text-align: left; white-space: normal; height: auto; line-height: 1.3;
 }
 .focuslog-float .flt-chip.flt-brk-chip.is-on { opacity: 1; font-weight: 700; border-color: #5b8c5a; background: #e7efe4; }
 .focuslog-float .flt-brk-empty { font-size: 11px; color: #8a8175; }
-.focuslog-float .flt-brk-feel { display: flex; flex-direction: column; gap: 5px; align-items: center; padding-top: 8px; border-top: 1px solid #ece5d6; }
+.focuslog-float .flt-brk-feel { display: flex; flex-direction: column; gap: 5px; align-items: center; padding-top: 8px; border-top: 1px solid #ece5d6; flex-shrink: 0; }
 
 /* Celebration modal */
 .focuslog-celebrate { text-align: center; position: relative; overflow: hidden; }

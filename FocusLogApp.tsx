@@ -359,6 +359,8 @@ function darken(rgb: any, f: number): string {
 // and a terracotta add.
 const EDIT_BTN: any = { padding: "3px 9px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "#F2EEE6", border: "1px solid #C9C1B2", color: "#6B6256" };
 const DEL_BTN: any = { padding: "3px 9px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "transparent", border: "1px solid #D89A8E", color: "#C06A57" };
+// Bare hover-reveal icon button (no box), like the Today-view lock toggle.
+const ICON_BTN: any = { background: "transparent", border: "none", boxShadow: "none", padding: 2, height: "auto", cursor: "pointer", color: "#8a8175", display: "inline-flex", flexShrink: 0 };
 const ADD_BTN: any = { padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "#C57B5A", border: "1px solid #C57B5A", color: "rgb(251, 248, 241)" };
 function polarPt(cx: number, cy: number, r: number, deg: number) {
   const a = (deg * Math.PI) / 180;
@@ -422,6 +424,24 @@ function LockIcon({ size = 13, open = false }: any) {
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
       <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
       {open ? <path d="M7 11V7a5 5 0 0 1 9.9-1" /> : <path d="M7 11V7a5 5 0 0 1 10 0v4" />}
+    </svg>
+  );
+}
+function PencilIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
+      <path d="m15 5 4 4" />
+    </svg>
+  );
+}
+function TrashIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <path d="M3 6h18" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" x2="10" y1="11" y2="17" />
+      <line x1="14" x2="14" y1="11" y2="17" />
     </svg>
   );
 }
@@ -821,6 +841,8 @@ export default function FocusLogApp({ api }: any) {
     active: !!timer.breakActive, secs: timer.breakSecs || 0, running: !!timer.breakRunning,
     finished: !!timer.breakFinished, picked: timer.breakPicked || [], feeling: timer.breakFeeling ?? null,
   };
+  // During a break, the Break-activities rows double as the picker (tap to toggle).
+  const isPicked = (a: any) => brk.active && brk.picked.includes(a.id);
   // Follow the engine into the break view whenever a break begins (e.g. one started from
   // the floating window), and refresh activities/breaks when the engine commits one.
   useEffect(() => { if (brk.active) setView("break"); }, [brk.active]);
@@ -1371,15 +1393,7 @@ export default function FocusLogApp({ api }: any) {
                     <button onClick={endBreak} style={btn(C.muted, true)}>{brk.finished ? "go back to my task" : "end break"}</button>
                   </div>
                 </div>
-                <p style={{ color: C.muted, fontSize: 12, margin: "0 0 8px" }}>Pick up to 3 things to do on this break ({brk.picked.length}/3):</p>
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 8 }}>
-                  {activities.length === 0 ? <span style={{ color: C.muted, fontSize: 13 }}>No activities yet — add some below.</span> :
-                    activities.map((a) => {
-                      const on = brk.picked.includes(a.id);
-                      const fill = areaColor(a.area);
-                      return <button key={a.id} onClick={() => togglePick(a.id)} style={{ padding: "6px 12px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${areaBorder(a.area)}`, background: fill, color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", textAlign: "left", maxWidth: "100%", height: "auto", minHeight: 0, lineHeight: 1.35 }}>{on ? "✓ " : ""}{a.name}</button>;
-                    })}
-                </div>
+                <p style={{ color: C.muted, fontSize: 12, margin: "0 0 0" }}>Pick up to 3 activities below — tap them to toggle ({brk.picked.length}/3).</p>
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
                   <Scale label="how do you feel now? (1 worse than no rest … 5 a lot better)" value={brk.feeling} onChange={(v: number) => api.timer.setBreakFeeling(v)} color={settings.endColor} />
                 </div>
@@ -1387,7 +1401,8 @@ export default function FocusLogApp({ api }: any) {
             )}
 
             <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
-              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Break activities</h3>
+              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: brk.active ? "0 0 4px" : "0 0 10px" }}>Break activities</h3>
+              {brk.active && <p style={{ color: C.muted, fontSize: 12, margin: "0 0 10px" }}>Tap an activity to pick it for this break ({brk.picked.length}/3).</p>}
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
                 {activities.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>None yet. Add an activity and an area below.</p>}
                 {activities.map((a, i) => (
@@ -1400,18 +1415,20 @@ export default function FocusLogApp({ api }: any) {
                     </div>
                   ) : (
                     <div key={a.id}
+                      className="fl-act-row"
+                      onClick={brk.active ? () => togglePick(a.id) : undefined}
                       onDragOver={(e) => { e.preventDefault(); if (actOver !== i) setActOver(i); }}
                       onDrop={(e) => { e.preventDefault(); moveActivity(actDrag, i); setActDrag(null); setActOver(null); }}
-                      style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: "#fbf8f1", border: `1px solid ${C.line}`, borderLeft: `4px solid ${areaBorder(a.area)}`, borderRadius: 6, color: C.ink, opacity: actDrag === i ? 0.4 : 1, boxShadow: actOver === i && actDrag !== null && actDrag !== i ? `inset 0 2px 0 ${C.ink}` : "none" }}>
-                      <span draggable onDragStart={(e) => { setActDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }} onDragEnd={() => { setActDrag(null); setActOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: isPicked(a) ? areaColor(a.area) : "#fbf8f1", border: `1px solid ${C.line}`, borderLeft: `${isPicked(a) ? 6 : 4}px solid ${areaBorder(a.area)}`, borderRadius: 6, color: C.ink, cursor: brk.active ? "pointer" : "default", opacity: actDrag === i ? 0.4 : 1, boxShadow: actOver === i && actDrag !== null && actDrag !== i ? `inset 0 2px 0 ${C.ink}` : "none" }}>
+                      <span draggable onClick={(e) => e.stopPropagation()} onDragStart={(e) => { setActDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }} onDragEnd={() => { setActDrag(null); setActOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
                         {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
                       </span>
-                      <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{a.name}</span>
+                      <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", fontWeight: isPicked(a) ? 700 : 400 }}>{isPicked(a) ? "✓ " : ""}{a.name}</span>
                       {!tinyPanel && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", padding: "1px 8px", borderRadius: 999, background: areaColor(a.area), border: `1px solid ${areaBorder(a.area)}`, color: darken(areaBorder(a.area), 0.62), whiteSpace: "nowrap" }}>#{a.area}</span>}
                       {!narrowPanel && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted }}>{a.count || 0}{"×"}</span>}
                       {!narrowPanel && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>}
-                      <button onClick={() => startEditAct(a)} style={EDIT_BTN}>edit</button>
-                      <button onClick={() => removeActivity(a.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
+                      <button onClick={(e) => { e.stopPropagation(); startEditAct(a); }} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); removeActivity(a.id); }} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
                     </div>
                   )
                 ))}

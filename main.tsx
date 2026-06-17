@@ -1488,6 +1488,7 @@ class FloatTimerView extends ItemView {
   }
   buildBreakChips(acts: any[], picked: string[]) {
     const el = this.els.brkActs;
+    const keepScroll = el.scrollTop; // a pick rebuilds the list — don't jump back to the top
     el.empty();
     if (!acts.length) { el.createDiv({ cls: "flt-brk-empty", text: "No activities yet — add some in the panel's Break tab." }); return; }
     acts.forEach((a: any) => {
@@ -1495,6 +1496,7 @@ class FloatTimerView extends ItemView {
       const chip = el.createEl("button", { cls: "flt-chip flt-brk-chip" + (on ? " is-on" : ""), text: (on ? "✓ " : "") + a.name });
       chip.onclick = () => this.plugin.timer.toggleBreakPick(a.id);
     });
+    el.scrollTop = keepScroll;
   }
 
   // Save the focus geometry and grow to the remembered (or default 380×400) break size;
@@ -1548,6 +1550,7 @@ class FloatTimerView extends ItemView {
   buildPicker(selected: string) {
     const el = this.els.picker;
     if (!el) return;
+    const keepScroll = el.scrollTop; // picking a tag rebuilds — preserve scroll position
     el.empty();
     el.createDiv({ cls: "flt-picker-q", text: "Paused — why? Pick a reason." });
     const chips = el.createDiv({ cls: "flt-picker-chips" });
@@ -1561,6 +1564,7 @@ class FloatTimerView extends ItemView {
       chip.style.borderColor = FLOAT_CAT[cat].border;
       chip.onclick = () => this.plugin.timer.setPauseTag(on ? "" : t.name);
     });
+    el.scrollTop = keepScroll;
   }
 
   flash(msg: string) {
