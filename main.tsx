@@ -1268,6 +1268,8 @@ class FloatTimerView extends ItemView {
   private celebrateT = 0;
   private localTick = 0;
   private lastIcon = ""; // avoid re-rendering the play/pause svg every tick
+  private lastBrkIcon = ""; // break toggle (pause/play) icon, re-set only on change
+  private lastEndIcon = ""; // break end (check/next) icon, re-set only on change
   private pickerShown = false; // whether the pause reason picker is currently expanded
   private pkey = "";           // chips rebuild only when this (tag list / selection) changes
   private boundsKey = "";      // last seen window geometry (to detect user move/resize)
@@ -1449,9 +1451,10 @@ class FloatTimerView extends ItemView {
     this.els.brkTime = head.createDiv({ cls: "flt-brktime" });
     const ctrls = head.createDiv({ cls: "flt-brk-ctrls" });
     this.els.brkMinus = ctrls.createEl("button", { cls: "flt-btn flt-step", text: "−" });
-    this.els.brkToggle = ctrls.createEl("button", { cls: "flt-btn flt-brk-toggle" });
+    this.els.brkToggle = ctrls.createEl("button", { cls: "flt-btn flt-brk-toggle flt-icon" });
     this.els.brkPlus = ctrls.createEl("button", { cls: "flt-btn flt-step", text: "+" });
-    this.els.brkEnd = ctrls.createEl("button", { cls: "flt-btn flt-brk-end" });
+    this.els.brkEnd = ctrls.createEl("button", { cls: "flt-btn flt-brk-end flt-icon" });
+    this.lastBrkIcon = ""; this.lastEndIcon = "";
     this.els.brkMinus.onclick = () => this.plugin.timer.stepBreak(-1);
     this.els.brkPlus.onclick = () => this.plugin.timer.stepBreak(1);
     this.els.brkToggle.onclick = () => this.plugin.timer.toggleBreakRun();
@@ -1474,11 +1477,15 @@ class FloatTimerView extends ItemView {
     const ss = String(s.breakSecs % 60).padStart(2, "0");
     this.els.brkTime.setText(mm + ":" + ss);
     this.els.brkTime.toggleClass("is-done", s.breakFinished);
-    this.els.brkToggle.setText(s.breakFinished ? "done" : (s.breakRunning ? "pause" : "start"));
     this.els.brkToggle.disabled = s.breakFinished;
+    const toggleIcon = s.breakRunning ? "pause" : "play";
+    if (this.lastBrkIcon !== toggleIcon) { setIcon(this.els.brkToggle, toggleIcon); this.lastBrkIcon = toggleIcon; }
+    this.els.brkToggle.setAttribute("aria-label", s.breakRunning ? "pause" : "start");
     this.els.brkMinus.disabled = s.breakSecs <= 60;
     this.els.brkPlus.disabled = s.breakSecs >= 30 * 60;
-    this.els.brkEnd.setText(s.breakFinished ? "next task →" : "end break");
+    const endIcon = s.breakFinished ? "arrow-right" : "check";
+    if (this.lastEndIcon !== endIcon) { setIcon(this.els.brkEnd, endIcon); this.lastEndIcon = endIcon; }
+    this.els.brkEnd.setAttribute("aria-label", s.breakFinished ? "next task" : "end break");
     const acts = this.plugin.data.activities || [];
     const picked = s.breakPicked || [];
     const bkey = "B:" + acts.map((a: any) => a.id).join("|") + "::" + picked.join(",");
@@ -1604,7 +1611,7 @@ class FloatTimerView extends ItemView {
     const doneLabel = opts.createEl("label", { cls: "flt-donebox" });
     const doneBox = doneLabel.createEl("input"); // empty (unticked) by default
     doneBox.type = "checkbox";
-    doneLabel.createSpan({ text: "Set this task to Done" });
+    doneLabel.createSpan({ text: "\u{1F389} Set this task to Done" });
     doneLabel.onclick = (ev: any) => { if (ev && ev.stopPropagation) ev.stopPropagation(); };
     doneBox.onchange = () => { done = doneBox.checked; };
     const sel = opts.createEl("select", { cls: "flt-next" }) as HTMLSelectElement;

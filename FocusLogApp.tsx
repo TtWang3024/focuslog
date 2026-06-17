@@ -1393,16 +1393,22 @@ export default function FocusLogApp({ api }: any) {
                     <button onClick={endBreak} style={btn(C.muted, true)}>{brk.finished ? "go back to my task" : "end break"}</button>
                   </div>
                 </div>
-                <p style={{ color: C.muted, fontSize: 12, margin: "0 0 0" }}>Pick up to 3 activities below — tap them to toggle ({brk.picked.length}/3).</p>
+                <p style={{ color: C.muted, fontSize: 12, margin: "0 0 8px" }}>Pick up to 3 — tap an activity ({brk.picked.length}/3):</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {activities.length === 0 ? <span style={{ color: C.muted, fontSize: 13 }}>No activities yet — end the break to add some.</span> :
+                    activities.map((a) => {
+                      const on = brk.picked.includes(a.id);
+                      return <button key={a.id} onClick={() => togglePick(a.id)} style={{ padding: "6px 12px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${areaBorder(a.area)}`, background: areaColor(a.area), color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", textAlign: "left", maxWidth: "100%", height: "auto", minHeight: 0, lineHeight: 1.35 }}>{on ? "✓ " : ""}{a.name}</button>;
+                    })}
+                </div>
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
                   <Scale label="how do you feel now? (1 worse than no rest … 5 a lot better)" value={brk.feeling} onChange={(v: number) => api.timer.setBreakFeeling(v)} color={settings.endColor} />
                 </div>
               </div>
             )}
 
-            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
-              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: brk.active ? "0 0 4px" : "0 0 10px" }}>Break activities</h3>
-              {brk.active && <p style={{ color: C.muted, fontSize: 12, margin: "0 0 10px" }}>Tap an activity to pick it for this break ({brk.picked.length}/3).</p>}
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20, display: brk.active ? "none" : undefined }}>
+              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Break activities</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
                 {activities.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>None yet. Add an activity and an area below.</p>}
                 {activities.map((a, i) => (

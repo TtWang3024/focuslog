@@ -221,14 +221,15 @@ body.focuslog-float-window .notice { display: none !important; }
 }
 .focuslog-float .flt-celebrate .flt-rbtn:hover { background: #5b8c5a; border-color: #5b8c5a; color: #fff; }
 .focuslog-float .flt-celebrate .flt-copts { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 8px; z-index: 1; width: 100%; }
-/* "Set this task to Done" — a clear checkbox + label, empty by default. */
+/* "Set this task to Done" — styled like the Notion "Done" status: pink pill with an
+   emoji before the text. Still a checkbox (empty by default) so it stays a clear toggle. */
 .focuslog-float .flt-celebrate .flt-donebox {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   width: 100%; box-sizing: border-box; cursor: pointer;
-  font-family: 'Baloo 2', system-ui, sans-serif; font-size: 13px; color: #2b2723;
-  background: #fffefc; border: 1px solid #cfc7b8; border-radius: 7px; padding: 6px 12px;
+  font-family: 'Baloo 2', system-ui, sans-serif; font-size: 13px; font-weight: 600; color: #7a3b53;
+  background: #f8e1ec; border: 1px solid #e3a9c5; border-radius: 7px; padding: 6px 12px;
 }
-.focuslog-float .flt-celebrate .flt-donebox input { width: 15px; height: 15px; accent-color: #5b8c5a; cursor: pointer; margin: 0; flex-shrink: 0; }
+.focuslog-float .flt-celebrate .flt-donebox input { width: 15px; height: 15px; accent-color: #c75b92; cursor: pointer; margin: 0; flex-shrink: 0; }
 .focuslog-float .flt-celebrate .flt-next {
   width: 100%; font-size: 11px; border: 1px solid #cfc7b8; border-radius: 6px;
   background: #fffefc; color: #2b2723; padding: 4px 6px;
@@ -259,13 +260,13 @@ body.focuslog-float-window .notice { display: none !important; }
   width: 100%; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px;
   overflow: hidden; padding: 2px;
 }
-.focuslog-float .flt-brk-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+.focuslog-float .flt-brk-head { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
 .focuslog-float .flt-brktime {
   font-family: 'Baloo 2', system-ui, sans-serif; font-weight: 600; font-size: 30px;
   line-height: 1; font-variant-numeric: tabular-nums; color: #2b2723;
 }
 .focuslog-float .flt-brktime.is-done { color: #5b8c5a; }
-.focuslog-float .flt-brk-ctrls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.focuslog-float .flt-brk-ctrls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; }
 .focuslog-float .flt-btn.flt-brk-toggle { background: #2b2723; color: #fdfbf6; border-color: #2b2723; }
 .focuslog-float .flt-btn.flt-brk-toggle:hover { background: #423b34; }
 .focuslog-float .flt-brk-lbl { font-size: 11px; color: #8a8175; flex-shrink: 0; }
