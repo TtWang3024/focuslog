@@ -26463,13 +26463,16 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     el.createDiv({ cls: "flt-clabel", text: "complete" });
     let done = false;
     const opts = el.createDiv({ cls: "flt-copts" });
-    const doneChip = opts.createEl("button", { cls: "flt-chip flt-done", text: "set task to Done" });
-    doneChip.onclick = (ev) => {
+    const doneLabel = opts.createEl("label", { cls: "flt-donebox" });
+    const doneBox = doneLabel.createEl("input");
+    doneBox.type = "checkbox";
+    doneLabel.createSpan({ text: "Set this task to Done" });
+    doneLabel.onclick = (ev) => {
       if (ev && ev.stopPropagation)
         ev.stopPropagation();
-      done = !done;
-      doneChip.toggleClass("is-on", done);
-      doneChip.setText((done ? "\u2713 " : "") + "set task to Done");
+    };
+    doneBox.onchange = () => {
+      done = doneBox.checked;
     };
     const sel = opts.createEl("select", { cls: "flt-next" });
     sel.createEl("option", { text: "\u2014 next task: decide later \u2014", value: "" });
@@ -26493,7 +26496,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
         this.flash("Logged " + n + "/5 \u2713");
       };
     });
-    el.createDiv({ cls: "flt-chint", text: "tap a rating to log \xB7 tap background for the full form" });
+    el.createDiv({ cls: "flt-chint", text: "Tap a rating to log it \u2014 or tap outside for the full form" });
     const colors = ["#d98324", "#2f6f8f", "#5b8c5a", "#b4533a", "#c9a227"];
     for (let i = 0; i < 24; i++) {
       const piece = el.createSpan({ cls: "fl-piece" });

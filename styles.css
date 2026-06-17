@@ -179,6 +179,8 @@ body.focuslog-float-window .notice { display: none !important; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 0 18px;            /* breathing room from the window edges */
+  box-sizing: border-box;
   background: rgba(253, 251, 246, 0.94);
   overflow: hidden;
   cursor: pointer;
@@ -195,9 +197,15 @@ body.focuslog-float-window .notice { display: none !important; }
   font-size: 14px; cursor: pointer; padding: 0;
 }
 .focuslog-float .flt-celebrate .flt-rbtn:hover { background: #5b8c5a; border-color: #5b8c5a; color: #fff; }
-.focuslog-float .flt-celebrate .flt-copts { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 8px; z-index: 1; width: 88%; }
-.focuslog-float .flt-celebrate .flt-done { font-size: 11px; padding: 4px 10px; opacity: 0.6; }
-.focuslog-float .flt-celebrate .flt-done.is-on { opacity: 1; font-weight: 700; border-color: #5b8c5a; background: #e7efe4; }
+.focuslog-float .flt-celebrate .flt-copts { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 8px; z-index: 1; width: 100%; }
+/* "Set this task to Done" — a clear checkbox + label, empty by default. */
+.focuslog-float .flt-celebrate .flt-donebox {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; box-sizing: border-box; cursor: pointer;
+  font-family: 'Baloo 2', system-ui, sans-serif; font-size: 13px; color: #2b2723;
+  background: #fffefc; border: 1px solid #cfc7b8; border-radius: 7px; padding: 6px 12px;
+}
+.focuslog-float .flt-celebrate .flt-donebox input { width: 15px; height: 15px; accent-color: #5b8c5a; cursor: pointer; margin: 0; flex-shrink: 0; }
 .focuslog-float .flt-celebrate .flt-next {
   width: 100%; font-size: 11px; border: 1px solid #cfc7b8; border-radius: 6px;
   background: #fffefc; color: #2b2723; padding: 4px 6px;
