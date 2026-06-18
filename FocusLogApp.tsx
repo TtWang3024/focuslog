@@ -355,12 +355,10 @@ export function darken(rgb: any, f: number): string {
   if (!m) return String(rgb);
   return `rgb(${Math.round(+m[1] * f)}, ${Math.round(+m[2] * f)}, ${Math.round(+m[3] * f)})`;
 }
-// Manager buttons: a quiet edit, a cautious delete (soft wash on hover via .fl-del in styles.css),
-// and a terracotta add.
-const EDIT_BTN: any = { padding: "3px 9px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "#F2EEE6", border: "1px solid #C9C1B2", color: "#6B6256" };
-const DEL_BTN: any = { padding: "3px 9px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "transparent", border: "1px solid #D89A8E", color: "#C06A57" };
-// Bare hover-reveal icon button (no box), like the Today-view lock toggle.
+// Bare hover-reveal icon button (no box), like the Today-view lock toggle. Used for
+// edit (pencil) / delete (trash) on every manager and session row.
 const ICON_BTN: any = { background: "transparent", border: "none", boxShadow: "none", padding: 2, height: "auto", cursor: "pointer", color: "#8a8175", display: "inline-flex", flexShrink: 0 };
+// The terracotta add button.
 const ADD_BTN: any = { padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "#C57B5A", border: "1px solid #C57B5A", color: "rgb(251, 248, 241)" };
 function polarPt(cx: number, cy: number, r: number, deg: number) {
   const a = (deg * Math.PI) / 180;
@@ -1300,7 +1298,7 @@ export default function FocusLogApp({ api }: any) {
                 return (
                   <div
                     key={key}
-                    className="fl-task-row"
+                    className="fl-task-row fl-act-row"
                     onDragOver={(e) => { e.preventDefault(); if (overIndex !== i) setOverIndex(i); }}
                     onDrop={(e) => { e.preventDefault(); moveTask(dragIndex, i); setDragIndex(null); setOverIndex(null); }}
                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${isOver ? C.ink : C.line}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }}
@@ -1331,7 +1329,7 @@ export default function FocusLogApp({ api }: any) {
                       <TomatoPips vivid={done} grey={remaining} />
                       <span style={{ fontSize: 10.5, color: C.muted, fontFamily: "var(--fl-mono)" }}>{completed} done</span>
                     </div>
-                    <button onClick={() => openLog(t.task)} title="log" aria-label="log" style={{ ...btn(C.muted, true), display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "6px 9px" }}><SquarePenIcon size={15} /></button>
+                    <button onClick={() => openLog(t.task)} className="fl-rowact" title="log" aria-label="log" style={ICON_BTN}><SquarePenIcon size={15} /></button>
                   </div>
                 );
               })}
@@ -1617,17 +1615,17 @@ export default function FocusLogApp({ api }: any) {
                           <Scale label="feeling" value={breakDraft.feeling} onChange={(v: number) => setBreakDraft({ ...breakDraft, feeling: v })} color={settings.endColor} />
                           <button onClick={() => setBreakDraft({ ...breakDraft, feeling: null })} style={{ ...btn(C.muted, true), padding: "2px 8px", fontSize: 11, marginBottom: 12 }}>clear</button>
                         </div>
-                        <button onClick={saveEditBreak} style={{ ...btn(C.ink), padding: "4px 10px" }}>save</button>
-                        <button onClick={() => setEditBreakId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
+                        <button onClick={saveEditBreak} title="save" aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
+                        <button onClick={() => setEditBreakId(null)} title="cancel" aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
                       </div>
                     ) : (
-                      <div key={b.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                      <div key={b.id} className="fl-act-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(b.start)} {fmtTime(b.start)}{"–"}{fmtTime(b.end)}</span>
                         <span style={{ flex: 1, minWidth: 120, overflowWrap: "anywhere" }}>{(b.activities && b.activities.length) ? b.activities.join(", ") : "—"}</span>
                         <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>{(b.areas && b.areas.length) ? b.areas.join(" · ") : ""}</span>
                         {b.feeling != null && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: settings.endColor, whiteSpace: "nowrap" }}>{b.feeling}/5</span>}
-                        <button onClick={() => startEditBreak(b)} style={EDIT_BTN}>edit</button>
-                        <button onClick={() => deleteBreak(b.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
+                        <button onClick={() => startEditBreak(b)} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                        <button onClick={() => deleteBreak(b.id)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
                       </div>
                     )
                   ))}
@@ -1727,16 +1725,16 @@ export default function FocusLogApp({ api }: any) {
                         <select value={pauseDraft.tag} onChange={(e) => setPauseDraft({ ...pauseDraft, tag: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }}>
                           {pauseTags.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
                         </select>
-                        <button onClick={saveEditPause} style={{ ...btn(C.ink), padding: "4px 10px" }}>save</button>
-                        <button onClick={() => setEditPauseId(null)} style={{ ...btn(C.muted, true), padding: "4px 10px" }}>cancel</button>
+                        <button onClick={saveEditPause} title="save" aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
+                        <button onClick={() => setEditPauseId(null)} title="cancel" aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
                       </div>
                     ) : (
-                      <div key={p.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                      <div key={p.id} className="fl-act-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(p.ts)} {fmtTime(p.ts)}</span>
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, minWidth: 34 }}>{p.mins != null ? p.mins + "m" : "—"}</span>
                         <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{p.tag}</span>
-                        <button onClick={() => startEditPause(p)} style={EDIT_BTN}>edit</button>
-                        <button onClick={() => deletePause(p.id)} style={DEL_BTN} className="fl-del">{"✕"}</button>
+                        <button onClick={() => startEditPause(p)} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                        <button onClick={() => deletePause(p.id)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
                       </div>
                     )
                   ))}

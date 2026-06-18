@@ -28,11 +28,6 @@
   padding-left: 0;
 }
 
-/* Delete (×) button in the break/pause managers: soft wash only on hover. */
-.workspace-leaf-content[data-type="focuslog-view"] .fl-del:hover {
-  background: #F6E4DF !important;
-}
-
 /* Pin-to-top lock in the Today list: hidden until the row is hovered, but always
    visible on tasks that are pinned. Bare glyph — no button chrome. */
 .workspace-leaf-content[data-type="focuslog-view"] .fl-lock,
