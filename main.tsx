@@ -1,7 +1,7 @@
 import { App, ItemView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath, requestUrl, setIcon } from "obsidian";
 import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
-import FocusLogApp from "./FocusLogApp";
+import FocusLogApp, { MACARON, darken } from "./FocusLogApp";
 
 export const VIEW_TYPE = "focuslog-view";
 export const VIEW_TYPE_FLOAT = "focuslog-float";
@@ -1534,10 +1534,24 @@ class FloatTimerView extends ItemView {
     const keepScroll = el.scrollTop; // a pick rebuilds the list — don't jump back to the top
     el.empty();
     if (!acts.length) { el.createDiv({ cls: "flt-brk-empty", text: "No activities yet — add some in the panel's Break tab." }); return; }
+    // Rows in the same format as the panel's Break-activities list: a coloured left
+    // bar + #area pill + name, tappable to toggle (up to 3). Colours match the panel
+    // (each area takes the next macaron colour, keyed by sorted name).
+    const areaNames = Array.from(new Set(acts.map((a: any) => a.area || "Other"))).sort();
+    const colorOf = (area: string) => MACARON[Math.max(0, areaNames.indexOf(area || "Other")) % MACARON.length];
     acts.forEach((a: any) => {
       const on = picked.includes(a.id);
-      const chip = el.createEl("button", { cls: "flt-chip flt-brk-chip" + (on ? " is-on" : ""), text: (on ? "✓ " : "") + a.name });
-      chip.onclick = () => this.plugin.timer.toggleBreakPick(a.id);
+      const col = colorOf(a.area || "Other");
+      const row = el.createDiv({ cls: "flt-brk-row" + (on ? " is-on" : "") });
+      row.style.borderLeftColor = col.border;
+      if (on) row.style.background = col.fill;
+      const pcol = row.createDiv({ cls: "flt-brk-pillcol" });
+      const pill = pcol.createSpan({ cls: "flt-brk-pill", text: "#" + (a.area || "Other") });
+      pill.style.background = col.fill;
+      pill.style.borderColor = col.border;
+      pill.style.color = darken(col.border, 0.62);
+      row.createDiv({ cls: "flt-brk-name", text: (on ? "✓ " : "") + a.name });
+      row.onclick = () => this.plugin.timer.toggleBreakPick(a.id);
     });
     el.scrollTop = keepScroll;
   }

@@ -270,12 +270,21 @@ body.focuslog-float-window .notice { display: none !important; }
 .focuslog-float .flt-btn.flt-brk-toggle { background: #2b2723; color: #fdfbf6; border-color: #2b2723; }
 .focuslog-float .flt-btn.flt-brk-toggle:hover { background: #423b34; }
 .focuslog-float .flt-brk-lbl { font-size: 11px; color: #8a8175; flex-shrink: 0; }
-.focuslog-float .flt-brk-acts { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-.focuslog-float .flt-chip.flt-brk-chip {
-  background: #f4efe4; border-color: #d8cfbd; opacity: 0.55;
-  text-align: left; white-space: normal; height: auto; line-height: 1.3;
+/* Break activities in the float: same row format as the panel — calm cream rows
+   with a coloured left bar + an #area pill, tappable to toggle (✓ + fill when on). */
+.focuslog-float .flt-brk-acts { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.focuslog-float .flt-brk-row {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  background: #fbf8f1; border: 1px solid #e4ddcf; border-left: 4px solid #ccc;
+  border-radius: 6px; padding: 6px 10px; font-size: 13px; color: #2b2723;
 }
-.focuslog-float .flt-chip.flt-brk-chip.is-on { opacity: 1; font-weight: 700; border-color: #5b8c5a; background: #e7efe4; }
+.focuslog-float .flt-brk-row.is-on { font-weight: 700; }
+.focuslog-float .flt-brk-pillcol { min-width: 88px; flex-shrink: 0; display: flex; align-items: center; }
+.focuslog-float .flt-brk-name { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.3; }
+.focuslog-float .flt-brk-pill {
+  font-family: 'Baloo 2', system-ui, sans-serif; font-size: 11px;
+  padding: 1px 8px; border-radius: 999px; border: 1px solid; white-space: nowrap; flex-shrink: 0;
+}
 .focuslog-float .flt-brk-empty { font-size: 11px; color: #8a8175; }
 .focuslog-float .flt-brk-feel { display: flex; flex-direction: column; gap: 5px; align-items: center; padding-top: 8px; border-top: 1px solid #ece5d6; flex-shrink: 0; }
 
