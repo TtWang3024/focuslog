@@ -50,15 +50,16 @@ function weekStartOf(d: any, sundayStart?: boolean) { const x = startOfDay(d); c
 // pushes the boundary later into the morning, so late-night work stays on the previous
 // day (subtract). An evening start (13–23) rolls the day over that night, so the late
 // hours fall on the next date (add).
-const dayShift = (s: any) => { const h = s.dayStart || 0; return h <= 12 ? h : h - 24; };
+const dayShift = (s: any) => { const h = (s.dayStart || 0) / 60; return h <= 12 ? h : h - 24; };
 const logicalDay = (ts: any, s: any) => startOfDay(new Date(ts).getTime() - dayShift(s) * 3600000);
 const logicalWeekStart = (ts: any, s: any) => weekStartOf(logicalDay(ts, s), s.weekStartsSunday);
 function bandOf(ts: any, s: any) {
-  const h = new Date(ts).getHours();
+  const d = new Date(ts);
+  const m = d.getHours() * 60 + d.getMinutes();
   const ds = s.dayStart || 0;
-  if (ds <= 12 && h < ds) return 2; // pre-dawn tail of a morning-offset day reads as evening
-  if (h < s.morningEnd) return 0;
-  if (h < s.afternoonEnd) return 1;
+  if (ds <= 720 && m < ds) return 2; // pre-dawn tail of a morning-offset day reads as evening
+  if (m < s.morningEnd) return 0;
+  if (m < s.afternoonEnd) return 1;
   return 2;
 }
 function timeColor(ts: any, s: any) {
@@ -67,6 +68,9 @@ function timeColor(ts: any, s: any) {
 }
 const weekdayInk = (wd: number) => { const w = WEEKDAY[wd]; return `hsl(${w.h} ${Math.max(w.s, 4)}% 40%)`; };
 const sameLogicalDay = (a: any, b: any, s: any) => logicalDay(a, s).getTime() === logicalDay(b, s).getTime();
+// Day/time settings are stored as minutes-from-midnight; show/edit them as HH:MM.
+export const fmtHM = (min: number) => { const m = Math.max(0, Math.round(min || 0)); return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
+export const parseHM = (str: string): number | null => { const m = String(str).trim().match(/^(\d{1,2})(?::(\d{1,2}))?$/); if (!m) return null; return Math.min(23, parseInt(m[1], 10) || 0) * 60 + Math.min(59, parseInt(m[2] || "0", 10) || 0); };
 const fmtDate = (d: any) => new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const fmtTime = (d: any) => new Date(d).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 // enjoyment: higher actual than expected is better (green)
@@ -547,6 +551,15 @@ function UserIcon({ size = 14 }: any) {
   );
 }
 
+function CopyIcon({ size = 13 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </svg>
+  );
+}
+
 // A textarea that starts at one line and grows to fit its content as the text wraps.
 function AutoTextarea({ value, onChange, placeholder, style }: any) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
@@ -830,6 +843,18 @@ export default function FocusLogApp({ api }: any) {
   const [newNight, setNewNight] = useState("");
   const [routineDrag, setRoutineDrag] = useState<{ w: string; i: number } | null>(null);
   const [routineOver, setRoutineOver] = useState<{ w: string; i: number } | null>(null);
+  // Timeline (daily plan): timelineMode swaps the today list for the time axis.
+  const [timelineMode, setTimelineModeState] = useState(false);
+  const [plans, setPlans] = useState<any>(init.plans || {});
+  const [tlDrag, setTlDrag] = useState<{ id: string; grab: number } | null>(null);
+  const [editBlockId, setEditBlockId] = useState<string | null>(null);
+  const [blockDraft, setBlockDraft] = useState<{ name: string; dur: number }>({ name: "", dur: 30 });
+  const tlRef = useRef<HTMLDivElement | null>(null);
+  const [longEvery, setLongEveryState] = useState<number>(settings.longBreakEvery || 3);
+  const nowRef = useRef<HTMLDivElement | null>(null);
+  // On opening the timeline, scroll so the current-time line is centred.
+  useEffect(() => { if (timelineMode && nowRef.current) nowRef.current.scrollIntoView({ block: "center", behavior: "auto" }); }, [timelineMode]);
+  const [expandedPast, setExpandedPast] = useState<Set<string>>(new Set());
   // The break is now owned by the shared timer engine (so the panel and the floating
   // window stay in lock-step). `brk` below is derived from the engine state; these
   // handlers just drive it through the api. The engine writes the finished break to the
@@ -1413,6 +1438,302 @@ export default function FocusLogApp({ api }: any) {
     );
   };
 
+  // ---------- Timeline (daily plan) ----------
+  const PX_PER_MIN = 1.5;
+  const tlStart = settings.morningBegins ?? 480;
+  const tlEnd = settings.dayEnds ?? 1380;
+  const MIN_BLOCK_H = 28;
+  const GAP_PXM = 0.4;
+  // Lay blocks out as a stack — each at least MIN_BLOCK_H tall (so short tasks stay
+  // readable), gaps compressed. Items carry both a pixel band (topY..+height) and a time
+  // band (t0..t1), which drive the render, the now-line, and drag mapping. Busy stretches
+  // grow; quiet ones don't (no even hourly grid).
+  const tlLayout = (blocks: any[]) => {
+    const sorted = blocks.slice().sort((a: any, b: any) => a.start - b.start);
+    const items: any[] = [];
+    let y = 0, prevEnd: number | null = null;
+    sorted.forEach((b: any) => {
+      if (prevEnd != null && b.start > prevEnd) {
+        const gh = Math.max(7, (b.start - prevEnd) * GAP_PXM);
+        items.push({ type: "gap", t0: prevEnd, t1: b.start, minutes: b.start - prevEnd, topY: y, height: gh });
+        y += gh;
+      }
+      const h = Math.max(MIN_BLOCK_H, b.dur * PX_PER_MIN);
+      items.push({ type: "block", b, t0: b.start, t1: b.start + b.dur, topY: y, height: h });
+      y += h;
+      prevEnd = b.start + b.dur;
+    });
+    return { items, totalH: Math.max(80, y) };
+  };
+  const yToMin = (items: any[], y: number) => {
+    if (!items.length) return tlStart;
+    if (y <= items[0].topY) return items[0].t0;
+    for (const it of items) if (y >= it.topY && y <= it.topY + it.height) return it.t0 + (it.height > 0 ? (y - it.topY) / it.height * (it.t1 - it.t0) : 0);
+    return items[items.length - 1].t1;
+  };
+  const snap5 = (m: number) => Math.round(m / 5) * 5;
+  const fmtClock = (m: number) => String(Math.floor(m / 60) % 24).padStart(2, "0") + ":" + String(Math.round(m) % 60).padStart(2, "0");
+  const clampStart = (m: number, dur: number) => Math.max(tlStart, Math.min(tlEnd - dur, m));
+  const todayBlocks = () => (plans[todayKey] || []);
+  const setTodayBlocks = (blocks: any[]) => { setPlans((p: any) => ({ ...p, [todayKey]: blocks })); api.savePlan && api.savePlan(todayKey, blocks); };
+  // Prevent overlaps: in start order, any block that begins before the previous one ends
+  // is pushed down. Free-time gaps are left untouched. When a pushed block is a task that
+  // follows another task, a break is inserted between them — short, but a long break after
+  // every `longEvery` short ones (the rhythm you set in the toolbar).
+  const resolveOverlaps = (blocks: any[]) => {
+    const shortB = settings.breakMinutes || 5;
+    const longB = settings.longBreakMinutes || 20;
+    const every = Math.max(2, longEvery || 3);
+    let cursor = -Infinity, prevTask = false, shortsRun = 0;
+    return blocks.slice().sort((a: any, c: any) => a.start - c.start).map((b: any) => {
+      const isTask = b.kind === "task";
+      let start = b.start;
+      if (start < cursor) {
+        let gap = 0;
+        if (isTask && prevTask) {
+          if (shortsRun >= every) { gap = longB; shortsRun = 0; }
+          else { gap = shortB; shortsRun += 1; }
+        }
+        start = cursor + gap;
+      }
+      cursor = start + b.dur;
+      prevTask = isTask;
+      return start === b.start ? b : { ...b, start };
+    });
+  };
+  // One task block per Work+Personal task from the day start, with short breaks between
+  // and a long break every N pomodoros (and once across noon). Saved as the day's plan.
+  const ROUTINE_MIN = 15;
+  const buildInitialPlan = () => {
+    const pomo = settings.pomodoroMinutes || 25;
+    const shortB = settings.breakMinutes || 5;
+    const longB = settings.longBreakMinutes || 20;
+    const every = longEvery;
+    const blocks: any[] = [];
+    let t = tlStart, count = 0, noon = false, seq = 0;
+    // Morning routine first (back-to-back, no pomodoro breaks), then a short break. Each
+    // item keeps its own length (it.dur) so a rebuild preserves edited routine lengths.
+    if (!settings.skipMorningRoutine) (morningRoutine || []).forEach((it: any) => {
+      const dur = it.dur || ROUTINE_MIN;
+      blocks.push({ id: "r" + Date.now() + "_" + (seq++), kind: "routine", name: it.name, start: t, dur, refId: it.id });
+      t += dur;
+    });
+    if (blocks.length) t += shortB;
+    // Work + Personal pomodoros with short/long breaks.
+    const pomos = [...workTasks, ...personalTasks];
+    pomos.forEach((task: any, idx: number) => {
+      blocks.push({ id: "b" + Date.now() + "_" + (seq++), kind: "task", name: task.task, start: t, dur: pomo, pageId: task.id || null, category: task.category || null, load: task.load || null, power: task.power || null });
+      t += pomo; count++;
+      if (idx === pomos.length - 1) return;
+      const crossNoon = !noon && t >= 12 * 60;
+      if (count >= every || crossNoon) { t += longB; count = 0; if (crossNoon) noon = true; }
+      else t += shortB;
+    });
+    // Night routine last.
+    if (!settings.skipNightRoutine && (nightRoutine || []).length) {
+      if (pomos.length) t += shortB;
+      (nightRoutine || []).forEach((it: any) => {
+        const dur = it.dur || ROUTINE_MIN;
+        blocks.push({ id: "r" + Date.now() + "_" + (seq++), kind: "routine", name: it.name, start: t, dur, refId: it.id });
+        t += dur;
+      });
+    }
+    return blocks;
+  };
+  const setTimelineMode = (on: boolean) => {
+    const hasInput = [...workTasks, ...personalTasks].length || (!settings.skipMorningRoutine && (morningRoutine || []).length) || (!settings.skipNightRoutine && (nightRoutine || []).length);
+    if (on && !plans[todayKey] && hasInput) setTodayBlocks(buildInitialPlan());
+    setTimelineModeState(on);
+  };
+  const duplicateBlock = (id: string) => {
+    const blocks = todayBlocks();
+    const b = blocks.find((x: any) => x.id === id);
+    if (!b) return;
+    const shortB = settings.breakMinutes || 5;
+    const shift = b.dur + shortB;
+    // Drop the copy into the next slot right after the original, and push every block that
+    // starts after the original down by the copy's footprint, so nothing overlaps.
+    const shifted = blocks.map((x: any) => (x.id !== id && x.start >= b.start + b.dur ? { ...x, start: x.start + shift } : x));
+    setTodayBlocks(resolveOverlaps([...shifted, { ...b, id: "b" + Date.now(), start: b.start + b.dur + shortB }]));
+  };
+  const deleteBlock = (id: string) => setTodayBlocks(todayBlocks().filter((b: any) => b.id !== id));
+  const addMeeting = () => {
+    const last = todayBlocks().reduce((m: number, b: any) => Math.max(m, b.start + b.dur), tlStart);
+    setTodayBlocks(resolveOverlaps([...todayBlocks(), { id: "m" + Date.now(), kind: "meeting", name: "Unavailable", start: clampStart(snap5(last + 10), 30), dur: 30 }]));
+  };
+  const saveBlockEdit = () => {
+    const blk = todayBlocks().find((b: any) => b.id === editBlockId);
+    const name = blockDraft.name.trim() || "Untitled";
+    const dur = Math.max(5, Math.min(480, Math.round(blockDraft.dur) || 30));
+    setTodayBlocks(todayBlocks().map((b: any) => (b.id === editBlockId ? { ...b, name, dur } : b)));
+    // A routine block writes its length (and name) back to the routine item, so a rebuild
+    // keeps the edited length.
+    if (blk && blk.kind === "routine" && blk.refId) {
+      const upd = (list: any[]) => list.map((it: any) => (it.id === blk.refId ? { ...it, name, dur } : it));
+      if ((morningRoutine || []).some((it: any) => it.id === blk.refId)) saveMorning(upd(morningRoutine));
+      else if ((nightRoutine || []).some((it: any) => it.id === blk.refId)) saveNight(upd(nightRoutine));
+    }
+    setEditBlockId(null);
+  };
+  const onTimelineDrop = (e: any) => {
+    e.preventDefault();
+    if (!tlDrag || !tlRef.current) { setTlDrag(null); return; }
+    const rect = tlRef.current.getBoundingClientRect();
+    const blocks = todayBlocks();
+    const b = blocks.find((x: any) => x.id === tlDrag.id);
+    if (!b) { setTlDrag(null); return; }
+    const target = snap5(yToMin(tlLayout(blocks).items, e.clientY - rect.top - tlDrag.grab));
+    // With "move the whole day" on, dragging the first task shifts it + everything after.
+    const firstTask = blocks.filter((x: any) => x.kind === "task").sort((a: any, c: any) => a.start - c.start)[0];
+    if (settings.anchorShift && firstTask && b.id === firstTask.id) {
+      const delta = Math.max(tlStart - b.start, target - b.start);
+      setTodayBlocks(blocks.map((x: any) => (x.start >= b.start ? { ...x, start: x.start + delta } : x)));
+    } else {
+      const moved = blocks.map((x: any) => (x.id === b.id ? { ...x, start: Math.max(tlStart, target) } : x));
+      setTodayBlocks(resolveOverlaps(moved));
+    }
+    setTlDrag(null);
+  };
+  const renderBlock = (b: any, topY: number, h: number) => {
+    const isTask = b.kind === "task";
+    if (editBlockId === b.id) {
+      return (
+        <div key={b.id} style={{ position: "absolute", left: 56, right: 4, top: topY, minHeight: h, boxSizing: "border-box", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6, padding: "4px 6px", display: "flex", alignItems: "center", gap: 6, zIndex: 5 }}>
+          <input value={blockDraft.name} autoFocus onChange={(e) => setBlockDraft({ ...blockDraft, name: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") saveBlockEdit(); if (e.key === "Escape") setEditBlockId(null); }} style={{ flex: 1, minWidth: 0, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 5, padding: "3px 6px", fontFamily: "var(--fl-display)" }} />
+          <input type="number" value={blockDraft.dur} onChange={(e) => setBlockDraft({ ...blockDraft, dur: Number(e.target.value) })} title="minutes" style={{ width: 50, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 5, padding: "3px 6px" }} />
+          <button onClick={saveBlockEdit} title="save" aria-label="save" style={{ ...btn(C.ink), padding: "4px 7px", display: "inline-flex" }}><SaveIcon size={13} /></button>
+          <button onClick={() => setEditBlockId(null)} title="cancel" aria-label="cancel" style={{ ...btn(C.muted, true), padding: "4px 7px", display: "inline-flex" }}><CircleXIcon size={13} /></button>
+        </div>
+      );
+    }
+    return (
+      <div key={b.id} className="fl-act-row" draggable
+        onDragStart={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setTlDrag({ id: b.id, grab: e.clientY - r.top }); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", b.id); }}
+        onDragEnd={() => setTlDrag(null)}
+        style={{ position: "absolute", left: 56, right: 4, top: topY, height: h, boxSizing: "border-box", background: isTask ? "#fff" : "#fbf8f1", border: `1px solid ${C.line}`, borderLeft: `4px solid ${isTask ? (POWER_COLOR[b.power] || POWER_COLOR.Y) : (b.kind === "routine" ? C.better : C.muted)}`, borderRadius: 6, padding: "2px 8px", cursor: "grab", display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: C.ink, opacity: tlDrag && tlDrag.id === b.id ? 0.4 : 1, overflow: "hidden" }}>
+        {isTask && <span style={{ color: LOAD_COLOR[b.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, fontSize: 12.5, flexShrink: 0 }} title={LOAD_LABEL[b.load] || LOAD_LABEL.B}>{b.load || "B"}</span>}
+        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isTask ? stripLeadingTag(b.name) : b.name}</span>
+        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 10, color: C.muted, flexShrink: 0 }}>{b.dur}m</span>
+        {(isTask || b.kind === "routine") && <button onClick={() => openLog(b.name)} className="fl-rowact" title="run a pomodoro" aria-label="run" style={ICON_BTN}><PlayIcon size={12} /></button>}
+        {isTask
+          ? <button onClick={() => duplicateBlock(b.id)} className="fl-rowact" title="duplicate (add a pomodoro)" aria-label="duplicate" style={ICON_BTN}><CopyIcon size={13} /></button>
+          : <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={13} /></button>}
+        <button onClick={() => deleteBlock(b.id)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={13} /></button>
+      </div>
+    );
+  };
+  const renderTimeline = () => {
+    const blocks = todayBlocks();
+    const { items, totalH } = tlLayout(blocks);
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    let nowY = -1;
+    if (items.length) {
+      if (nowMin <= items[0].t0) nowY = 0;
+      else if (nowMin >= items[items.length - 1].t1) nowY = totalH;
+      else for (const it of items) if (nowMin >= it.t0 && nowMin <= it.t1) { nowY = it.topY + (it.t1 > it.t0 ? (nowMin - it.t0) / (it.t1 - it.t0) * it.height : 0); break; }
+    }
+    return (
+      <div style={{ marginTop: 4 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={SECTION_HEAD}>{"\u{1F5D3}️"} Timeline</span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            <label style={{ fontSize: 11, color: C.muted, display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>long break /
+              <select value={longEvery} onChange={(e) => { const n = parseInt(e.target.value, 10) || 3; setLongEveryState(n); api.patchSettings && api.patchSettings({ longBreakEvery: n }); }} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 6, padding: "2px 4px", fontFamily: "var(--fl-mono)", cursor: "pointer" }}>
+                <option value={2}>2</option><option value={3}>3</option><option value={4}>4</option>
+              </select>
+            </label>
+            <button onClick={() => setTodayBlocks(buildInitialPlan())} title="rebuild the plan from your tasks + routines" style={{ ...btn(C.muted, true), padding: "4px 9px", display: "inline-flex", alignItems: "center" }}><RotateCcwIcon size={13} /></button>
+            <button onClick={addMeeting} style={{ ...btn(C.ink, true), padding: "4px 10px", display: "inline-flex", alignItems: "center", gap: 5 }}><ListPlusIcon size={14} /> unavailable</button>
+          </div>
+        </div>
+        {blocks.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: "0 0 8px" }}>No blocks yet — sync some tasks and re-open the timeline, or add a meeting.</p>}
+        <div ref={tlRef} onDragOver={(e) => e.preventDefault()} onDrop={onTimelineDrop} style={{ position: "relative", height: totalH }}>
+          <div style={{ position: "absolute", left: 48, top: 0, bottom: 0, width: 2, background: C.line }} />
+          {items.map((it: any, i: number) => it.type === "gap" ? (
+            <span key={"g" + i} style={{ position: "absolute", left: 56, top: it.topY + Math.max(0, (it.height - 11) / 2), fontSize: 9, color: C.faint, fontFamily: "var(--fl-mono)" }}>{it.minutes}m {it.minutes >= (settings.longBreakMinutes || 20) - 1 ? "long break" : it.minutes <= (settings.breakMinutes || 5) + 1 ? "break" : "free"}</span>
+          ) : (
+            <React.Fragment key={it.b.id}>
+              <span style={{ position: "absolute", left: 0, top: it.topY + 3, width: 44, textAlign: "right", fontSize: 10, color: C.muted, fontFamily: "var(--fl-mono)" }}>{fmtClock(it.b.start)}</span>
+              {renderBlock(it.b, it.topY, it.height)}
+            </React.Fragment>
+          ))}
+          {nowY >= 0 && (
+            <div ref={nowRef} style={{ position: "absolute", left: 0, right: 0, top: nowY, height: 0, zIndex: 6, pointerEvents: "none" }}>
+              <div style={{ position: "absolute", left: 46, right: 0, top: 0, borderTop: `2px solid ${C.worse}` }} />
+              <span style={{ position: "absolute", left: 0, top: -7, width: 40, textAlign: "right", fontSize: 10, color: C.worse, fontFamily: "var(--fl-mono)", fontWeight: 700 }}>{fmtClock(nowMin)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Time-aware list ordering: the phase you're in now (morning routine / work+personal /
+  // night routine) sits on top; finished phases collapse to an expandable header. Phase
+  // boundaries come from today's timeline plan if you made one, else from the morning
+  // routine length (morning) and Afternoon-ends (work/personal).
+  const phaseRankNow = (() => {
+    const d = new Date();
+    const nowM = d.getHours() * 60 + d.getMinutes();
+    const sumMorning = (morningRoutine || []).reduce((s: number, it: any) => s + (it.dur || ROUTINE_MIN), 0);
+    const planB = plans[todayKey];
+    let morningEnd: number, workEnd: number;
+    if (planB && planB.length) {
+      const mIds = new Set((morningRoutine || []).map((it: any) => it.id));
+      const mEnds = planB.filter((b: any) => b.kind === "routine" && mIds.has(b.refId)).map((b: any) => b.start + b.dur);
+      const tEnds = planB.filter((b: any) => b.kind === "task").map((b: any) => b.start + b.dur);
+      morningEnd = mEnds.length ? Math.max(...mEnds) : tlStart;
+      workEnd = tEnds.length ? Math.max(...tEnds) : (settings.afternoonEnd || 1080);
+    } else {
+      morningEnd = tlStart + sumMorning;
+      workEnd = settings.afternoonEnd || 1080;
+    }
+    return nowM < morningEnd ? 0 : nowM < workEnd ? 1 : 2;
+  })();
+  const renderFullSection = (key: string) => {
+    if (key === "morning") return renderRoutineBlock("morning");
+    if (key === "night") return renderRoutineBlock("night");
+    if (key === "work") return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {workTasks.length > 0 && <div style={SECTION_HEAD}>{"\u{1F31E}"} Work</div>}
+        {workTasks.map((t: any) => renderTaskRow(t))}
+      </div>
+    );
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={SECTION_HEAD}>{"\u{1F3E1}"} Personal</div>
+        {personalTasks.map((t: any) => renderTaskRow(t))}
+      </div>
+    );
+  };
+  const renderTodaySections = () => {
+    const defs = [
+      { key: "morning", label: "\u{1F305} Morning", rank: 0, on: !settings.skipMorningRoutine },
+      { key: "work", label: "\u{1F31E} Work", rank: 1, on: true },
+      { key: "personal", label: "\u{1F3E1} Personal", rank: 1, on: personalTasks.length > 0 },
+      { key: "night", label: "\u{1F319} Night", rank: 2, on: !settings.skipNightRoutine },
+    ].filter((s) => s.on);
+    const future = defs.filter((s) => s.rank >= phaseRankNow);
+    const past = defs.filter((s) => s.rank < phaseRankNow);
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {future.map((s) => <div key={s.key}>{renderFullSection(s.key)}</div>)}
+        {past.length > 0 && (
+          <div style={{ borderTop: `1px dashed ${C.line}`, paddingTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ fontSize: 10, color: C.faint, textTransform: "uppercase", letterSpacing: 0.6 }}>earlier today</div>
+            {past.map((s) => (
+              <div key={s.key}>
+                <button onClick={() => setExpandedPast((e) => { const n = new Set(e); if (n.has(s.key)) n.delete(s.key); else n.add(s.key); return n; })} style={{ ...SECTION_HEAD, margin: 0, background: "transparent", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 0" }}>{expandedPast.has(s.key) ? "▾" : "▸"} {s.label}</button>
+                {expandedPast.has(s.key) && <div style={{ marginTop: 4 }}>{renderFullSection(s.key)}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const seg = (on: boolean): any => ({ padding: "6px 14px", borderRadius: 9, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", textTransform: "capitalize", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.14)" : "none", fontFamily: "var(--fl-display)", whiteSpace: "nowrap" });
 
   return (
@@ -1435,7 +1756,7 @@ export default function FocusLogApp({ api }: any) {
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><b style={{ color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" }}>A</b> high</span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><b style={{ color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" }}>B</b> medium</span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><b style={{ color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" }}>C</b> low</span>
-            <span style={{ marginLeft: 4 }}>{"\u{1F451}"} = King {"·"} day starts at {settings.dayStart}:00</span>
+            <span style={{ marginLeft: 4 }}>{"\u{1F451}"} = King {"·"} day starts at {fmtHM(settings.dayStart)}</span>
           </div>
         </div>
 
@@ -1469,10 +1790,13 @@ export default function FocusLogApp({ api }: any) {
                 )}
                 {"\u{1F345}"} today
               </span>
-              <button onClick={doSync} disabled={sync === "loading"} style={{ ...btn(C.ink, true), display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <RefreshCwIcon size={14} spin={sync === "loading"} />
-                {sync === "loading" ? "syncing\u2026" : <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>Sync from <img src={NOTION_LOGO} alt="Notion" style={{ width: 15, height: 15 }} />{!narrowPanel && "Notion"}</span>}
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button onClick={() => setTimelineMode(!timelineMode)} title={timelineMode ? "back to the list" : "plan on a timeline"} style={{ ...btn(C.ink, !timelineMode), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 5 }}>{"\u{1F5D3}\ufe0f"} {timelineMode ? "list" : "timeline"}</button>
+                <button onClick={doSync} disabled={sync === "loading"} style={{ ...btn(C.ink, true), display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <RefreshCwIcon size={14} spin={sync === "loading"} />
+                  {sync === "loading" ? "syncing\u2026" : <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>Sync from <img src={NOTION_LOGO} alt="Notion" style={{ width: 15, height: 15 }} />{!narrowPanel && "Notion"}</span>}
+                </button>
+              </div>
             </div>
             {fallingEnjoyment && (
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
@@ -1481,19 +1805,8 @@ export default function FocusLogApp({ api }: any) {
               </div>
             )}
             {tasks.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No tasks yet. Set your Notion token in settings, then press sync.</p>}
-            {tasks.length > 1 && <p style={{ color: C.muted, fontSize: 11, margin: "0 0 8px" }}>Pinned tasks stay on top, then {"\u{1F451}"} King. New tasks arrive ranked Must {"→"} Aim {"→"} Bonus; drag the grip to reorder freely. Hover a row to pin it or move it between Work and Personal.</p>}
-            {!settings.skipMorningRoutine && renderRoutineBlock("morning")}
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {workTasks.length > 0 && <div style={SECTION_HEAD}>{"\u{1F31E}"} Work</div>}
-              {workTasks.map((t) => renderTaskRow(t))}
-            </div>
-            {personalTasks.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 14 }}>
-                <div style={SECTION_HEAD}>{"\u{1F3E1}"} Personal</div>
-                {personalTasks.map((t) => renderTaskRow(t))}
-              </div>
-            )}
-            {!settings.skipNightRoutine && renderRoutineBlock("night")}
+            {!timelineMode && tasks.length > 1 && <p style={{ color: C.muted, fontSize: 11, margin: "0 0 8px" }}>Pinned tasks stay on top, then {"\u{1F451}"} King. New tasks arrive ranked Must {"→"} Aim {"→"} Bonus; drag the grip to reorder freely. Hover a row to pin it or move it between Work and Personal.</p>}
+            {timelineMode ? renderTimeline() : renderTodaySections()}
           </div>
         )}
 

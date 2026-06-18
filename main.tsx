@@ -1,7 +1,7 @@
 import { App, ItemView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath, requestUrl, setIcon } from "obsidian";
 import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
-import FocusLogApp, { MACARON, darken } from "./FocusLogApp";
+import FocusLogApp, { MACARON, darken, fmtHM, parseHM } from "./FocusLogApp";
 
 export const VIEW_TYPE = "focuslog-view";
 export const VIEW_TYPE_FLOAT = "focuslog-float";
@@ -86,6 +86,12 @@ export interface FocusLogSettings {
   personalAreas: string[];
   skipMorningRoutine: boolean;
   skipNightRoutine: boolean;
+  morningBegins: number;
+  dayEnds: number;
+  longBreakMinutes: number;
+  longBreakEvery: number;
+  anchorShift: boolean;
+  timeFmtV2: boolean;
 }
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
@@ -97,10 +103,10 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   showCategoryInView: true,
   writeCategoryTag: true,
   dailyGoal: 8,
-  dayStart: 4,
+  dayStart: 240,
   weekStartsSunday: false,
-  morningEnd: 12,
-  afternoonEnd: 18,
+  morningEnd: 720,
+  afternoonEnd: 1080,
   heatThresholds: "1,2,4,6,8,10",
   beginColor: "#d98324",
   endColor: "#2f6f8f",
@@ -133,6 +139,12 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   personalAreas: [],
   skipMorningRoutine: false,
   skipNightRoutine: false,
+  morningBegins: 480,
+  dayEnds: 1380,
+  longBreakMinutes: 20,
+  longBreakEvery: 3,
+  anchorShift: false,
+  timeFmtV2: true,
 };
 
 // Pause tags carry a category: "internal" (the impulse came from you) or
@@ -177,6 +189,7 @@ interface PluginData {
   morningRoutine: any[];
   nightRoutine: any[];
   routineDone: { [dayKey: string]: string[] };
+  plans: { [dayKey: string]: any[] };
 }
 
 // ---------- Notion property parsing ----------
@@ -239,7 +252,7 @@ function tagSlug(value: string): string {
 // keeps late-night work on the previous day; an evening start (13–23) rolls the day over
 // that night, so work after that hour counts toward the next date. Mirrors dayShift in the UI.
 function dayShiftHours(dayStart: number): number {
-  const h = dayStart || 0;
+  const h = (dayStart || 0) / 60;
   return h <= 12 ? h : h - 24;
 }
 
@@ -598,6 +611,7 @@ export default class FocusLogPlugin extends Plugin {
       morningRoutine: loaded.morningRoutine || DEFAULT_MORNING.map((a) => ({ ...a })),
       nightRoutine: loaded.nightRoutine || DEFAULT_NIGHT.map((a) => ({ ...a })),
       routineDone: loaded.routineDone || {},
+      plans: loaded.plans || {},
     };
     // Seed the per-phase float bounds from the old single focus/break bounds (one-time).
     if (!this.data.settings.floatPhaseBounds || Object.keys(this.data.settings.floatPhaseBounds).length === 0) {
@@ -605,6 +619,19 @@ export default class FocusLogPlugin extends Plugin {
       if (this.data.settings.floatBounds) m.focus = this.data.settings.floatBounds;
       if (this.data.settings.floatBreakBounds) m.break = this.data.settings.floatBreakBounds;
       this.data.settings.floatPhaseBounds = m;
+    }
+    // Migrate the day/time-band settings from whole hours to minutes-from-midnight (one
+    // time). Old configs stored e.g. dayStart: 4; the code now expects 240. Persist the
+    // flag right away so a reload before any later save can't double-convert.
+    if (loaded.settings && !loaded.settings.timeFmtV2) {
+      for (const k of ["dayStart", "morningBegins", "dayEnds", "morningEnd", "afternoonEnd"] as const) {
+        const v = (this.data.settings as any)[k];
+        if (typeof v === "number" && v <= 24) (this.data.settings as any)[k] = Math.round(v * 60);
+      }
+      this.data.settings.timeFmtV2 = true;
+      await this.persist();
+    } else {
+      this.data.settings.timeFmtV2 = true;
     }
 
     this.timer = new TimerEngine(this, this.data.settings.pomodoroMinutes);
@@ -979,24 +1006,28 @@ export default class FocusLogPlugin extends Plugin {
 
   // Mirrors the "Today Tasks" view: Today / King / This week, plus Daily dated today.
   async queryToday(): Promise<any[]> {
-    const today = this.logicalTodayISO();
+    // \uD83C\uDF31 Daily tasks recur and carry the status with no per-day Date, so match on status
+    // alone (this mirrors the user's own "Today Tasks" Notion view). The earlier filter
+    // also required Date == today, which hid every Daily task.
     const filter = {
       or: [
         { property: "Status", select: { equals: "\u{1F33B} Today" } },
         { property: "Status", select: { equals: "1\uFE0F\u20E3 King" } },
-        {
-          and: [
-            { property: "Status", select: { equals: "\u{1F331} Daily" } },
-            { property: "Date", date: { equals: today } },
-          ],
-        },
+        { property: "Status", select: { equals: "\u{1F331} Daily" } },
       ],
     };
-    const json = await this.notionFetch(`/databases/${this.data.settings.databaseId}/query`, "POST", {
-      filter,
-      page_size: 50,
-    });
-    const pages: any[] = json.results || [];
+    // Page through every match — Notion returns at most 100 rows per request and sets
+    // has_more / next_cursor when there are more. Without this loop, any task past the
+    // first page was silently dropped.
+    const pages: any[] = [];
+    let cursor: string | undefined = undefined;
+    do {
+      const body: any = { filter, page_size: 100 };
+      if (cursor) body.start_cursor = cursor;
+      const json: any = await this.notionFetch(`/databases/${this.data.settings.databaseId}/query`, "POST", body);
+      pages.push(...(json.results || []));
+      cursor = json.has_more ? json.next_cursor : undefined;
+    } while (cursor);
     const cache: Record<string, any> = {};
     const tasks: any[] = [];
     for (const p of pages) {
@@ -1226,6 +1257,7 @@ export default class FocusLogPlugin extends Plugin {
         morningRoutine: self.data.morningRoutine || [],
         nightRoutine: self.data.nightRoutine || [],
         routineDone: self.data.routineDone || {},
+        plans: self.data.plans || {},
       }),
       saveSessions: async (arr: any[]) => { self.data.sessions = arr; await self.persist(); },
       saveActivities: async (arr: any[]) => { self.data.activities = arr; await self.persist(); },
@@ -1235,6 +1267,7 @@ export default class FocusLogPlugin extends Plugin {
       saveMorningRoutine: async (arr: any[]) => { self.data.morningRoutine = arr; await self.persist(); },
       saveNightRoutine: async (arr: any[]) => { self.data.nightRoutine = arr; await self.persist(); },
       saveRoutineDone: async (obj: any) => { self.data.routineDone = obj; await self.persist(); },
+      savePlan: async (dayKey: string, blocks: any[]) => { self.data.plans = { ...(self.data.plans || {}), [dayKey]: blocks }; await self.persist(); },
       appendPause: (p: any) => self.appendPauseToDailyNote(p),
       savePending: async (arr: any[]) => { self.data.pending = arr; await self.persist(); },
       saveTasks: async (arr: any[]) => { self.data.tasks = arr; await self.persist(); },
@@ -1800,33 +1833,55 @@ class FocusLogSettingTab extends PluginSettingTab {
     containerEl.createEl("h3", { text: "Day and time bands" });
 
     new Setting(containerEl)
-      .setName("Day starts at (hour, 0–23)")
-      .setDesc("The clock hour your logical day rolls over. A morning value like 4 keeps late-night work on the previous day (anything up to 03:59 counts as yesterday). An evening value like 22 starts a fresh day that night, so a pomodoro after 22:00 counts toward the next date.")
+      .setName("Day starts at (HH:MM)")
+      .setDesc("The clock time your logical day rolls over. A morning value like 04:00 keeps late-night work on the previous day (anything up to 03:59 counts as yesterday). An evening value like 22:00 starts a fresh day that night, so a pomodoro after 22:00 counts toward the next date.")
       .addText((t) =>
-        t.setValue(String(this.plugin.data.settings.dayStart)).onChange(async (v) => {
-          const n = Math.max(0, Math.min(23, parseInt(v, 10) || 0));
+        t.setPlaceholder("04:00").setValue(fmtHM(this.plugin.data.settings.dayStart)).onChange(async (v) => {
+          const n = parseHM(v); if (n == null) return;
           this.plugin.data.settings.dayStart = n;
           await this.plugin.persist();
         })
       );
 
     new Setting(containerEl)
-      .setName("Morning ends at (hour)")
-      .setDesc("Pomodoros logged before this hour are coloured as morning on the heatmap.")
+      .setName("Morning begins at (HH:MM)")
+      .setDesc("When your active day starts — the top of the Timeline. e.g. 08:00, or 08:15.")
       .addText((t) =>
-        t.setValue(String(this.plugin.data.settings.morningEnd)).onChange(async (v) => {
-          const n = Math.max(0, Math.min(24, parseInt(v, 10) || 0));
+        t.setPlaceholder("08:00").setValue(fmtHM(this.plugin.data.settings.morningBegins)).onChange(async (v) => {
+          const n = parseHM(v); if (n == null) return;
+          this.plugin.data.settings.morningBegins = n;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Day ends at (HH:MM)")
+      .setDesc("When your active day ends — the bottom of the Timeline. e.g. 23:00.")
+      .addText((t) =>
+        t.setPlaceholder("23:00").setValue(fmtHM(this.plugin.data.settings.dayEnds)).onChange(async (v) => {
+          const n = parseHM(v); if (n == null) return;
+          this.plugin.data.settings.dayEnds = n;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Morning ends at (HH:MM)")
+      .setDesc("Pomodoros logged before this time are coloured as morning on the heatmap.")
+      .addText((t) =>
+        t.setPlaceholder("12:00").setValue(fmtHM(this.plugin.data.settings.morningEnd)).onChange(async (v) => {
+          const n = parseHM(v); if (n == null) return;
           this.plugin.data.settings.morningEnd = n;
           await this.plugin.persist();
         })
       );
 
     new Setting(containerEl)
-      .setName("Afternoon ends at (hour)")
-      .setDesc("Anything after this hour is coloured as evening.")
+      .setName("Afternoon ends at (HH:MM)")
+      .setDesc("Anything after this time is coloured as evening.")
       .addText((t) =>
-        t.setValue(String(this.plugin.data.settings.afternoonEnd)).onChange(async (v) => {
-          const n = Math.max(0, Math.min(24, parseInt(v, 10) || 0));
+        t.setPlaceholder("18:00").setValue(fmtHM(this.plugin.data.settings.afternoonEnd)).onChange(async (v) => {
+          const n = parseHM(v); if (n == null) return;
           this.plugin.data.settings.afternoonEnd = n;
           await this.plugin.persist();
         })
@@ -1848,6 +1903,41 @@ class FocusLogSettingTab extends PluginSettingTab {
       .addText((t) =>
         t.setPlaceholder("1,2,4,6,8,10").setValue(this.plugin.data.settings.heatThresholds).onChange(async (v) => {
           this.plugin.data.settings.heatThresholds = v.trim();
+          await this.plugin.persist();
+        })
+      );
+
+    containerEl.createEl("h3", { text: "Timeline" });
+
+    new Setting(containerEl)
+      .setName("Long break length (minutes)")
+      .setDesc("The longer break inserted between work stretches when the Timeline auto-stacks your day.")
+      .addText((t) =>
+        t.setValue(String(this.plugin.data.settings.longBreakMinutes)).onChange(async (v) => {
+          const n = Math.max(5, Math.min(120, parseInt(v, 10) || 20));
+          this.plugin.data.settings.longBreakMinutes = n;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Long break every")
+      .setDesc("How many pomodoros between long breaks when the Timeline auto-stacks (a noon long break is also added).")
+      .addDropdown((d) =>
+        d.addOption("2", "2 pomodoros").addOption("3", "3 pomodoros").addOption("4", "4 pomodoros")
+          .setValue(String(this.plugin.data.settings.longBreakEvery))
+          .onChange(async (v) => {
+            this.plugin.data.settings.longBreakEvery = parseInt(v, 10) || 3;
+            await this.plugin.persist();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Move the whole day with the first task")
+      .setDesc("When on, dragging your first task on the Timeline (e.g. Plan Today's Tasks) shifts that task and everything after it by the same amount — slide your whole work plan at once. Morning-routine blocks before it stay put.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.anchorShift).onChange(async (v) => {
+          this.plugin.data.settings.anchorShift = v;
           await this.plugin.persist();
         })
       );
