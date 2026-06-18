@@ -59,6 +59,9 @@
 .workspace-leaf-content[data-type="focuslog-view"] .fl-act-row:hover .fl-rowact { opacity: 0.65; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-rowact:hover { opacity: 1; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-rowdel:hover { color: #C06A57 !important; }
+/* Spinning refresh icon while a Notion sync is in flight. */
+@keyframes fl-spin { to { transform: rotate(360deg); } }
+.workspace-leaf-content[data-type="focuslog-view"] .fl-spin { transform-origin: center; animation: fl-spin 0.8s linear infinite; }
 
 /* ---------- Floating timer (popout window) ---------- */
 .workspace-leaf-content[data-type="focuslog-float"] .view-content { padding: 0; }

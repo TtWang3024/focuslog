@@ -1,4 +1,5 @@
 import * as React from "react";
+import { NOTION_LOGO } from "./notionLogo";
 const { useState, useEffect, useRef, useCallback } = React;
 
 // Focus Log UI. `api` bridge from the plugin:
@@ -511,6 +512,17 @@ function CircleXIcon({ size = 15 }: any) {
       <circle cx="12" cy="12" r="10" />
       <path d="m15 9-6 6" />
       <path d="m9 9 6 6" />
+    </svg>
+  );
+}
+
+function RefreshCwIcon({ size = 14, spin = false }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={spin ? "fl-spin" : undefined} style={{ display: "block" }}>
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+      <path d="M3 21v-5h5" />
     </svg>
   );
 }
@@ -1256,8 +1268,8 @@ export default function FocusLogApp({ api }: any) {
 
         {view === "today" && (
           <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={{ color: C.ink, fontSize: 16, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "8px 12px", marginBottom: 12 }}>
+              <span style={{ color: C.ink, fontSize: 16, fontWeight: 700, display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
                 {tasks.length} tasks {"\u00B7"} {countToday} /
                 {editingGoal ? (
                   <input
@@ -1271,7 +1283,10 @@ export default function FocusLogApp({ api }: any) {
                 )}
                 {"\u{1F345}"} today
               </span>
-              <button onClick={doSync} style={btn(C.ink, true)} disabled={sync === "loading"}>{sync === "loading" ? "syncing\u2026" : "sync from Notion"}</button>
+              <button onClick={doSync} disabled={sync === "loading"} style={{ ...btn(C.ink, true), display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <RefreshCwIcon size={14} spin={sync === "loading"} />
+                {sync === "loading" ? "syncing\u2026" : <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>Sync from <img src={NOTION_LOGO} alt="Notion" style={{ width: 15, height: 15 }} />{!narrowPanel && "Notion"}</span>}
+              </button>
             </div>
             {fallingEnjoyment && (
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
