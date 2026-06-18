@@ -23875,6 +23875,7 @@ function darken(rgb, f) {
 }
 var ICON_BTN = { background: "transparent", border: "none", boxShadow: "none", padding: 2, height: "auto", cursor: "pointer", color: "#8a8175", display: "inline-flex", flexShrink: 0 };
 var ADD_BTN = { padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "#C57B5A", border: "1px solid #C57B5A", color: "rgb(251, 248, 241)" };
+var SECTION_HEAD = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: "#8a8175", margin: "2px 0 4px 2px", fontFamily: "var(--fl-display)" };
 function polarPt(cx, cy, r, deg) {
   const a = deg * Math.PI / 180;
   return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
@@ -23940,6 +23941,12 @@ function CircleXIcon({ size = 15 }) {
 }
 function RefreshCwIcon({ size = 14, spin = false }) {
   return /* @__PURE__ */ React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", className: spin ? "fl-spin" : void 0, style: { display: "block" } }, /* @__PURE__ */ React.createElement("path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" }), /* @__PURE__ */ React.createElement("path", { d: "M21 3v5h-5" }), /* @__PURE__ */ React.createElement("path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" }), /* @__PURE__ */ React.createElement("path", { d: "M3 21v-5h5" }));
+}
+function BriefcaseIcon({ size = 14 }) {
+  return /* @__PURE__ */ React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React.createElement("rect", { width: "20", height: "14", x: "2", y: "7", rx: "2", ry: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" }));
+}
+function UserIcon({ size = 14 }) {
+  return /* @__PURE__ */ React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React.createElement("path", { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7", r: "4" }));
 }
 function AutoTextarea({ value, onChange, placeholder, style }) {
   const ref = useRef(null);
@@ -24012,7 +24019,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   return /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink } }, mm, ":", ss), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("button", { disabled: lenLocked || pomoMin <= 5, onMouseDown: () => beginHold(-1), onMouseUp: endHold, onMouseLeave: endHold, title: lenLocked ? "length is locked while a pomodoro is running" : "shorter \u2014 hold to speed up (min 5)", style: { ...btn(C.muted, true), padding: "6px 10px", opacity: lenLocked || pomoMin <= 5 ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" } }, "\u2212"), /* @__PURE__ */ React.createElement("button", { onClick: running ? onPause : () => onStart(task), style: { ...btn(C.ink), minWidth: 104 } }, running ? "pause" : `${paused || pauseActive ? "resume" : "start"} ${pomoMin}m`), /* @__PURE__ */ React.createElement("button", { disabled: lenLocked || pomoMin >= 30, onMouseDown: () => beginHold(1), onMouseUp: endHold, onMouseLeave: endHold, title: lenLocked ? "length is locked while a pomodoro is running" : "longer \u2014 hold to speed up (max 30)", style: { ...btn(C.muted, true), padding: "6px 10px", opacity: lenLocked || pomoMin >= 30 ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" } }, "+"), /* @__PURE__ */ React.createElement("button", { onClick: resetTimer, title: "reset", "aria-label": "reset", style: { ...btn(C.muted, true), padding: "7px 11px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(RotateCcwIcon, { size: 15 })))), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 14, fontSize: 12.5, color: C.muted, cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: !!floatOn, onChange: (e) => setFloatOn(e.target.checked), style: { width: 15, height: 15, accentColor: C.ink, cursor: "pointer" } }), "floating timer window \u2014 a small window that stays on top of your other apps"), pauseActive && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14, padding: 10, borderRadius: 8, background: C.paper, border: `1px solid ${C.faint}` } }, /* @__PURE__ */ React.createElement("p", { style: { margin: "0 0 6px", fontSize: 12, color: C.muted } }, "Paused \u2014 why? Pick a tag; it's written to your note when you resume."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, pauseTags.length === 0 ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: C.muted } }, "No pause tags \u2014 add some in the Pause tab.") : pauseTags.map((pt) => {
     const on = pauseTag === pt.name;
     return /* @__PURE__ */ React.createElement("button", { key: pt.id, onClick: () => setPauseTag(on ? "" : pt.name), style: { padding: "5px 11px", borderRadius: 8, border: `${on ? 2 : 1.5}px solid ${catBorder(pt.category)}`, background: catColor(pt.category), color: C.ink, opacity: on ? 1 : 0.5, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", whiteSpace: "normal", maxWidth: "100%", height: "auto", minHeight: 0, lineHeight: 1.35 } }, on ? "\u2713 " : "", pt.name);
-  }))), /* @__PURE__ */ React.createElement("label", { style: { color: C.muted, fontSize: 12 } }, "task (Act +1 writes to this page)"), /* @__PURE__ */ React.createElement("select", { value: task, onChange: (e) => setTask(e.target.value), style: { ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 } }, tasks.map((t) => /* @__PURE__ */ React.createElement("option", { key: t.task, value: t.task }, t.task, t.king ? " \u{1F451}" : ""))), finished ? (
+  }))), /* @__PURE__ */ React.createElement("label", { style: { color: C.muted, fontSize: 12 } }, "task (Act +1 writes to this page)"), /* @__PURE__ */ React.createElement("select", { value: task, onChange: (e) => setTask(e.target.value), style: { ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 } }, task && !tasks.some((t) => t.task === task) && /* @__PURE__ */ React.createElement("option", { value: task }, task), tasks.map((t) => /* @__PURE__ */ React.createElement("option", { key: t.task, value: t.task }, t.task, t.king ? " \u{1F451}" : ""))), finished ? (
     /* ---------- AFTER the pomodoro: decide Done + next task first; the rating is the
          final tap — with auto-log on, it logs the moment you pick it. ---------- */
     /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4, padding: 14, borderRadius: 8, background: C.paper, border: `1px solid ${C.better}` } }, /* @__PURE__ */ React.createElement("p", { style: { margin: "0 0 10px", fontSize: 15, fontFamily: "var(--fl-display)", color: C.ink } }, "\u{1F389}", " Pomodoro done \u2014 how did it go?"), markDoneLabel, chooseNextControls, /* @__PURE__ */ React.createElement("input", { value: note, onChange: (e) => setNote(e.target.value), placeholder: "quick note (optional)", style: { ...inputStyle, marginBottom: 14, marginTop: 4 } }), /* @__PURE__ */ React.createElement(Scale, { label: "after: how enjoyable was it actually? (1 dull ... 5 great)", value: act, onChange: rateActual, color: settings.endColor }), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12.5, color: C.ink, cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: autoLog, onChange: (e) => toggleAuto(e.target.checked), style: { width: 15, height: 15, accentColor: C.better, cursor: "pointer" } }), "log to Obsidian automatically when I pick a rating"), autoLog ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 12, color: C.muted, margin: "4px 0 0" } }, "Set the options above first \u2014 picking a rating logs straight to Obsidian, no button needed.") : logBtn)
@@ -24072,6 +24079,16 @@ function FocusLogApp({ api }) {
       return frozenNames.indexOf(a.t.task) - frozenNames.indexOf(b.t.task);
     return a.i - b.i;
   }).map((x) => x.t);
+  const [personalNames, setPersonalNames] = useState(Array.isArray(settings.personalTaskNames) ? settings.personalTaskNames : []);
+  const togglePersonal = (name) => {
+    const next = personalNames.includes(name) ? personalNames.filter((n) => n !== name) : [...personalNames, name];
+    setPersonalNames(next);
+    api.patchSettings && api.patchSettings({ personalTaskNames: next });
+  };
+  const personalAreas = Array.isArray(settings.personalAreas) ? settings.personalAreas : [];
+  const isPersonal = (t) => personalNames.includes(t.task) || !!t.category && personalAreas.includes(t.category);
+  const workTasks = orderedTasks.filter((t) => !isPersonal(t));
+  const personalTasks = orderedTasks.filter((t) => isPersonal(t));
   const [floatOn, setFloatOnState] = useState(!!(api.floatingOpen && api.floatingOpen()));
   useEffect(() => {
     if (!api.onFloatChange)
@@ -24097,6 +24114,23 @@ function FocusLogApp({ api }) {
     setBreaks(next);
     api.saveBreaks && api.saveBreaks(next);
   };
+  const [morningRoutine, setMorningRoutine] = useState(init.morningRoutine || []);
+  const saveMorning = (next) => {
+    setMorningRoutine(next);
+    api.saveMorningRoutine && api.saveMorningRoutine(next);
+  };
+  const [nightRoutine, setNightRoutine] = useState(init.nightRoutine || []);
+  const saveNight = (next) => {
+    setNightRoutine(next);
+    api.saveNightRoutine && api.saveNightRoutine(next);
+  };
+  const [routineDone, setRoutineDone] = useState(init.routineDone || {});
+  const [editRoutineId, setEditRoutineId] = useState(null);
+  const [editRoutineName, setEditRoutineName] = useState("");
+  const [newMorning, setNewMorning] = useState("");
+  const [newNight, setNewNight] = useState("");
+  const [routineDrag, setRoutineDrag] = useState(null);
+  const [routineOver, setRoutineOver] = useState(null);
   const [newAct, setNewAct] = useState({ name: "", area: "" });
   const startBreak = () => api.timer.startBreak && api.timer.startBreak();
   const togglePick = (id) => api.timer.toggleBreakPick && api.timer.toggleBreakPick(id);
@@ -24646,30 +24680,8 @@ ${s.task}`))
       removeActivity(a.id);
     }, className: "fl-rowact fl-rowdel", title: "delete", "aria-label": "delete", style: ICON_BTN }, /* @__PURE__ */ React.createElement(TrashIcon, { size: 14 }))
   );
-  const seg = (on) => ({ padding: "6px 14px", borderRadius: 9, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", textTransform: "capitalize", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.14)" : "none", fontFamily: "var(--fl-display)", whiteSpace: "nowrap" });
-  return /* @__PURE__ */ React.createElement("div", { ref: rootRef, style: { background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums" } }, /* @__PURE__ */ React.createElement("style", null, `
-        @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&display=swap');
-        :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:'Baloo 2',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
-      `), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Square = ExecutionPower:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Letter = CognitiveLoad:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" } }, "A"), " high"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" } }, "B"), " medium"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" } }, "C"), " low"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 4 } }, "\u{1F451}", " = King ", "\xB7", " day starts at ", settings.dayStart, ":00"))), flash && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20, overflowX: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "inline-flex", gap: 2, background: C.line, borderRadius: 12, padding: 4 } }, ["today", "week", "month", "totals", "log", "break", "pause"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, onClick: () => setView(t), style: seg(view === t) }, t)))), view === "today" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "8px 12px", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: C.ink, fontSize: 16, fontWeight: 700, display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 6, whiteSpace: "nowrap" } }, tasks.length, " tasks ", "\xB7", " ", countToday, " /", editingGoal ? /* @__PURE__ */ React.createElement(
-    "input",
-    {
-      type: "text",
-      inputMode: "numeric",
-      autoFocus: true,
-      defaultValue: goal,
-      onBlur: (e) => saveGoal(Number(e.target.value)),
-      onKeyDown: (e) => {
-        if (e.key === "Enter")
-          saveGoal(Number(e.target.value));
-        if (e.key === "Escape")
-          setEditingGoal(false);
-      },
-      style: { width: 32, height: 32, fontSize: 16, fontWeight: 700, padding: 0, textAlign: "center", border: `1.5px solid ${C.ink}`, borderRadius: 6, fontFamily: "var(--fl-mono)", boxSizing: "border-box" }
-    }
-  ) : /* @__PURE__ */ React.createElement("button", { onClick: () => setEditingGoal(true), title: "click to set today's goal", style: { width: 32, height: 32, border: `1.5px solid ${C.faint}`, background: "transparent", color: C.ink, fontFamily: "var(--fl-mono)", fontSize: 16, fontWeight: 700, cursor: "pointer", borderRadius: 6, padding: 0, boxSizing: "border-box" } }, goal), "\u{1F345}", " today"), /* @__PURE__ */ React.createElement("button", { onClick: doSync, disabled: sync === "loading", style: { ...btn(C.ink, true), display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(RefreshCwIcon, { size: 14, spin: sync === "loading" }), sync === "loading" ? "syncing\u2026" : /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, "Sync from ", /* @__PURE__ */ React.createElement("img", { src: NOTION_LOGO, alt: "Notion", style: { width: 15, height: 15 } }), !narrowPanel && "Notion"))), fallingEnjoyment && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 200 } }, "Enjoyment is dipping over your last few pomodoros \\u2014 consider an extra break."), /* @__PURE__ */ React.createElement("button", { onClick: () => {
-    startBreak();
-    setView("break");
-  }, style: { ...btn(C.ink, true), padding: "3px 10px" } }, "take a break")), tasks.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), tasks.length > 1 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, margin: "0 0 8px" } }, "Pinned tasks stay on top, then ", "\u{1F451}", " King. New tasks arrive ranked Must ", "\u2192", " Aim ", "\u2192", " Bonus; drag the grip to reorder freely. Hover a row to pin it."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, orderedTasks.map((t, i) => {
+  const renderTaskRow = (t) => {
+    const i = orderedTasks.indexOf(t);
     const key = t.id || t.task;
     const done = doneSess[key] || 0;
     const est = t.pomodoros || 0;
@@ -24682,6 +24694,7 @@ ${s.task}`))
     const isDragging = dragIndex === i;
     const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
     const isFrozen = frozenNames.includes(t.task);
+    const personal = isPersonal(t);
     return /* @__PURE__ */ React.createElement(
       "div",
       {
@@ -24720,6 +24733,7 @@ ${s.task}`))
       ),
       /* @__PURE__ */ React.createElement("span", { style: { width: 14, height: 14, borderRadius: 4, background: POWER_COLOR[t.power] || POWER_COLOR.Y, flexShrink: 0 }, title: POWER_LABEL[t.power] || POWER_LABEL.Y }),
       /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" } }, /* @__PURE__ */ React.createElement("span", { style: { color: LOAD_COLOR[t.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, marginRight: 6 }, title: LOAD_LABEL[t.load] || LOAD_LABEL.B }, t.load || "B"), cat && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "1px 5px", marginRight: 6, whiteSpace: "nowrap" } }, cat), titleText, t.king ? " \u{1F451}" : ""), hier && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hier)),
+      /* @__PURE__ */ React.createElement("button", { onClick: () => togglePersonal(t.task), className: "fl-rowact", title: personal ? "move to Work" : "move to Personal", "aria-label": personal ? "move to Work" : "move to Personal", style: ICON_BTN }, personal ? /* @__PURE__ */ React.createElement(BriefcaseIcon, { size: 14 }) : /* @__PURE__ */ React.createElement(UserIcon, { size: 14 })),
       /* @__PURE__ */ React.createElement(
         "button",
         {
@@ -24733,7 +24747,127 @@ ${s.task}`))
       /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(TomatoPips, { vivid: done, grey: remaining }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10.5, color: C.muted, fontFamily: "var(--fl-mono)" } }, completed, " done")),
       /* @__PURE__ */ React.createElement("button", { onClick: () => openLog(t.task), className: "fl-rowact", title: "log", "aria-label": "log", style: ICON_BTN }, /* @__PURE__ */ React.createElement(SquarePenIcon, { size: 15 }))
     );
-  }))), view === "week" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOff((w) => w - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, fmtDate(weekStart), " ", "\u2013", " ", fmtDate(new Date(+weekEnd - DAY))), /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOff((w) => Math.min(0, w + 1)), style: btn(C.muted, true) }, "\u2192")), weekAreas.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, textAlign: "center", padding: "40px 0" } }, weekSessions.length ? "No pomodoros with an Area this week." : "No pomodoros this week.") : weekAreas.map((a) => /* @__PURE__ */ React.createElement(GroupChart, { key: a, group: a, sessions: weekSessions.filter((x) => x.category === a), settings })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted } }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: settings.beginColor } }, "\u25CF"), " expected"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: settings.endColor } }, "\u25CF"), " actual"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: C.better } }, "\u2014"), " better than expected"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: C.worse } }, "\u2014"), " worse than expected"))), view === "month" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setMonthOff((m) => m - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, monthRef.toLocaleDateString(void 0, { month: "long", year: "numeric" })), /* @__PURE__ */ React.createElement("button", { onClick: () => setMonthOff((m) => Math.min(0, m + 1)), style: btn(C.muted, true) }, "\u2192")), /* @__PURE__ */ React.createElement(Heatmap, { sessions, monthRef, settings })), view === "totals" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Pomodoro totals"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 6 } }, "All pomodoros, every project combined."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around" } }, /* @__PURE__ */ React.createElement(Stat, { label: "this week", value: countWeek, big: true }), /* @__PURE__ */ React.createElement(Stat, { label: "this month", value: countMonth, big: true }), /* @__PURE__ */ React.createElement(Stat, { label: "this year", value: countYear, big: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 } }, /* @__PURE__ */ React.createElement(Stat, { label: "hours, week", value: hrsOf(sumMin(inWeek)), color: C.muted }), /* @__PURE__ */ React.createElement(Stat, { label: "hours, month", value: hrsOf(sumMin(inMonth)), color: C.muted }), /* @__PURE__ */ React.createElement(Stat, { label: "hours, year", value: hrsOf(sumMin(inYear)), color: C.muted }))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Six-month heatmap"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 12 } }, "Last 6 months \u2014 pomodoros per day."), /* @__PURE__ */ React.createElement(ContribHeatmap, { sessions, settings })), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Expected vs actual"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "Expected vs actual enjoyment."), rated === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No ratings yet. Log a few pomodoros to see your calibration.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, lineHeight: 1.5, marginBottom: surprises.length ? 14 : 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 22, color: C.better } }, betterPct, "%"), " of your pomodoros turned out ", /* @__PURE__ */ React.createElement("span", { style: { color: C.better } }, "more enjoyable"), " than you expected", /* @__PURE__ */ React.createElement("span", { style: { color: C.muted } }, " (avg gap ", /* @__PURE__ */ React.createElement("span", { style: { color: avgGapAll > 0 ? C.better : avgGapAll < 0 ? C.worse : C.neutral, fontFamily: "var(--fl-mono)" } }, (avgGapAll >= 0 ? "+" : "") + avgGapAll.toFixed(1)), ").")), surprises.length > 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 } }, "Biggest surprises \u2014 dreaded, then enjoyed"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, surprises.map((s) => /* @__PURE__ */ React.createElement("div", { key: s.id, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.better, minWidth: 28 } }, "+", s.actual - s.expected), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, s.task), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" } }, /* @__PURE__ */ React.createElement("span", { style: { color: settings.beginColor } }, s.expected), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted } }, " \u2192 "), /* @__PURE__ */ React.createElement("span", { style: { color: settings.endColor } }, s.actual)), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 11, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap" } }, fmtDate(s.ts)))))))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Best time of day"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "Average enjoyment per band."), !bestBand ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "Not enough data yet.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, marginBottom: 12 } }, "Your highest-enjoyment band is ", /* @__PURE__ */ React.createElement("b", { style: { color: C.ink } }, bestBand.name), " ", /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 13 } }, "(", bestBand.avg.toFixed(1), " / 5)"), "."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, bandStats.map((b) => {
+  };
+  const todayKey = String(logicalDay(Date.now(), settings).getTime());
+  const isRoutineDone = (id) => (routineDone[todayKey] || []).includes(id);
+  const toggleRoutineDone = (id) => {
+    const cur = routineDone[todayKey] || [];
+    const nextList = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+    const next = { ...routineDone, [todayKey]: nextList };
+    setRoutineDone(next);
+    api.saveRoutineDone && api.saveRoutineDone(next);
+  };
+  const routineSaver = (which) => which === "morning" ? saveMorning : saveNight;
+  const routineList = (which) => which === "morning" ? morningRoutine : nightRoutine;
+  const addRoutine = (which) => {
+    const name = (which === "morning" ? newMorning : newNight).trim();
+    if (!name)
+      return;
+    routineSaver(which)([...routineList(which), { id: "r" + Date.now(), name }]);
+    if (which === "morning")
+      setNewMorning("");
+    else
+      setNewNight("");
+  };
+  const saveEditRoutine = (which) => {
+    const n = editRoutineName.trim();
+    if (!n) {
+      setEditRoutineId(null);
+      return;
+    }
+    routineSaver(which)(routineList(which).map((x) => x.id === editRoutineId ? { ...x, name: n } : x));
+    setEditRoutineId(null);
+  };
+  const removeRoutine = (which, id) => routineSaver(which)(routineList(which).filter((x) => x.id !== id));
+  const moveRoutine = (which, from, to) => {
+    if (from === to)
+      return;
+    const a = [...routineList(which)];
+    const [m] = a.splice(from, 1);
+    a.splice(to, 0, m);
+    routineSaver(which)(a);
+  };
+  const renderRoutineBlock = (which) => {
+    const list = routineList(which);
+    const label = which === "morning" ? "\u{1F305} Morning" : "\u{1F319} Night";
+    const newVal = which === "morning" ? newMorning : newNight;
+    const setNewVal = which === "morning" ? setNewMorning : setNewNight;
+    return /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: SECTION_HEAD }, label), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, list.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12.5, margin: "0 0 0 2px" } }, "None yet \u2014 add one below."), list.map((it, i) => {
+      const done = isRoutineDone(it.id);
+      const dragging = !!routineDrag && routineDrag.w === which && routineDrag.i === i;
+      const over = !!routineOver && routineOver.w === which && routineOver.i === i && !!routineDrag && !(routineDrag.w === which && routineDrag.i === i);
+      if (editRoutineId === it.id) {
+        return /* @__PURE__ */ React.createElement("div", { key: it.id, style: { display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 } }, /* @__PURE__ */ React.createElement("input", { value: editRoutineName, onChange: (e) => setEditRoutineName(e.target.value), onKeyDown: (e) => {
+          if (e.key === "Enter")
+            saveEditRoutine(which);
+          if (e.key === "Escape")
+            setEditRoutineId(null);
+        }, autoFocus: true, style: { flex: 1, minWidth: 80, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px", fontFamily: "var(--fl-display)" } }), /* @__PURE__ */ React.createElement("button", { onClick: () => saveEditRoutine(which), title: "save", "aria-label": "save", style: { ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(SaveIcon, { size: 15 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditRoutineId(null), title: "cancel", "aria-label": "cancel", style: { ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(CircleXIcon, { size: 15 })));
+      }
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: it.id,
+          className: "fl-act-row",
+          onDragOver: (e) => {
+            e.preventDefault();
+            if (!routineOver || routineOver.w !== which || routineOver.i !== i)
+              setRoutineOver({ w: which, i });
+          },
+          onDrop: (e) => {
+            e.preventDefault();
+            if (routineDrag && routineDrag.w === which)
+              moveRoutine(which, routineDrag.i, i);
+            setRoutineDrag(null);
+            setRoutineOver(null);
+          },
+          style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "7px 10px", background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, color: C.ink, opacity: dragging ? 0.4 : 1, boxShadow: over ? `inset 0 2px 0 ${C.ink}` : "none" }
+        },
+        /* @__PURE__ */ React.createElement("span", { draggable: true, onDragStart: (e) => {
+          setRoutineDrag({ w: which, i });
+          e.dataTransfer.effectAllowed = "move";
+        }, onDragEnd: () => {
+          setRoutineDrag(null);
+          setRoutineOver(null);
+        }, title: "drag to reorder", style: { display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" } }, Array.from({ length: 6 }).map((_, k) => /* @__PURE__ */ React.createElement("span", { key: k, style: { width: 3, height: 3, borderRadius: "50%", background: C.faint } }))),
+        /* @__PURE__ */ React.createElement("button", { onClick: () => toggleRoutineDone(it.id), title: done ? "mark not done" : "mark done", "aria-label": done ? "mark not done" : "mark done", style: { width: 18, height: 18, flexShrink: 0, borderRadius: 5, border: `1.5px solid ${done ? C.better : C.faint}`, background: done ? C.better : "transparent", color: "#fff", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, done && /* @__PURE__ */ React.createElement(CheckIcon, { size: 12 })),
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere", textDecoration: done ? "line-through" : "none", color: done ? C.muted : C.ink } }, it.name),
+        /* @__PURE__ */ React.createElement("button", { onClick: () => openLog(it.name), className: "fl-rowact", title: "run a pomodoro", "aria-label": "run a pomodoro", style: ICON_BTN }, /* @__PURE__ */ React.createElement(PlayIcon, { size: 13 })),
+        /* @__PURE__ */ React.createElement("button", { onClick: () => {
+          setEditRoutineId(it.id);
+          setEditRoutineName(it.name);
+        }, className: "fl-rowact", title: "edit", "aria-label": "edit", style: ICON_BTN }, /* @__PURE__ */ React.createElement(PencilIcon, { size: 14 })),
+        /* @__PURE__ */ React.createElement("button", { onClick: () => removeRoutine(which, it.id), className: "fl-rowact fl-rowdel", title: "delete", "aria-label": "delete", style: ICON_BTN }, /* @__PURE__ */ React.createElement(TrashIcon, { size: 14 }))
+      );
+    })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement("input", { value: newVal, onChange: (e) => setNewVal(e.target.value), onKeyDown: (e) => {
+      if (e.key === "Enter")
+        addRoutine(which);
+    }, placeholder: which === "morning" ? "add a morning step" : "add a night step", style: { flex: 1, minWidth: 0, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)" } }), /* @__PURE__ */ React.createElement("button", { onClick: () => addRoutine(which), title: "add", "aria-label": "add", style: { ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(ListPlusIcon, { size: 16 }))));
+  };
+  const seg = (on) => ({ padding: "6px 14px", borderRadius: 9, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", textTransform: "capitalize", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.14)" : "none", fontFamily: "var(--fl-display)", whiteSpace: "nowrap" });
+  return /* @__PURE__ */ React.createElement("div", { ref: rootRef, style: { background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums" } }, /* @__PURE__ */ React.createElement("style", null, `
+        @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&display=swap');
+        :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:'Baloo 2',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
+      `), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Square = ExecutionPower:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React.createElement("span", null, "Letter = CognitiveLoad:"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" } }, "A"), " high"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" } }, "B"), " medium"), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("b", { style: { color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" } }, "C"), " low"), /* @__PURE__ */ React.createElement("span", { style: { marginLeft: 4 } }, "\u{1F451}", " = King ", "\xB7", " day starts at ", settings.dayStart, ":00"))), flash && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20, overflowX: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "inline-flex", gap: 2, background: C.line, borderRadius: 12, padding: 4 } }, ["today", "week", "month", "totals", "log", "break", "pause"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, onClick: () => setView(t), style: seg(view === t) }, t)))), view === "today" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "8px 12px", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: C.ink, fontSize: 16, fontWeight: 700, display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 6, whiteSpace: "nowrap" } }, tasks.length, " tasks ", "\xB7", " ", countToday, " /", editingGoal ? /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "text",
+      inputMode: "numeric",
+      autoFocus: true,
+      defaultValue: goal,
+      onBlur: (e) => saveGoal(Number(e.target.value)),
+      onKeyDown: (e) => {
+        if (e.key === "Enter")
+          saveGoal(Number(e.target.value));
+        if (e.key === "Escape")
+          setEditingGoal(false);
+      },
+      style: { width: 32, height: 32, fontSize: 16, fontWeight: 700, padding: 0, textAlign: "center", border: `1.5px solid ${C.ink}`, borderRadius: 6, fontFamily: "var(--fl-mono)", boxSizing: "border-box" }
+    }
+  ) : /* @__PURE__ */ React.createElement("button", { onClick: () => setEditingGoal(true), title: "click to set today's goal", style: { width: 32, height: 32, border: `1.5px solid ${C.faint}`, background: "transparent", color: C.ink, fontFamily: "var(--fl-mono)", fontSize: 16, fontWeight: 700, cursor: "pointer", borderRadius: 6, padding: 0, boxSizing: "border-box" } }, goal), "\u{1F345}", " today"), /* @__PURE__ */ React.createElement("button", { onClick: doSync, disabled: sync === "loading", style: { ...btn(C.ink, true), display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(RefreshCwIcon, { size: 14, spin: sync === "loading" }), sync === "loading" ? "syncing\u2026" : /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, "Sync from ", /* @__PURE__ */ React.createElement("img", { src: NOTION_LOGO, alt: "Notion", style: { width: 15, height: 15 } }), !narrowPanel && "Notion"))), fallingEnjoyment && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 200 } }, "Enjoyment is dipping over your last few pomodoros \\u2014 consider an extra break."), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+    startBreak();
+    setView("break");
+  }, style: { ...btn(C.ink, true), padding: "3px 10px" } }, "take a break")), tasks.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), tasks.length > 1 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, margin: "0 0 8px" } }, "Pinned tasks stay on top, then ", "\u{1F451}", " King. New tasks arrive ranked Must ", "\u2192", " Aim ", "\u2192", " Bonus; drag the grip to reorder freely. Hover a row to pin it or move it between Work and Personal."), !settings.skipMorningRoutine && renderRoutineBlock("morning"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, workTasks.length > 0 && /* @__PURE__ */ React.createElement("div", { style: SECTION_HEAD }, "\u{1F31E}", " Work"), workTasks.map((t) => renderTaskRow(t))), personalTasks.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 14 } }, /* @__PURE__ */ React.createElement("div", { style: SECTION_HEAD }, "\u{1F3E1}", " Personal"), personalTasks.map((t) => renderTaskRow(t))), !settings.skipNightRoutine && renderRoutineBlock("night")), view === "week" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOff((w) => w - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, fmtDate(weekStart), " ", "\u2013", " ", fmtDate(new Date(+weekEnd - DAY))), /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOff((w) => Math.min(0, w + 1)), style: btn(C.muted, true) }, "\u2192")), weekAreas.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, textAlign: "center", padding: "40px 0" } }, weekSessions.length ? "No pomodoros with an Area this week." : "No pomodoros this week.") : weekAreas.map((a) => /* @__PURE__ */ React.createElement(GroupChart, { key: a, group: a, sessions: weekSessions.filter((x) => x.category === a), settings })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted } }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: settings.beginColor } }, "\u25CF"), " expected"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: settings.endColor } }, "\u25CF"), " actual"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: C.better } }, "\u2014"), " better than expected"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: C.worse } }, "\u2014"), " worse than expected"))), view === "month" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setMonthOff((m) => m - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, monthRef.toLocaleDateString(void 0, { month: "long", year: "numeric" })), /* @__PURE__ */ React.createElement("button", { onClick: () => setMonthOff((m) => Math.min(0, m + 1)), style: btn(C.muted, true) }, "\u2192")), /* @__PURE__ */ React.createElement(Heatmap, { sessions, monthRef, settings })), view === "totals" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Pomodoro totals"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 6 } }, "All pomodoros, every project combined."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around" } }, /* @__PURE__ */ React.createElement(Stat, { label: "this week", value: countWeek, big: true }), /* @__PURE__ */ React.createElement(Stat, { label: "this month", value: countMonth, big: true }), /* @__PURE__ */ React.createElement(Stat, { label: "this year", value: countYear, big: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 } }, /* @__PURE__ */ React.createElement(Stat, { label: "hours, week", value: hrsOf(sumMin(inWeek)), color: C.muted }), /* @__PURE__ */ React.createElement(Stat, { label: "hours, month", value: hrsOf(sumMin(inMonth)), color: C.muted }), /* @__PURE__ */ React.createElement(Stat, { label: "hours, year", value: hrsOf(sumMin(inYear)), color: C.muted }))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Six-month heatmap"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 12 } }, "Last 6 months \u2014 pomodoros per day."), /* @__PURE__ */ React.createElement(ContribHeatmap, { sessions, settings })), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Expected vs actual"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "Expected vs actual enjoyment."), rated === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No ratings yet. Log a few pomodoros to see your calibration.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, lineHeight: 1.5, marginBottom: surprises.length ? 14 : 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 22, color: C.better } }, betterPct, "%"), " of your pomodoros turned out ", /* @__PURE__ */ React.createElement("span", { style: { color: C.better } }, "more enjoyable"), " than you expected", /* @__PURE__ */ React.createElement("span", { style: { color: C.muted } }, " (avg gap ", /* @__PURE__ */ React.createElement("span", { style: { color: avgGapAll > 0 ? C.better : avgGapAll < 0 ? C.worse : C.neutral, fontFamily: "var(--fl-mono)" } }, (avgGapAll >= 0 ? "+" : "") + avgGapAll.toFixed(1)), ").")), surprises.length > 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 } }, "Biggest surprises \u2014 dreaded, then enjoyed"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, surprises.map((s) => /* @__PURE__ */ React.createElement("div", { key: s.id, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.better, minWidth: 28 } }, "+", s.actual - s.expected), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, s.task), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" } }, /* @__PURE__ */ React.createElement("span", { style: { color: settings.beginColor } }, s.expected), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted } }, " \u2192 "), /* @__PURE__ */ React.createElement("span", { style: { color: settings.endColor } }, s.actual)), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 11, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap" } }, fmtDate(s.ts)))))))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Best time of day"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "Average enjoyment per band."), !bestBand ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "Not enough data yet.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, marginBottom: 12 } }, "Your highest-enjoyment band is ", /* @__PURE__ */ React.createElement("b", { style: { color: C.ink } }, bestBand.name), " ", /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 13 } }, "(", bestBand.avg.toFixed(1), " / 5)"), "."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, bandStats.map((b) => {
     const pct = b.avg != null ? b.avg / 5 * 100 : 0;
     const isBest = bestBand && b.band === bestBand.band;
     return /* @__PURE__ */ React.createElement("div", { key: b.band, style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 70, fontSize: 12, color: C.muted, textTransform: "capitalize" } }, b.name), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` } }, /* @__PURE__ */ React.createElement("div", { style: { width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral } })), /* @__PURE__ */ React.createElement("span", { style: { width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted } }, b.avg != null ? b.avg.toFixed(1) : "\u2014", " \xB7 ", b.count, "\u{1F345}"));
@@ -24833,7 +24967,11 @@ var DEFAULT_SETTINGS = {
   floatAlwaysOnTop: true,
   floatBounds: null,
   floatBreakBounds: null,
-  floatPhaseBounds: {}
+  floatPhaseBounds: {},
+  personalTaskNames: [],
+  personalAreas: [],
+  skipMorningRoutine: false,
+  skipNightRoutine: false
 };
 var DEFAULT_PAUSE_TAGS = [
   { id: "p-bathroom", name: "bathroom", category: "internal" },
@@ -24849,6 +24987,14 @@ var DEFAULT_ACTIVITIES = [
   { id: "a-water", name: "Drink water", area: "Body", count: 0, lastUsed: null },
   { id: "a-eyes", name: "Rest eyes \u2014 look far", area: "Body", count: 0, lastUsed: null },
   { id: "a-breathe", name: "Deep breathing", area: "Mind", count: 0, lastUsed: null }
+];
+var DEFAULT_MORNING = [
+  { id: "m-water", name: "Drink water" },
+  { id: "m-stretch", name: "Stretch" }
+];
+var DEFAULT_NIGHT = [
+  { id: "n-tidy", name: "Tidy the desk" },
+  { id: "n-review", name: "Review the day" }
 ];
 function plainTitle(page) {
   var _a, _b;
@@ -25318,7 +25464,10 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       activities: loaded.activities || DEFAULT_ACTIVITIES.map((a) => ({ ...a })),
       pauseTags: (loaded.pauseTags || DEFAULT_PAUSE_TAGS.map((a) => ({ ...a }))).map((t) => ({ ...t, category: t.category || PAUSE_TAG_DEFAULT_CAT[t.name] || "internal" })),
       pauses: loaded.pauses || [],
-      breaks: loaded.breaks || []
+      breaks: loaded.breaks || [],
+      morningRoutine: loaded.morningRoutine || DEFAULT_MORNING.map((a) => ({ ...a })),
+      nightRoutine: loaded.nightRoutine || DEFAULT_NIGHT.map((a) => ({ ...a })),
+      routineDone: loaded.routineDone || {}
     };
     if (!this.data.settings.floatPhaseBounds || Object.keys(this.data.settings.floatPhaseBounds).length === 0) {
       const m = {};
@@ -26042,7 +26191,10 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         activities: self.data.activities || [],
         pauseTags: self.data.pauseTags || [],
         pauses: self.data.pauses || [],
-        breaks: self.data.breaks || []
+        breaks: self.data.breaks || [],
+        morningRoutine: self.data.morningRoutine || [],
+        nightRoutine: self.data.nightRoutine || [],
+        routineDone: self.data.routineDone || {}
       }),
       saveSessions: async (arr) => {
         self.data.sessions = arr;
@@ -26062,6 +26214,18 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       },
       saveBreaks: async (arr) => {
         self.data.breaks = arr;
+        await self.persist();
+      },
+      saveMorningRoutine: async (arr) => {
+        self.data.morningRoutine = arr;
+        await self.persist();
+      },
+      saveNightRoutine: async (arr) => {
+        self.data.nightRoutine = arr;
+        await self.persist();
+      },
+      saveRoutineDone: async (obj) => {
+        self.data.routineDone = obj;
         await self.persist();
       },
       appendPause: (p) => self.appendPauseToDailyNote(p),
@@ -26641,6 +26805,25 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
     new import_obsidian.Setting(containerEl).setName("Show category in the today list").setDesc("Show each task's Area as a chip in the panel's today view. Off hides the chip and keeps the full task title.").addToggle(
       (t) => t.setValue(this.plugin.data.settings.showCategoryInView).onChange(async (v) => {
         this.plugin.data.settings.showCategoryInView = v;
+        await this.plugin.persist();
+      })
+    );
+    containerEl.createEl("h3", { text: "Groups and routines" });
+    new import_obsidian.Setting(containerEl).setName("Personal areas").setDesc("Comma-separated Notion Areas that belong in the Personal group (e.g. Health, Home). Tasks in these Areas show under Personal instead of Work.").addText(
+      (t) => t.setPlaceholder("Health, Home").setValue((this.plugin.data.settings.personalAreas || []).join(", ")).onChange(async (v) => {
+        this.plugin.data.settings.personalAreas = v.split(",").map((s) => s.trim()).filter(Boolean);
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Skip morning routine").setDesc("Hide the morning routine block at the top of the today view.").addToggle(
+      (t) => t.setValue(this.plugin.data.settings.skipMorningRoutine).onChange(async (v) => {
+        this.plugin.data.settings.skipMorningRoutine = v;
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Skip night routine").setDesc("Hide the night routine block at the bottom of the today view.").addToggle(
+      (t) => t.setValue(this.plugin.data.settings.skipNightRoutine).onChange(async (v) => {
+        this.plugin.data.settings.skipNightRoutine = v;
         await this.plugin.persist();
       })
     );

@@ -82,6 +82,10 @@ export interface FocusLogSettings {
   floatBounds: { x: number; y: number; w: number; h: number } | null;
   floatBreakBounds: { x: number; y: number; w: number; h: number } | null;
   floatPhaseBounds: { [phase: string]: { x: number; y: number; w: number; h: number } };
+  personalTaskNames: string[];
+  personalAreas: string[];
+  skipMorningRoutine: boolean;
+  skipNightRoutine: boolean;
 }
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
@@ -125,6 +129,10 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   floatBounds: null,
   floatBreakBounds: null,
   floatPhaseBounds: {},
+  personalTaskNames: [],
+  personalAreas: [],
+  skipMorningRoutine: false,
+  skipNightRoutine: false,
 };
 
 // Pause tags carry a category: "internal" (the impulse came from you) or
@@ -147,6 +155,16 @@ const DEFAULT_ACTIVITIES = [
   { id: "a-breathe", name: "Deep breathing", area: "Mind", count: 0, lastUsed: null },
 ];
 
+// Fixed personal routines (local, never synced from Notion). Editable in the today view.
+const DEFAULT_MORNING = [
+  { id: "m-water", name: "Drink water" },
+  { id: "m-stretch", name: "Stretch" },
+];
+const DEFAULT_NIGHT = [
+  { id: "n-tidy", name: "Tidy the desk" },
+  { id: "n-review", name: "Review the day" },
+];
+
 interface PluginData {
   settings: FocusLogSettings;
   sessions: any[];
@@ -156,6 +174,9 @@ interface PluginData {
   pauseTags: any[];
   pauses: any[];
   breaks: any[];
+  morningRoutine: any[];
+  nightRoutine: any[];
+  routineDone: { [dayKey: string]: string[] };
 }
 
 // ---------- Notion property parsing ----------
@@ -574,6 +595,9 @@ export default class FocusLogPlugin extends Plugin {
       pauseTags: (loaded.pauseTags || DEFAULT_PAUSE_TAGS.map((a) => ({ ...a }))).map((t: any) => ({ ...t, category: t.category || PAUSE_TAG_DEFAULT_CAT[t.name] || "internal" })),
       pauses: loaded.pauses || [],
       breaks: loaded.breaks || [],
+      morningRoutine: loaded.morningRoutine || DEFAULT_MORNING.map((a) => ({ ...a })),
+      nightRoutine: loaded.nightRoutine || DEFAULT_NIGHT.map((a) => ({ ...a })),
+      routineDone: loaded.routineDone || {},
     };
     // Seed the per-phase float bounds from the old single focus/break bounds (one-time).
     if (!this.data.settings.floatPhaseBounds || Object.keys(this.data.settings.floatPhaseBounds).length === 0) {
@@ -1199,12 +1223,18 @@ export default class FocusLogPlugin extends Plugin {
         pauseTags: self.data.pauseTags || [],
         pauses: self.data.pauses || [],
         breaks: self.data.breaks || [],
+        morningRoutine: self.data.morningRoutine || [],
+        nightRoutine: self.data.nightRoutine || [],
+        routineDone: self.data.routineDone || {},
       }),
       saveSessions: async (arr: any[]) => { self.data.sessions = arr; await self.persist(); },
       saveActivities: async (arr: any[]) => { self.data.activities = arr; await self.persist(); },
       savePauseTags: async (arr: any[]) => { self.data.pauseTags = arr; await self.persist(); },
       savePauses: async (arr: any[]) => { self.data.pauses = arr; await self.persist(); },
       saveBreaks: async (arr: any[]) => { self.data.breaks = arr; await self.persist(); },
+      saveMorningRoutine: async (arr: any[]) => { self.data.morningRoutine = arr; await self.persist(); },
+      saveNightRoutine: async (arr: any[]) => { self.data.nightRoutine = arr; await self.persist(); },
+      saveRoutineDone: async (obj: any) => { self.data.routineDone = obj; await self.persist(); },
       appendPause: (p: any) => self.appendPauseToDailyNote(p),
       savePending: async (arr: any[]) => { self.data.pending = arr; await self.persist(); },
       saveTasks: async (arr: any[]) => { self.data.tasks = arr; await self.persist(); },
@@ -1729,6 +1759,40 @@ class FocusLogSettingTab extends PluginSettingTab {
       .addToggle((t) =>
         t.setValue(this.plugin.data.settings.showCategoryInView).onChange(async (v) => {
           this.plugin.data.settings.showCategoryInView = v;
+          await this.plugin.persist();
+        })
+      );
+
+    containerEl.createEl("h3", { text: "Groups and routines" });
+
+    new Setting(containerEl)
+      .setName("Personal areas")
+      .setDesc("Comma-separated Notion Areas that belong in the Personal group (e.g. Health, Home). Tasks in these Areas show under Personal instead of Work.")
+      .addText((t) =>
+        t.setPlaceholder("Health, Home")
+          .setValue((this.plugin.data.settings.personalAreas || []).join(", "))
+          .onChange(async (v) => {
+            this.plugin.data.settings.personalAreas = v.split(",").map((s) => s.trim()).filter(Boolean);
+            await this.plugin.persist();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Skip morning routine")
+      .setDesc("Hide the morning routine block at the top of the today view.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.skipMorningRoutine).onChange(async (v) => {
+          this.plugin.data.settings.skipMorningRoutine = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Skip night routine")
+      .setDesc("Hide the night routine block at the bottom of the today view.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.skipNightRoutine).onChange(async (v) => {
+          this.plugin.data.settings.skipNightRoutine = v;
           await this.plugin.persist();
         })
       );

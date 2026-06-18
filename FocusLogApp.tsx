@@ -361,6 +361,8 @@ export function darken(rgb: any, f: number): string {
 const ICON_BTN: any = { background: "transparent", border: "none", boxShadow: "none", padding: 2, height: "auto", cursor: "pointer", color: "#8a8175", display: "inline-flex", flexShrink: 0 };
 // The terracotta add button.
 const ADD_BTN: any = { padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "#C57B5A", border: "1px solid #C57B5A", color: "rgb(251, 248, 241)" };
+// Small uppercase heading for the today-view groups (Work / Personal) and routine blocks.
+const SECTION_HEAD: any = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: "#8a8175", margin: "2px 0 4px 2px", fontFamily: "var(--fl-display)" };
 function polarPt(cx: number, cy: number, r: number, deg: number) {
   const a = (deg * Math.PI) / 180;
   return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
@@ -527,6 +529,24 @@ function RefreshCwIcon({ size = 14, spin = false }: any) {
   );
 }
 
+function BriefcaseIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </svg>
+  );
+}
+
+function UserIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
 // A textarea that starts at one line and grows to fit its content as the text wraps.
 function AutoTextarea({ value, onChange, placeholder, style }: any) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
@@ -634,6 +654,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
       {/* The task picker stays visible in both phases — it's the page Act +1 writes to. */}
       <label style={{ color: C.muted, fontSize: 12 }}>task (Act +1 writes to this page)</label>
       <select value={task} onChange={(e) => setTask(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
+        {task && !tasks.some((t: any) => t.task === task) && <option value={task}>{task}</option>}
         {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
       </select>
 
@@ -759,6 +780,20 @@ export default function FocusLogApp({ api }: any) {
     return a.i - b.i;
   }).map((x) => x.t);
 
+  // Group assignment: a task is Personal if pinned-to-personal by name, or its Area is
+  // listed as a personal area in settings; everything else is Work. Personal pins are by
+  // name (like freeze pins) so they survive daily Notion re-creation.
+  const [personalNames, setPersonalNames] = useState<string[]>(Array.isArray(settings.personalTaskNames) ? settings.personalTaskNames : []);
+  const togglePersonal = (name: string) => {
+    const next = personalNames.includes(name) ? personalNames.filter((n) => n !== name) : [...personalNames, name];
+    setPersonalNames(next);
+    api.patchSettings && api.patchSettings({ personalTaskNames: next });
+  };
+  const personalAreas = Array.isArray(settings.personalAreas) ? settings.personalAreas : [];
+  const isPersonal = (t: any) => personalNames.includes(t.task) || (!!t.category && personalAreas.includes(t.category));
+  const workTasks = orderedTasks.filter((t) => !isPersonal(t));
+  const personalTasks = orderedTasks.filter((t) => isPersonal(t));
+
   // Floating-window on/off, controllable right from the log view. The checkbox
   // tracks whether the window is actually open (synced via onFloatChange), so it
   // never gets stuck "on" after the window is closed with its own X — one click
@@ -782,6 +817,19 @@ export default function FocusLogApp({ api }: any) {
   const saveActivities = (next: any[]) => { setActivities(next); api.saveActivities && api.saveActivities(next); };
   const [breaks, setBreaks] = useState<any[]>(init.breaks || []);
   const saveBreaks = (next: any[]) => { setBreaks(next); api.saveBreaks && api.saveBreaks(next); };
+  // Personal routines (morning + night): fixed local lists, editable inline, with a
+  // per-day check-off and an optional "run a pomodoro" on any item.
+  const [morningRoutine, setMorningRoutine] = useState<any[]>(init.morningRoutine || []);
+  const saveMorning = (next: any[]) => { setMorningRoutine(next); api.saveMorningRoutine && api.saveMorningRoutine(next); };
+  const [nightRoutine, setNightRoutine] = useState<any[]>(init.nightRoutine || []);
+  const saveNight = (next: any[]) => { setNightRoutine(next); api.saveNightRoutine && api.saveNightRoutine(next); };
+  const [routineDone, setRoutineDone] = useState<any>(init.routineDone || {});
+  const [editRoutineId, setEditRoutineId] = useState<string | null>(null);
+  const [editRoutineName, setEditRoutineName] = useState("");
+  const [newMorning, setNewMorning] = useState("");
+  const [newNight, setNewNight] = useState("");
+  const [routineDrag, setRoutineDrag] = useState<{ w: string; i: number } | null>(null);
+  const [routineOver, setRoutineOver] = useState<{ w: string; i: number } | null>(null);
   // The break is now owned by the shared timer engine (so the panel and the floating
   // window stay in lock-step). `brk` below is derived from the engine state; these
   // handlers just drive it through the api. The engine writes the finished break to the
@@ -1227,6 +1275,144 @@ export default function FocusLogApp({ api }: any) {
     )
   );
 
+  // One Notion task row in the today list. Index is resolved against the master
+  // orderedTasks so drag-reorder works the same whether the row sits in Work or Personal.
+  const renderTaskRow = (t: any) => {
+    const i = orderedTasks.indexOf(t);
+    const key = t.id || t.task;
+    const done = doneSess[key] || 0;
+    const est = t.pomodoros || 0;
+    const completed = (t.act || 0) + done;
+    const remaining = Math.max(0, est - completed);
+    const hier = hierarchyText(t);
+    const showCat = !!t.category && settings.showCategoryInView !== false;
+    const cat = showCat ? t.category : null;
+    const titleText = showCat ? stripLeadingTag(t.task) : t.task;
+    const isDragging = dragIndex === i;
+    const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
+    const isFrozen = frozenNames.includes(t.task);
+    const personal = isPersonal(t);
+    return (
+      <div
+        key={key}
+        className="fl-task-row fl-act-row"
+        onDragOver={(e) => { e.preventDefault(); if (overIndex !== i) setOverIndex(i); }}
+        onDrop={(e) => { e.preventDefault(); moveTask(dragIndex, i); setDragIndex(null); setOverIndex(null); }}
+        style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${isOver ? C.ink : C.line}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }}
+      >
+        <span
+          draggable
+          onDragStart={(e) => { setDragIndex(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }}
+          onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+          title="drag to reorder"
+          style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}
+        >
+          {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
+        </span>
+        <span style={{ width: 14, height: 14, borderRadius: 4, background: POWER_COLOR[t.power] || POWER_COLOR.Y, flexShrink: 0 }} title={POWER_LABEL[t.power] || POWER_LABEL.Y} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}><span style={{ color: LOAD_COLOR[t.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, marginRight: 6 }} title={LOAD_LABEL[t.load] || LOAD_LABEL.B}>{t.load || "B"}</span>{cat && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "1px 5px", marginRight: 6, whiteSpace: "nowrap" }}>{cat}</span>}{titleText}{t.king ? " \u{1F451}" : ""}</div>
+          {hier && <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hier}</div>}
+        </div>
+        <button onClick={() => togglePersonal(t.task)} className="fl-rowact" title={personal ? "move to Work" : "move to Personal"} aria-label={personal ? "move to Work" : "move to Personal"} style={ICON_BTN}>{personal ? <BriefcaseIcon size={14} /> : <UserIcon size={14} />}</button>
+        <button
+          onClick={() => toggleFreeze(t.task)}
+          className={"fl-lock" + (isFrozen ? " is-locked" : "")}
+          title={isFrozen ? "unpin from the top" : "pin to the top (by name, so it survives daily re-created Notion tasks)"}
+          style={{ background: "transparent", border: "none", boxShadow: "none", height: "auto", cursor: "pointer", padding: 2, color: isFrozen ? C.ink : C.muted, flexShrink: 0, display: "inline-flex" }}
+        >
+          <LockIcon size={13} open={!isFrozen} />
+        </button>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
+          <TomatoPips vivid={done} grey={remaining} />
+          <span style={{ fontSize: 10.5, color: C.muted, fontFamily: "var(--fl-mono)" }}>{completed} done</span>
+        </div>
+        <button onClick={() => openLog(t.task)} className="fl-rowact" title="log" aria-label="log" style={ICON_BTN}><SquarePenIcon size={15} /></button>
+      </div>
+    );
+  };
+
+  // Routine block helpers. `which` is "morning" or "night"; everything routes to the
+  // matching list + saver so the two blocks share one implementation.
+  const todayKey = String(logicalDay(Date.now(), settings).getTime());
+  const isRoutineDone = (id: string) => (routineDone[todayKey] || []).includes(id);
+  const toggleRoutineDone = (id: string) => {
+    const cur = routineDone[todayKey] || [];
+    const nextList = cur.includes(id) ? cur.filter((x: string) => x !== id) : [...cur, id];
+    const next = { ...routineDone, [todayKey]: nextList };
+    setRoutineDone(next);
+    api.saveRoutineDone && api.saveRoutineDone(next);
+  };
+  const routineSaver = (which: string) => (which === "morning" ? saveMorning : saveNight);
+  const routineList = (which: string) => (which === "morning" ? morningRoutine : nightRoutine);
+  const addRoutine = (which: string) => {
+    const name = (which === "morning" ? newMorning : newNight).trim();
+    if (!name) return;
+    routineSaver(which)([...routineList(which), { id: "r" + Date.now(), name }]);
+    if (which === "morning") setNewMorning(""); else setNewNight("");
+  };
+  const saveEditRoutine = (which: string) => {
+    const n = editRoutineName.trim();
+    if (!n) { setEditRoutineId(null); return; }
+    routineSaver(which)(routineList(which).map((x: any) => (x.id === editRoutineId ? { ...x, name: n } : x)));
+    setEditRoutineId(null);
+  };
+  const removeRoutine = (which: string, id: string) => routineSaver(which)(routineList(which).filter((x: any) => x.id !== id));
+  const moveRoutine = (which: string, from: number, to: number) => {
+    if (from === to) return;
+    const a = [...routineList(which)];
+    const [m] = a.splice(from, 1);
+    a.splice(to, 0, m);
+    routineSaver(which)(a);
+  };
+  const renderRoutineBlock = (which: string) => {
+    const list = routineList(which);
+    const label = which === "morning" ? "\u{1F305} Morning" : "\u{1F319} Night";
+    const newVal = which === "morning" ? newMorning : newNight;
+    const setNewVal = which === "morning" ? setNewMorning : setNewNight;
+    return (
+      <div style={{ marginBottom: 14 }}>
+        <div style={SECTION_HEAD}>{label}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {list.length === 0 && <p style={{ color: C.muted, fontSize: 12.5, margin: "0 0 0 2px" }}>None yet — add one below.</p>}
+          {list.map((it: any, i: number) => {
+            const done = isRoutineDone(it.id);
+            const dragging = !!routineDrag && routineDrag.w === which && routineDrag.i === i;
+            const over = !!routineOver && routineOver.w === which && routineOver.i === i && !!routineDrag && !(routineDrag.w === which && routineDrag.i === i);
+            if (editRoutineId === it.id) {
+              return (
+                <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
+                  <input value={editRoutineName} onChange={(e) => setEditRoutineName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveEditRoutine(which); if (e.key === "Escape") setEditRoutineId(null); }} autoFocus style={{ flex: 1, minWidth: 80, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px", fontFamily: "var(--fl-display)" }} />
+                  <button onClick={() => saveEditRoutine(which)} title="save" aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
+                  <button onClick={() => setEditRoutineId(null)} title="cancel" aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
+                </div>
+              );
+            }
+            return (
+              <div key={it.id} className="fl-act-row"
+                onDragOver={(e) => { e.preventDefault(); if (!routineOver || routineOver.w !== which || routineOver.i !== i) setRoutineOver({ w: which, i }); }}
+                onDrop={(e) => { e.preventDefault(); if (routineDrag && routineDrag.w === which) moveRoutine(which, routineDrag.i, i); setRoutineDrag(null); setRoutineOver(null); }}
+                style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "7px 10px", background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, color: C.ink, opacity: dragging ? 0.4 : 1, boxShadow: over ? `inset 0 2px 0 ${C.ink}` : "none" }}>
+                <span draggable onDragStart={(e) => { setRoutineDrag({ w: which, i }); e.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => { setRoutineDrag(null); setRoutineOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
+                  {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
+                </span>
+                <button onClick={() => toggleRoutineDone(it.id)} title={done ? "mark not done" : "mark done"} aria-label={done ? "mark not done" : "mark done"} style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 5, border: `1.5px solid ${done ? C.better : C.faint}`, background: done ? C.better : "transparent", color: "#fff", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{done && <CheckIcon size={12} />}</button>
+                <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", textDecoration: done ? "line-through" : "none", color: done ? C.muted : C.ink }}>{it.name}</span>
+                <button onClick={() => openLog(it.name)} className="fl-rowact" title="run a pomodoro" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={13} /></button>
+                <button onClick={() => { setEditRoutineId(it.id); setEditRoutineName(it.name); }} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                <button onClick={() => removeRoutine(which, it.id)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+          <input value={newVal} onChange={(e) => setNewVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addRoutine(which); }} placeholder={which === "morning" ? "add a morning step" : "add a night step"} style={{ flex: 1, minWidth: 0, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)" }} />
+          <button onClick={() => addRoutine(which)} title="add" aria-label="add" style={{ ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><ListPlusIcon size={16} /></button>
+        </div>
+      </div>
+    );
+  };
+
   const seg = (on: boolean): any => ({ padding: "6px 14px", borderRadius: 9, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", textTransform: "capitalize", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.14)" : "none", fontFamily: "var(--fl-display)", whiteSpace: "nowrap" });
 
   return (
@@ -1295,60 +1481,19 @@ export default function FocusLogApp({ api }: any) {
               </div>
             )}
             {tasks.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No tasks yet. Set your Notion token in settings, then press sync.</p>}
-            {tasks.length > 1 && <p style={{ color: C.muted, fontSize: 11, margin: "0 0 8px" }}>Pinned tasks stay on top, then {"\u{1F451}"} King. New tasks arrive ranked Must {"→"} Aim {"→"} Bonus; drag the grip to reorder freely. Hover a row to pin it.</p>}
+            {tasks.length > 1 && <p style={{ color: C.muted, fontSize: 11, margin: "0 0 8px" }}>Pinned tasks stay on top, then {"\u{1F451}"} King. New tasks arrive ranked Must {"→"} Aim {"→"} Bonus; drag the grip to reorder freely. Hover a row to pin it or move it between Work and Personal.</p>}
+            {!settings.skipMorningRoutine && renderRoutineBlock("morning")}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {orderedTasks.map((t, i) => {
-                const key = t.id || t.task;
-                const done = doneSess[key] || 0;
-                const est = t.pomodoros || 0;
-                const completed = (t.act || 0) + done;
-                const remaining = Math.max(0, est - completed);
-                const hier = hierarchyText(t);
-                const showCat = !!t.category && settings.showCategoryInView !== false;
-                const cat = showCat ? t.category : null;
-                const titleText = showCat ? stripLeadingTag(t.task) : t.task;
-                const isDragging = dragIndex === i;
-                const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
-                const isFrozen = frozenNames.includes(t.task);
-                return (
-                  <div
-                    key={key}
-                    className="fl-task-row fl-act-row"
-                    onDragOver={(e) => { e.preventDefault(); if (overIndex !== i) setOverIndex(i); }}
-                    onDrop={(e) => { e.preventDefault(); moveTask(dragIndex, i); setDragIndex(null); setOverIndex(null); }}
-                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${isOver ? C.ink : C.line}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }}
-                  >
-                    <span
-                      draggable
-                      onDragStart={(e) => { setDragIndex(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }}
-                      onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
-                      title="drag to reorder"
-                      style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}
-                    >
-                      {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
-                    </span>
-                    <span style={{ width: 14, height: 14, borderRadius: 4, background: POWER_COLOR[t.power] || POWER_COLOR.Y, flexShrink: 0 }} title={POWER_LABEL[t.power] || POWER_LABEL.Y} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}><span style={{ color: LOAD_COLOR[t.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, marginRight: 6 }} title={LOAD_LABEL[t.load] || LOAD_LABEL.B}>{t.load || "B"}</span>{cat && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "1px 5px", marginRight: 6, whiteSpace: "nowrap" }}>{cat}</span>}{titleText}{t.king ? " \u{1F451}" : ""}</div>
-                      {hier && <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hier}</div>}
-                    </div>
-                    <button
-                      onClick={() => toggleFreeze(t.task)}
-                      className={"fl-lock" + (isFrozen ? " is-locked" : "")}
-                      title={isFrozen ? "unpin from the top" : "pin to the top (by name, so it survives daily re-created Notion tasks)"}
-                      style={{ background: "transparent", border: "none", boxShadow: "none", height: "auto", cursor: "pointer", padding: 2, color: isFrozen ? C.ink : C.muted, flexShrink: 0, display: "inline-flex" }}
-                    >
-                      <LockIcon size={13} open={!isFrozen} />
-                    </button>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
-                      <TomatoPips vivid={done} grey={remaining} />
-                      <span style={{ fontSize: 10.5, color: C.muted, fontFamily: "var(--fl-mono)" }}>{completed} done</span>
-                    </div>
-                    <button onClick={() => openLog(t.task)} className="fl-rowact" title="log" aria-label="log" style={ICON_BTN}><SquarePenIcon size={15} /></button>
-                  </div>
-                );
-              })}
+              {workTasks.length > 0 && <div style={SECTION_HEAD}>{"\u{1F31E}"} Work</div>}
+              {workTasks.map((t) => renderTaskRow(t))}
             </div>
+            {personalTasks.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 14 }}>
+                <div style={SECTION_HEAD}>{"\u{1F3E1}"} Personal</div>
+                {personalTasks.map((t) => renderTaskRow(t))}
+              </div>
+            )}
+            {!settings.skipNightRoutine && renderRoutineBlock("night")}
           </div>
         )}
 
