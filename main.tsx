@@ -1834,7 +1834,7 @@ class FocusLogSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Day starts at (HH:MM)")
-      .setDesc("The clock time your logical day rolls over. A morning value like 04:00 keeps late-night work on the previous day (anything up to 03:59 counts as yesterday). An evening value like 22:00 starts a fresh day that night, so a pomodoro after 22:00 counts toward the next date.")
+      .setDesc("The clock time your day rolls over — the end of one day and the start of the next, and the bottom of the Timeline. A morning value like 04:00 keeps late-night work on the previous day (anything up to 03:59 counts as yesterday). An evening value like 22:00 starts a fresh day that night, so a pomodoro after 22:00 counts toward the next date.")
       .addText((t) =>
         t.setPlaceholder("04:00").setValue(fmtHM(this.plugin.data.settings.dayStart)).onChange(async (v) => {
           const n = parseHM(v); if (n == null) return;
@@ -1850,17 +1850,6 @@ class FocusLogSettingTab extends PluginSettingTab {
         t.setPlaceholder("08:00").setValue(fmtHM(this.plugin.data.settings.morningBegins)).onChange(async (v) => {
           const n = parseHM(v); if (n == null) return;
           this.plugin.data.settings.morningBegins = n;
-          await this.plugin.persist();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Day ends at (HH:MM)")
-      .setDesc("When your active day ends — the bottom of the Timeline. e.g. 23:00.")
-      .addText((t) =>
-        t.setPlaceholder("23:00").setValue(fmtHM(this.plugin.data.settings.dayEnds)).onChange(async (v) => {
-          const n = parseHM(v); if (n == null) return;
-          this.plugin.data.settings.dayEnds = n;
           await this.plugin.persist();
         })
       );

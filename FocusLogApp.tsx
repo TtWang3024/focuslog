@@ -570,6 +570,27 @@ function WandSparklesIcon({ size = 14 }: any) {
   );
 }
 
+function Rows4Icon({ size = 15 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M21 7.5H3" /><path d="M21 12H3" /><path d="M21 16.5H3" />
+    </svg>
+  );
+}
+
+function TimelineIcon({ size = 15 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <path d="M4 3v18" />
+      <circle cx="4" cy="8" r="1.6" fill="currentColor" stroke="none" />
+      <path d="M7 8h11" />
+      <circle cx="4" cy="15" r="1.6" fill="currentColor" stroke="none" />
+      <path d="M7 15h8" />
+    </svg>
+  );
+}
+
 // A textarea that starts at one line and grows to fit its content as the text wraps.
 function AutoTextarea({ value, onChange, placeholder, style }: any) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
@@ -868,7 +889,8 @@ export default function FocusLogApp({ api }: any) {
     if (!timelineMode || !tlScrollRef.current) return;
     const { items } = tlLayout(todayBlocks());
     const d = new Date();
-    const nm = d.getHours() * 60 + d.getMinutes();
+    const nmClock = d.getHours() * 60 + d.getMinutes();
+    const nm = nmClock < (settings.dayStart ?? 240) ? nmClock + 1440 : nmClock;
     let nowY = 0;
     if (items.length) {
       const last = items[items.length - 1];
@@ -879,6 +901,9 @@ export default function FocusLogApp({ api }: any) {
     tlScrollRef.current.scrollTop = Math.max(0, nowY - tlScrollRef.current.clientHeight / 2);
   }, [timelineMode]);
   const [expandedPast, setExpandedPast] = useState<Set<string>>(new Set());
+  // The logged-history lists (All sessions / breaks / pauses) start folded.
+  const [foldedHistory, setFoldedHistory] = useState<Set<string>>(new Set(["sessions", "breaks", "pauses"]));
+  const toggleFold = (k: string) => setFoldedHistory((s: Set<string>) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   // The break is now owned by the shared timer engine (so the panel and the floating
   // window stay in lock-step). `brk` below is derived from the engine state; these
   // handlers just drive it through the api. The engine writes the finished break to the
@@ -1449,7 +1474,8 @@ export default function FocusLogApp({ api }: any) {
   // ---------- Timeline (daily plan) ----------
   const PX_PER_MIN = 1.5;
   const tlStart = settings.morningBegins ?? 480;
-  const tlEnd = settings.dayEnds ?? 1380;
+  // The day ends where the next one starts: the bottom of the Timeline is the rollover, one full day below the top.
+  const tlEnd = (settings.dayStart ?? 240) + 1440;
   const MIN_BLOCK_H = 28;
   const GAP_PXM = 0.4;
   // Lay blocks out as a stack — each at least MIN_BLOCK_H tall (so short tasks stay
@@ -1650,7 +1676,9 @@ export default function FocusLogApp({ api }: any) {
     const blocks = todayBlocks();
     const { items, totalH } = tlLayout(blocks);
     const now = new Date();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const nowClock = now.getHours() * 60 + now.getMinutes();
+    // Before the rollover (early morning) the "now" line lives at the day's tail, below the evening.
+    const nowMin = nowClock < (settings.dayStart ?? 240) ? nowClock + 1440 : nowClock;
     let nowY = -1;
     if (items.length) {
       if (nowMin <= items[0].t0) nowY = 0;
@@ -1818,7 +1846,7 @@ export default function FocusLogApp({ api }: any) {
                 {"\u{1F345}"} today
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button onClick={() => setTimelineMode(!timelineMode)} title={timelineMode ? "back to the list" : "plan on a timeline"} style={{ ...btn(C.ink, !timelineMode), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 5 }}>{"\u{1F5D3}\ufe0f"} {timelineMode ? "list" : "timeline"}</button>
+                <button onClick={() => setTimelineMode(!timelineMode)} title={timelineMode ? "back to the list" : "plan on a timeline"} aria-label={timelineMode ? "list view" : "timeline view"} style={{ ...btn(C.ink, !timelineMode), padding: "6px 12px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{timelineMode ? <Rows4Icon size={15} /> : <TimelineIcon size={15} />}</button>
                 <button onClick={doSync} disabled={sync === "loading"} style={{ ...btn(C.ink, true), display: "inline-flex", alignItems: "center", gap: 6 }}>
                   <RefreshCwIcon size={14} spin={sync === "loading"} />
                   {sync === "loading" ? "syncing\u2026" : <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>Sync from <img src={NOTION_LOGO} alt="Notion" style={{ width: 15, height: 15 }} />{!narrowPanel && "Notion"}</span>}
@@ -1948,10 +1976,10 @@ export default function FocusLogApp({ api }: any) {
 
             <div style={{ marginTop: 20 }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>All sessions</h3>
+                <h3 onClick={() => toggleFold("sessions")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>{foldedHistory.has("sessions") ? "▸" : "▾"} All sessions</h3>
                 <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{sessions.length} logged</span>
               </div>
-              {sessions.length === 0 ? (
+              {foldedHistory.has("sessions") ? null : sessions.length === 0 ? (
                 <p style={{ color: C.muted, fontSize: 13 }}>No sessions yet. Log a pomodoro to see it here.</p>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1964,9 +1992,9 @@ export default function FocusLogApp({ api }: any) {
                   ))}
                 </div>
               )}
-              <p style={{ color: C.muted, fontSize: 11, marginTop: 10 }}>
+              {!foldedHistory.has("sessions") && <p style={{ color: C.muted, fontSize: 11, marginTop: 10 }}>
                 Edits and deletes only change the local log; they do not undo the Act write-back on Notion.
-              </p>
+              </p>}
             </div>
           </div>
         )}
@@ -2106,10 +2134,10 @@ export default function FocusLogApp({ api }: any) {
 
             <div style={{ marginTop: 20 }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>All breaks</h3>
+                <h3 onClick={() => toggleFold("breaks")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>{foldedHistory.has("breaks") ? "▸" : "▾"} All breaks</h3>
                 <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{breaks.length} logged</span>
               </div>
-              {breaks.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No breaks logged yet.</p> : (
+              {foldedHistory.has("breaks") ? null : breaks.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No breaks logged yet.</p> : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {[...breaks].sort((a, b) => b.start - a.start).map((b) => (
                     editBreakId === b.id ? (
@@ -2209,10 +2237,10 @@ export default function FocusLogApp({ api }: any) {
 
             <div style={{ marginTop: 20 }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>All pauses</h3>
+                <h3 onClick={() => toggleFold("pauses")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>{foldedHistory.has("pauses") ? "▸" : "▾"} All pauses</h3>
                 <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{pauses.length} logged</span>
               </div>
-              {pauses.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No pauses logged yet.</p> : (
+              {foldedHistory.has("pauses") ? null : pauses.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No pauses logged yet.</p> : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {[...pauses].sort((a, b) => (+new Date(b.ts)) - (+new Date(a.ts))).map((p) => (
                     editPauseId === p.id ? (
