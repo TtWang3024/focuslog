@@ -560,6 +560,16 @@ function CopyIcon({ size = 13 }: any) {
   );
 }
 
+function WandSparklesIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z" />
+      <path d="m14 7 3 3" />
+      <path d="M5 6v4" /><path d="M19 14v4" /><path d="M10 2v2" /><path d="M7 8H3" /><path d="M21 16h-4" /><path d="M11 3H9" />
+    </svg>
+  );
+}
+
 // A textarea that starts at one line and grows to fit its content as the text wraps.
 function AutoTextarea({ value, onChange, placeholder, style }: any) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
@@ -852,15 +862,29 @@ export default function FocusLogApp({ api }: any) {
   const tlRef = useRef<HTMLDivElement | null>(null);
   const [longEvery, setLongEveryState] = useState<number>(settings.longBreakEvery || 3);
   const nowRef = useRef<HTMLDivElement | null>(null);
-  // On opening the timeline, scroll so the current-time line is centred.
-  useEffect(() => { if (timelineMode && nowRef.current) nowRef.current.scrollIntoView({ block: "center", behavior: "auto" }); }, [timelineMode]);
+  const tlScrollRef = useRef<HTMLDivElement | null>(null);
+  // On opening the timeline, scroll its own scroll area so the current time is centred.
+  useEffect(() => {
+    if (!timelineMode || !tlScrollRef.current) return;
+    const { items } = tlLayout(todayBlocks());
+    const d = new Date();
+    const nm = d.getHours() * 60 + d.getMinutes();
+    let nowY = 0;
+    if (items.length) {
+      const last = items[items.length - 1];
+      if (nm <= items[0].t0) nowY = 0;
+      else if (nm >= last.t1) nowY = last.topY + last.height;
+      else for (const it of items) if (nm >= it.t0 && nm <= it.t1) { nowY = it.topY + (it.t1 > it.t0 ? (nm - it.t0) / (it.t1 - it.t0) * it.height : 0); break; }
+    }
+    tlScrollRef.current.scrollTop = Math.max(0, nowY - tlScrollRef.current.clientHeight / 2);
+  }, [timelineMode]);
   const [expandedPast, setExpandedPast] = useState<Set<string>>(new Set());
   // The break is now owned by the shared timer engine (so the panel and the floating
   // window stay in lock-step). `brk` below is derived from the engine state; these
   // handlers just drive it through the api. The engine writes the finished break to the
   // log itself (commitBreak), and the panel re-reads activities/breaks via onBreaksChange.
   const [newAct, setNewAct] = useState<any>({ name: "", area: "" });
-  const startBreak = () => api.timer.startBreak && api.timer.startBreak();
+  const startBreak = (mins?: number) => api.timer.startBreak && api.timer.startBreak(mins);
   const togglePick = (id: string) => api.timer.toggleBreakPick && api.timer.toggleBreakPick(id);
   const endBreak = () => {
     api.timer.endBreak && api.timer.endBreak();
@@ -1225,36 +1249,20 @@ export default function FocusLogApp({ api }: any) {
   const pauseMonth = pauses.filter((p) => { const d = logicalDay(p.ts, settings); return d.getMonth() === nowLD.getMonth() && d.getFullYear() === nowLD.getFullYear(); });
   const topPauseWeek = topPauseOf(pauseWeek);
   const topPauseMonth = topPauseOf(pauseMonth);
-  const tagBands = pauseTags.map((t: any) => {
-    const evs = pauses.filter((p) => p.tag === t.name);
-    const bands = [0, 0, 0];
-    evs.forEach((p) => { bands[bandOf(p.ts, settings)]++; });
-    return { name: t.name, total: evs.length, bands, top: evs.length ? BAND_NAME[bands.indexOf(Math.max(...bands))] : null };
+  // Internal vs external pause counts per time band (a pause inherits its tag's category).
+  const bandSplit = [0, 1, 2].map((bi) => {
+    let internal = 0, external = 0;
+    pauses.forEach((p: any) => {
+      if (bandOf(p.ts, settings) !== bi) return;
+      const tag = pauseTags.find((t: any) => t.name === p.tag);
+      if (tag && catOf(tag.category) === "external") external++; else internal++;
+    });
+    return { internal, external };
   });
   const tagNamesSorted = pauseTags.map((t: any) => t.name).slice().sort();
   const tagIdx = (n: any) => Math.max(0, tagNamesSorted.indexOf(n)) % MACARON.length;
   const tagColor = (n: any) => MACARON[tagIdx(n)].fill;
   const tagBorder = (n: any) => MACARON[tagIdx(n)].border;
-  const pausePie = tagBands.filter((t: any) => t.total > 0).map((t: any) => ({ label: t.name, value: t.total, color: tagColor(t.name) }));
-  // Internal vs external split over rolling windows. A pause inherits its tag's category.
-  const tagCatByName = (name: string) => { const t = pauseTags.find((x: any) => x.name === name); return t && t.category === "external" ? "external" : "internal"; };
-  const catSplit = (sinceMs: number) => {
-    let internal = 0, external = 0;
-    pauses.forEach((p: any) => {
-      const ts = typeof p.ts === "number" ? p.ts : +new Date(p.ts);
-      if (ts >= sinceMs) { if (tagCatByName(p.tag) === "external") external++; else internal++; }
-    });
-    return [
-      { label: "internal", value: internal, color: PAUSE_CAT.internal.border },
-      { label: "external", value: external, color: PAUSE_CAT.external.border },
-    ];
-  };
-  const catPies = [
-    { lbl: "past 7 days", data: catSplit(Date.now() - 7 * DAY) },
-    { lbl: "past 30 days", data: catSplit(Date.now() - 30 * DAY) },
-    { lbl: "past 12 months", data: catSplit(Date.now() - 365 * DAY) },
-  ];
-
   const openLog = (leafTask: string) => { setPreset(leafTask); setView("log"); };
 
   // Panel width, so manager rows can shed metadata on narrow panels: below 520px
@@ -1482,18 +1490,12 @@ export default function FocusLogApp({ api }: any) {
   // every `longEvery` short ones (the rhythm you set in the toolbar).
   const resolveOverlaps = (blocks: any[]) => {
     const shortB = settings.breakMinutes || 5;
-    const longB = settings.longBreakMinutes || 20;
-    const every = Math.max(2, longEvery || 3);
-    let cursor = -Infinity, prevTask = false, shortsRun = 0;
+    let cursor = -Infinity, prevTask = false;
     return blocks.slice().sort((a: any, c: any) => a.start - c.start).map((b: any) => {
       const isTask = b.kind === "task";
       let start = b.start;
       if (start < cursor) {
-        let gap = 0;
-        if (isTask && prevTask) {
-          if (shortsRun >= every) { gap = longB; shortsRun = 0; }
-          else { gap = shortB; shortsRun += 1; }
-        }
+        const gap = isTask && prevTask ? shortB : 0;
         start = cursor + gap;
       }
       cursor = start + b.dur;
@@ -1526,7 +1528,7 @@ export default function FocusLogApp({ api }: any) {
       t += pomo; count++;
       if (idx === pomos.length - 1) return;
       const crossNoon = !noon && t >= 12 * 60;
-      if (count >= every || crossNoon) { t += longB; count = 0; if (crossNoon) noon = true; }
+      if (count >= every || crossNoon) { blocks.push({ id: "lb" + Date.now() + "_" + (seq++), kind: "longbreak", name: "Long break", start: t, dur: longB }); t += longB; count = 0; if (crossNoon) noon = true; }
       else t += shortB;
     });
     // Night routine last.
@@ -1560,6 +1562,28 @@ export default function FocusLogApp({ api }: any) {
   const addMeeting = () => {
     const last = todayBlocks().reduce((m: number, b: any) => Math.max(m, b.start + b.dur), tlStart);
     setTodayBlocks(resolveOverlaps([...todayBlocks(), { id: "m" + Date.now(), kind: "meeting", name: "Unavailable", start: clampStart(snap5(last + 10), 30), dur: 30 }]));
+  };
+  // Wand: re-flow the plan into a clean break rhythm — a short break (settings.breakMinutes)
+  // between consecutive tasks and a long-break BLOCK (settings.longBreakMinutes) after every
+  // N pomodoros (N = the in-view picker). Routines/unavailable stay back-to-back in order.
+  const autoBreaks = () => {
+    const shortB = settings.breakMinutes || 5;
+    const longB = settings.longBreakMinutes || 20;
+    const N = Math.max(2, longEvery || 3);
+    const src = todayBlocks().filter((b: any) => b.kind !== "longbreak").slice().sort((a: any, b: any) => a.start - b.start);
+    if (!src.length) return;
+    const out: any[] = [];
+    let t = src[0].start, count = 0;
+    src.forEach((b: any, i: number) => {
+      out.push({ ...b, start: t });
+      t += b.dur;
+      if (b.kind === "task") count++;
+      const next = src[i + 1];
+      if (!next) return;
+      if (b.kind === "task" && count >= N) { out.push({ id: "lb" + Date.now() + "_" + i, kind: "longbreak", name: "Long break", start: t, dur: longB }); t += longB; count = 0; }
+      else if (b.kind === "task" && next.kind === "task") t += shortB;
+    });
+    setTodayBlocks(out);
   };
   const saveBlockEdit = () => {
     const blk = todayBlocks().find((b: any) => b.id === editBlockId);
@@ -1610,7 +1634,7 @@ export default function FocusLogApp({ api }: any) {
       <div key={b.id} className="fl-act-row" draggable
         onDragStart={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setTlDrag({ id: b.id, grab: e.clientY - r.top }); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", b.id); }}
         onDragEnd={() => setTlDrag(null)}
-        style={{ position: "absolute", left: 56, right: 4, top: topY, height: h, boxSizing: "border-box", background: isTask ? "#fff" : "#fbf8f1", border: `1px solid ${C.line}`, borderLeft: `4px solid ${isTask ? (POWER_COLOR[b.power] || POWER_COLOR.Y) : (b.kind === "routine" ? C.better : C.muted)}`, borderRadius: 6, padding: "2px 8px", cursor: "grab", display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: C.ink, opacity: tlDrag && tlDrag.id === b.id ? 0.4 : 1, overflow: "hidden" }}>
+        style={{ position: "absolute", left: 56, right: 4, top: topY, height: h, boxSizing: "border-box", background: isTask ? "#fff" : (b.kind === "longbreak" ? "#eef2f6" : "#fbf8f1"), border: `1px solid ${C.line}`, borderLeft: `4px solid ${isTask ? (POWER_COLOR[b.power] || POWER_COLOR.Y) : (b.kind === "routine" ? C.better : b.kind === "longbreak" ? C.neutral : C.muted)}`, borderRadius: 6, padding: "2px 8px", cursor: "grab", display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: C.ink, opacity: tlDrag && tlDrag.id === b.id ? 0.4 : 1, overflow: "hidden" }}>
         {isTask && <span style={{ color: LOAD_COLOR[b.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, fontSize: 12.5, flexShrink: 0 }} title={LOAD_LABEL[b.load] || LOAD_LABEL.B}>{b.load || "B"}</span>}
         <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isTask ? stripLeadingTag(b.name) : b.name}</span>
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 10, color: C.muted, flexShrink: 0 }}>{b.dur}m</span>
@@ -1643,11 +1667,13 @@ export default function FocusLogApp({ api }: any) {
                 <option value={2}>2</option><option value={3}>3</option><option value={4}>4</option>
               </select>
             </label>
+            <button onClick={autoBreaks} title="auto-fix breaks: a short break between tasks and a long-break block every N pomodoros" aria-label="auto-fix breaks" style={{ ...btn(C.muted, true), padding: "4px 9px", display: "inline-flex", alignItems: "center" }}><WandSparklesIcon size={14} /></button>
             <button onClick={() => setTodayBlocks(buildInitialPlan())} title="rebuild the plan from your tasks + routines" style={{ ...btn(C.muted, true), padding: "4px 9px", display: "inline-flex", alignItems: "center" }}><RotateCcwIcon size={13} /></button>
             <button onClick={addMeeting} style={{ ...btn(C.ink, true), padding: "4px 10px", display: "inline-flex", alignItems: "center", gap: 5 }}><ListPlusIcon size={14} /> unavailable</button>
           </div>
         </div>
         {blocks.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: "0 0 8px" }}>No blocks yet — sync some tasks and re-open the timeline, or add a meeting.</p>}
+        <div ref={tlScrollRef} style={{ maxHeight: "62vh", overflowY: "auto", overflowX: "hidden" }}>
         <div ref={tlRef} onDragOver={(e) => e.preventDefault()} onDrop={onTimelineDrop} style={{ position: "relative", height: totalH }}>
           <div style={{ position: "absolute", left: 48, top: 0, bottom: 0, width: 2, background: C.line }} />
           {items.map((it: any, i: number) => it.type === "gap" ? (
@@ -1664,6 +1690,7 @@ export default function FocusLogApp({ api }: any) {
               <span style={{ position: "absolute", left: 0, top: -7, width: 40, textAlign: "right", fontSize: 10, color: C.worse, fontFamily: "var(--fl-mono)", fontWeight: 700 }}>{fmtClock(nowMin)}</span>
             </div>
           )}
+        </div>
         </div>
       </div>
     );
@@ -1948,6 +1975,11 @@ export default function FocusLogApp({ api }: any) {
 
         {view === "break" && (
           <div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 16 }}>
+              <span style={SECTION_HEAD}>start a break</span>
+              <button onClick={() => startBreak(settings.breakMinutes)} style={{ ...btn(C.ink, true), padding: "5px 12px" }}>short · {settings.breakMinutes}m</button>
+              <button onClick={() => startBreak(settings.longBreakMinutes)} style={{ ...btn(C.ink, true), padding: "5px 12px" }}>long · {settings.longBreakMinutes}m</button>
+            </div>
             {brk.active && (
               <div style={{ background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 }}>
@@ -2150,36 +2182,27 @@ export default function FocusLogApp({ api }: any) {
                   <div style={{ fontSize: 14, color: C.ink }}>{topPauseMonth ? `${topPauseMonth.tag} (${topPauseMonth.n})` : "—"}</div>
                 </div>
               </div>
-              <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Internal vs external interrupt</p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 18, marginBottom: 16 }}>
-                {catPies.map(({ lbl, data }: any) => (
-                  <div key={lbl}>
-                    <p style={{ fontSize: 11, color: C.muted, margin: "0 0 4px", fontFamily: "var(--fl-mono)" }}>{lbl}</p>
-                    <PieChart data={data} empty={`No pauses in the ${lbl}.`} />
-                  </div>
-                ))}
-              </div>
-              <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>By tag</p>
-              <div style={{ marginBottom: 16 }}><PieChart data={pausePie} empty="No pauses recorded yet." /></div>
               <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Typical time of day (all history)</p>
-              {tagBands.filter((t: any) => t.total > 0).length === 0 ? (
+              {pauses.length === 0 ? (
                 <p style={{ color: C.muted, fontSize: 13 }}>No pauses recorded yet.</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {tagBands.filter((t: any) => t.total > 0).sort((a: any, b: any) => b.total - a.total).map((t: any) => (
-                    <div key={t.name} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "5px 10px", background: tagColor(t.name), border: `1.5px solid ${tagBorder(t.name)}`, borderRadius: 6, color: C.ink }}>
-                      <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
-                      <span style={{ display: "flex", gap: 3 }}>
-                        {t.bands.map((n: number, i: number) => (<span key={i} title={`${BAND_NAME[i]}: ${n}`} style={{ width: 26, textAlign: "center", fontFamily: "var(--fl-mono)", fontSize: 11, opacity: i === t.bands.indexOf(Math.max(...t.bands)) ? 1 : 0.45 }}>{n}</span>))}
-                      </span>
-                      <span style={{ minWidth: 70, textAlign: "right", fontSize: 12, opacity: 0.85 }}>{t.top}</span>
-                    </div>
-                  ))}
-                  <div style={{ display: "flex", gap: 3, justifyContent: "flex-end", fontSize: 10, color: C.muted, marginTop: 2 }}>
-                    <span style={{ flex: 1 }} />
-                    {BAND_NAME.map((b, i) => (<span key={i} style={{ width: 26, textAlign: "center" }}>{b.slice(0, 3)}</span>))}
-                    <span style={{ minWidth: 70 }} />
-                  </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {BAND_NAME.map((band, bi) => {
+                    const s = bandSplit[bi];
+                    const total = s.internal + s.external;
+                    return (
+                      <div key={band}>
+                        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", fontSize: 11, marginBottom: 3, fontFamily: "var(--fl-mono)" }}>
+                          <span style={{ color: C.muted, textTransform: "capitalize" }}>{band}</span>
+                          <span><span style={{ color: PAUSE_CAT.internal.border }}>internal {s.internal}</span><span style={{ color: C.faint }}> · </span><span style={{ color: PAUSE_CAT.external.border }}>external {s.external}</span></span>
+                        </div>
+                        <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: C.line }}>
+                          {total > 0 && <div title={`internal ${s.internal}/${total}`} style={{ width: `${(s.internal / total) * 100}%`, background: PAUSE_CAT.internal.border }} />}
+                          {total > 0 && <div title={`external ${s.external}/${total}`} style={{ width: `${(s.external / total) * 100}%`, background: PAUSE_CAT.external.border }} />}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

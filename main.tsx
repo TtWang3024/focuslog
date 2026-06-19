@@ -476,8 +476,8 @@ class TimerEngine {
   // Begin (or restart) the rest timer using the configured break length. Honors the
   // break-auto-start setting; either way the break phase becomes active so the panel
   // and float can show its controls + activity picker.
-  startBreak() {
-    const mins = Math.max(1, Math.min(60, Math.round(this.plugin.data.settings.breakMinutes) || 5));
+  startBreak(reqMins?: number) {
+    const mins = Math.max(1, Math.min(120, Math.round(reqMins != null ? reqMins : (this.plugin.data.settings.breakMinutes || 5)) || 5));
     this.breakTotal = mins * 60;
     this.breakFrozen = this.breakTotal;
     this.breakStart = Date.now();
@@ -1291,7 +1291,7 @@ export default class FocusLogPlugin extends Plugin {
         setExpected: (n: number) => self.timer.setExpected(n),
         setTask: (name: string) => self.timer.setTask(name),
         commitPendingPause: () => self.timer.commitPendingPause(),
-        startBreak: () => self.timer.startBreak(),
+        startBreak: (mins?: number) => self.timer.startBreak(mins),
         toggleBreakRun: () => self.timer.toggleBreakRun(),
         stepBreak: (d: number) => self.timer.stepBreak(d),
         toggleBreakPick: (id: string) => self.timer.toggleBreakPick(id),
