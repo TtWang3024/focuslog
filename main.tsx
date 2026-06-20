@@ -1,7 +1,7 @@
 import { App, ItemView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath, requestUrl, setIcon } from "obsidian";
 import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
-import FocusLogApp, { MACARON, darken, fmtHM, parseHM } from "./FocusLogApp";
+import FocusLogApp, { MACARON, MODE_COLORS, darken, fmtHM, parseHM } from "./FocusLogApp";
 
 export const VIEW_TYPE = "focuslog-view";
 export const VIEW_TYPE_FLOAT = "focuslog-float";
@@ -92,6 +92,7 @@ export interface FocusLogSettings {
   longBreakEvery: number;
   anchorShift: boolean;
   timeFmtV2: boolean;
+  workDays: boolean[];
 }
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
@@ -145,6 +146,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   longBreakEvery: 3,
   anchorShift: false,
   timeFmtV2: true,
+  workDays: [true, true, true, true, true, true, true],
 };
 
 // Pause tags carry a category: "internal" (the impulse came from you) or
@@ -176,6 +178,15 @@ const DEFAULT_NIGHT = [
   { id: "n-tidy", name: "Tidy the desk" },
   { id: "n-review", name: "Review the day" },
 ];
+// Relax-day routines (used on rest days, or when the today switch is set to Relax).
+const DEFAULT_RELAX_MORNING = [
+  { id: "rm-sleep", name: "Sleep in" },
+  { id: "rm-coffee", name: "Slow coffee" },
+];
+const DEFAULT_RELAX_NIGHT = [
+  { id: "rn-unwind", name: "Unwind — no screens" },
+  { id: "rn-read", name: "Read for fun" },
+];
 
 interface PluginData {
   settings: FocusLogSettings;
@@ -188,7 +199,10 @@ interface PluginData {
   breaks: any[];
   morningRoutine: any[];
   nightRoutine: any[];
+  relaxMorningRoutine: any[];
+  relaxNightRoutine: any[];
   routineDone: { [dayKey: string]: string[] };
+  modeOverride: { [dayKey: string]: string };
   plans: { [dayKey: string]: any[] };
 }
 
@@ -610,7 +624,10 @@ export default class FocusLogPlugin extends Plugin {
       breaks: loaded.breaks || [],
       morningRoutine: loaded.morningRoutine || DEFAULT_MORNING.map((a) => ({ ...a })),
       nightRoutine: loaded.nightRoutine || DEFAULT_NIGHT.map((a) => ({ ...a })),
+      relaxMorningRoutine: loaded.relaxMorningRoutine || DEFAULT_RELAX_MORNING.map((a) => ({ ...a })),
+      relaxNightRoutine: loaded.relaxNightRoutine || DEFAULT_RELAX_NIGHT.map((a) => ({ ...a })),
       routineDone: loaded.routineDone || {},
+      modeOverride: loaded.modeOverride || {},
       plans: loaded.plans || {},
     };
     // Seed the per-phase float bounds from the old single focus/break bounds (one-time).
@@ -1256,7 +1273,10 @@ export default class FocusLogPlugin extends Plugin {
         breaks: self.data.breaks || [],
         morningRoutine: self.data.morningRoutine || [],
         nightRoutine: self.data.nightRoutine || [],
+        relaxMorningRoutine: self.data.relaxMorningRoutine || [],
+        relaxNightRoutine: self.data.relaxNightRoutine || [],
         routineDone: self.data.routineDone || {},
+        modeOverride: self.data.modeOverride || {},
         plans: self.data.plans || {},
       }),
       saveSessions: async (arr: any[]) => { self.data.sessions = arr; await self.persist(); },
@@ -1266,7 +1286,10 @@ export default class FocusLogPlugin extends Plugin {
       saveBreaks: async (arr: any[]) => { self.data.breaks = arr; await self.persist(); },
       saveMorningRoutine: async (arr: any[]) => { self.data.morningRoutine = arr; await self.persist(); },
       saveNightRoutine: async (arr: any[]) => { self.data.nightRoutine = arr; await self.persist(); },
+      saveRelaxMorningRoutine: async (arr: any[]) => { self.data.relaxMorningRoutine = arr; await self.persist(); },
+      saveRelaxNightRoutine: async (arr: any[]) => { self.data.relaxNightRoutine = arr; await self.persist(); },
       saveRoutineDone: async (obj: any) => { self.data.routineDone = obj; await self.persist(); },
+      saveModeOverride: async (obj: any) => { self.data.modeOverride = obj; await self.persist(); },
       savePlan: async (dayKey: string, blocks: any[]) => { self.data.plans = { ...(self.data.plans || {}), [dayKey]: blocks }; await self.persist(); },
       appendPause: (p: any) => self.appendPauseToDailyNote(p),
       savePending: async (arr: any[]) => { self.data.pending = arr; await self.persist(); },
@@ -1829,6 +1852,20 @@ class FocusLogSettingTab extends PluginSettingTab {
           await this.plugin.persist();
         })
       );
+
+    containerEl.createEl("h3", { text: "Active schedule" });
+    const schedDesc = containerEl.createEl("p", { text: "Working days (orange) open the today view in Work mode; rest days (dark green) open in Relax mode with your relax routines. Tap a day to flip it — the switch in the today view overrides just one day." });
+    schedDesc.style.fontSize = "12px"; schedDesc.style.color = "var(--text-muted)"; schedDesc.style.marginTop = "4px";
+    if (!this.plugin.data.settings.workDays) this.plugin.data.settings.workDays = [true, true, true, true, true, true, true];
+    const schedRow = containerEl.createDiv();
+    schedRow.style.display = "flex"; schedRow.style.gap = "6px"; schedRow.style.flexWrap = "wrap"; schedRow.style.margin = "8px 0 22px";
+    ["M", "T", "W", "T", "F", "S", "S"].forEach((lab, i) => {
+      const b = schedRow.createEl("button", { text: lab });
+      b.style.width = "38px"; b.style.height = "38px"; b.style.borderRadius = "9px"; b.style.border = "none"; b.style.color = "#fff"; b.style.fontWeight = "700"; b.style.fontSize = "14px"; b.style.cursor = "pointer";
+      const paint = () => { const rest = this.plugin.data.settings.workDays[i] === false; b.style.background = rest ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid; b.title = rest ? "rest day — tap to make it a working day" : "working day — tap to make it a rest day"; };
+      paint();
+      b.onclick = async () => { const arr = this.plugin.data.settings.workDays.slice(); arr[i] = arr[i] === false; this.plugin.data.settings.workDays = arr; await this.plugin.persist(); paint(); };
+    });
 
     containerEl.createEl("h3", { text: "Day and time bands" });
 

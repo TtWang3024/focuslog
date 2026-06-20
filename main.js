@@ -23612,6 +23612,10 @@ var C = {
   worse: "#b4533a",
   neutral: "#a59c8c"
 };
+var MODE_COLORS = {
+  work: { solid: "#d98324", fill: "#fbe7d4", border: "#e3a45f" },
+  relax: { solid: "#2f6f4f", fill: "#e4efe8", border: "#6aa386" }
+};
 var DAY = 864e5;
 var startOfDay = (d) => {
   const x = new Date(d);
@@ -23969,7 +23973,7 @@ function Rows4Icon({ size = 15 }) {
   return /* @__PURE__ */ React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M21 7.5H3" }), /* @__PURE__ */ React.createElement("path", { d: "M21 12H3" }), /* @__PURE__ */ React.createElement("path", { d: "M21 16.5H3" }));
 }
 function TimelineIcon({ size = 15 }) {
-  return /* @__PURE__ */ React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React.createElement("path", { d: "M4 3v18" }), /* @__PURE__ */ React.createElement("circle", { cx: "4", cy: "8", r: "1.6", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("path", { d: "M7 8h11" }), /* @__PURE__ */ React.createElement("circle", { cx: "4", cy: "15", r: "1.6", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("path", { d: "M7 15h8" }));
+  return /* @__PURE__ */ React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React.createElement("path", { d: "M4 12h.01" }), /* @__PURE__ */ React.createElement("path", { d: "M4 16h.01" }), /* @__PURE__ */ React.createElement("path", { d: "M4 20h.01" }), /* @__PURE__ */ React.createElement("path", { d: "M4 4h.01" }), /* @__PURE__ */ React.createElement("path", { d: "M4 8h.01" }), /* @__PURE__ */ React.createElement("path", { d: "M9.414 13.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 12z" }), /* @__PURE__ */ React.createElement("path", { d: "M9.414 21.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 20z" }), /* @__PURE__ */ React.createElement("path", { d: "M9.414 5.414A2 2 0 0 0 10.828 6H19a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 4z" }));
 }
 function AutoTextarea({ value, onChange, placeholder, style }) {
   const ref = useRef(null);
@@ -24148,6 +24152,17 @@ function FocusLogApp({ api }) {
     api.saveNightRoutine && api.saveNightRoutine(next);
   };
   const [routineDone, setRoutineDone] = useState(init.routineDone || {});
+  const [relaxMorning, setRelaxMorning] = useState(init.relaxMorningRoutine || []);
+  const saveRelaxMorning = (next) => {
+    setRelaxMorning(next);
+    api.saveRelaxMorningRoutine && api.saveRelaxMorningRoutine(next);
+  };
+  const [relaxNight, setRelaxNight] = useState(init.relaxNightRoutine || []);
+  const saveRelaxNight = (next) => {
+    setRelaxNight(next);
+    api.saveRelaxNightRoutine && api.saveRelaxNightRoutine(next);
+  };
+  const [modeOverride, setModeOverride] = useState(init.modeOverride || {});
   const [editRoutineId, setEditRoutineId] = useState(null);
   const [editRoutineName, setEditRoutineName] = useState("");
   const [newMorning, setNewMorning] = useState("");
@@ -24437,7 +24452,7 @@ function FocusLogApp({ api }) {
     setTasks(a);
     api.saveTasks(a);
     const nf = Array.from(new Set(a.filter((t) => frozenNames.includes(t.task)).map((t) => t.task)));
-    if (nf.join("\0") !== frozenNames.join("\0")) {
+    if (nf.join(" ") !== frozenNames.join(" ")) {
       setFrozenNames(nf);
       api.patchSettings && api.patchSettings({ frozenTaskNames: nf });
     }
@@ -24794,6 +24809,18 @@ ${s.task}`))
     );
   };
   const todayKey = String(logicalDay(Date.now(), settings).getTime());
+  const workDays = settings.workDays || [true, true, true, true, true, true, true];
+  const todayWeekday = (logicalDay(Date.now(), settings).getDay() + 6) % 7;
+  const autoMode = workDays[todayWeekday] === false ? "relax" : "work";
+  const dayMode = modeOverride[todayKey] === "work" || modeOverride[todayKey] === "relax" ? modeOverride[todayKey] : autoMode;
+  const toggleDayMode = () => {
+    const next = dayMode === "work" ? "relax" : "work";
+    const obj = { ...modeOverride, [todayKey]: next };
+    setModeOverride(obj);
+    api.saveModeOverride && api.saveModeOverride(obj);
+  };
+  const activeMorning = dayMode === "relax" ? relaxMorning : morningRoutine;
+  const activeNight = dayMode === "relax" ? relaxNight : nightRoutine;
   const isRoutineDone = (id) => (routineDone[todayKey] || []).includes(id);
   const toggleRoutineDone = (id) => {
     const cur = routineDone[todayKey] || [];
@@ -24802,8 +24829,8 @@ ${s.task}`))
     setRoutineDone(next);
     api.saveRoutineDone && api.saveRoutineDone(next);
   };
-  const routineSaver = (which) => which === "morning" ? saveMorning : saveNight;
-  const routineList = (which) => which === "morning" ? morningRoutine : nightRoutine;
+  const routineSaver = (which) => dayMode === "relax" ? which === "morning" ? saveRelaxMorning : saveRelaxNight : which === "morning" ? saveMorning : saveNight;
+  const routineList = (which) => which === "morning" ? activeMorning : activeNight;
   const addRoutine = (which) => {
     const name = (which === "morning" ? newMorning : newNight).trim();
     if (!name)
@@ -24834,10 +24861,11 @@ ${s.task}`))
   };
   const renderRoutineBlock = (which) => {
     const list = routineList(which);
+    const relax = dayMode === "relax";
     const label = which === "morning" ? "\u{1F305} Morning" : "\u{1F319} Night";
     const newVal = which === "morning" ? newMorning : newNight;
     const setNewVal = which === "morning" ? setNewMorning : setNewNight;
-    return /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: SECTION_HEAD }, label), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, list.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12.5, margin: "0 0 0 2px" } }, "None yet \u2014 add one below."), list.map((it, i) => {
+    return /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { ...SECTION_HEAD, ...relax ? { color: MODE_COLORS.relax.solid } : {} } }, label), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, list.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12.5, margin: "0 0 0 2px" } }, "None yet \u2014 add one below."), list.map((it, i) => {
       const done = isRoutineDone(it.id);
       const dragging = !!routineDrag && routineDrag.w === which && routineDrag.i === i;
       const over = !!routineOver && routineOver.w === which && routineOver.i === i && !!routineDrag && !(routineDrag.w === which && routineDrag.i === i);
@@ -24866,7 +24894,7 @@ ${s.task}`))
             setRoutineDrag(null);
             setRoutineOver(null);
           },
-          style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "7px 10px", background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, color: C.ink, opacity: dragging ? 0.4 : 1, boxShadow: over ? `inset 0 2px 0 ${C.ink}` : "none" }
+          style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "7px 10px", background: relax ? MODE_COLORS.relax.fill : C.card, border: `1px solid ${relax ? MODE_COLORS.relax.border : C.line}`, borderRadius: 6, color: C.ink, opacity: dragging ? 0.4 : 1, boxShadow: over ? `inset 0 2px 0 ${C.ink}` : "none" }
         },
         /* @__PURE__ */ React.createElement("span", { draggable: true, onDragStart: (e) => {
           setRoutineDrag({ w: which, i });
@@ -24953,7 +24981,7 @@ ${s.task}`))
     const blocks = [];
     let t = tlStart, count = 0, noon = false, seq = 0;
     if (!settings.skipMorningRoutine)
-      (morningRoutine || []).forEach((it) => {
+      (activeMorning || []).forEach((it) => {
         const dur = it.dur || ROUTINE_MIN;
         blocks.push({ id: "r" + Date.now() + "_" + seq++, kind: "routine", name: it.name, start: t, dur, refId: it.id });
         t += dur;
@@ -24977,10 +25005,10 @@ ${s.task}`))
       } else
         t += shortB;
     });
-    if (!settings.skipNightRoutine && (nightRoutine || []).length) {
+    if (!settings.skipNightRoutine && (activeNight || []).length) {
       if (pomos.length)
         t += shortB;
-      (nightRoutine || []).forEach((it) => {
+      (activeNight || []).forEach((it) => {
         const dur = it.dur || ROUTINE_MIN;
         blocks.push({ id: "r" + Date.now() + "_" + seq++, kind: "routine", name: it.name, start: t, dur, refId: it.id });
         t += dur;
@@ -24989,7 +25017,7 @@ ${s.task}`))
     return blocks;
   };
   const setTimelineMode = (on) => {
-    const hasInput = [...workTasks, ...personalTasks].length || !settings.skipMorningRoutine && (morningRoutine || []).length || !settings.skipNightRoutine && (nightRoutine || []).length;
+    const hasInput = [...workTasks, ...personalTasks].length || !settings.skipMorningRoutine && (activeMorning || []).length || !settings.skipNightRoutine && (activeNight || []).length;
     if (on && !plans[todayKey] && hasInput)
       setTodayBlocks(buildInitialPlan());
     setTimelineModeState(on);
@@ -25042,10 +25070,10 @@ ${s.task}`))
     setTodayBlocks(todayBlocks().map((b) => b.id === editBlockId ? { ...b, name, dur } : b));
     if (blk && blk.kind === "routine" && blk.refId) {
       const upd = (list) => list.map((it) => it.id === blk.refId ? { ...it, name, dur } : it);
-      if ((morningRoutine || []).some((it) => it.id === blk.refId))
-        saveMorning(upd(morningRoutine));
-      else if ((nightRoutine || []).some((it) => it.id === blk.refId))
-        saveNight(upd(nightRoutine));
+      if ((activeMorning || []).some((it) => it.id === blk.refId))
+        routineSaver("morning")(upd(activeMorning));
+      else if ((activeNight || []).some((it) => it.id === blk.refId))
+        routineSaver("night")(upd(activeNight));
     }
     setEditBlockId(null);
   };
@@ -25138,11 +25166,11 @@ ${s.task}`))
   const phaseRankNow = (() => {
     const d = /* @__PURE__ */ new Date();
     const nowM = d.getHours() * 60 + d.getMinutes();
-    const sumMorning = (morningRoutine || []).reduce((s, it) => s + (it.dur || ROUTINE_MIN), 0);
+    const sumMorning = (activeMorning || []).reduce((s, it) => s + (it.dur || ROUTINE_MIN), 0);
     const planB = plans[todayKey];
     let morningEnd, workEnd;
     if (planB && planB.length) {
-      const mIds = new Set((morningRoutine || []).map((it) => it.id));
+      const mIds = new Set((activeMorning || []).map((it) => it.id));
       const mEnds = planB.filter((b) => b.kind === "routine" && mIds.has(b.refId)).map((b) => b.start + b.dur);
       const tEnds = planB.filter((b) => b.kind === "task").map((b) => b.start + b.dur);
       morningEnd = mEnds.length ? Math.max(...mEnds) : tlStart;
@@ -25200,7 +25228,7 @@ ${s.task}`))
       },
       style: { width: 32, height: 32, fontSize: 16, fontWeight: 700, padding: 0, textAlign: "center", border: `1.5px solid ${C.ink}`, borderRadius: 6, fontFamily: "var(--fl-mono)", boxSizing: "border-box" }
     }
-  ) : /* @__PURE__ */ React.createElement("button", { onClick: () => setEditingGoal(true), title: "click to set today's goal", style: { width: 32, height: 32, border: `1.5px solid ${C.faint}`, background: "transparent", color: C.ink, fontFamily: "var(--fl-mono)", fontSize: 16, fontWeight: 700, cursor: "pointer", borderRadius: 6, padding: 0, boxSizing: "border-box" } }, goal), "\u{1F345}", " today"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setTimelineMode(!timelineMode), title: timelineMode ? "back to the list" : "plan on a timeline", "aria-label": timelineMode ? "list view" : "timeline view", style: { ...btn(C.ink, !timelineMode), padding: "6px 12px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, timelineMode ? /* @__PURE__ */ React.createElement(Rows4Icon, { size: 15 }) : /* @__PURE__ */ React.createElement(TimelineIcon, { size: 15 })), /* @__PURE__ */ React.createElement("button", { onClick: doSync, disabled: sync === "loading", style: { ...btn(C.ink, true), display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(RefreshCwIcon, { size: 14, spin: sync === "loading" }), sync === "loading" ? "syncing\u2026" : /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, "Sync from ", /* @__PURE__ */ React.createElement("img", { src: NOTION_LOGO, alt: "Notion", style: { width: 15, height: 15 } }), !narrowPanel && "Notion")))), fallingEnjoyment && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 200 } }, "Enjoyment is dipping over your last few pomodoros \\u2014 consider an extra break."), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+  ) : /* @__PURE__ */ React.createElement("button", { onClick: () => setEditingGoal(true), title: "click to set today's goal", style: { width: 32, height: 32, border: `1.5px solid ${C.faint}`, background: "transparent", color: C.ink, fontFamily: "var(--fl-mono)", fontSize: 16, fontWeight: 700, cursor: "pointer", borderRadius: 6, padding: 0, boxSizing: "border-box" } }, goal), "\u{1F345}", " today"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 6 }, title: dayMode === "work" ? "Work mode \u2014 tap to switch to Relax" : "Relax mode \u2014 tap to switch to Work" }, !narrowPanel && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: dayMode === "work" ? MODE_COLORS.work.solid : MODE_COLORS.relax.solid } }, dayMode === "work" ? "Work" : "Relax"), /* @__PURE__ */ React.createElement("button", { onClick: toggleDayMode, "aria-label": "toggle work or relax mode", style: { position: "relative", width: 46, height: 26, borderRadius: 13, border: "none", background: dayMode === "work" ? MODE_COLORS.work.solid : MODE_COLORS.relax.solid, cursor: "pointer", padding: 0, flexShrink: 0, transition: "background .15s" } }, /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", top: 3, left: dayMode === "work" ? 23 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .15s", boxShadow: "0 1px 3px rgba(0,0,0,.35)" } }))), /* @__PURE__ */ React.createElement("button", { onClick: () => setTimelineMode(!timelineMode), title: timelineMode ? "back to the list" : "plan on a timeline", "aria-label": timelineMode ? "list view" : "timeline view", style: { ...btn(C.ink, !timelineMode), padding: "6px 12px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, timelineMode ? /* @__PURE__ */ React.createElement(Rows4Icon, { size: 15 }) : /* @__PURE__ */ React.createElement(TimelineIcon, { size: 15 })), /* @__PURE__ */ React.createElement("button", { onClick: doSync, disabled: sync === "loading", style: { ...btn(C.ink, true), display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(RefreshCwIcon, { size: 14, spin: sync === "loading" }), sync === "loading" ? "syncing\u2026" : /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, "Sync from ", /* @__PURE__ */ React.createElement("img", { src: NOTION_LOGO, alt: "Notion", style: { width: 15, height: 15 } }), !narrowPanel && "Notion")))), fallingEnjoyment && /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 200 } }, "Enjoyment is dipping over your last few pomodoros \\u2014 consider an extra break."), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     startBreak();
     setView("break");
   }, style: { ...btn(C.ink, true), padding: "3px 10px" } }, "take a break")), tasks.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), !timelineMode && tasks.length > 1 && /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 11, margin: "0 0 8px" } }, "Pinned tasks stay on top, then ", "\u{1F451}", " King. New tasks arrive ranked Must ", "\u2192", " Aim ", "\u2192", " Bonus; drag the grip to reorder freely. Hover a row to pin it or move it between Work and Personal."), timelineMode ? renderTimeline() : renderTodaySections()), view === "week" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOff((w) => w - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, fmtDate(weekStart), " ", "\u2013", " ", fmtDate(new Date(+weekEnd - DAY))), /* @__PURE__ */ React.createElement("button", { onClick: () => setWeekOff((w) => Math.min(0, w + 1)), style: btn(C.muted, true) }, "\u2192")), weekAreas.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, textAlign: "center", padding: "40px 0" } }, weekSessions.length ? "No pomodoros with an Area this week." : "No pomodoros this week.") : weekAreas.map((a) => /* @__PURE__ */ React.createElement(GroupChart, { key: a, group: a, sessions: weekSessions.filter((x) => x.category === a), settings })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted } }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: settings.beginColor } }, "\u25CF"), " expected"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: settings.endColor } }, "\u25CF"), " actual"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: C.better } }, "\u2014"), " better than expected"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { color: C.worse } }, "\u2014"), " worse than expected"))), view === "month" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setMonthOff((m) => m - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, monthRef.toLocaleDateString(void 0, { month: "long", year: "numeric" })), /* @__PURE__ */ React.createElement("button", { onClick: () => setMonthOff((m) => Math.min(0, m + 1)), style: btn(C.muted, true) }, "\u2192")), /* @__PURE__ */ React.createElement(Heatmap, { sessions, monthRef, settings })), view === "totals" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Pomodoro totals"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 6 } }, "All pomodoros, every project combined."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around" } }, /* @__PURE__ */ React.createElement(Stat, { label: "this week", value: countWeek, big: true }), /* @__PURE__ */ React.createElement(Stat, { label: "this month", value: countMonth, big: true }), /* @__PURE__ */ React.createElement(Stat, { label: "this year", value: countYear, big: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 } }, /* @__PURE__ */ React.createElement(Stat, { label: "hours, week", value: hrsOf(sumMin(inWeek)), color: C.muted }), /* @__PURE__ */ React.createElement(Stat, { label: "hours, month", value: hrsOf(sumMin(inMonth)), color: C.muted }), /* @__PURE__ */ React.createElement(Stat, { label: "hours, year", value: hrsOf(sumMin(inYear)), color: C.muted }))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Six-month heatmap"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 12 } }, "Last 6 months \u2014 pomodoros per day."), /* @__PURE__ */ React.createElement(ContribHeatmap, { sessions, settings })), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Expected vs actual"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "Expected vs actual enjoyment."), rated === 0 ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No ratings yet. Log a few pomodoros to see your calibration.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, lineHeight: 1.5, marginBottom: surprises.length ? 14 : 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 22, color: C.better } }, betterPct, "%"), " of your pomodoros turned out ", /* @__PURE__ */ React.createElement("span", { style: { color: C.better } }, "more enjoyable"), " than you expected", /* @__PURE__ */ React.createElement("span", { style: { color: C.muted } }, " (avg gap ", /* @__PURE__ */ React.createElement("span", { style: { color: avgGapAll > 0 ? C.better : avgGapAll < 0 ? C.worse : C.neutral, fontFamily: "var(--fl-mono)" } }, (avgGapAll >= 0 ? "+" : "") + avgGapAll.toFixed(1)), ").")), surprises.length > 0 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 } }, "Biggest surprises \u2014 dreaded, then enjoyed"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, surprises.map((s) => /* @__PURE__ */ React.createElement("div", { key: s.id, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.better, minWidth: 28 } }, "+", s.actual - s.expected), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, s.task), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" } }, /* @__PURE__ */ React.createElement("span", { style: { color: settings.beginColor } }, s.expected), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted } }, " \u2192 "), /* @__PURE__ */ React.createElement("span", { style: { color: settings.endColor } }, s.actual)), /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontSize: 11, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap" } }, fmtDate(s.ts)))))))), /* @__PURE__ */ React.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Best time of day"), /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "Average enjoyment per band."), !bestBand ? /* @__PURE__ */ React.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "Not enough data yet.") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, marginBottom: 12 } }, "Your highest-enjoyment band is ", /* @__PURE__ */ React.createElement("b", { style: { color: C.ink } }, bestBand.name), " ", /* @__PURE__ */ React.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 13 } }, "(", bestBand.avg.toFixed(1), " / 5)"), "."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, bandStats.map((b) => {
@@ -25317,7 +25345,8 @@ var DEFAULT_SETTINGS = {
   longBreakMinutes: 20,
   longBreakEvery: 3,
   anchorShift: false,
-  timeFmtV2: true
+  timeFmtV2: true,
+  workDays: [true, true, true, true, true, true, true]
 };
 var DEFAULT_PAUSE_TAGS = [
   { id: "p-bathroom", name: "bathroom", category: "internal" },
@@ -25341,6 +25370,14 @@ var DEFAULT_MORNING = [
 var DEFAULT_NIGHT = [
   { id: "n-tidy", name: "Tidy the desk" },
   { id: "n-review", name: "Review the day" }
+];
+var DEFAULT_RELAX_MORNING = [
+  { id: "rm-sleep", name: "Sleep in" },
+  { id: "rm-coffee", name: "Slow coffee" }
+];
+var DEFAULT_RELAX_NIGHT = [
+  { id: "rn-unwind", name: "Unwind \u2014 no screens" },
+  { id: "rn-read", name: "Read for fun" }
 ];
 function plainTitle(page) {
   var _a, _b;
@@ -25813,7 +25850,10 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       breaks: loaded.breaks || [],
       morningRoutine: loaded.morningRoutine || DEFAULT_MORNING.map((a) => ({ ...a })),
       nightRoutine: loaded.nightRoutine || DEFAULT_NIGHT.map((a) => ({ ...a })),
+      relaxMorningRoutine: loaded.relaxMorningRoutine || DEFAULT_RELAX_MORNING.map((a) => ({ ...a })),
+      relaxNightRoutine: loaded.relaxNightRoutine || DEFAULT_RELAX_NIGHT.map((a) => ({ ...a })),
       routineDone: loaded.routineDone || {},
+      modeOverride: loaded.modeOverride || {},
       plans: loaded.plans || {}
     };
     if (!this.data.settings.floatPhaseBounds || Object.keys(this.data.settings.floatPhaseBounds).length === 0) {
@@ -26551,7 +26591,10 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         breaks: self.data.breaks || [],
         morningRoutine: self.data.morningRoutine || [],
         nightRoutine: self.data.nightRoutine || [],
+        relaxMorningRoutine: self.data.relaxMorningRoutine || [],
+        relaxNightRoutine: self.data.relaxNightRoutine || [],
         routineDone: self.data.routineDone || {},
+        modeOverride: self.data.modeOverride || {},
         plans: self.data.plans || {}
       }),
       saveSessions: async (arr) => {
@@ -26582,8 +26625,20 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         self.data.nightRoutine = arr;
         await self.persist();
       },
+      saveRelaxMorningRoutine: async (arr) => {
+        self.data.relaxMorningRoutine = arr;
+        await self.persist();
+      },
+      saveRelaxNightRoutine: async (arr) => {
+        self.data.relaxNightRoutine = arr;
+        await self.persist();
+      },
       saveRoutineDone: async (obj) => {
         self.data.routineDone = obj;
+        await self.persist();
+      },
+      saveModeOverride: async (obj) => {
+        self.data.modeOverride = obj;
         await self.persist();
       },
       savePlan: async (dayKey, blocks) => {
@@ -27189,6 +27244,42 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.persist();
       })
     );
+    containerEl.createEl("h3", { text: "Active schedule" });
+    const schedDesc = containerEl.createEl("p", { text: "Working days (orange) open the today view in Work mode; rest days (dark green) open in Relax mode with your relax routines. Tap a day to flip it \u2014 the switch in the today view overrides just one day." });
+    schedDesc.style.fontSize = "12px";
+    schedDesc.style.color = "var(--text-muted)";
+    schedDesc.style.marginTop = "4px";
+    if (!this.plugin.data.settings.workDays)
+      this.plugin.data.settings.workDays = [true, true, true, true, true, true, true];
+    const schedRow = containerEl.createDiv();
+    schedRow.style.display = "flex";
+    schedRow.style.gap = "6px";
+    schedRow.style.flexWrap = "wrap";
+    schedRow.style.margin = "8px 0 22px";
+    ["M", "T", "W", "T", "F", "S", "S"].forEach((lab, i) => {
+      const b = schedRow.createEl("button", { text: lab });
+      b.style.width = "38px";
+      b.style.height = "38px";
+      b.style.borderRadius = "9px";
+      b.style.border = "none";
+      b.style.color = "#fff";
+      b.style.fontWeight = "700";
+      b.style.fontSize = "14px";
+      b.style.cursor = "pointer";
+      const paint = () => {
+        const rest = this.plugin.data.settings.workDays[i] === false;
+        b.style.background = rest ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid;
+        b.title = rest ? "rest day \u2014 tap to make it a working day" : "working day \u2014 tap to make it a rest day";
+      };
+      paint();
+      b.onclick = async () => {
+        const arr = this.plugin.data.settings.workDays.slice();
+        arr[i] = arr[i] === false;
+        this.plugin.data.settings.workDays = arr;
+        await this.plugin.persist();
+        paint();
+      };
+    });
     containerEl.createEl("h3", { text: "Day and time bands" });
     new import_obsidian.Setting(containerEl).setName("Day starts at (HH:MM)").setDesc("The clock time your day rolls over \u2014 the end of one day and the start of the next, and the bottom of the Timeline. A morning value like 04:00 keeps late-night work on the previous day (anything up to 03:59 counts as yesterday). An evening value like 22:00 starts a fresh day that night, so a pomodoro after 22:00 counts toward the next date.").addText(
       (t) => t.setPlaceholder("04:00").setValue(fmtHM(this.plugin.data.settings.dayStart)).onChange(async (v) => {

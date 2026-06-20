@@ -43,6 +43,13 @@ const C: any = {
   faint: "#cfc7b8", line: "#e4ddcf", better: "#5b8c5a", worse: "#b4533a", neutral: "#a59c8c",
 };
 
+// Work / Relax mode accents — orange marks a working day, dark green a rest day.
+// `solid` paints the toggle + the schedule buttons; `fill`/`border` tint the relax routine rows.
+export const MODE_COLORS = {
+  work: { solid: "#d98324", fill: "#fbe7d4", border: "#e3a45f" },
+  relax: { solid: "#2f6f4f", fill: "#e4efe8", border: "#6aa386" },
+};
+
 const DAY = 86400000;
 const startOfDay = (d: any) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 function weekStartOf(d: any, sundayStart?: boolean) { const x = startOfDay(d); const k = sundayStart ? x.getDay() : (x.getDay() + 6) % 7; x.setDate(x.getDate() - k); return x; }
@@ -582,11 +589,10 @@ function Rows4Icon({ size = 15 }: any) {
 function TimelineIcon({ size = 15 }: any) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
-      <path d="M4 3v18" />
-      <circle cx="4" cy="8" r="1.6" fill="currentColor" stroke="none" />
-      <path d="M7 8h11" />
-      <circle cx="4" cy="15" r="1.6" fill="currentColor" stroke="none" />
-      <path d="M7 15h8" />
+      <path d="M4 12h.01" /><path d="M4 16h.01" /><path d="M4 20h.01" /><path d="M4 4h.01" /><path d="M4 8h.01" />
+      <path d="M9.414 13.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 12z" />
+      <path d="M9.414 21.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 20z" />
+      <path d="M9.414 5.414A2 2 0 0 0 10.828 6H19a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 4z" />
     </svg>
   );
 }
@@ -868,6 +874,12 @@ export default function FocusLogApp({ api }: any) {
   const [nightRoutine, setNightRoutine] = useState<any[]>(init.nightRoutine || []);
   const saveNight = (next: any[]) => { setNightRoutine(next); api.saveNightRoutine && api.saveNightRoutine(next); };
   const [routineDone, setRoutineDone] = useState<any>(init.routineDone || {});
+  // Relax-mode routines: a separate morning + night set shown on rest days / when the switch is Relax.
+  const [relaxMorning, setRelaxMorning] = useState<any[]>(init.relaxMorningRoutine || []);
+  const saveRelaxMorning = (next: any[]) => { setRelaxMorning(next); api.saveRelaxMorningRoutine && api.saveRelaxMorningRoutine(next); };
+  const [relaxNight, setRelaxNight] = useState<any[]>(init.relaxNightRoutine || []);
+  const saveRelaxNight = (next: any[]) => { setRelaxNight(next); api.saveRelaxNightRoutine && api.saveRelaxNightRoutine(next); };
+  const [modeOverride, setModeOverride] = useState<any>(init.modeOverride || {});
   const [editRoutineId, setEditRoutineId] = useState<string | null>(null);
   const [editRoutineName, setEditRoutineName] = useState("");
   const [newMorning, setNewMorning] = useState("");
@@ -1109,7 +1121,7 @@ export default function FocusLogApp({ api }: any) {
     // Frozen tasks display in lock order, so a drag within the frozen group re-records
     // that sequence too.
     const nf = Array.from(new Set(a.filter((t) => frozenNames.includes(t.task)).map((t) => t.task)));
-    if (nf.join(" ") !== frozenNames.join(" ")) {
+    if (nf.join(" ") !== frozenNames.join(" ")) {
       setFrozenNames(nf);
       api.patchSettings && api.patchSettings({ frozenTaskNames: nf });
     }
@@ -1393,6 +1405,14 @@ export default function FocusLogApp({ api }: any) {
   // Routine block helpers. `which` is "morning" or "night"; everything routes to the
   // matching list + saver so the two blocks share one implementation.
   const todayKey = String(logicalDay(Date.now(), settings).getTime());
+  // Work / Relax mode: auto from today's weekday in the active schedule, with a per-day manual override.
+  const workDays: boolean[] = settings.workDays || [true, true, true, true, true, true, true];
+  const todayWeekday = (logicalDay(Date.now(), settings).getDay() + 6) % 7; // 0 = Monday … 6 = Sunday
+  const autoMode: "work" | "relax" = workDays[todayWeekday] === false ? "relax" : "work";
+  const dayMode: "work" | "relax" = (modeOverride[todayKey] === "work" || modeOverride[todayKey] === "relax") ? modeOverride[todayKey] : autoMode;
+  const toggleDayMode = () => { const next = dayMode === "work" ? "relax" : "work"; const obj = { ...modeOverride, [todayKey]: next }; setModeOverride(obj); api.saveModeOverride && api.saveModeOverride(obj); };
+  const activeMorning = dayMode === "relax" ? relaxMorning : morningRoutine;
+  const activeNight = dayMode === "relax" ? relaxNight : nightRoutine;
   const isRoutineDone = (id: string) => (routineDone[todayKey] || []).includes(id);
   const toggleRoutineDone = (id: string) => {
     const cur = routineDone[todayKey] || [];
@@ -1401,8 +1421,8 @@ export default function FocusLogApp({ api }: any) {
     setRoutineDone(next);
     api.saveRoutineDone && api.saveRoutineDone(next);
   };
-  const routineSaver = (which: string) => (which === "morning" ? saveMorning : saveNight);
-  const routineList = (which: string) => (which === "morning" ? morningRoutine : nightRoutine);
+  const routineSaver = (which: string) => (dayMode === "relax" ? (which === "morning" ? saveRelaxMorning : saveRelaxNight) : (which === "morning" ? saveMorning : saveNight));
+  const routineList = (which: string) => (which === "morning" ? activeMorning : activeNight);
   const addRoutine = (which: string) => {
     const name = (which === "morning" ? newMorning : newNight).trim();
     if (!name) return;
@@ -1425,12 +1445,13 @@ export default function FocusLogApp({ api }: any) {
   };
   const renderRoutineBlock = (which: string) => {
     const list = routineList(which);
+    const relax = dayMode === "relax";
     const label = which === "morning" ? "\u{1F305} Morning" : "\u{1F319} Night";
     const newVal = which === "morning" ? newMorning : newNight;
     const setNewVal = which === "morning" ? setNewMorning : setNewNight;
     return (
       <div style={{ marginBottom: 14 }}>
-        <div style={SECTION_HEAD}>{label}</div>
+        <div style={{ ...SECTION_HEAD, ...(relax ? { color: MODE_COLORS.relax.solid } : {}) }}>{label}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {list.length === 0 && <p style={{ color: C.muted, fontSize: 12.5, margin: "0 0 0 2px" }}>None yet — add one below.</p>}
           {list.map((it: any, i: number) => {
@@ -1450,7 +1471,7 @@ export default function FocusLogApp({ api }: any) {
               <div key={it.id} className="fl-act-row"
                 onDragOver={(e) => { e.preventDefault(); if (!routineOver || routineOver.w !== which || routineOver.i !== i) setRoutineOver({ w: which, i }); }}
                 onDrop={(e) => { e.preventDefault(); if (routineDrag && routineDrag.w === which) moveRoutine(which, routineDrag.i, i); setRoutineDrag(null); setRoutineOver(null); }}
-                style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "7px 10px", background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, color: C.ink, opacity: dragging ? 0.4 : 1, boxShadow: over ? `inset 0 2px 0 ${C.ink}` : "none" }}>
+                style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "7px 10px", background: relax ? MODE_COLORS.relax.fill : C.card, border: `1px solid ${relax ? MODE_COLORS.relax.border : C.line}`, borderRadius: 6, color: C.ink, opacity: dragging ? 0.4 : 1, boxShadow: over ? `inset 0 2px 0 ${C.ink}` : "none" }}>
                 <span draggable onDragStart={(e) => { setRoutineDrag({ w: which, i }); e.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => { setRoutineDrag(null); setRoutineOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
                   {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
                 </span>
@@ -1541,7 +1562,7 @@ export default function FocusLogApp({ api }: any) {
     let t = tlStart, count = 0, noon = false, seq = 0;
     // Morning routine first (back-to-back, no pomodoro breaks), then a short break. Each
     // item keeps its own length (it.dur) so a rebuild preserves edited routine lengths.
-    if (!settings.skipMorningRoutine) (morningRoutine || []).forEach((it: any) => {
+    if (!settings.skipMorningRoutine) (activeMorning || []).forEach((it: any) => {
       const dur = it.dur || ROUTINE_MIN;
       blocks.push({ id: "r" + Date.now() + "_" + (seq++), kind: "routine", name: it.name, start: t, dur, refId: it.id });
       t += dur;
@@ -1558,9 +1579,9 @@ export default function FocusLogApp({ api }: any) {
       else t += shortB;
     });
     // Night routine last.
-    if (!settings.skipNightRoutine && (nightRoutine || []).length) {
+    if (!settings.skipNightRoutine && (activeNight || []).length) {
       if (pomos.length) t += shortB;
-      (nightRoutine || []).forEach((it: any) => {
+      (activeNight || []).forEach((it: any) => {
         const dur = it.dur || ROUTINE_MIN;
         blocks.push({ id: "r" + Date.now() + "_" + (seq++), kind: "routine", name: it.name, start: t, dur, refId: it.id });
         t += dur;
@@ -1569,7 +1590,7 @@ export default function FocusLogApp({ api }: any) {
     return blocks;
   };
   const setTimelineMode = (on: boolean) => {
-    const hasInput = [...workTasks, ...personalTasks].length || (!settings.skipMorningRoutine && (morningRoutine || []).length) || (!settings.skipNightRoutine && (nightRoutine || []).length);
+    const hasInput = [...workTasks, ...personalTasks].length || (!settings.skipMorningRoutine && (activeMorning || []).length) || (!settings.skipNightRoutine && (activeNight || []).length);
     if (on && !plans[todayKey] && hasInput) setTodayBlocks(buildInitialPlan());
     setTimelineModeState(on);
   };
@@ -1620,8 +1641,8 @@ export default function FocusLogApp({ api }: any) {
     // keeps the edited length.
     if (blk && blk.kind === "routine" && blk.refId) {
       const upd = (list: any[]) => list.map((it: any) => (it.id === blk.refId ? { ...it, name, dur } : it));
-      if ((morningRoutine || []).some((it: any) => it.id === blk.refId)) saveMorning(upd(morningRoutine));
-      else if ((nightRoutine || []).some((it: any) => it.id === blk.refId)) saveNight(upd(nightRoutine));
+      if ((activeMorning || []).some((it: any) => it.id === blk.refId)) routineSaver("morning")(upd(activeMorning));
+      else if ((activeNight || []).some((it: any) => it.id === blk.refId)) routineSaver("night")(upd(activeNight));
     }
     setEditBlockId(null);
   };
@@ -1731,11 +1752,11 @@ export default function FocusLogApp({ api }: any) {
   const phaseRankNow = (() => {
     const d = new Date();
     const nowM = d.getHours() * 60 + d.getMinutes();
-    const sumMorning = (morningRoutine || []).reduce((s: number, it: any) => s + (it.dur || ROUTINE_MIN), 0);
+    const sumMorning = (activeMorning || []).reduce((s: number, it: any) => s + (it.dur || ROUTINE_MIN), 0);
     const planB = plans[todayKey];
     let morningEnd: number, workEnd: number;
     if (planB && planB.length) {
-      const mIds = new Set((morningRoutine || []).map((it: any) => it.id));
+      const mIds = new Set((activeMorning || []).map((it: any) => it.id));
       const mEnds = planB.filter((b: any) => b.kind === "routine" && mIds.has(b.refId)).map((b: any) => b.start + b.dur);
       const tEnds = planB.filter((b: any) => b.kind === "task").map((b: any) => b.start + b.dur);
       morningEnd = mEnds.length ? Math.max(...mEnds) : tlStart;
@@ -1846,6 +1867,12 @@ export default function FocusLogApp({ api }: any) {
                 {"\u{1F345}"} today
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }} title={dayMode === "work" ? "Work mode — tap to switch to Relax" : "Relax mode — tap to switch to Work"}>
+                  {!narrowPanel && <span style={{ fontSize: 11.5, fontWeight: 600, color: dayMode === "work" ? MODE_COLORS.work.solid : MODE_COLORS.relax.solid }}>{dayMode === "work" ? "Work" : "Relax"}</span>}
+                  <button onClick={toggleDayMode} aria-label="toggle work or relax mode" style={{ position: "relative", width: 46, height: 26, borderRadius: 13, border: "none", background: dayMode === "work" ? MODE_COLORS.work.solid : MODE_COLORS.relax.solid, cursor: "pointer", padding: 0, flexShrink: 0, transition: "background .15s" }}>
+                    <span style={{ position: "absolute", top: 3, left: dayMode === "work" ? 23 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .15s", boxShadow: "0 1px 3px rgba(0,0,0,.35)" }} />
+                  </button>
+                </span>
                 <button onClick={() => setTimelineMode(!timelineMode)} title={timelineMode ? "back to the list" : "plan on a timeline"} aria-label={timelineMode ? "list view" : "timeline view"} style={{ ...btn(C.ink, !timelineMode), padding: "6px 12px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{timelineMode ? <Rows4Icon size={15} /> : <TimelineIcon size={15} />}</button>
                 <button onClick={doSync} disabled={sync === "loading"} style={{ ...btn(C.ink, true), display: "inline-flex", alignItems: "center", gap: 6 }}>
                   <RefreshCwIcon size={14} spin={sync === "loading"} />
