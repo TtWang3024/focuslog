@@ -1,5 +1,7 @@
 import * as React from "react";
 import { NOTION_LOGO } from "./notionLogo";
+import { SkyView } from "./SkyView";
+import { ReflectPanel } from "./ReflectPanel";
 const { useState, useEffect, useRef, useCallback } = React;
 
 // Focus Log UI. `api` bridge from the plugin:
@@ -674,7 +676,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
     </>
   );
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, maxWidth: 460, margin: "0 auto" }}>
+    <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
@@ -795,6 +797,8 @@ export default function FocusLogApp({ api }: any) {
   const [pending, setPending] = useState<any[]>(init.pending);
   const [doneSess, setDoneSess] = useState<any>({});
   const [view, setView] = useState("today");
+  // Status view bundles the old week/month/totals; its right-side vertical control picks the sub-view.
+  const [statusSub, setStatusSub] = useState("totals");
   const [preset, setPreset] = useState("");
   const [weekOff, setWeekOff] = useState(0);
   const [monthOff, setMonthOff] = useState(0);
@@ -1041,6 +1045,15 @@ export default function FocusLogApp({ api }: any) {
   const pauseActive = timer.pauseStart != null;
   const pauseTag = timer.pauseTag || "";
   const setPauseTag = (t: string) => api.timer.setPauseTag(t);
+  const [reflections, setReflections] = useState<any[]>(init.reflections || []);
+  const reflectFeelings = init.feelings && Object.keys(init.feelings).length ? init.feelings : {};
+  const onSaveReflection = (r: any) => {
+    const entry = { id: "rf" + Date.now(), ts: new Date().toISOString(), tag: pauseTag || "", thoughts: r.thoughts || [], body: r.body || [], mood: r.mood || [] };
+    const next = [...reflections, entry];
+    setReflections(next);
+    api.saveReflections && api.saveReflections(next);
+    api.notify && api.notify("Reflection saved", 1500);
+  };
 
   const resetTimer = () => api.timer.reset();
   const changePomo = (n: number) => api.timer.setLength(n);
@@ -1800,6 +1813,7 @@ export default function FocusLogApp({ api }: any) {
   };
 
   const seg = (on: boolean): any => ({ padding: "6px 14px", borderRadius: 9, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", textTransform: "capitalize", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.14)" : "none", fontFamily: "var(--fl-display)", whiteSpace: "nowrap" });
+  const segV = (on: boolean): any => ({ padding: "8px 16px", borderRadius: 8, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.14)" : "none", fontFamily: "var(--fl-display)", whiteSpace: "nowrap", width: "100%", textAlign: "center" });
 
   return (
     <div ref={rootRef} style={{ background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums" }}>
@@ -1834,9 +1848,18 @@ export default function FocusLogApp({ api }: any) {
 
         <div style={{ marginBottom: 20, overflowX: "auto" }}>
           <div style={{ display: "inline-flex", gap: 2, background: C.line, borderRadius: 12, padding: 4 }}>
-            {["today", "week", "month", "totals", "log", "break", "pause"].map((t) => (<button key={t} onClick={() => setView(t)} style={seg(view === t)}>{t}</button>))}
+            {([["log", "Focus"], ["break", "Break"], ["pause", "Pause"], ["reflect", "Reflect"], ["today", "Plan"], ["status", "Status"], ["sky", "Sky"]] as [string, string][]).map(([t, lab]) => (<button key={t} onClick={() => setView(t)} style={seg(view === t)}>{lab}</button>))}
           </div>
         </div>
+
+        {view === "sky" && <SkyView sessions={sessions} C={C} />}
+
+        {view === "reflect" && (
+          <div>
+            <p style={{ fontSize: 12.5, color: C.muted, margin: "2px 0 8px" }}>A quiet moment: name what's pulling at you and place how it feels. It's saved to your reflections.</p>
+            <ReflectPanel feelings={reflectFeelings} C={C} onSave={onSaveReflection} />
+          </div>
+        )}
 
         {view === "today" && (
           <div>
@@ -1881,7 +1904,10 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "week" && (
+        {view === "status" && (
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+        {statusSub === "week" && (
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <button onClick={() => setWeekOff((w) => w - 1)} style={btn(C.muted, true)}>{"\u2190"}</button>
@@ -1899,7 +1925,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "month" && (
+        {statusSub === "month" && (
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <button onClick={() => setMonthOff((m) => m - 1)} style={btn(C.muted, true)}>{"\u2190"}</button>
@@ -1910,7 +1936,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "totals" && (
+        {statusSub === "totals" && (
           <div>
             <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
               <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" }}>Pomodoro totals</h3>
@@ -2011,6 +2037,14 @@ export default function FocusLogApp({ api }: any) {
               {!foldedHistory.has("sessions") && <p style={{ color: C.muted, fontSize: 11, marginTop: 10 }}>
                 Edits and deletes only change the local log; they do not undo the Act write-back on Notion.
               </p>}
+            </div>
+          </div>
+        )}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 11, padding: 4 }}>
+              {([["week", "Week"], ["month", "Month"], ["totals", "Total"]] as [string, string][]).map(([k, lab]) => (
+                <button key={k} onClick={() => setStatusSub(k)} style={segV(statusSub === k)}>{lab}</button>
+              ))}
             </div>
           </div>
         )}

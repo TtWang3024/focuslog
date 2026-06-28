@@ -188,6 +188,14 @@ const DEFAULT_RELAX_NIGHT = [
   { id: "rn-read", name: "Read for fun" },
 ];
 
+// Default valence/arousal feeling vocabulary for the pause reflection (ported from Hold to Pause).
+const DEFAULT_FEELINGS: any = {
+  tl: ["vexation", "distress", "panic", "rage", "anger", "tension", "frustration", "worry"],
+  tr: ["excitement", "joy", "delight", "amazement", "surprise"],
+  bl: ["sadness", "fatigue", "exhaustion", "dejection", "disappointment", "loneliness"],
+  br: ["ease & comfort", "contentment", "relaxation", "serenity", "reassurance", "tranquillity"],
+};
+
 interface PluginData {
   settings: FocusLogSettings;
   sessions: any[];
@@ -197,6 +205,8 @@ interface PluginData {
   pauseTags: any[];
   pauses: any[];
   breaks: any[];
+  reflections: any[];
+  feelings: any;
   morningRoutine: any[];
   nightRoutine: any[];
   relaxMorningRoutine: any[];
@@ -622,6 +632,8 @@ export default class FocusLogPlugin extends Plugin {
       pauseTags: (loaded.pauseTags || DEFAULT_PAUSE_TAGS.map((a) => ({ ...a }))).map((t: any) => ({ ...t, category: t.category || PAUSE_TAG_DEFAULT_CAT[t.name] || "internal" })),
       pauses: loaded.pauses || [],
       breaks: loaded.breaks || [],
+      reflections: loaded.reflections || [],
+      feelings: loaded.feelings || JSON.parse(JSON.stringify(DEFAULT_FEELINGS)),
       morningRoutine: loaded.morningRoutine || DEFAULT_MORNING.map((a) => ({ ...a })),
       nightRoutine: loaded.nightRoutine || DEFAULT_NIGHT.map((a) => ({ ...a })),
       relaxMorningRoutine: loaded.relaxMorningRoutine || DEFAULT_RELAX_MORNING.map((a) => ({ ...a })),
@@ -630,6 +642,11 @@ export default class FocusLogPlugin extends Plugin {
       modeOverride: loaded.modeOverride || {},
       plans: loaded.plans || {},
     };
+    // One-time: refresh the mood vocabulary to the current word set (no feelings editor existed before).
+    if (!(this.data.settings as any).feelingsV2) {
+      (this.data.settings as any).feelingsV2 = true;
+      this.data.feelings = JSON.parse(JSON.stringify(DEFAULT_FEELINGS));
+    }
     // Seed the per-phase float bounds from the old single focus/break bounds (one-time).
     if (!this.data.settings.floatPhaseBounds || Object.keys(this.data.settings.floatPhaseBounds).length === 0) {
       const m: any = {};
@@ -1271,6 +1288,8 @@ export default class FocusLogPlugin extends Plugin {
         pauseTags: self.data.pauseTags || [],
         pauses: self.data.pauses || [],
         breaks: self.data.breaks || [],
+        reflections: self.data.reflections || [],
+        feelings: self.data.feelings || {},
         morningRoutine: self.data.morningRoutine || [],
         nightRoutine: self.data.nightRoutine || [],
         relaxMorningRoutine: self.data.relaxMorningRoutine || [],
@@ -1284,6 +1303,8 @@ export default class FocusLogPlugin extends Plugin {
       savePauseTags: async (arr: any[]) => { self.data.pauseTags = arr; await self.persist(); },
       savePauses: async (arr: any[]) => { self.data.pauses = arr; await self.persist(); },
       saveBreaks: async (arr: any[]) => { self.data.breaks = arr; await self.persist(); },
+      saveReflections: async (arr: any[]) => { self.data.reflections = arr; await self.persist(); },
+      saveFeelings: async (obj: any) => { self.data.feelings = obj; await self.persist(); },
       saveMorningRoutine: async (arr: any[]) => { self.data.morningRoutine = arr; await self.persist(); },
       saveNightRoutine: async (arr: any[]) => { self.data.nightRoutine = arr; await self.persist(); },
       saveRelaxMorningRoutine: async (arr: any[]) => { self.data.relaxMorningRoutine = arr; await self.persist(); },
