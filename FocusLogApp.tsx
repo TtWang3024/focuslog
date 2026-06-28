@@ -1246,17 +1246,6 @@ export default function FocusLogApp({ api }: any) {
     return { band: b, name: BAND_NAME[b], count: list.length, avg: list.length ? list.reduce((a: number, x: any) => a + x.feeling, 0) / list.length : null };
   });
   const bestBreakBand = breakBandStats.filter((b) => b.avg != null).sort((a: any, b: any) => b.avg - a.avg)[0];
-  // Best pomodoro position: bucket each break by how many sessions ran in the same logical day
-  // after the previous break ended and before this break started.
-  const posBuckets: any = {};
-  ratedBreaks.forEach((b: any) => {
-    const prevBreakEnd = Math.max(0, ...breaks.filter((o: any) => o.end < b.start && sameLogicalDay(o.end, b.start, settings)).map((o: any) => o.end));
-    const before = sessions.filter((s: any) => { const t = +new Date(s.ts); return sameLogicalDay(t, b.start, settings) && t < b.start && t > prevBreakEnd; }).length;
-    (posBuckets[before] = posBuckets[before] || { sum: 0, n: 0 });
-    posBuckets[before].sum += b.feeling; posBuckets[before].n += 1;
-  });
-  const posStats = Object.keys(posBuckets).map((k: any) => ({ count: Number(k), n: posBuckets[k].n, avg: posBuckets[k].sum / posBuckets[k].n })).sort((a, b) => a.count - b.count);
-  const bestPos = [...posStats].sort((a, b) => b.avg - a.avg)[0];
   // Falling-enjoyment nudge: average actual of today's last two pomodoros dropped >=1 vs the prior two.
   const todaySess = sessions.filter((s: any) => sameLogicalDay(s.ts, Date.now(), settings)).sort((a: any, b: any) => +new Date(a.ts) - +new Date(b.ts));
   const fallingEnjoyment = (() => {
@@ -2105,56 +2094,31 @@ export default function FocusLogApp({ api }: any) {
                 <>
                   <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" }}>Most restorative activities</p>
                   {actScore.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No rated breaks had activities yet.</p> : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
-                      {actScore.map((x: any) => {
-                        const low = x.n < 3;
-                        return (
-                          <div key={x.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span style={{ width: 110, fontSize: 12, color: C.muted, overflowWrap: "anywhere" }}>{x.name}{low && <span style={{ fontSize: 10 }}> (low sample)</span>}</span>
-                            <div style={{ flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` }}>
-                              <div style={{ width: (x.avg / 5) * 100 + "%", height: "100%", background: low ? C.neutral : C.better }} />
-                            </div>
-                            <span style={{ width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{x.avg.toFixed(1)} · {x.n}{"\u{1F345}"}</span>
-                          </div>
-                        );
-                      })}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 18 }}>
+                      {actScore.slice(0, 3).map((x: any, i: number) => (
+                        <div key={x.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 13 }}>
+                          <span style={{ width: 16, color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 12 }}>{i + 1}.</span>
+                          <span style={{ flex: 1, color: C.ink, overflowWrap: "anywhere" }}>{x.name}{x.n < 3 && <span style={{ fontSize: 10, color: C.muted }}> (low sample)</span>}</span>
+                          <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{x.avg.toFixed(1)} / 5</span>
+                        </div>
+                      ))}
                     </div>
                   )}
 
                   <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" }}>Best time for breaks</p>
-                  {bestBreakBand && <div style={{ fontSize: 13, marginBottom: 8 }}>Breaks feel best in the <b style={{ color: C.ink }}>{bestBreakBand.name}</b> <span style={{ color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 12 }}>({(bestBreakBand.avg as number).toFixed(1)} / 5)</span>.</div>}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
-                    {breakBandStats.map((b) => {
-                      const pct = b.avg != null ? ((b.avg as number) / 5) * 100 : 0;
-                      const isBest = bestBreakBand && b.band === bestBreakBand.band;
-                      return (
-                        <div key={b.band} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ width: 70, fontSize: 12, color: C.muted, textTransform: "capitalize" }}>{b.name}</span>
-                          <div style={{ flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` }}>
-                            <div style={{ width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral }} />
+                  {bestBreakBand ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {breakBandStats.map((b) => {
+                        const isBest = bestBreakBand && b.band === bestBreakBand.band;
+                        return (
+                          <div key={b.band} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 13 }}>
+                            <span style={{ flex: 1, textTransform: "capitalize", color: isBest ? C.ink : C.muted, fontWeight: isBest ? 700 : 400 }}>{b.name}{isBest ? " — best" : ""}</span>
+                            <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{b.avg != null ? (b.avg as number).toFixed(1) + " / 5" : "—"}</span>
                           </div>
-                          <span style={{ width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{b.avg != null ? (b.avg as number).toFixed(1) : "—"} · {b.count}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" }}>Best pomodoro position</p>
-                  {bestPos && <div style={{ fontSize: 13, marginBottom: 8 }}>Breaks {bestPos.count === 0 ? "before any pomodoro" : <>after <b style={{ color: C.ink }}>{bestPos.count}</b> pomodoro{bestPos.count === 1 ? "" : "s"}</>} feel best <span style={{ color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 12 }}>({bestPos.avg.toFixed(1)} / 5)</span>.</div>}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {posStats.map((p) => {
-                      const isBest = bestPos && p.count === bestPos.count;
-                      return (
-                        <div key={p.count} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ width: 90, fontSize: 12, color: C.muted }}>{p.count === 0 ? "before any" : `after ${p.count}\u{1F345}`}</span>
-                          <div style={{ flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` }}>
-                            <div style={{ width: (p.avg / 5) * 100 + "%", height: "100%", background: isBest ? C.better : C.neutral }} />
-                          </div>
-                          <span style={{ width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{p.avg.toFixed(1)} · {p.n}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  ) : <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>Not enough rated breaks yet.</p>}
                 </>
               )}
             </div>
