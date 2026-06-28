@@ -12,3 +12,6 @@ data.json
 # Optional: ignore the built bundle if you prefer to build on clone.
 # Leave it commented to keep main.js committed for drop-in installs.
 # main.js
+
+# Local working note — kept out of the repo on purpose
+CHANGELOG.md
