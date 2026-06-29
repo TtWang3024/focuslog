@@ -14,20 +14,30 @@ function isDarkTheme(): boolean {
   return typeof document !== "undefined" && document.body.classList.contains("theme-dark");
 }
 
-// The Sky tab: each logged pomodoro lights a real star (brighter when recent). Drag to pan,
-// scroll to zoom, hover a glow for the task + star name. Follows the Obsidian light/dark theme.
-export function SkyView({ sessions, C }: { sessions: any[]; C: any }) {
+// A label for a reflection star: its first thought, else first mood word, else first body part.
+function reflectionLabel(r: any): string {
+  if (r.thoughts && r.thoughts.length) return r.thoughts[0];
+  if (r.mood && r.mood.length) return r.mood[0].name || "reflection";
+  if (r.body && r.body.length) return r.body[0].part || "reflection";
+  return "reflection";
+}
+
+// The Sky tab: pomodoros light amber stars; reflections light a separate silver-star sky you toggle to.
+// Drag to pan, scroll to zoom, hover a glow for its label, hover near a constellation for its name.
+export function SkyView({ sessions, reflections, C }: { sessions: any[]; reflections: any[]; C: any }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const skyRef = useRef<any>(null);
+  const [mode, setMode] = useState<"pomodoro" | "reflection">("pomodoro");
   const [tip, setTip] = useState<{ x: number; y: number; title: string; sub: string } | null>(null);
+  const [clabel, setClabel] = useState<{ name: string; x: number; y: number } | null>(null);
 
-  // pomodoro sessions → star entries; recency spans the real data range (oldest dim → newest bright)
   const entries = useMemo(() => {
-    return (sessions || [])
-      .map((s) => ({ id: String(s.id), text: s.task || "pomodoro", ts: new Date(s.ts).getTime() }))
-      .filter((e) => !isNaN(e.ts));
-  }, [sessions]);
+    const src = mode === "reflection" ? (reflections || []) : (sessions || []);
+    return src
+      .map((s: any) => ({ id: String(s.id), text: mode === "reflection" ? reflectionLabel(s) : (s.task || "pomodoro"), ts: new Date(s.ts).getTime() }))
+      .filter((e: any) => !isNaN(e.ts));
+  }, [sessions, reflections, mode]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -35,9 +45,10 @@ export function SkyView({ sessions, C }: { sessions: any[]; C: any }) {
     const sky = createSkyMap(canvas, { data: SKY_DATA });
     skyRef.current = sky;
     sky.setLightMode(!isDarkTheme());
+    sky.setRefTint(mode === "reflection" ? "silver" : "amber");
     sky.setSize();
     const now = Date.now();
-    const oldest = entries.length ? Math.min(...entries.map((e) => e.ts)) : now;
+    const oldest = entries.length ? Math.min(...entries.map((e: any) => e.ts)) : now;
     const months = Math.max(1, Math.ceil((now - oldest) / (30 * 24 * 3600 * 1000)) + 1);
     sky.setReflections(entries, months, now);
     sky.render(false);
@@ -54,21 +65,25 @@ export function SkyView({ sessions, C }: { sessions: any[]; C: any }) {
         const dx = e.clientX - lx, dy = e.clientY - ly;
         lx = e.clientX; ly = e.clientY;
         sky.pan(dx, dy); sky.render(true);
-        setTip(null);
+        setTip(null); setClabel(null);
         return;
       }
       const rect = canvas.getBoundingClientRect();
-      const hit = sky.hitTest(e.clientX - rect.left, e.clientY - rect.top);
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      const hit = sky.hitTest(mx, my);
       if (hit) {
         const d = new Date(hit.ts);
-        setTip({ x: e.clientX - rect.left, y: e.clientY - rect.top, title: hit.text || hit.name, sub: hit.name + " · " + d.toLocaleDateString() });
+        setTip({ x: mx, y: my, title: hit.text || hit.name, sub: hit.name + " · " + d.toLocaleDateString() });
+        setClabel(null);
         canvas.style.cursor = "pointer";
       } else {
-        setTip(null); canvas.style.cursor = "grab";
+        setTip(null);
+        setClabel(sky.pickLabel(mx, my));
+        canvas.style.cursor = "grab";
       }
     };
     const onUp = (e: PointerEvent) => { dragging = false; try { canvas.releasePointerCapture(e.pointerId); } catch (err) {} sky.render(false); };
-    const onLeave = () => { setTip(null); };
+    const onLeave = () => { setTip(null); setClabel(null); };
     const onWheel = (e: WheelEvent) => { e.preventDefault(); sky.zoomBy(e.deltaY < 0 ? 1.1 : 0.9); sky.render(false); };
 
     canvas.addEventListener("pointerdown", onDown);
@@ -77,13 +92,12 @@ export function SkyView({ sessions, C }: { sessions: any[]; C: any }) {
     canvas.addEventListener("pointerleave", onLeave);
     canvas.addEventListener("wheel", onWheel, { passive: false });
 
-    // re-adapt only when the Obsidian theme actually flips (body class toggles often)
     let lastDark = isDarkTheme();
     const mo = new MutationObserver(() => {
-      const d = isDarkTheme();
-      if (d === lastDark) return;
-      lastDark = d;
-      sky.setLightMode(!d);
+      const dk = isDarkTheme();
+      if (dk === lastDark) return;
+      lastDark = dk;
+      sky.setLightMode(!dk);
       sky.render(false);
     });
     mo.observe(document.body, { attributes: true, attributeFilter: ["class"] });
@@ -98,12 +112,22 @@ export function SkyView({ sessions, C }: { sessions: any[]; C: any }) {
       canvas.removeEventListener("wheel", onWheel as any);
       skyRef.current = null;
     };
-  }, [entries]);
+  }, [entries, mode]);
+
+  const seg = (on: boolean): any => ({ padding: "4px 12px", borderRadius: 8, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 12.5, fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: "var(--fl-display)" });
+  const empty = mode === "reflection" ? "Save your first reflection to light a star." : "Log your first pomodoro to light a star.";
+  const hint = mode === "reflection"
+    ? "Each reflection you save lights a silver star, brighter when it's recent. Drag to roam, scroll to zoom."
+    : "Each pomodoro you log lights a star, brighter when it's recent. Drag to roam, scroll to zoom.";
 
   return (
     <div>
-      <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 8 }}>
-        Each pomodoro you log lights a star, brighter when it's recent. Drag to roam, scroll to zoom.
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        <div style={{ fontSize: 12.5, color: C.muted, flex: 1, minWidth: 200 }}>{hint}</div>
+        <div style={{ display: "inline-flex", gap: 2, background: C.line, borderRadius: 10, padding: 3, flexShrink: 0 }}>
+          <button type="button" style={seg(mode === "pomodoro")} onClick={() => setMode("pomodoro")}>Pomodoros</button>
+          <button type="button" style={seg(mode === "reflection")} onClick={() => setMode("reflection")}>Reflections</button>
+        </div>
       </div>
       <div ref={wrapRef} style={{ position: "relative", width: "100%", height: "min(68vh, 560px)", minHeight: 340, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.line}` }}>
         <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block", cursor: "grab", touchAction: "none" }} />
@@ -113,9 +137,12 @@ export function SkyView({ sessions, C }: { sessions: any[]; C: any }) {
             <div style={{ fontSize: 11, color: C.muted }}>{tip.sub}</div>
           </div>
         )}
+        {clabel && (
+          <div style={{ position: "absolute", left: clabel.x, top: clabel.y, transform: "translate(-50%, -50%)", pointerEvents: "none", background: C.card, border: `1px solid ${C.line}`, borderRadius: 6, padding: "2px 8px", fontSize: 12.5, color: C.ink, whiteSpace: "nowrap", boxShadow: "0 1px 6px rgba(0,0,0,0.18)" }}>{clabel.name}</div>
+        )}
         {!entries.length && (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.muted, fontSize: 13, textAlign: "center", padding: 20, pointerEvents: "none" }}>
-            Log your first pomodoro to light a star.
+            {empty}
           </div>
         )}
       </div>

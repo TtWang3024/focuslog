@@ -1,5 +1,6 @@
 import * as React from "react";
 import bodyImg from "./assets/body.png";
+import { Trash } from "./icons";
 
 const { useState, useRef } = React;
 
@@ -22,6 +23,8 @@ const BODY_POINTS = [
 // Crowded head senses → one cluster: head area opens left, see/smell/taste open right.
 const FACE_CLUSTER = { x: 0.667, y: 0.143, members: ["head area", "see", "smell", "taste"] };
 const SENSE_PARTS = ["see", "smell", "taste", "head area", "listen", "touch"];
+// The five senses (not "head area") get a pink-tinted saved row, to read as senses.
+const PINK_SENSES = ["see", "smell", "taste", "listen", "touch"];
 
 // Where in the body do you feel it: hover the rabbit, tap a glowing point (up to 3), jot a word.
 // Controlled — `value` is [{ part, note }], reported up via onChange.
@@ -53,10 +56,11 @@ export function BodyMap({ value, onChange, C }: { value: any[]; onChange: (t: an
       const d = Math.hypot(px - p.x * rect.width, py - p.y * rect.height);
       if (d < bestD) { bestD = d; best = p; }
     }
-    // stay open while the cursor is actually over a face chip (robust to any font line-height),
-    // or within a wide radius; open from closed when the cluster is the nearest target.
+    // Keep the cluster open while the cursor is actually over a face chip (robust to font size),
+    // or while the cluster is still the NEAREST target. The moment another dot is closer, it closes
+    // and that dot's label shows instead — so head area never overlaps neck/shoulder/etc.
     const overFace = !!(faceRef.current && e.target instanceof Node && faceRef.current.contains(e.target));
-    const open = overFace || (faceOpen ? (faceDist < nearR * 2.2) : (faceDist < nearR && faceDist <= bestD));
+    const open = overFace || ((faceOpen ? faceDist < nearR * 2.2 : faceDist < nearR) && faceDist <= bestD);
     setFaceOpen(open);
     setNear(!open && best && bestD < nearR ? best.part : null);
   };
@@ -98,10 +102,10 @@ export function BodyMap({ value, onChange, C }: { value: any[]; onChange: (t: an
         <p style={{ margin: "0 0 8px", fontSize: 12, color: C.muted }}>Hover the rabbit, then tap a glowing point (up to {BODY_MAX}).</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
           {value.map((t) => (
-            <div key={t.part} className="fl-btag">
+            <div key={t.part} className="fl-btag" style={{ background: PINK_SENSES.includes(t.part) ? "#fbe7ef" : "#fde4d2" }}>
               <div className="fl-btag-head">
                 <span className="fl-btag-name">{t.part}</span>
-                <button type="button" onClick={() => toggle(t.part)} style={{ border: "none", background: "rgba(0,0,0,0.14)", color: C.ink, borderRadius: 999, padding: "1px 8px", cursor: "pointer", fontSize: 13, lineHeight: 1 }}>{"×"}</button>
+                <button type="button" onClick={() => toggle(t.part)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", color: "#8a8175", display: "inline-flex" }}><Trash size={13} /></button>
               </div>
               <input value={t.note || ""} placeholder="words for this… (optional)" onChange={(e) => setNote(t.part, e.target.value)} />
             </div>

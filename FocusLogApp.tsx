@@ -1852,7 +1852,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         </div>
 
-        {view === "sky" && <SkyView sessions={sessions} C={C} />}
+        {view === "sky" && <SkyView sessions={sessions} reflections={reflections} C={C} />}
 
         {view === "reflect" && (
           <div>

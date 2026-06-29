@@ -59,6 +59,8 @@
 .workspace-leaf-content[data-type="focuslog-view"] .fl-act-row:hover .fl-rowact { opacity: 0.65; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-rowact:hover { opacity: 1; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-rowdel:hover { color: #C06A57 !important; }
+.workspace-leaf-content[data-type="focuslog-view"] .fl-thought:hover .fl-rowact,
+.workspace-leaf-content[data-type="focuslog-view"] .fl-btag:hover .fl-rowact { opacity: 0.65; }
 /* Spinning refresh icon while a Notion sync is in flight. */
 @keyframes fl-spin { to { transform: rotate(360deg); } }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-spin { transform-origin: center; animation: fl-spin 0.8s linear infinite; }
@@ -319,6 +321,15 @@ body.focuslog-float-window .notice { display: none !important; }
 .fl-cx-chip { font-family: var(--fl-display); font-size: 13px; padding: 5px 11px; border-radius: 16px; background: #fff; border: 1.5px solid; cursor: pointer; font-weight: 600; line-height: 1.2; max-width: 100%; box-sizing: border-box; text-align: center; overflow-wrap: anywhere; }
 .fl-cx-chip.on { color: #fff !important; }
 
+/* Thought pills: text dead-centre; the bin fades in on hover in a reserved right slot, balanced by a left spacer. */
+.fl-thought {
+  display: inline-grid; grid-template-columns: 14px 1fr 14px; align-items: center; gap: 3px;
+  padding: 1px 8px; border-radius: 999px; background: #fff; border: 2.25px solid;
+  font-family: var(--fl-display); font-size: 12.5px; font-weight: 600; color: #2b2723; line-height: 1.2;
+}
+.fl-thought .fl-thought-text { grid-column: 2; text-align: center; white-space: nowrap; }
+.fl-thought .fl-rowact { grid-column: 3; justify-self: center; padding: 0; color: #8a8175; display: inline-flex; align-items: center; cursor: pointer; }
+
 /* ---------- Pause reflection: body map (ported from Hold to Pause) ---------- */
 .fl-bodymap { display: flex; gap: 14px; align-items: flex-start; }
 .fl-bodymap-fig { position: relative; flex: 0 0 170px; width: 170px; touch-action: none; }
@@ -326,21 +337,27 @@ body.focuslog-float-window .notice { display: none !important; }
 .fl-bodymap-side { flex: 1 1 auto; min-width: 0; }
 .fl-bdots { position: absolute; inset: 0; opacity: 0; transition: opacity 0.18s ease; }
 .fl-bdots.active { opacity: 1; }   /* dots appear only while the cursor is over the rabbit */
+/* the glow lives on ::before so the button never scales — its label stays a constant size */
 .fl-bdot {
   position: absolute; width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; padding: 0;
-  border: none; border-radius: 50%; cursor: pointer; opacity: 0.34; transform: scale(0.82);
+  border: none !important; background: transparent !important; box-shadow: none !important; cursor: pointer;
+}
+.fl-bdot::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; opacity: 0.34; transform: scale(0.82);
   background: radial-gradient(circle, rgba(255,238,175,0.97) 0%, rgba(255,205,110,0.65) 55%, rgba(255,205,110,0) 76%);
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
-.fl-bdot:hover, .fl-bdot.near { opacity: 1; transform: scale(1.18); }
-.fl-bdot.on { opacity: 1; transform: scale(1.12); background: radial-gradient(circle, #fff 0%, #ff9b6b 58%, rgba(255,155,107,0) 78%); }
+.fl-bdot:hover::before, .fl-bdot.near::before { opacity: 1; transform: scale(1.18); }
+.fl-bdot.on::before { opacity: 1; transform: scale(1.12); background: radial-gradient(circle, #fff 0%, #ff9b6b 58%, rgba(255,155,107,0) 78%); }
 .fl-bdot-label {
-  position: absolute; left: 50%; bottom: 145%; transform: translateX(-50%);
-  white-space: nowrap; font-size: 12px; padding: 3px 9px; border-radius: 999px;
+  position: absolute; left: 50%; bottom: 150%; transform: translateX(-50%);
+  white-space: nowrap; font-size: 12px; padding: 4px 11px; border-radius: 999px;
   background: rgba(20,20,30,0.92); color: #fff; opacity: 0; pointer-events: none; transition: opacity 0.12s ease;
 }
 .fl-bdot:hover .fl-bdot-label, .fl-bdot.near .fl-bdot-label { opacity: 1; }
-.fl-bdot.sense .fl-bdot-label { background: #f8d7e3; color: #111; }   /* senses: light pink, black text */
+.fl-bdot.sense .fl-bdot-label { background: #f8d7e3; color: #111; border: 1px solid #e8a9c0; }   /* senses: light pink, black text, thin border */
+.fl-bdot.on .fl-bdot-label { background: #ff9b6b; color: #fff; border-color: #ff9b6b; }            /* selected body part → orange, like head area */
+.fl-bdot.sense.on .fl-bdot-label { background: #e97ba6; color: #fff; border-color: #e97ba6; }      /* selected sense → vivid pink, like a selected see chip */
 .fl-bface { position: absolute; }
 .fl-bface-anchor {
   position: absolute; left: 0; top: 0; width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px;
@@ -356,12 +373,12 @@ body.focuslog-float-window .notice { display: none !important; }
 .fl-bface.open .fl-bface-pop { display: flex; }
 .fl-bface-chip {
   font-family: var(--fl-display); font-size: 12px; white-space: nowrap; padding: 4px 11px; border-radius: 999px;
-  border: 1px solid #e8a9c0; background: #f8d7e3; color: #111; cursor: pointer; text-decoration: none;
+  border: 1px solid #e8a9c0; background: #f8d7e3 !important; color: #111; cursor: pointer; text-decoration: none;   /* full pink + thin border (beat Obsidian's button bg) */
 }
-.fl-bface-chip.on { background: #e97ba6; border-color: #e97ba6; color: #fff; }
-.fl-bface-chip[data-part="head area"] { background: #2b2723; color: #fff; border-color: rgba(0,0,0,0.2); }   /* a general body part, dark */
-.fl-bface-chip[data-part="head area"].on { background: #ff9b6b; border-color: #ff9b6b; color: #fff; }
-.fl-btag { background: rgba(128,128,128,0.1); border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 6px; }
+.fl-bface-chip.on { background: #e97ba6 !important; border-color: #e97ba6; color: #fff; }
+.fl-bface-chip[data-part="head area"] { background: #2b2723 !important; color: #fff; border-color: rgba(255,255,255,0.25); }   /* a general body part, dark */
+.fl-bface-chip[data-part="head area"].on { background: #ff9b6b !important; border-color: #ff9b6b; color: #fff; }
+.fl-btag { background: #fdf5ea; border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 6px; }
 .fl-btag-head { display: flex; align-items: center; gap: 6px; }
 .fl-btag-name { font-weight: 600; font-size: 13px; flex: 1; color: #2b2723; }
-.fl-btag input { width: 100%; box-sizing: border-box; font-family: var(--fl-display); font-size: 12.5px; padding: 6px 10px; border-radius: 7px; border: 1px solid rgba(128,128,128,0.35); background: rgba(128,128,128,0.08); color: #2b2723; }
+.fl-btag input { width: 100%; box-sizing: border-box; font-family: var(--fl-display); font-size: 12.5px; padding: 6px 10px; border-radius: 7px; border: 1px solid #e8dfcf; background: #fff; color: #2b2723; }

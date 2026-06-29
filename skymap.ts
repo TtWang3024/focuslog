@@ -22,6 +22,7 @@ export function createSkyMap(canvas: HTMLCanvasElement, opts?: any) {
   let LINE_COLOR  = "rgba(130,160,225,0.28)";
   let STARNAME_COLOR = "rgba(220,228,255,0.6)";
   let isLight = false;   // dark sky by default; flipped for light backgrounds
+  let refTint = "amber"; // "amber" for pomodoro stars, "silver" for reflection stars
   const FONT = "'Baloo 2', ui-sans-serif, system-ui, sans-serif";
   // Stars light up brightest-first, kept at least this far apart.
   const CLUSTER_MIN_SEP_DEG = 1.5;
@@ -34,6 +35,7 @@ export function createSkyMap(canvas: HTMLCanvasElement, opts?: any) {
   let ra0 = 80, dec0 = 0, zoom = ZOOM_DEFAULT;   // view center (RA/Dec) + zoom
   let reflections: any[] = [], placed: any[] = [], windowMonths = 1, nowTs = 0;
   let drawnRefs: any[] = [];   // screen positions of reflection stars, for hit-testing
+  let drawnLabels: any[] = [];  // screen positions of constellation labels, for hover-pick
 
   // B–V colour index → a soft star colour.
   function bvColor(bv: number): number[] {
@@ -204,14 +206,13 @@ export function createSkyMap(canvas: HTMLCanvasElement, opts?: any) {
   }
 
   function drawLabels() {
-    ctx.font = "12px " + FONT;
-    ctx.textAlign = "center";
-    ctx.fillStyle = LABEL_COLOR;
+    // constellation labels are hover-only: record their screen positions for picking, don't draw them
+    drawnLabels = [];
     for (const lb of labels) {
       if (lb[3] > 3) continue;
       const q = project(lb[1], lb[2]);
       if (!q || q.x < 30 || q.x > W - 30 || q.y < 30 || q.y > H - 20) continue;
-      ctx.fillText(lb[0], q.x, q.y);
+      drawnLabels.push({ name: lb[0], x: q.x, y: q.y });
     }
     if (zoom >= STAR_NAME_ZOOM) {
       ctx.fillStyle = STARNAME_COLOR;
@@ -236,18 +237,23 @@ export function createSkyMap(canvas: HTMLCanvasElement, opts?: any) {
       const r = 3 + p.recency * 6;
       const a = 0.45 + p.recency * 0.55;
       const dot = r / 3;
-      ctx.beginPath();                          // halo (outer glow, halved)
-      ctx.fillStyle = isLight
-        ? `rgba(210,130,20,${0.16 + p.recency * 0.18})`
-        : `rgba(255,205,110,${0.12 + p.recency * 0.13})`;
+      const slv = refTint === "silver";
+      ctx.beginPath();                          // halo (outer glow)
+      ctx.fillStyle = slv
+        ? (isLight ? `rgba(110,118,140,${0.16 + p.recency * 0.18})` : `rgba(200,206,222,${0.12 + p.recency * 0.13})`)
+        : (isLight ? `rgba(210,130,20,${0.16 + p.recency * 0.18})` : `rgba(255,205,110,${0.12 + p.recency * 0.13})`);
       ctx.arc(q.x, q.y, r * 1.2, 0, 6.2832);
       ctx.fill();
-      ctx.beginPath();                          // warm core
-      ctx.fillStyle = isLight ? `rgba(200,120,15,${a})` : `rgba(255,224,150,${a})`;
+      ctx.beginPath();                          // core
+      ctx.fillStyle = slv
+        ? (isLight ? `rgba(95,103,125,${a})` : `rgba(214,219,233,${a})`)
+        : (isLight ? `rgba(200,120,15,${a})` : `rgba(255,224,150,${a})`);
       ctx.arc(q.x, q.y, dot, 0, 6.2832);
       ctx.fill();
       ctx.beginPath();                          // bright center
-      ctx.fillStyle = isLight ? `rgba(120,65,0,${a})` : `rgba(255,255,255,${a})`;
+      ctx.fillStyle = slv
+        ? (isLight ? `rgba(64,70,92,${a})` : `rgba(240,243,250,${a})`)
+        : (isLight ? `rgba(120,65,0,${a})` : `rgba(255,255,255,${a})`);
       ctx.arc(q.x, q.y, dot * 0.42, 0, 6.2832);
       ctx.fill();
       drawnRefs.push({ x: q.x, y: q.y, r: Math.max(10, r * 1.2), data: p });
@@ -317,8 +323,20 @@ export function createSkyMap(canvas: HTMLCanvasElement, opts?: any) {
     return best;
   }
 
+  function setRefTint(m: string) { refTint = m; }
+
+  // nearest constellation label to a screen point (within ~55px); else null
+  function pickLabel(px: number, py: number) {
+    let best: any = null, bestD = 55 * 55;
+    for (const d of drawnLabels) {
+      const dd = (px - d.x) * (px - d.x) + (py - d.y) * (py - d.y);
+      if (dd < bestD) { bestD = dd; best = d; }
+    }
+    return best;
+  }
+
   return {
-    setData, setSize, render, setReflections, pan, zoomBy, setCenter, setLightMode, hitTest, animateTo,
+    setData, setSize, render, setReflections, pan, zoomBy, setCenter, setLightMode, setRefTint, hitTest, pickLabel, animateTo,
     getRef: (id: string) => placed.find((p) => p.id === id) || null,
     isLoaded: () => loaded,
     getZoom: () => zoom
