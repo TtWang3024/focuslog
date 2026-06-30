@@ -1,11 +1,23 @@
-import { App, ItemView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath, requestUrl, setIcon } from "obsidian";
+import { App, ItemView, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath, requestUrl, setIcon } from "obsidian";
 import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
 import FocusLogApp, { MACARON, MODE_COLORS, darken, fmtHM, parseHM } from "./FocusLogApp";
+import rateRain from "./assets/rate-rain.png";
+import rateClouds from "./assets/rate-clouds.png";
+import ratePartly from "./assets/rate-partly-sunny.png";
+import rateSun from "./assets/rate-sun.png";
 
 export const VIEW_TYPE = "focuslog-view";
 export const VIEW_TYPE_FLOAT = "focuslog-float";
 const NOTION_VERSION = "2022-06-28";
+// The enjoyment scale is 1-4 weather buttons, shared verbatim with the React panel's
+// Scale (FocusLogApp). Break feeling stays numeric 1-5 and is NOT in this list.
+const RATE_WEATHER = [
+  { v: 1, img: rateRain, bg: "#BCBCBC" },
+  { v: 2, img: rateClouds, bg: "#E3EBF1" },
+  { v: 3, img: ratePartly, bg: "#C9EAFF" },
+  { v: 4, img: rateSun, bg: "#89D2FF" },
+];
 
 // Best-effort access to Electron's remote module so we can pin a popout window
 // on top of every other app. The module is deprecated and its availability
@@ -50,14 +62,17 @@ export interface FocusLogSettings {
   tagNamespace: string;
   showCategoryInView: boolean;
   writeCategoryTag: boolean;
-  dailyGoal: number;
   dayStart: number;
   weekStartsSunday: boolean;
   morningEnd: number;
   afternoonEnd: number;
+  lunchEnabled: boolean;
+  lunchStart: number;
+  lunchMinutes: number;
+  dinnerEnabled: boolean;
+  dinnerStart: number;
+  dinnerMinutes: number;
   heatThresholds: string;
-  beginColor: string;
-  endColor: string;
   dailyNoteWrite: boolean;
   dailyNoteTrueDate: boolean;
   dailyHeading: string;
@@ -90,7 +105,6 @@ export interface FocusLogSettings {
   dayEnds: number;
   longBreakMinutes: number;
   longBreakEvery: number;
-  anchorShift: boolean;
   timeFmtV2: boolean;
   workDays: boolean[];
 }
@@ -103,14 +117,17 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   tagNamespace: "Notion",
   showCategoryInView: true,
   writeCategoryTag: true,
-  dailyGoal: 8,
   dayStart: 240,
   weekStartsSunday: false,
   morningEnd: 720,
   afternoonEnd: 1080,
+  lunchEnabled: false,
+  lunchStart: 750,
+  lunchMinutes: 45,
+  dinnerEnabled: false,
+  dinnerStart: 1110,
+  dinnerMinutes: 45,
   heatThresholds: "1,2,4,6,8,10",
-  beginColor: "#d98324",
-  endColor: "#2f6f8f",
   dailyNoteWrite: true,
   dailyNoteTrueDate: true,
   dailyHeading: "\u{1F33B} Today",
@@ -131,7 +148,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   pomodoroMinutes: 25,
   chooseNextTask: true,
   pauseTemplate: "- [ ] <mark class=\"hltr-pink\">{date}</mark> {pause-start} - {pause-end} ⏸️ {pause-tag}",
-  floatOnStart: true,
+  floatOnStart: false,
   floatAlwaysOnTop: true,
   floatBounds: null,
   floatBreakBounds: null,
@@ -144,7 +161,6 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   dayEnds: 1380,
   longBreakMinutes: 20,
   longBreakEvery: 3,
-  anchorShift: false,
   timeFmtV2: true,
   workDays: [true, true, true, true, true, true, true],
 };
@@ -362,7 +378,7 @@ class TimerEngine {
   private startedAt: number | null = null;
   private pauseStart: number | null = null; // pause-with-reason: when this pause began
   private pauseTag = "";                     // pause-with-reason: chosen reason
-  private expected = 3;                      // "before" enjoyment rating; set from the panel, read at log time
+  private expected = 0;                      // "before" enjoyment rating (0 = not yet rated); set from the panel, read at log time
   // ----- break phase: a second, wall-clock countdown owned by the same engine so the
   // panel and the floating window share one source of truth for the rest-and-resume loop.
   private breakActive = false;
@@ -407,7 +423,7 @@ class TimerEngine {
   setPauseTag(tag: string) { this.pauseTag = tag || ""; this.emit(); }
   // The panel's "before" rating; kept on the engine so a quick-log from the float window
   // (which never shows a before-section) still records the expectation the user set.
-  setExpected(n: number) { this.expected = Math.max(1, Math.min(5, Math.round(n) || 3)); }
+  setExpected(n: number) { this.expected = (n >= 1 && n <= 4) ? Math.round(n) : 0; this.emit(); }
   // Pre-select the task for the next pomodoro (e.g. chosen on the float celebration)
   // without starting the timer; both windows show it as the upcoming task.
   setTask(name: string) { this.taskName = (name || "").trim(); this.emit(); }
@@ -482,6 +498,7 @@ class TimerEngine {
     this.endTs = 0;
     this.startedAt = null;
     this.taskName = "";
+    this.expected = 0;
     this.pauseStart = null;
     this.pauseTag = "";
     this.fired = {};
@@ -762,7 +779,7 @@ export default class FocusLogPlugin extends Plugin {
     const s: any = {
       id: Date.now(), task: taskName, group: meta.group || taskName, hierarchy: meta.hierarchy || "",
       load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null,
-      ts: new Date().toISOString(), expected: st.expected, actual: Math.max(1, Math.min(5, Math.round(actual) || 3)), note: "", minutes,
+      ts: new Date().toISOString(), expected: st.expected, actual: Math.max(1, Math.min(4, Math.round(actual) || 3)), note: "", minutes,
     };
     this.data.sessions = [...(this.data.sessions || []), s];
     await this.persist();
@@ -831,6 +848,7 @@ export default class FocusLogPlugin extends Plugin {
   }
 
   async openFloating() {
+    if (Platform.isMobile) return;   // the floating timer is an Electron popout window — desktop only
     const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT);
     // A previously-closed popout can leave a leaf behind whose window is already
     // gone. Reveal one only if its window is genuinely still open; otherwise drop
@@ -940,8 +958,11 @@ export default class FocusLogPlugin extends Plugin {
     if (celebrating) return "celebrate";
     const s = this.timer.getState();
     if (s.breakActive) return "break";
-    if (s.paused) return "pause";
-    if (!s.running && s.startedAt == null) return "setup";
+    // A pomodoro paused before a restart/reopen is rendered as setup until a live run is seen this
+    // window-lifetime; size to setup then too, so the window doesn't grow to the pause geometry.
+    const liveRun = this.floatView()?.hasSeenRun() ?? false;
+    if (s.paused && (s.running || liveRun)) return "pause";
+    if (!s.running && (s.startedAt == null || !liveRun)) return "setup";
     return "focus";
   }
   private applyFloatPhaseBounds(phase: string) {
@@ -1244,6 +1265,34 @@ export default class FocusLogPlugin extends Plugin {
     if (counterStatus === "ambiguous") new Notice("Focus Log: the counter prefix matches more than one line — counter not updated.");
   }
 
+  // Open the daily note FILE for a calendar date (clicked in the Status month view). Resolves the
+  // path with the same folder/format logic as appendToDailyNote, creates it if missing (only when
+  // "Create new daily note if missing" is on), and opens it in the MAIN editor area rather than the
+  // right-sidebar leaf the panel lives in (so the click never replaces the panel itself).
+  async openDailyNoteForDate(ts: number) {
+    const s = this.data.settings;
+    const moment = (window as any).moment;
+    if (!moment) { new Notice("Focus Log: moment unavailable, cannot open the daily note."); return; }
+    const d = new Date(ts);
+    const m = moment(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dn: any = (this.app as any).internalPlugins?.getPluginById?.("daily-notes");
+    const opts = dn?.instance?.options || {};
+    const format = (s.dailyTitleFormat || opts.format || "YYYY-MM-DD").trim();
+    const folder = (s.dailyNoteFolder || opts.folder || "").trim();
+    const path = normalizePath((folder ? folder + "/" : "") + m.format(format) + ".md");
+    let file = this.app.vault.getAbstractFileByPath(path) as TFile;
+    if (!file) {
+      if (!s.createDailyIfMissing) {
+        new Notice("Focus Log: no daily note for " + m.format(format) + ". Enable “Create new daily note if missing” to make one.");
+        return;
+      }
+      if (folder && !this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder).catch(() => {});
+      file = await this.app.vault.create(path, await this.buildDailyNoteContent(m, format, opts.template));
+    }
+    const leaf = this.app.workspace.getMostRecentLeaf() || this.app.workspace.getLeaf("tab");
+    await leaf.openFile(file);
+  }
+
   // Append a pause entry under the daily heading, using the pause template and its placeholders.
   async appendPauseToDailyNote(p: { pomodoroStart: number | null; pauseStart: number; pauseEnd: number; tag: string }) {
     const s = this.data.settings;
@@ -1320,6 +1369,7 @@ export default class FocusLogPlugin extends Plugin {
       writeAct: (pageId: string) => self.incrementAct(pageId),
       setDone: (pageId: string) => self.setTaskDone(pageId),
       appendDaily: (p: any) => self.appendToDailyNote(p),
+      openDailyNote: (ts: number) => self.openDailyNoteForDate(ts),
       notify: (msg: string, duration?: number) => new Notice(msg, duration),
       celebrate: () => new CelebrateModal(self.app).open(),
       timer: {
@@ -1420,6 +1470,7 @@ class FloatTimerView extends ItemView {
   private celebrateShown = false; // celebration overlay up → the "celebrate" size phase
   private curPhase = "";       // "setup" | "focus" | "break" — which screen of the loop is showing
   private skey = "";           // setup task-picker rebuilds only when the task list / selection changes
+  private sawRun = false;       // seen a genuinely-live run in THIS window's lifetime (so a paused pomodoro left over from a restart/reopen isn't shown)
   private bkey = "";           // break activity chips rebuild only when the list / picked set changes
   private fwin: any = null; // this popout's own window object (its timers aren't throttled while it's visible)
   constructor(leaf: WorkspaceLeaf, plugin: FocusLogPlugin) {
@@ -1429,6 +1480,9 @@ class FloatTimerView extends ItemView {
   getViewType() { return VIEW_TYPE_FLOAT; }
   getDisplayText() { return "Focus timer"; }
   getIcon() { return "timer"; }
+  // Whether a genuinely-live run has been seen in this window's lifetime (used by the plugin's
+  // phase sizing so a paused-from-before pomodoro is sized as setup, matching what we render).
+  hasSeenRun() { return this.sawRun; }
 
   async onOpen() {
     const root = this.contentEl;
@@ -1470,6 +1524,7 @@ class FloatTimerView extends ItemView {
       if (st.running) { this.plugin.timer.pause(); return; }
       // Fresh start wants a task chosen first — but only nag when there are tasks to pick.
       if (!st.paused && !(st.taskName || "").trim() && (this.plugin.data.tasks || []).length) { this.flash("Pick a task first."); return; }
+      if (!st.paused && !(st.expected >= 1)) { this.flash("Rate it first."); return; }
       this.plugin.timer.start();
     };
     this.els.reset.onclick = () => this.plugin.timer.reset();
@@ -1489,11 +1544,16 @@ class FloatTimerView extends ItemView {
   private phaseOf(s: TimerState): string {
     if (s.breakActive) return "break";
     if (!s.running && !s.paused && s.startedAt == null) return "setup";
+    // A pomodoro left paused before a restart/reopen survives on the shared engine, but it must
+    // not carry its task into a freshly opened float — until we've seen it run live this lifetime,
+    // a paused (and not running) engine falls back to the setup picker showing "— pick a task —".
+    if (!s.running && !this.sawRun) return "setup";
     return "focus";
   }
 
   render() {
     const s = this.plugin.timer.getState();
+    if (s.running) this.sawRun = true; // mark this lifetime as having a genuinely-live run
     const phase = this.phaseOf(s);
     if (phase !== this.curPhase) { this.onPhaseChange(this.curPhase, phase); this.curPhase = phase; }
     this.setPhaseVisibility(phase);
@@ -1509,20 +1569,23 @@ class FloatTimerView extends ItemView {
       this.els.task.setText(s.taskName || "Focus");
       const wantIcon = s.running ? "pause" : "play";
       if (this.lastIcon !== wantIcon) { setIcon(this.els.primary, wantIcon); this.lastIcon = wantIcon; }
-      this.els.primary.setAttribute("aria-label", s.running ? "pause" : (s.paused ? "resume" : "start"));
+      // A paused pomodoro left over from a restart/reopen is shown as setup (placeholder), so for
+      // the focus-only controls below treat "paused" as false until it's the active focus screen.
+      const pausedShown = s.paused && phase === "focus";
+      this.els.primary.setAttribute("aria-label", s.running ? "pause" : (pausedShown ? "resume" : "start"));
       this.els.primary.toggleClass("is-running", s.running);
-      const locked = s.running || s.paused; // length is frozen while a pomodoro is active
+      const locked = s.running || pausedShown; // length is frozen while a pomodoro is active
       this.els.minus.disabled = locked || s.lengthMin <= 5;
       this.els.plus.disabled = locked || s.lengthMin >= 30;
 
       if (phase === "setup") this.refreshSetup(s);
 
       // Pause reason picker: show the chips while paused (the "pause" size phase grows the window).
-      if (s.paused !== this.pickerShown) {
-        this.pickerShown = s.paused;
-        if (!s.paused && this.els.picker) { this.els.picker.empty(); this.pkey = ""; }
+      if (pausedShown !== this.pickerShown) {
+        this.pickerShown = pausedShown;
+        if (!pausedShown && this.els.picker) { this.els.picker.empty(); this.pkey = ""; }
       }
-      if (s.paused) {
+      if (pausedShown) {
         const pkey = "P:" + s.pauseTag + ":" + ((this.plugin.data.pauseTags || []).length);
         if (this.pkey !== pkey) { this.pkey = pkey; this.buildPicker(s.pauseTag); }
       }
@@ -1562,14 +1625,18 @@ class FloatTimerView extends ItemView {
   // ---------- setup screen (pick task + rate before starting) ----------
   refreshSetup(s: TimerState) {
     const tasks = this.plugin.data.tasks || [];
-    const skey = "S:" + tasks.map((t: any) => t.task).join("|") + "::" + (s.taskName || "");
+    // While idle in setup, only preselect the engine's task once a live run has been seen this
+    // lifetime; a paused pomodoro left over from a restart/reopen reaches setup with a stale
+    // taskName, which we drop so the selector shows "— pick a task —".
+    const setupTask = this.sawRun ? (s.taskName || "") : "";
+    const skey = "S:" + tasks.map((t: any) => t.task + (t.king ? "K" : "")).join("|") + "::" + setupTask;
     if (this.skey !== skey) {
       this.skey = skey;
       const sel = this.els.setupSel as HTMLSelectElement;
       sel.empty();
       sel.createEl("option", { text: tasks.length ? "— pick a task —" : "— no tasks (sync first) —", value: "" });
-      tasks.forEach((t: any) => sel.createEl("option", { text: t.task, value: t.task }));
-      sel.value = s.taskName || "";
+      tasks.forEach((t: any) => sel.createEl("option", { text: t.task + (t.king ? " \u{1F451}" : ""), value: t.task }));
+      sel.value = setupTask;
     }
     if (!this.els.setupRate.childElementCount) this.buildSetupRate();
     (this.els.setupRateBtns || []).forEach((b: any, i: number) => b.toggleClass("is-on", i + 1 === s.expected));
@@ -1579,9 +1646,11 @@ class FloatTimerView extends ItemView {
     el.empty();
     el.createDiv({ cls: "flt-setlabel", text: "how enjoyable do you expect this to be?" });
     const r = el.createDiv({ cls: "flt-rate" });
-    this.els.setupRateBtns = [1, 2, 3, 4, 5].map((n) => {
-      const b = r.createEl("button", { cls: "flt-rbtn", text: String(n) });
-      b.onclick = () => this.plugin.timer.setExpected(n);
+    this.els.setupRateBtns = RATE_WEATHER.map((w) => {
+      const b = r.createEl("button", { cls: "flt-rbtn flt-rbtn-weather" });
+      b.style.background = w.bg;
+      b.createEl("img", { attr: { src: w.img, alt: "rating " + w.v, draggable: "false" } });
+      b.onclick = () => this.plugin.timer.setExpected(w.v);
       return b;
     });
   }
@@ -1730,18 +1799,20 @@ class FloatTimerView extends ItemView {
     doneBox.onchange = () => { done = doneBox.checked; };
     const sel = opts.createEl("select", { cls: "flt-next" }) as HTMLSelectElement;
     sel.createEl("option", { text: "— next task: decide later —", value: "" });
-    (this.plugin.data.tasks || []).forEach((t: any) => { sel.createEl("option", { text: t.task, value: t.task }); });
+    (this.plugin.data.tasks || []).forEach((t: any) => { sel.createEl("option", { text: t.task + (t.king ? " \u{1F451}" : ""), value: t.task }); });
     sel.onclick = (ev: any) => { if (ev && ev.stopPropagation) ev.stopPropagation(); };
     el.createDiv({ cls: "flt-cask", text: "how enjoyable was it?" });
     const rate = el.createDiv({ cls: "flt-rate" });
-    [1, 2, 3, 4, 5].forEach((n) => {
-      const b = rate.createEl("button", { cls: "flt-rbtn", text: String(n) });
+    RATE_WEATHER.forEach((w) => {
+      const b = rate.createEl("button", { cls: "flt-rbtn flt-rbtn-weather" });
+      b.style.background = w.bg;
+      b.createEl("img", { attr: { src: w.img, alt: "rating " + w.v, draggable: "false" } });
       b.onclick = (ev: any) => {
         if (ev && ev.stopPropagation) ev.stopPropagation();
         const nextTask = sel.value || "";
         dismiss();
-        this.plugin.quickLog(n, done, nextTask);
-        this.flash("Logged " + n + "/5 ✓");
+        this.plugin.quickLog(w.v, done, nextTask);
+        this.flash("Logged ✓");
       };
     });
     el.createDiv({ cls: "flt-chint", text: "Tap a rating to log it — or tap outside for the full form" });
@@ -1934,6 +2005,24 @@ class FocusLogSettingTab extends PluginSettingTab {
         })
       );
 
+    const lunchSet = new Setting(containerEl)
+      .setName("Lunch")
+      .setDesc("Auto-place a lunch block on the Timeline. Tasks flow around it and it counts as a long rest, so no long break right after.");
+    lunchSet.addToggle((t) => t.setValue(this.plugin.data.settings.lunchEnabled).onChange(async (v) => { this.plugin.data.settings.lunchEnabled = v; await this.plugin.persist(); }));
+    lunchSet.addText((t) => { t.setPlaceholder("13:30").setValue(fmtHM(this.plugin.data.settings.lunchStart)).onChange(async (v) => { const n = parseHM(v); if (n == null) return; this.plugin.data.settings.lunchStart = n; await this.plugin.persist(); }); t.inputEl.style.width = "5.5em"; });
+    lunchSet.controlEl.createEl("span", { text: "24h hh:mm", attr: { style: "font-size:11px;color:var(--text-muted);margin:0 12px 0 5px" } });
+    lunchSet.addText((t) => { t.setPlaceholder("60").setValue(String(this.plugin.data.settings.lunchMinutes)).onChange(async (v) => { const n = parseInt(v, 10); if (!n || n < 5) return; this.plugin.data.settings.lunchMinutes = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
+    lunchSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
+
+    const dinnerSet = new Setting(containerEl)
+      .setName("Dinner")
+      .setDesc("Auto-place a dinner block on the Timeline. Same rules as lunch.");
+    dinnerSet.addToggle((t) => t.setValue(this.plugin.data.settings.dinnerEnabled).onChange(async (v) => { this.plugin.data.settings.dinnerEnabled = v; await this.plugin.persist(); }));
+    dinnerSet.addText((t) => { t.setPlaceholder("17:30").setValue(fmtHM(this.plugin.data.settings.dinnerStart)).onChange(async (v) => { const n = parseHM(v); if (n == null) return; this.plugin.data.settings.dinnerStart = n; await this.plugin.persist(); }); t.inputEl.style.width = "5.5em"; });
+    dinnerSet.controlEl.createEl("span", { text: "24h hh:mm", attr: { style: "font-size:11px;color:var(--text-muted);margin:0 12px 0 5px" } });
+    dinnerSet.addText((t) => { t.setPlaceholder("60").setValue(String(this.plugin.data.settings.dinnerMinutes)).onChange(async (v) => { const n = parseInt(v, 10); if (!n || n < 5) return; this.plugin.data.settings.dinnerMinutes = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
+    dinnerSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
+
     new Setting(containerEl)
       .setName("Start the week on Sunday")
       .setDesc("Off (default): weeks run Monday–Sunday. On: weeks run Sunday–Saturday. Affects the week view range, the weekly grouping, and the weekday headers on both heatmaps.")
@@ -1946,7 +2035,7 @@ class FocusLogSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Heatmap colour thresholds")
-      .setDesc("Six-month heatmap: six ascending pomodoro counts — the minimum for each of the 6 colour levels (0 stays blank). Default \"1,2,4,6,8,10\" colours days as 1 · 2–3 · 4–5 · 6–7 · 8–9 · 10+. The legend under the heatmap shows the resulting ranges.")
+      .setDesc("Six-month heatmap. Give 3 to 6 ascending pomodoro counts (the minimum for each colour band; 0 stays blank). Fewer numbers means fewer bands, still spanning the lightest to the deepest colour. Default \"1,2,4,6,8,10\" colours days as 1 · 2-3 · 4-5 · 6-7 · 8-9 · 10+. Anything other than 3 to 6 rising numbers falls back to the default. The legend under the heatmap shows the resulting ranges.")
       .addText((t) =>
         t.setPlaceholder("1,2,4,6,8,10").setValue(this.plugin.data.settings.heatThresholds).onChange(async (v) => {
           this.plugin.data.settings.heatThresholds = v.trim();
@@ -1979,39 +2068,6 @@ class FocusLogSettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(containerEl)
-      .setName("Move the whole day with the first task")
-      .setDesc("When on, dragging your first task on the Timeline (e.g. Plan Today's Tasks) shifts that task and everything after it by the same amount — slide your whole work plan at once. Morning-routine blocks before it stay put.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.data.settings.anchorShift).onChange(async (v) => {
-          this.plugin.data.settings.anchorShift = v;
-          await this.plugin.persist();
-        })
-      );
-
-    containerEl.createEl("h3", { text: "Rating colours" });
-    containerEl.createEl("p", {
-      text: "These colours show on the weekly chart dots: expected before, actual after.",
-      cls: "setting-item-description",
-    });
-
-    new Setting(containerEl)
-      .setName("Expected (before)")
-      .addColorPicker((c) =>
-        c.setValue(this.plugin.data.settings.beginColor).onChange(async (v) => {
-          this.plugin.data.settings.beginColor = v;
-          await this.plugin.persist();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Actual (after)")
-      .addColorPicker((c) =>
-        c.setValue(this.plugin.data.settings.endColor).onChange(async (v) => {
-          this.plugin.data.settings.endColor = v;
-          await this.plugin.persist();
-        })
-      );
 
     containerEl.createEl("h3", { text: "Daily note" });
 
@@ -2114,6 +2170,7 @@ class FocusLogSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setClass("fl-fullrow")
       .setName("Block template")
       .setDesc("Placeholders: {date} {start} {end} {task} {hierarchy} {tag} {note}. {hierarchy} expands to \" (ancestor \u00B7 parent)\" when present; {tag} is the category tag configured below.")
       .addTextArea((t) => {
@@ -2121,7 +2178,7 @@ class FocusLogSettingTab extends PluginSettingTab {
           this.plugin.data.settings.dailyTemplate = v;
           await this.plugin.persist();
         });
-        t.inputEl.rows = 4;
+        t.inputEl.rows = 6;
         t.inputEl.style.width = "100%";
       });
 
@@ -2223,6 +2280,7 @@ class FocusLogSettingTab extends PluginSettingTab {
     containerEl.createEl("h3", { text: "Pause" });
 
     new Setting(containerEl)
+      .setClass("fl-fullrow")
       .setName("Pause block template")
       .setDesc("Written to the daily note when you tag a pause. Placeholders: {date} {pomodoro-start} {pause-start} {pause-end} {pomodoro-resume} {pause-tag}. ({pause-end} and {pomodoro-resume} are both the moment you resumed or reset.) Manage pause tags in the panel's Pause tab.")
       .addTextArea((t) => {
@@ -2230,7 +2288,7 @@ class FocusLogSettingTab extends PluginSettingTab {
           this.plugin.data.settings.pauseTemplate = v;
           await this.plugin.persist();
         });
-        t.inputEl.rows = 3;
+        t.inputEl.rows = 5;
         t.inputEl.style.width = "100%";
       });
 

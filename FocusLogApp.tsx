@@ -2,7 +2,19 @@ import * as React from "react";
 import { NOTION_LOGO } from "./notionLogo";
 import { SkyView } from "./SkyView";
 import { ReflectPanel } from "./ReflectPanel";
+import breakShortIcon from "./assets/break-short.png";
+import breakLongIcon from "./assets/break-long.png";
+import rateRain from "./assets/rate-rain.png";
+import rateClouds from "./assets/rate-clouds.png";
+import ratePartly from "./assets/rate-partly-sunny.png";
+import rateSun from "./assets/rate-sun.png";
+import crownImg from "./assets/crown.png";
 const { useState, useEffect, useRef, useCallback } = React;
+// Break-block palette: short break = blue, long break = teal (the note icons match the text colour).
+const BREAK_BG = "#edf3f8", BREAK_STRIPE = "#9bb4c8", BREAK_TEXT = "#5e7d96";
+const LBREAK_BG = "#e3eef0", LBREAK_STRIPE = "#5e93a8", LBREAK_TEXT = "#3d6b80";
+// Meal-block palette (lunch / dinner): a warm food tone, distinct from breaks and routines.
+const MEAL_BG = "#f6ece1", MEAL_STRIPE = "#cf9a5a", MEAL_TEXT = "#8a5a22";
 
 // Focus Log UI. `api` bridge from the plugin:
 //   settings, getInitial(), saveSessions, savePending, saveTasks, sync, writeAct, notify(msg,ms), celebrate(), timer
@@ -141,7 +153,7 @@ function GroupChart({ group, sessions, settings }: any) {
   const W = padL + Math.max(n * step, 60) + padR;
   const H = 250;
   const plotT = padT, plotB = H - padB;
-  const yOf = (s: number) => plotB - ((s - 1) / 4) * (plotB - plotT);
+  const yOf = (s: number) => plotB - ((s - 1) / 3) * (plotB - plotT);
   const xOf = (i: number) => padL + i * step + step / 2;
 
   let trend: any = null;
@@ -165,28 +177,28 @@ function GroupChart({ group, sessions, settings }: any) {
         <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{n} {"\u{1F345}"}</span>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", borderBottom: `1px solid ${C.line}` }}>
-        <Stat label="avg expected" value={avg("expected").toFixed(1)} color={settings.beginColor} />
-        <Stat label="avg actual" value={avg("actual").toFixed(1)} color={settings.endColor} />
+        <Stat label="avg expected" value={avg("expected").toFixed(1)} color={C.ink} />
+        <Stat label="avg actual" value={avg("actual").toFixed(1)} color={C.ink} />
         <Stat label="avg gap" value={(avgGap >= 0 ? "+" : "") + avgGap.toFixed(1)} color={avgGap > 0 ? C.better : avgGap < 0 ? C.worse : C.neutral} />
       </div>
       <div style={{ overflowX: "auto" }}>
         <div style={{ position: "relative", width: Math.max(W, 220) }}>
           <svg width={W} height={H} style={{ display: "block" }}>
-            {[1, 2, 3, 4, 5].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <g key={s}>
                 <line x1={padL} y1={yOf(s)} x2={W - padR} y2={yOf(s)} stroke={C.line} />
                 <text x={6} y={yOf(s) + 4} fontSize={11} fill={C.muted} fontFamily="var(--fl-mono)">{s}</text>
               </g>
             ))}
-            {trend && <line x1={trend.x1} y1={trend.y1} x2={trend.x2} y2={trend.y2} stroke={settings.beginColor} strokeWidth={1.5} strokeDasharray="2 4" opacity={0.55} />}
+            {trend && <line x1={trend.x1} y1={trend.y1} x2={trend.x2} y2={trend.y2} stroke={C.muted} strokeWidth={1.5} strokeDasharray="2 4" opacity={0.55} />}
             {ordered.map((d: any, i: number) => {
               const x = xOf(i), yE = yOf(d.expected), yA = yOf(d.actual), on = active === d.id;
               return (
                 <g key={d.id} onMouseEnter={() => setActive(d.id)} onMouseLeave={() => setActive((a: any) => (a === d.id ? null : a))} onClick={() => setActive((a: any) => (a === d.id ? null : d.id))} style={{ cursor: "pointer" }}>
                   <rect x={x - step / 2} y={plotT} width={step} height={plotB - plotT} fill="transparent" />
                   <line x1={x} y1={yE} x2={x} y2={yA} stroke={gapColor(d.expected, d.actual)} strokeWidth={on ? 4 : 2.5} />
-                  <circle cx={x} cy={yE} r={on ? 6 : 4.5} fill={settings.beginColor} />
-                  <circle cx={x} cy={yA} r={on ? 6 : 4.5} fill={settings.endColor} />
+                  <circle cx={x} cy={yE} r={on ? 6 : 4.5} fill="none" stroke={C.ink} strokeWidth={1.5} />
+                  <circle cx={x} cy={yA} r={on ? 6 : 4.5} fill={C.ink} />
                   {dotMode ? (
                     <circle cx={x} cy={plotB + 18} r={6} fill={timeColor(d.ts, settings)} />
                   ) : (
@@ -207,9 +219,9 @@ function GroupChart({ group, sessions, settings }: any) {
                 <div style={{ fontFamily: "var(--fl-mono)", fontSize: 10.5, color: "#cfc7b8", marginBottom: 2 }}>{fmtDate(d.ts)} {fmtTime(d.ts)}</div>
                 <div style={{ fontSize: 13, marginBottom: 3, wordBreak: "break-word" }}>{d.task}</div>
                 <div style={{ fontFamily: "var(--fl-mono)", fontSize: 12.5 }}>
-                  <span style={{ color: settings.beginColor }}>{d.expected}</span>
+                  <span style={{ color: "#fff" }}>{d.expected}</span>
                   <span> {"\u2192"} </span>
-                  <span style={{ color: settings.endColor }}>{d.actual}</span>
+                  <span style={{ color: "#fff" }}>{d.actual}</span>
                   <span style={{ color: gapColor(d.expected, d.actual) }}> {verdictOf(d.expected, d.actual)}</span>
                 </div>
               </div>
@@ -221,7 +233,7 @@ function GroupChart({ group, sessions, settings }: any) {
   );
 }
 
-function Heatmap({ sessions, monthRef, settings }: any) {
+function Heatmap({ sessions, monthRef, settings, onOpenDay }: any) {
   const year = monthRef.getFullYear(), month = monthRef.getMonth();
   const byDay: any = {};
   sessions.forEach((x: any) => {
@@ -245,7 +257,9 @@ function Heatmap({ sessions, monthRef, settings }: any) {
           const wd = date.getDay();
           const list = (byDay[d] || []).sort((a: any, b: any) => +new Date(a.ts) - +new Date(b.ts));
           return (
-            <div key={d} style={{ minHeight: 56, border: `1px solid ${C.line}`, borderRadius: 6, padding: 4, background: C.paper }}>
+            <div key={d} className="fl-calday" onClick={() => onOpenDay && onOpenDay(date)}
+              title={`Open daily note for ${date.toLocaleDateString()}`}
+              style={{ minHeight: 56, border: `1px solid ${C.line}`, borderRadius: 6, padding: 4, background: C.paper, cursor: "pointer" }}>
               <div style={{ fontSize: 10.5, fontFamily: "var(--fl-mono)", color: weekdayInk(wd), marginBottom: 3 }}>{d}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
                 {list.map((x: any) => (<span key={x.id} title={`${x.task} \u00B7 ${BAND_NAME[bandOf(x.ts, settings)]}`} style={{ width: 9, height: 9, borderRadius: 2, background: timeColor(x.ts, settings) }} />))}
@@ -267,13 +281,24 @@ function Heatmap({ sessions, monthRef, settings }: any) {
   );
 }
 
-function Scale({ value, onChange, color, label }: any) {
+// Enjoyment rating: a 4-step weather scale (rain to sun), each its own colour. Same look before/after.
+const RATE_SCALE = [
+  { v: 1, img: rateRain, bg: "#BCBCBC" },
+  { v: 2, img: rateClouds, bg: "#E3EBF1" },
+  { v: 3, img: ratePartly, bg: "#C9EAFF" },
+  { v: 4, img: rateSun, bg: "#89D2FF" },
+];
+function Scale({ value, onChange, label, weather, color }: any) {
   return (
     <div style={{ marginBottom: 12 }}>
       <label style={{ color: C.muted, fontSize: 12 }}>{label}</label>
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-        {[1, 2, 3, 4, 5].map((s) => (
-          <button key={s} onClick={() => onChange(s)} style={{ width: 38, height: 38, borderRadius: 8, border: `1.5px solid ${value === s ? color : C.faint}`, background: value === s ? color : "transparent", color: value === s ? "#fff" : C.ink, fontFamily: "var(--fl-mono)", cursor: "pointer" }}>{s}</button>
+        {weather ? RATE_SCALE.map((w) => (
+          <button key={w.v} onClick={() => onChange(w.v)} aria-pressed={value === w.v} style={{ width: 48, height: 48, borderRadius: 10, border: value === w.v ? `2.5px solid ${C.ink}` : `1.5px solid ${C.faint}`, background: w.bg, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 5, boxSizing: "border-box" }}>
+            <img src={w.img} alt={"rating " + w.v} draggable={false} style={{ width: 32, height: 32, display: "block" }} />
+          </button>
+        )) : [1, 2, 3, 4, 5].map((s) => (
+          <button key={s} onClick={() => onChange(s)} style={{ width: 38, height: 38, borderRadius: 8, border: `1.5px solid ${value === s ? (color || C.ink) : C.faint}`, background: value === s ? (color || C.ink) : "transparent", color: value === s ? "#fff" : C.ink, fontFamily: "var(--fl-mono)", cursor: "pointer" }}>{s}</button>
         ))}
       </div>
     </div>
@@ -284,13 +309,20 @@ function Scale({ value, onChange, color, label }: any) {
 // pomodoro count. Computed from sessions grouped by logical day (so it respects the day-start).
 const HEAT = ["#f3d9bf", "#ecbf8e", "#e09a55", "#d0703e", "#b94a2e", "#9a3420"]; // 6 levels, light → deep
 const HEAT_EMPTY = "#e8e0cf"; // a day with 0 pomodoros
-const DEFAULT_HEAT_TH = [1, 2, 4, 6, 9, 11]; // min pomodoros for each of the 6 colours
-// Parse the settings string into six ascending positive thresholds (else the default).
+const DEFAULT_HEAT_TH = [1, 2, 4, 6, 8, 10]; // min pomodoros for each colour, fallback for invalid input
+// Parse the settings string into 3 to 6 ascending positive thresholds (else the default).
 function parseHeatTh(s: string): number[] {
   const nums = (s || "").split(/[^0-9]+/).map((x) => parseInt(x, 10)).filter((n) => Number.isFinite(n) && n > 0);
-  if (nums.length !== 6) return DEFAULT_HEAT_TH.slice();
-  for (let i = 1; i < 6; i++) if (nums[i] <= nums[i - 1]) return DEFAULT_HEAT_TH.slice();
+  if (nums.length < 3 || nums.length > 6) return DEFAULT_HEAT_TH.slice();
+  for (let i = 1; i < nums.length; i++) if (nums[i] <= nums[i - 1]) return DEFAULT_HEAT_TH.slice();
   return nums;
+}
+// Resample the 6-colour ramp down to n bands (3-6) so the first band is always the lightest and
+// the last is always the deepest, however many thresholds the user gave (full light-to-deep range).
+function heatPalette(n: number): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) out.push(HEAT[Math.round((i * (HEAT.length - 1)) / (n - 1))]);
+  return out;
 }
 function ContribHeatmap({ sessions, settings }: any) {
   const CELL = 13, GAP = 3, MONTH_H = 14, HEAD_GAP = 4;
@@ -304,7 +336,8 @@ function ContribHeatmap({ sessions, settings }: any) {
   const gridStart = weekStartOf(startMonth, sun);
   const weeks = Math.round((+weekStartOf(end, sun) - +gridStart) / (7 * DAY)) + 1;
   const TH = parseHeatTh(settings.heatThresholds);
-  const heat = (n: number) => { if (!n) return HEAT_EMPTY; let lvl = 0; for (let i = 0; i < TH.length; i++) if (n >= TH[i]) lvl = i; return HEAT[lvl]; };
+  const PAL = heatPalette(TH.length);
+  const heat = (n: number) => { if (!n) return HEAT_EMPTY; let lvl = 0; for (let i = 0; i < TH.length; i++) if (n >= TH[i]) lvl = i; return PAL[lvl]; };
   const lvlLabel = (i: number) => { const lo = TH[i]; if (i === TH.length - 1) return lo + "+"; const hi = TH[i + 1] - 1; return hi <= lo ? String(lo) : lo + "-" + hi; };
 
   const cells: any[] = [];
@@ -335,7 +368,7 @@ function ContribHeatmap({ sessions, settings }: any) {
         </div>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-        {[{ c: HEAT_EMPTY, label: "0" }, ...HEAT.map((c, i) => ({ c, label: lvlLabel(i) }))].map((it: any, i: number) => (
+        {[{ c: HEAT_EMPTY, label: "0" }, ...PAL.map((c, i) => ({ c, label: lvlLabel(i) }))].map((it: any, i: number) => (
           <span key={i} title={`${it.label} pomodoro${it.label === "1" ? "" : "s"}`} style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
             <span style={{ width: CELL, height: CELL, borderRadius: 2, background: it.c, border: `1px solid ${C.line}`, boxSizing: "border-box" }} />
             <span style={{ fontSize: 9, color: C.muted, fontFamily: "var(--fl-mono)" }}>{it.label}</span>
@@ -501,6 +534,60 @@ function ListPlusIcon({ size = 16 }: any) {
     </svg>
   );
 }
+function PinIcon({ size = 16 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </svg>
+  );
+}
+function ClockIcon({ size = 16 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l-4 2" />
+    </svg>
+  );
+}
+function ListTodoIcon({ size = 16 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <path d="M13 5h8" />
+      <path d="M13 12h8" />
+      <path d="M13 19h8" />
+      <path d="m3 17 2 2 4-4" />
+      <rect x="3" y="4" width="6" height="6" rx="1" />
+    </svg>
+  );
+}
+function BriefcaseBusinessIcon({ size = 16 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <path d="M12 12h.01" />
+      <path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+      <path d="M22 13a18.15 18.15 0 0 1-20 0" />
+      <rect width="20" height="14" x="2" y="6" rx="2" />
+    </svg>
+  );
+}
+function LeafIcon({ size = 16 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+      <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+    </svg>
+  );
+}
+function UtensilsIcon({ size = 16 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
+      <path d="M7 2v20" />
+      <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
+    </svg>
+  );
+}
 
 function SquarePenIcon({ size = 15 }: any) {
   return (
@@ -611,9 +698,8 @@ function AutoTextarea({ value, onChange, placeholder, style }: any) {
   return <textarea ref={ref} value={value} onChange={onChange} placeholder={placeholder} rows={1} style={style} />;
 }
 
-function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, onSetExpected, autoLogDefault, onAutoLogChange }: any) {
-  const [task, setTask] = useState(preset || (tasks[0] && tasks[0].task) || "");
-  const [exp, setExp] = useState(3);
+function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, expected, onSetExpected, autoLogDefault, onAutoLogChange }: any) {
+  const [task, setTask] = useState(preset || "");
   const [act, setAct] = useState(3);
   const [note, setNote] = useState("");
   const [markDone, setMarkDone] = useState(false);
@@ -630,7 +716,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   const endHold = () => { if (holdRef.current) { clearTimeout(holdRef.current); holdRef.current = null; } };
   useEffect(() => () => endHold(), []);
 
-  useEffect(() => setTask(preset || (tasks[0] && tasks[0].task) || ""), [preset, tasks]);
+  useEffect(() => setTask(preset || ""), [preset, tasks]);
 
   const mm = String(Math.floor(secs / 60)).padStart(2, "0");
   const ss = String(secs % 60).padStart(2, "0");
@@ -647,14 +733,19 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
     setNote("");
     setMarkDone(false);
   };
-  const submit = () => buildAndAdd(act, exp);
-  // The "before" rating also rides on the timer engine, so a float quick-log carries it.
-  const setExpected = (v: number) => { setExp(v); onSetExpected && onSetExpected(v); };
+  const submit = () => buildAndAdd(act, expected);
+  // The "before" rating lives on the timer engine (single source of truth), so the panel, the
+  // float, and a quick-log all agree — and resetting the timer clears it for the next pomodoro.
+  const setExpected = (v: number) => { onSetExpected && onSetExpected(v); };
   // The "after" rating: with auto-log on, picking a number logs immediately — no button press.
-  const rateActual = (v: number) => { setAct(v); if (autoLog) buildAndAdd(v, exp); };
+  const rateActual = (v: number) => { setAct(v); if (autoLog) buildAndAdd(v, expected); };
   const toggleAuto = (v: boolean) => { setAutoLog(v); onAutoLogChange && onAutoLogChange(v); };
   const inputStyle: any = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
-  const logBtn = <button onClick={submit} style={{ ...btn(C.ink), width: "100%", padding: "10px" }}>log pomodoro + write Act</button>;
+  const rated = expected >= 1 && expected <= 5;
+  const hasTask = !!(task && task.trim());
+  const canLog = rated && hasTask;
+  const blockStart = !running && !paused && !pauseActive && !canLog;
+  const logBtn = <button onClick={submit} disabled={!canLog} title={canLog ? "" : "pick a task and an expected rating first"} style={{ ...btn(C.ink), width: "100%", padding: "10px", opacity: canLog ? 1 : 0.5, cursor: canLog ? "pointer" : "not-allowed" }}>log pomodoro + write Act</button>;
   const markDoneLabel = (
     <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13, color: C.ink, cursor: "pointer" }}>
       <input type="checkbox" checked={markDone} onChange={(e) => setMarkDone(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.better, cursor: "pointer" }} />
@@ -681,14 +772,14 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <button disabled={lenLocked || pomoMin <= 5} onMouseDown={() => beginHold(-1)} onMouseUp={endHold} onMouseLeave={endHold} title={lenLocked ? "length is locked while a pomodoro is running" : "shorter — hold to speed up (min 5)"} style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: (lenLocked || pomoMin <= 5) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}>{"−"}</button>
-          <button onClick={running ? onPause : () => onStart(task)} style={{ ...btn(C.ink), minWidth: 104 }}>{running ? "pause" : `${(paused || pauseActive) ? "resume" : "start"} ${pomoMin}m`}</button>
+          <button onClick={running ? onPause : () => onStart(task)} disabled={blockStart} title={blockStart ? "pick a task and an expected rating first" : ""} style={{ ...btn(C.ink), minWidth: 104, opacity: blockStart ? 0.5 : 1, cursor: blockStart ? "not-allowed" : "pointer" }}>{running ? "pause" : `${(paused || pauseActive) ? "resume" : "start"} ${pomoMin}m`}</button>
           <button disabled={lenLocked || pomoMin >= 30} onMouseDown={() => beginHold(1)} onMouseUp={endHold} onMouseLeave={endHold} title={lenLocked ? "length is locked while a pomodoro is running" : "longer — hold to speed up (max 30)"} style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: (lenLocked || pomoMin >= 30) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}>{"+"}</button>
-          <button onClick={resetTimer} title="reset" aria-label="reset" style={{ ...btn(C.muted, true), padding: "7px 11px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><RotateCcwIcon size={15} /></button>
+          <button onClick={() => { resetTimer(); setTask(""); onPickTask && onPickTask(""); }} title="reset" aria-label="reset" style={{ ...btn(C.muted, true), padding: "7px 11px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><RotateCcwIcon size={15} /></button>
         </div>
       </div>
       <label style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 14, fontSize: 12.5, color: C.muted, cursor: "pointer" }}>
         <input type="checkbox" checked={!!floatOn} onChange={(e) => setFloatOn(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.ink, cursor: "pointer" }} />
-        floating timer window — a small window that stays on top of your other apps
+        open a floating timer window on start — a small window that stays on top of your other apps
       </label>
       {pauseActive && (
         <div style={{ marginBottom: 14, padding: 10, borderRadius: 8, background: C.paper, border: `1px solid ${C.faint}` }}>
@@ -705,7 +796,8 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
 
       {/* The task picker stays visible in both phases — it's the page Act +1 writes to. */}
       <label style={{ color: C.muted, fontSize: 12 }}>task (Act +1 writes to this page)</label>
-      <select value={task} onChange={(e) => setTask(e.target.value)} style={{ ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
+      <select value={task} onChange={(e) => { setTask(e.target.value); onPickTask && onPickTask(e.target.value); }} style={{ ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
+        <option value="">{tasks.length ? "— pick a task —" : "— no tasks (sync first) —"}</option>
         {task && !tasks.some((t: any) => t.task === task) && <option value={task}>{task}</option>}
         {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
       </select>
@@ -718,7 +810,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
           {markDoneLabel}
           {chooseNextControls}
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
-          <Scale label="after: how enjoyable was it actually? (1 dull ... 5 great)" value={act} onChange={rateActual} color={settings.endColor} />
+          <Scale label="after: how enjoyable was it actually?" value={act} onChange={rateActual} weather />
           <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
             <input type="checkbox" checked={autoLog} onChange={(e) => toggleAuto(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.better, cursor: "pointer" }} />
             log to Obsidian automatically when I pick a rating
@@ -730,13 +822,13 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
       ) : (
         /* ---------- BEFORE the pomodoro: set the expectation, then start the timer ---------- */
         <div>
-          <Scale label="before: how enjoyable do I expect this to be? (1 dull ... 5 great)" value={exp} onChange={setExpected} color={settings.beginColor} />
-          <p style={{ fontSize: 12, color: C.muted, margin: "0 0 12px" }}>Start the timer; when it finishes you'll be asked to rate how it actually went.</p>
+          <Scale label="before: how enjoyable do I expect this to be?" value={expected} onChange={setExpected} weather />
+          <p style={{ fontSize: 12, color: C.muted, margin: "0 0 12px" }}>{!hasTask ? "Pick a task above to start." : !rated ? "Pick an expected rating above to start the timer." : "Start the timer; when it finishes you'll be asked to rate how it actually went."}</p>
           <button onClick={() => setShowManual((s) => !s)} style={{ ...btn(C.muted, true), fontSize: 12.5, padding: "6px 10px" }}>{showManual ? "− hide manual log" : "+ log a pomodoro manually"}</button>
           {showManual && (
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
               <p style={{ fontSize: 12, color: C.muted, margin: "0 0 10px" }}>Logs the task above with the "before" rating as the expectation, and the timer's elapsed time (a full {pomoMin}m if the timer wasn't used).</p>
-              <Scale label="after: how enjoyable was it actually? (1 dull ... 5 great)" value={act} onChange={setAct} color={settings.endColor} />
+              <Scale label="after: how enjoyable was it actually?" value={act} onChange={setAct} weather />
               <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
               {markDoneLabel}
               {chooseNextControls}
@@ -756,9 +848,9 @@ function SessionRow({ s, settings, onEdit, onDelete }: any) {
       <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, minWidth: 96 }}>{fmtDate(d)} {fmtTime(d)}</span>
       <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.ink, overflowWrap: "anywhere" }}>{s.task}</div>
       <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" }}>
-        <span style={{ color: settings.beginColor }}>{s.expected}</span>
+        <span style={{ color: C.ink }}>{s.expected}</span>
         <span style={{ color: C.muted }}> {"→"} </span>
-        <span style={{ color: settings.endColor }}>{s.actual}</span>
+        <span style={{ color: C.ink }}>{s.actual}</span>
       </span>
       <button onClick={() => onEdit(s)} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
       <button onClick={() => onDelete(s)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
@@ -780,8 +872,8 @@ function SessionEditRow({ draft, setDraft, settings, onSave, onCancel }: any) {
           <input type="text" value={draft.task} onChange={(e) => setDraft({ ...draft, task: e.target.value })} style={{ ...inputStyle, width: "100%" }} />
         </label>
       </div>
-      <Scale label="expected (before)" value={draft.expected} onChange={(v: number) => setDraft({ ...draft, expected: v })} color={settings.beginColor} />
-      <Scale label="actual (after)" value={draft.actual} onChange={(v: number) => setDraft({ ...draft, actual: v })} color={settings.endColor} />
+      <Scale label="expected (before)" value={draft.expected} onChange={(v: number) => setDraft({ ...draft, expected: v })} weather />
+      <Scale label="actual (after)" value={draft.actual} onChange={(v: number) => setDraft({ ...draft, actual: v })} weather />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <button onClick={onCancel} style={btn(C.muted, true)}>cancel</button>
         <button onClick={onSave} style={btn(C.ink)}>save</button>
@@ -798,16 +890,13 @@ export default function FocusLogApp({ api }: any) {
   const [doneSess, setDoneSess] = useState<any>({});
   const [view, setView] = useState("today");
   // Status view bundles the old week/month/totals; its right-side vertical control picks the sub-view.
-  const [statusSub, setStatusSub] = useState("totals");
+  const [statusSub, setStatusSub] = useState("month");
   const [preset, setPreset] = useState("");
   const [weekOff, setWeekOff] = useState(0);
   const [monthOff, setMonthOff] = useState(0);
   const [sync, setSync] = useState("idle");
   const [flash, setFlash] = useState("");
   const settings = api.settings;
-  const [goal, setGoal] = useState<number>(Number(settings.dailyGoal) || 8);
-  const [editingGoal, setEditingGoal] = useState(false);
-  const saveGoal = (n: number) => { const g = Math.max(1, Math.min(99, Math.round(n) || 1)); setGoal(g); api.patchSettings && api.patchSettings({ dailyGoal: g }); setEditingGoal(false); };
 
   // The "pick the next task before a break" option. (Pomodoro length now lives in
   // the plugin-level timer engine — see useTimer below.)
@@ -848,15 +937,12 @@ export default function FocusLogApp({ api }: any) {
   const workTasks = orderedTasks.filter((t) => !isPersonal(t));
   const personalTasks = orderedTasks.filter((t) => isPersonal(t));
 
-  // Floating-window on/off, controllable right from the log view. The checkbox
-  // tracks whether the window is actually open (synced via onFloatChange), so it
-  // never gets stuck "on" after the window is closed with its own X — one click
-  // always reopens it. Toggling on also enables auto-open on a fresh start.
-  const [floatOn, setFloatOnState] = useState<boolean>(!!(api.floatingOpen && api.floatingOpen()));
-  useEffect(() => {
-    if (!api.onFloatChange) return;
-    return api.onFloatChange(() => setFloatOnState(!!(api.floatingOpen && api.floatingOpen())));
-  }, []);
+  // Floating-window preference, controllable right from the log view. The checkbox
+  // mirrors the floatOnStart setting (a persistent "open the float when I start" choice),
+  // not the live window state — so an untouched box never silently opens the float on start.
+  // Ticking it opens the window now and on every fresh start; unticking closes it and keeps
+  // starts quiet.
+  const [floatOn, setFloatOnState] = useState<boolean>(!!settings.floatOnStart);
   const setFloatOn = (v: boolean) => {
     setFloatOnState(v);
     api.patchSettings && api.patchSettings({ floatOnStart: v });
@@ -886,6 +972,7 @@ export default function FocusLogApp({ api }: any) {
   const [modeOverride, setModeOverride] = useState<any>(init.modeOverride || {});
   const [editRoutineId, setEditRoutineId] = useState<string | null>(null);
   const [editRoutineName, setEditRoutineName] = useState("");
+  const [editRoutineDur, setEditRoutineDur] = useState<number>(15);
   const [newMorning, setNewMorning] = useState("");
   const [newNight, setNewNight] = useState("");
   const [routineDrag, setRoutineDrag] = useState<{ w: string; i: number } | null>(null);
@@ -893,7 +980,9 @@ export default function FocusLogApp({ api }: any) {
   // Timeline (daily plan): timelineMode swaps the today list for the time axis.
   const [timelineMode, setTimelineModeState] = useState(false);
   const [plans, setPlans] = useState<any>(init.plans || {});
-  const [tlDrag, setTlDrag] = useState<{ id: string; grab: number } | null>(null);
+  const [tlDrag, setTlDrag] = useState<{ id: string; grab: number; button: number; y: number; tlTop: number } | null>(null);
+  const [planUndo, setPlanUndo] = useState<any[] | null>(null);
+  useEffect(() => { if (!planUndo) return; const tm = window.setTimeout(() => setPlanUndo(null), 8000); return () => window.clearTimeout(tm); }, [planUndo]);
   const [editBlockId, setEditBlockId] = useState<string | null>(null);
   const [blockDraft, setBlockDraft] = useState<{ name: string; dur: number }>({ name: "", dur: 30 });
   const tlRef = useRef<HTMLDivElement | null>(null);
@@ -1038,6 +1127,14 @@ export default function FocusLogApp({ api }: any) {
   const timer = useTimer(api);
   const secs = timer.secs;
   const running = timer.running;
+  // Keep the panel's task on whatever the engine is running, so the Focus view matches the float
+  // and doesn't snap to the first task on a re-render. We only adopt the engine task once we've
+  // seen a genuinely-live run (running === true) during THIS panel's lifetime — a pause that began
+  // in this session keeps the task (sawRun stays true), but a paused pomodoro left over from before
+  // a restart/reopen is never adopted, so a fresh panel shows "— pick a task —" instead of it.
+  const sawRun = useRef(false);
+  if (timer.running) sawRun.current = true;
+  useEffect(() => { if (sawRun.current && (timer.running || timer.paused) && timer.taskName) setPreset(timer.taskName); }, [timer.taskName, timer.running, timer.paused]);
   const pomoMin = timer.lengthMin;
   const lenLocked = timer.running || timer.paused; // freeze −/+ while a pomodoro is active
   // Pause-with-reason state is owned by the engine (shared with the floating window);
@@ -1368,9 +1465,10 @@ export default function FocusLogApp({ api }: any) {
       <div
         key={key}
         className="fl-task-row fl-act-row"
+        title={POWER_LABEL[t.power] || POWER_LABEL.Y}
         onDragOver={(e) => { e.preventDefault(); if (overIndex !== i) setOverIndex(i); }}
         onDrop={(e) => { e.preventDefault(); moveTask(dragIndex, i); setDragIndex(null); setOverIndex(null); }}
-        style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 6, background: C.card, border: `1px solid ${isOver ? C.ink : C.line}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }}
+        style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: 6, background: "#fff", border: `1px solid ${isOver ? C.ink : C.line}`, borderLeft: `4px solid ${POWER_COLOR[t.power] || POWER_COLOR.Y}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }}
       >
         <span
           draggable
@@ -1381,9 +1479,8 @@ export default function FocusLogApp({ api }: any) {
         >
           {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
         </span>
-        <span style={{ width: 14, height: 14, borderRadius: 4, background: POWER_COLOR[t.power] || POWER_COLOR.Y, flexShrink: 0 }} title={POWER_LABEL[t.power] || POWER_LABEL.Y} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}><span style={{ color: LOAD_COLOR[t.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, marginRight: 6 }} title={LOAD_LABEL[t.load] || LOAD_LABEL.B}>{t.load || "B"}</span>{cat && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "1px 5px", marginRight: 6, whiteSpace: "nowrap" }}>{cat}</span>}{titleText}{t.king ? " \u{1F451}" : ""}</div>
+          <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}><span style={{ color: LOAD_COLOR[t.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, marginRight: 6 }} title={LOAD_LABEL[t.load] || LOAD_LABEL.B}>{t.load || "B"}</span>{cat && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "1px 5px", marginRight: 6, whiteSpace: "nowrap" }}>{cat}</span>}{titleText}{t.king ? <img src={crownImg} alt="king" draggable={false} style={{ width: 13, height: 13, marginLeft: 4, verticalAlign: "-2px" }} /> : null}</div>
           {hier && <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hier}</div>}
         </div>
         <button onClick={() => togglePersonal(t.task)} className="fl-rowact" title={personal ? "move to Work" : "move to Personal"} aria-label={personal ? "move to Work" : "move to Personal"} style={ICON_BTN}>{personal ? <BriefcaseIcon size={14} /> : <UserIcon size={14} />}</button>
@@ -1395,9 +1492,8 @@ export default function FocusLogApp({ api }: any) {
         >
           <LockIcon size={13} open={!isFrozen} />
         </button>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }} title={`${completed} of ${est} done for this task`}>
           <TomatoPips vivid={done} grey={remaining} />
-          <span style={{ fontSize: 10.5, color: C.muted, fontFamily: "var(--fl-mono)" }}>{completed} done</span>
         </div>
         <button onClick={() => openLog(t.task)} className="fl-rowact" title="log" aria-label="log" style={ICON_BTN}><SquarePenIcon size={15} /></button>
       </div>
@@ -1434,7 +1530,11 @@ export default function FocusLogApp({ api }: any) {
   const saveEditRoutine = (which: string) => {
     const n = editRoutineName.trim();
     if (!n) { setEditRoutineId(null); return; }
-    routineSaver(which)(routineList(which).map((x: any) => (x.id === editRoutineId ? { ...x, name: n } : x)));
+    const dur = Math.max(1, Math.min(480, Math.round(editRoutineDur) || 15));
+    routineSaver(which)(routineList(which).map((x: any) => (x.id === editRoutineId ? { ...x, name: n, dur } : x)));
+    // Keep the timeline in step: update the block that references this routine item, then re-flow.
+    const tb = todayBlocks();
+    if (tb.some((b: any) => b.refId === editRoutineId)) setTodayBlocks(autoBreaksOf(tb.map((b: any) => (b.refId === editRoutineId ? { ...b, name: n, dur } : b))));
     setEditRoutineId(null);
   };
   const removeRoutine = (which: string, id: string) => routineSaver(which)(routineList(which).filter((x: any) => x.id !== id));
@@ -1445,7 +1545,7 @@ export default function FocusLogApp({ api }: any) {
     a.splice(to, 0, m);
     routineSaver(which)(a);
   };
-  const renderRoutineBlock = (which: string) => {
+  const renderRoutineBlock = (which: string, hideHeader?: boolean) => {
     const list = routineList(which);
     const relax = dayMode === "relax";
     const label = which === "morning" ? "\u{1F305} Morning" : "\u{1F319} Night";
@@ -1453,7 +1553,7 @@ export default function FocusLogApp({ api }: any) {
     const setNewVal = which === "morning" ? setNewMorning : setNewNight;
     return (
       <div style={{ marginBottom: 14 }}>
-        <div style={{ ...SECTION_HEAD, ...(relax ? { color: MODE_COLORS.relax.solid } : {}) }}>{label}</div>
+        {!hideHeader && <div style={{ ...SECTION_HEAD, color: relax ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid }}>{label}</div>}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {list.length === 0 && <p style={{ color: C.muted, fontSize: 12.5, margin: "0 0 0 2px" }}>None yet — add one below.</p>}
           {list.map((it: any, i: number) => {
@@ -1464,6 +1564,8 @@ export default function FocusLogApp({ api }: any) {
               return (
                 <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
                   <input value={editRoutineName} onChange={(e) => setEditRoutineName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveEditRoutine(which); if (e.key === "Escape") setEditRoutineId(null); }} autoFocus style={{ flex: 1, minWidth: 80, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px", fontFamily: "var(--fl-display)" }} />
+                  <input type="number" value={editRoutineDur} onChange={(e) => setEditRoutineDur(Number(e.target.value))} onKeyDown={(e) => { if (e.key === "Enter") saveEditRoutine(which); if (e.key === "Escape") setEditRoutineId(null); }} title="length in minutes" style={{ width: 52, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 6px" }} />
+                  <span style={{ fontSize: 11, color: C.muted, flexShrink: 0 }}>min</span>
                   <button onClick={() => saveEditRoutine(which)} title="save" aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
                   <button onClick={() => setEditRoutineId(null)} title="cancel" aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
                 </div>
@@ -1473,14 +1575,14 @@ export default function FocusLogApp({ api }: any) {
               <div key={it.id} className="fl-act-row"
                 onDragOver={(e) => { e.preventDefault(); if (!routineOver || routineOver.w !== which || routineOver.i !== i) setRoutineOver({ w: which, i }); }}
                 onDrop={(e) => { e.preventDefault(); if (routineDrag && routineDrag.w === which) moveRoutine(which, routineDrag.i, i); setRoutineDrag(null); setRoutineOver(null); }}
-                style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "7px 10px", background: relax ? MODE_COLORS.relax.fill : C.card, border: `1px solid ${relax ? MODE_COLORS.relax.border : C.line}`, borderRadius: 6, color: C.ink, opacity: dragging ? 0.4 : 1, boxShadow: over ? `inset 0 2px 0 ${C.ink}` : "none" }}>
+                style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "7px 10px", background: relax ? MODE_COLORS.relax.fill : "#fbf8f1", border: `1px solid ${relax ? MODE_COLORS.relax.border : C.line}`, borderLeft: `4px solid ${C.better}`, borderRadius: 6, color: C.ink, opacity: dragging ? 0.4 : 1, boxShadow: over ? `inset 0 2px 0 ${C.ink}` : "none" }}>
                 <span draggable onDragStart={(e) => { setRoutineDrag({ w: which, i }); e.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => { setRoutineDrag(null); setRoutineOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
                   {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
                 </span>
                 <button onClick={() => toggleRoutineDone(it.id)} title={done ? "mark not done" : "mark done"} aria-label={done ? "mark not done" : "mark done"} style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 5, border: `1.5px solid ${done ? C.better : C.faint}`, background: done ? C.better : "transparent", color: "#fff", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{done && <CheckIcon size={12} />}</button>
                 <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", textDecoration: done ? "line-through" : "none", color: done ? C.muted : C.ink }}>{it.name}</span>
                 <button onClick={() => openLog(it.name)} className="fl-rowact" title="run a pomodoro" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={13} /></button>
-                <button onClick={() => { setEditRoutineId(it.id); setEditRoutineName(it.name); }} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                <button onClick={() => { setEditRoutineId(it.id); setEditRoutineName(it.name); setEditRoutineDur(it.dur || 15); }} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
                 <button onClick={() => removeRoutine(which, it.id)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
               </div>
             );
@@ -1500,6 +1602,7 @@ export default function FocusLogApp({ api }: any) {
   // The day ends where the next one starts: the bottom of the Timeline is the rollover, one full day below the top.
   const tlEnd = (settings.dayStart ?? 240) + 1440;
   const MIN_BLOCK_H = 28;
+  const SHORT_BREAK_H = 36, LONG_BREAK_H = 54;   // break blocks: short ≈ a task block, long = 1.5×
   const GAP_PXM = 0.4;
   // Lay blocks out as a stack — each at least MIN_BLOCK_H tall (so short tasks stay
   // readable), gaps compressed. Items carry both a pixel band (topY..+height) and a time
@@ -1515,7 +1618,7 @@ export default function FocusLogApp({ api }: any) {
         items.push({ type: "gap", t0: prevEnd, t1: b.start, minutes: b.start - prevEnd, topY: y, height: gh });
         y += gh;
       }
-      const h = Math.max(MIN_BLOCK_H, b.dur * PX_PER_MIN);
+      const h = b.kind === "break" ? SHORT_BREAK_H : b.kind === "longbreak" ? LONG_BREAK_H : (b.kind === "meal" || (b.kind === "task" && !b.pageId)) ? Math.max(MIN_BLOCK_H, (settings.pomodoroMinutes || 25) * PX_PER_MIN) : Math.max(MIN_BLOCK_H, b.dur * PX_PER_MIN);
       items.push({ type: "block", b, t0: b.start, t1: b.start + b.dur, topY: y, height: h });
       y += h;
       prevEnd = b.start + b.dur;
@@ -1532,7 +1635,18 @@ export default function FocusLogApp({ api }: any) {
   const fmtClock = (m: number) => String(Math.floor(m / 60) % 24).padStart(2, "0") + ":" + String(Math.round(m) % 60).padStart(2, "0");
   const clampStart = (m: number, dur: number) => Math.max(tlStart, Math.min(tlEnd - dur, m));
   const todayBlocks = () => (plans[todayKey] || []);
-  const setTodayBlocks = (blocks: any[]) => { setPlans((p: any) => ({ ...p, [todayKey]: blocks })); api.savePlan && api.savePlan(todayKey, blocks); };
+  // Every plan mutation flows through here, so it also invalidates the undo snapshot — the only
+  // caller that wants undo kept (the left-drag) re-sets planUndo right AFTER calling this.
+  const setTodayBlocks = (blocks: any[]) => { setPlans((p: any) => ({ ...p, [todayKey]: blocks })); api.savePlan && api.savePlan(todayKey, blocks); setPlanUndo(null); };
+  // Header day-summary: the pomodoro count comes from the timeline (task blocks; duplicates add up),
+  // falling back to remaining task estimates when there's no plan. "ends" is the last block's end;
+  // it overflows when that runs past your day-end (settings.dayEnds).
+  const planBlocks0 = todayBlocks();
+  const plannedPomos = planBlocks0.length
+    ? planBlocks0.filter((b: any) => b.kind === "task").length
+    : [...workTasks, ...personalTasks].reduce((s: number, t: any) => s + (t.pomodoros || 0), 0);
+  const planEndMin = planBlocks0.reduce((m: number, b: any) => Math.max(m, b.start + b.dur), 0);
+  const planOverflow = planBlocks0.length && planEndMin > (settings.dayEnds || 1380) ? Math.round(planEndMin - (settings.dayEnds || 1380)) : 0;
   // Prevent overlaps: in start order, any block that begins before the previous one ends
   // is pushed down. Free-time gaps are left untouched. When a pushed block is a task that
   // follows another task, a break is inserted between them — short, but a long break after
@@ -1542,6 +1656,7 @@ export default function FocusLogApp({ api }: any) {
     let cursor = -Infinity, prevTask = false;
     return blocks.slice().sort((a: any, c: any) => a.start - c.start).map((b: any) => {
       const isTask = b.kind === "task";
+      if (b.kind === "meeting") { cursor = Math.max(cursor, b.start + b.dur); prevTask = false; return b; }   // fixed: never moved; tasks flow around it
       let start = b.start;
       if (start < cursor) {
         const gap = isTask && prevTask ? shortB : 0;
@@ -1555,45 +1670,42 @@ export default function FocusLogApp({ api }: any) {
   // One task block per Work+Personal task from the day start, with short breaks between
   // and a long break every N pomodoros (and once across noon). Saved as the day's plan.
   const ROUTINE_MIN = 15;
+  // Smart rule: a plan never ends on a break — drop any break/long-break left at the tail.
+  const dropTrailingBreaks = (bl: any[]) => { const s = bl.slice().sort((a: any, c: any) => a.start - c.start); while (s.length && (s[s.length - 1].kind === "break" || s[s.length - 1].kind === "longbreak")) s.pop(); return s; };
+  const mkBreak = (start: number, k: string) => ({ id: (k === "longbreak" ? "lb" : "sb") + Date.now() + "_" + Math.round(start), kind: k, name: k === "longbreak" ? "Long break" : "Break", start, dur: k === "longbreak" ? (settings.longBreakMinutes || 20) : (settings.breakMinutes || 5) });
   const buildInitialPlan = () => {
     const pomo = settings.pomodoroMinutes || 25;
-    const shortB = settings.breakMinutes || 5;
-    const longB = settings.longBreakMinutes || 20;
-    const every = longEvery;
     const blocks: any[] = [];
-    let t = tlStart, count = 0, noon = false, seq = 0;
-    // Morning routine first (back-to-back, no pomodoro breaks), then a short break. Each
-    // item keeps its own length (it.dur) so a rebuild preserves edited routine lengths.
+    let t = tlStart, seq = 0;
+    // Morning routine, then the work + personal pomodoros back-to-back, then the night routine.
+    // Breaks, the long-break rhythm, and the lunch/dinner meals are all added by autoBreaksOf, so
+    // a rebuild and the auto-fix wand produce the same shape.
     if (!settings.skipMorningRoutine) (activeMorning || []).forEach((it: any) => {
       const dur = it.dur || ROUTINE_MIN;
       blocks.push({ id: "r" + Date.now() + "_" + (seq++), kind: "routine", name: it.name, start: t, dur, refId: it.id });
       t += dur;
     });
-    if (blocks.length) t += shortB;
-    // Work + Personal pomodoros with short/long breaks.
-    const pomos = [...workTasks, ...personalTasks];
-    pomos.forEach((task: any, idx: number) => {
+    [...workTasks, ...personalTasks].forEach((task: any) => {
       blocks.push({ id: "b" + Date.now() + "_" + (seq++), kind: "task", name: task.task, start: t, dur: pomo, pageId: task.id || null, category: task.category || null, load: task.load || null, power: task.power || null });
-      t += pomo; count++;
-      if (idx === pomos.length - 1) return;
-      const crossNoon = !noon && t >= 12 * 60;
-      if (count >= every || crossNoon) { blocks.push({ id: "lb" + Date.now() + "_" + (seq++), kind: "longbreak", name: "Long break", start: t, dur: longB }); t += longB; count = 0; if (crossNoon) noon = true; }
-      else t += shortB;
+      t += pomo;
     });
-    // Night routine last.
-    if (!settings.skipNightRoutine && (activeNight || []).length) {
-      if (pomos.length) t += shortB;
-      (activeNight || []).forEach((it: any) => {
-        const dur = it.dur || ROUTINE_MIN;
-        blocks.push({ id: "r" + Date.now() + "_" + (seq++), kind: "routine", name: it.name, start: t, dur, refId: it.id });
-        t += dur;
-      });
-    }
-    return blocks;
+    if (!settings.skipNightRoutine) (activeNight || []).forEach((it: any) => {
+      const dur = it.dur || ROUTINE_MIN;
+      blocks.push({ id: "r" + Date.now() + "_" + (seq++), kind: "routine", name: it.name, start: t, dur, refId: it.id, night: true });
+      t += dur;
+    });
+    return autoBreaksOf(blocks);
   };
   const setTimelineMode = (on: boolean) => {
     const hasInput = [...workTasks, ...personalTasks].length || (!settings.skipMorningRoutine && (activeMorning || []).length) || (!settings.skipNightRoutine && (activeNight || []).length);
     if (on && !plans[todayKey] && hasInput) setTodayBlocks(buildInitialPlan());
+    else if (on && plans[todayKey]) {
+      // A lunch/dinner toggle in settings only takes effect through autoBreaksOf; if the plan's
+      // meals no longer match the settings, re-flow once on open so the change applies.
+      const cur = plans[todayKey];
+      const hasLunch = cur.some((b: any) => b.meal === "lunch"), hasDinner = cur.some((b: any) => b.meal === "dinner");
+      if (!!settings.lunchEnabled !== hasLunch || !!settings.dinnerEnabled !== hasDinner) setTodayBlocks(autoBreaksOf(cur));
+    }
     setTimelineModeState(on);
   };
   const duplicateBlock = (id: string) => {
@@ -1608,32 +1720,84 @@ export default function FocusLogApp({ api }: any) {
     setTodayBlocks(resolveOverlaps([...shifted, { ...b, id: "b" + Date.now(), start: b.start + b.dur + shortB }]));
   };
   const deleteBlock = (id: string) => setTodayBlocks(todayBlocks().filter((b: any) => b.id !== id));
-  const addMeeting = () => {
+  // Add a blank task block at the end and open it for naming. Lock it (the lock icon before its
+  // name) if it's a fixed commitment, then auto-fix won't move it.
+  const addBlock = () => {
+    const pomo = settings.pomodoroMinutes || 25;
     const last = todayBlocks().reduce((m: number, b: any) => Math.max(m, b.start + b.dur), tlStart);
-    setTodayBlocks(resolveOverlaps([...todayBlocks(), { id: "m" + Date.now(), kind: "meeting", name: "Unavailable", start: clampStart(snap5(last + 10), 30), dur: 30 }]));
+    const id = "b" + Date.now();
+    setTodayBlocks([...todayBlocks(), { id, kind: "task", name: "New task", start: clampStart(snap5(last + (settings.breakMinutes || 5)), pomo), dur: pomo, power: "Y", load: "B" }]);
+    setEditBlockId(id); setBlockDraft({ name: "New task", dur: pomo });
   };
-  // Wand: re-flow the plan into a clean break rhythm — a short break (settings.breakMinutes)
-  // between consecutive tasks and a long-break BLOCK (settings.longBreakMinutes) after every
-  // N pomodoros (N = the in-view picker). Routines/unavailable stay back-to-back in order.
-  const autoBreaks = () => {
+  const toggleLock = (id: string) => setTodayBlocks(todayBlocks().map((b: any) => (b.id === id ? { ...b, locked: !b.locked } : b)));
+  // Lunch/dinner blocks from settings: kept if already in the plan (so a dragged meal stays put),
+  // added at the configured time when missing, dropped when their setting is turned off.
+  const ensureMeals = (blocks: any[]) => {
+    const keep = blocks.filter((b: any) => b.kind !== "meal" || (b.meal === "lunch" ? settings.lunchEnabled : b.meal === "dinner" ? settings.dinnerEnabled : false));
+    const have = new Set(keep.filter((b: any) => b.kind === "meal").map((b: any) => b.meal));
+    const add: any[] = [];
+    if (settings.lunchEnabled && !have.has("lunch")) add.push({ id: "ml" + Date.now(), kind: "meal", meal: "lunch", name: "Lunch", start: settings.lunchStart ?? 750, dur: settings.lunchMinutes ?? 45 });
+    if (settings.dinnerEnabled && !have.has("dinner")) add.push({ id: "md" + Date.now(), kind: "meal", meal: "dinner", name: "Dinner", start: settings.dinnerStart ?? 1110, dur: settings.dinnerMinutes ?? 45 });
+    return add.length ? [...keep, ...add] : keep;
+  };
+  // Re-flow into a clean break rhythm, merging gaps. Fixed blocks (meals + LOCKED tasks) stay put
+  // and the flow of unlocked tasks/routines packs AROUND them. A meal is the rest itself (resets the
+  // long-break counter, no break against it); a locked task earns a long break right after it plus a
+  // reset. Otherwise: short break between consecutive tasks, long break every N pomodoros.
+  const autoBreaksOf = (blocksIn: any[]) => {
+    const blocks = ensureMeals(blocksIn);
     const shortB = settings.breakMinutes || 5;
     const longB = settings.longBreakMinutes || 20;
-    const N = Math.max(2, longEvery || 3);
-    const src = todayBlocks().filter((b: any) => b.kind !== "longbreak").slice().sort((a: any, b: any) => a.start - b.start);
-    if (!src.length) return;
-    const out: any[] = [];
-    let t = src[0].start, count = 0;
-    src.forEach((b: any, i: number) => {
+    const N = Math.max(3, longEvery || 3);
+    const fixed = blocks.filter((b: any) => b.kind === "meal" || (b.kind === "task" && b.locked)).slice().sort((a: any, c: any) => a.start - c.start);
+    const flow = blocks.filter((b: any) => (b.kind === "task" && !b.locked) || b.kind === "routine").slice().sort((a: any, c: any) => a.start - c.start);
+    const dinnerBlock = blocks.find((b: any) => b.kind === "meal" && b.meal === "dinner");
+    const nightAnchor = dinnerBlock ? dinnerBlock.start + dinnerBlock.dur + 60 : null;   // night routine defaults to 60 min after dinner
+    if (!flow.length) {
+      // No unlocked work to flow, but locked tasks still earn a long break in any gap after them.
+      const lts = fixed.filter((f: any) => f.kind === "task").slice().sort((a: any, c: any) => a.start - c.start);
+      const extra: any[] = [];
+      for (let i = 0; i < lts.length - 1; i++) { const end = lts[i].start + lts[i].dur; if (lts[i + 1].start - end >= longB) extra.push(mkBreak(end, "longbreak")); }
+      return dropTrailingBreaks([...blocks, ...extra]);
+    }
+    const overlapsFixed = (s: number, dur: number) => fixed.some((f: any) => s < f.start + f.dur && s + dur > f.start);
+    // Advance past fixed blocks. Meals are a rest in themselves; a locked task earns a long break
+    // after it (when there's room), reported in `lb` so the caller drops it in and resets the count.
+    const skipFixed = (s: number, dur: number) => {
+      let moved = true, hitMeal = false; const lb: number[] = [];
+      while (moved) {
+        moved = false;
+        for (const f of fixed) if (s < f.start + f.dur && s + dur > f.start) {
+          const end = f.start + f.dur;
+          if (f.kind === "meal") { s = end; hitMeal = true; }
+          else if (!overlapsFixed(end, longB)) { lb.push(end); s = end + longB; }
+          else s = end;
+          moved = true;
+        }
+      }
+      return { s, hitMeal, lb };
+    };
+    const rest = (r: any) => r.hitMeal || r.lb.length > 0;
+    const out: any[] = [...fixed];
+    let t = flow[0].start, count = 0;
+    flow.forEach((b: any, i: number) => {
+      if (b.night && nightAnchor != null && t < nightAnchor) t = nightAnchor;   // first night-routine step waits until 60 min after dinner
+      const r = skipFixed(t, b.dur);
+      if (r.hitMeal) count = 0;
+      r.lb.forEach((ls: number) => { out.push(mkBreak(ls, "longbreak")); count = 0; });   // long break after a locked task
+      t = r.s;
       out.push({ ...b, start: t });
       t += b.dur;
       if (b.kind === "task") count++;
-      const next = src[i + 1];
-      if (!next) return;
-      if (b.kind === "task" && count >= N) { out.push({ id: "lb" + Date.now() + "_" + i, kind: "longbreak", name: "Long break", start: t, dur: longB }); t += longB; count = 0; }
-      else if (b.kind === "task" && next.kind === "task") t += shortB;
+      const next = flow[i + 1];
+      if (!next || b.kind !== "task") return;
+      if (rest(skipFixed(t, next.dur))) { count = 0; return; }   // a meal/locked task provides the rest before the next task
+      if (count >= N) { const lb = skipFixed(t, longB); if (rest(lb)) { count = 0; return; } out.push(mkBreak(lb.s, "longbreak")); t = lb.s + longB; count = 0; }
+      else if (next.kind === "task") { const sb = skipFixed(t, shortB); if (rest(sb)) { count = 0; return; } out.push(mkBreak(sb.s, "break")); t = sb.s + shortB; }
     });
-    setTodayBlocks(out);
+    return dropTrailingBreaks(out);
   };
+  const autoBreaks = () => { const r = autoBreaksOf(todayBlocks()); setTodayBlocks(r); };
   const saveBlockEdit = () => {
     const blk = todayBlocks().find((b: any) => b.id === editBlockId);
     const name = blockDraft.name.trim() || "Untitled";
@@ -1648,22 +1812,32 @@ export default function FocusLogApp({ api }: any) {
     }
     setEditBlockId(null);
   };
-  const onTimelineDrop = (e: any) => {
-    e.preventDefault();
-    if (!tlDrag || !tlRef.current) { setTlDrag(null); return; }
-    const rect = tlRef.current.getBoundingClientRect();
+  // Drop a dragged block. LEFT-drag (button 0): move just this block, then auto-fix the break
+  // rhythm (saving the prior plan so it's undoable). RIGHT-drag (button 2): cascade — move this
+  // block and everything starting at/after it by the same delta, keeping their spacing, no auto-fix.
+  const onTlDrop = (b: any, clientY: number) => {
+    const d = tlDrag;
     const blocks = todayBlocks();
-    const b = blocks.find((x: any) => x.id === tlDrag.id);
-    if (!b) { setTlDrag(null); return; }
-    const target = snap5(yToMin(tlLayout(blocks).items, e.clientY - rect.top - tlDrag.grab));
-    // With "move the whole day" on, dragging the first task shifts it + everything after.
-    const firstTask = blocks.filter((x: any) => x.kind === "task").sort((a: any, c: any) => a.start - c.start)[0];
-    if (settings.anchorShift && firstTask && b.id === firstTask.id) {
-      const delta = Math.max(tlStart - b.start, target - b.start);
-      setTodayBlocks(blocks.map((x: any) => (x.start >= b.start ? { ...x, start: x.start + delta } : x)));
+    const cur = blocks.find((x: any) => x.id === b.id);
+    if (!d || !cur) { setTlDrag(null); return; }
+    const tlTop = tlRef.current ? tlRef.current.getBoundingClientRect().top : d.tlTop;
+    const target = snap5(yToMin(tlLayout(blocks).items, clientY - tlTop - d.grab));
+    const newStart = clampStart(target, cur.dur);
+    if (d.button === 2) {
+      // cascade: shift this block + everything after it (but NOT fixed meetings) by one bounded
+      // delta, so internal spacing is preserved and the moved group stays inside [tlStart, tlEnd].
+      const moving = blocks.filter((x: any) => x.start >= cur.start && (x.id === cur.id || (x.kind !== "meeting" && x.kind !== "meal" && !(x.kind === "task" && x.locked))));
+      const minStart = Math.min(...moving.map((x: any) => x.start));
+      const maxEnd = Math.max(...moving.map((x: any) => x.start + x.dur));
+      const delta = Math.max(tlStart - minStart, Math.min(newStart - cur.start, tlEnd - maxEnd));
+      const ids = new Set(moving.map((x: any) => x.id));
+      setTodayBlocks(blocks.map((x: any) => (ids.has(x.id) ? { ...x, start: x.start + delta } : x)));
     } else {
-      const moved = blocks.map((x: any) => (x.id === b.id ? { ...x, start: Math.max(tlStart, target) } : x));
-      setTodayBlocks(resolveOverlaps(moved));
+      // move only this block, then auto-fix; keep the pre-move snapshot for undo (set AFTER
+      // setTodayBlocks, which clears any prior undo).
+      const moved = blocks.map((x: any) => (x.id === cur.id ? { ...x, start: newStart } : x));
+      setTodayBlocks(autoBreaksOf(moved));
+      setPlanUndo(blocks);
     }
     setTlDrag(null);
   };
@@ -1679,18 +1853,37 @@ export default function FocusLogApp({ api }: any) {
         </div>
       );
     }
+    const dragging = !!(tlDrag && tlDrag.id === b.id);
+    const blkTop = (dragging && tlDrag) ? Math.max(0, tlDrag.y - tlDrag.grab) : topY;
     return (
-      <div key={b.id} className="fl-act-row" draggable
-        onDragStart={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setTlDrag({ id: b.id, grab: e.clientY - r.top }); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", b.id); }}
-        onDragEnd={() => setTlDrag(null)}
-        style={{ position: "absolute", left: 56, right: 4, top: topY, height: h, boxSizing: "border-box", background: isTask ? "#fff" : (b.kind === "longbreak" ? "#eef2f6" : "#fbf8f1"), border: `1px solid ${C.line}`, borderLeft: `4px solid ${isTask ? (POWER_COLOR[b.power] || POWER_COLOR.Y) : (b.kind === "routine" ? C.better : b.kind === "longbreak" ? C.neutral : C.muted)}`, borderRadius: 6, padding: "2px 8px", cursor: "grab", display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: C.ink, opacity: tlDrag && tlDrag.id === b.id ? 0.4 : 1, overflow: "hidden" }}>
+      <div key={b.id} className="fl-act-row"
+        onPointerDown={(e) => {
+          if (b.kind === "meeting" || b.kind === "break" || b.kind === "longbreak") return;   // auto-fix owns break placement
+          if ((e.target as HTMLElement).closest("button")) return;
+          const el = e.currentTarget as HTMLElement;
+          try { el.setPointerCapture(e.pointerId); } catch (err) { return; }   // no capture → don't start a drag we can't end here
+          e.preventDefault();
+          const tlTop = tlRef.current ? tlRef.current.getBoundingClientRect().top : 0;
+          const r = el.getBoundingClientRect();
+          setTlDrag({ id: b.id, grab: e.clientY - r.top, button: e.button, y: e.clientY - tlTop, tlTop });
+        }}
+        onPointerMove={(e) => { if (!tlDrag || tlDrag.id !== b.id) return; const top = tlRef.current ? tlRef.current.getBoundingClientRect().top : null; const cy = e.clientY; setTlDrag((dd: any) => (dd && dd.id === b.id ? { ...dd, y: cy - (top != null ? top : dd.tlTop) } : dd)); }}
+        onPointerUp={(e) => { if (tlDrag && tlDrag.id === b.id) { try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch (err) {} onTlDrop(b, e.clientY); } }}
+        onPointerCancel={(e) => { try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch (err) {} setTlDrag(null); }}
+        onContextMenu={(e) => e.preventDefault()}
+        style={{ position: "absolute", left: 56, right: 4, top: blkTop, height: h, boxSizing: "border-box", background: isTask ? "#fff" : (b.kind === "break" ? BREAK_BG : b.kind === "longbreak" ? LBREAK_BG : b.kind === "meal" ? MEAL_BG : "#fbf8f1"), border: `1px solid ${C.line}`, borderLeft: `4px solid ${isTask ? (POWER_COLOR[b.power] || POWER_COLOR.Y) : (b.kind === "routine" ? C.better : b.kind === "break" ? BREAK_STRIPE : b.kind === "longbreak" ? LBREAK_STRIPE : b.kind === "meal" ? MEAL_STRIPE : C.muted)}`, borderRadius: 6, padding: "2px 8px", cursor: (b.kind === "meeting" || b.kind === "break" || b.kind === "longbreak") ? "default" : (dragging ? "grabbing" : "grab"), display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: b.kind === "break" ? BREAK_TEXT : b.kind === "longbreak" ? LBREAK_TEXT : b.kind === "meal" ? MEAL_TEXT : C.ink, zIndex: dragging ? 20 : 1, boxShadow: dragging ? "0 4px 14px rgba(0,0,0,0.18)" : "none", touchAction: "none", userSelect: "none", overflow: "hidden" }}>
+        {b.kind === "meeting" && <span style={{ color: C.muted, display: "inline-flex", flexShrink: 0 }}><LockIcon size={12} /></span>}
+        {(b.kind === "break" || b.kind === "longbreak") && <img src={b.kind === "longbreak" ? breakLongIcon : breakShortIcon} alt="" draggable={false} style={{ width: 14, height: 14, flexShrink: 0 }} />}
+        {b.kind === "meal" && <span style={{ color: MEAL_TEXT, display: "inline-flex", flexShrink: 0 }}><UtensilsIcon size={13} /></span>}
         {isTask && <span style={{ color: LOAD_COLOR[b.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, fontSize: 12.5, flexShrink: 0 }} title={LOAD_LABEL[b.load] || LOAD_LABEL.B}>{b.load || "B"}</span>}
+        {isTask && <button onClick={() => toggleLock(b.id)} className={b.locked ? "" : "fl-rowact fl-collapse"} title={b.locked ? "locked to this time, auto-fix won't move it" : "lock to this time"} aria-label={b.locked ? "unlock" : "lock"} style={{ ...ICON_BTN, color: b.locked ? (POWER_COLOR[b.power] || POWER_COLOR.Y) : C.muted }}><LockIcon size={12} open={!b.locked} /></button>}
         <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isTask ? stripLeadingTag(b.name) : b.name}</span>
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 10, color: C.muted, flexShrink: 0 }}>{b.dur}m</span>
         {(isTask || b.kind === "routine") && <button onClick={() => openLog(b.name)} className="fl-rowact" title="run a pomodoro" aria-label="run" style={ICON_BTN}><PlayIcon size={12} /></button>}
+        {isTask && !b.pageId && <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" title="rename" aria-label="rename" style={ICON_BTN}><PencilIcon size={13} /></button>}
         {isTask
           ? <button onClick={() => duplicateBlock(b.id)} className="fl-rowact" title="duplicate (add a pomodoro)" aria-label="duplicate" style={ICON_BTN}><CopyIcon size={13} /></button>
-          : <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={13} /></button>}
+          : b.kind === "routine" ? <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={13} /></button> : null}
         <button onClick={() => deleteBlock(b.id)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={13} /></button>
       </div>
     );
@@ -1700,36 +1893,44 @@ export default function FocusLogApp({ api }: any) {
     const { items, totalH } = tlLayout(blocks);
     const now = new Date();
     const nowClock = now.getHours() * 60 + now.getMinutes();
-    // Before the rollover (early morning) the "now" line lives at the day's tail, below the evening.
-    const nowMin = nowClock < (settings.dayStart ?? 240) ? nowClock + 1440 : nowClock;
-    let nowY = -1;
+    // The plan can run past midnight and the clock can sit on either side of it. Independently of
+    // dayStart/morningBegins, put "now" on whichever copy (today, or +1 day for a genuine
+    // after-midnight tail) lands closer to the visible band — correct for any day-start setting.
+    let nowY = -1, nowMin = nowClock;
     if (items.length) {
+      const mid = (items[0].t0 + items[items.length - 1].t1) / 2;
+      if (Math.abs(nowClock + 1440 - mid) < Math.abs(nowClock - mid)) nowMin = nowClock + 1440;
       if (nowMin <= items[0].t0) nowY = 0;
       else if (nowMin >= items[items.length - 1].t1) nowY = totalH;
       else for (const it of items) if (nowMin >= it.t0 && nowMin <= it.t1) { nowY = it.topY + (it.t1 > it.t0 ? (nowMin - it.t0) / (it.t1 - it.t0) * it.height : 0); break; }
     }
     return (
       <div style={{ marginTop: 4 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <span style={SECTION_HEAD}>{"\u{1F5D3}️"} Timeline</span>
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "8px 12px", marginBottom: 10 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 12, color: C.muted, whiteSpace: "nowrap" }}>Long break every</span>
+            <div style={{ display: "inline-flex", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 9, padding: 3, gap: 2 }}>
+              {[3, 4, 5].map((n) => {
+                const on = (longEvery >= 3 ? longEvery : 3) === n;
+                return (
+                  <button key={n} onClick={() => { setLongEveryState(n); api.patchSettings && api.patchSettings({ longBreakEvery: n }); }} aria-pressed={on} title={`a long break every ${n} pomodoros`}
+                    style={{ border: "none", boxShadow: "none", background: on ? C.ink : "transparent", color: on ? "#fff" : C.muted, fontFamily: "var(--fl-mono)", fontSize: 12.5, fontWeight: on ? 600 : 400, padding: "3px 11px", borderRadius: 6, cursor: "pointer", minWidth: 28 }}>{n}</button>
+                );
+              })}
+            </div>
+          </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <label style={{ fontSize: 11, color: C.muted, display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>long break /
-              <select value={longEvery} onChange={(e) => { const n = parseInt(e.target.value, 10) || 3; setLongEveryState(n); api.patchSettings && api.patchSettings({ longBreakEvery: n }); }} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 6, padding: "2px 4px", fontFamily: "var(--fl-mono)", cursor: "pointer" }}>
-                <option value={2}>2</option><option value={3}>3</option><option value={4}>4</option>
-              </select>
-            </label>
-            <button onClick={autoBreaks} title="auto-fix breaks: a short break between tasks and a long-break block every N pomodoros" aria-label="auto-fix breaks" style={{ ...btn(C.muted, true), padding: "4px 9px", display: "inline-flex", alignItems: "center" }}><WandSparklesIcon size={14} /></button>
-            <button onClick={() => setTodayBlocks(buildInitialPlan())} title="rebuild the plan from your tasks + routines" style={{ ...btn(C.muted, true), padding: "4px 9px", display: "inline-flex", alignItems: "center" }}><RotateCcwIcon size={13} /></button>
-            <button onClick={addMeeting} style={{ ...btn(C.ink, true), padding: "4px 10px", display: "inline-flex", alignItems: "center", gap: 5 }}><ListPlusIcon size={14} /> unavailable</button>
+            <button onClick={autoBreaks} title="auto-fix breaks: a short break between tasks and a long-break block every N pomodoros" style={{ ...btn(C.muted, true), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 }}><WandSparklesIcon size={14} /> auto-fix breaks</button>
+            <button onClick={() => { if (window.confirm("Rebuild the day from your tasks and routines? This replaces your current arrangement.")) setTodayBlocks(buildInitialPlan()); }} title="restart: rebuild the day from your tasks + routines (replaces the current arrangement)" aria-label="restart" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", opacity: 0.7 }}><RotateCcwIcon size={14} /></button>
+            <button onClick={addBlock} title="add a block to the timeline, then lock it (the lock by its name) if it's fixed" style={{ ...btn(C.ink, true), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 }}><ListPlusIcon size={14} /> add block</button>
+            {planUndo && <button onClick={() => { setTodayBlocks(planUndo); setPlanUndo(null); }} title="undo the last auto-fix" style={{ ...btn(C.worse, true), padding: "5px 10px", fontSize: 12 }}>undo</button>}
           </div>
         </div>
-        {blocks.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: "0 0 8px" }}>No blocks yet — sync some tasks and re-open the timeline, or add a meeting.</p>}
+        {blocks.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: "0 0 8px" }}>No blocks yet — sync some tasks and re-open the timeline, or add a block.</p>}
         <div ref={tlScrollRef} style={{ maxHeight: "62vh", overflowY: "auto", overflowX: "hidden" }}>
-        <div ref={tlRef} onDragOver={(e) => e.preventDefault()} onDrop={onTimelineDrop} style={{ position: "relative", height: totalH }}>
+        <div ref={tlRef} onContextMenu={(e) => e.preventDefault()} style={{ position: "relative", height: totalH }}>
           <div style={{ position: "absolute", left: 48, top: 0, bottom: 0, width: 2, background: C.line }} />
-          {items.map((it: any, i: number) => it.type === "gap" ? (
-            <span key={"g" + i} style={{ position: "absolute", left: 56, top: it.topY + Math.max(0, (it.height - 11) / 2), fontSize: 9, color: C.faint, fontFamily: "var(--fl-mono)" }}>{it.minutes}m {it.minutes >= (settings.longBreakMinutes || 20) - 1 ? "long break" : it.minutes <= (settings.breakMinutes || 5) + 1 ? "break" : "free"}</span>
-          ) : (
+          {items.map((it: any, i: number) => it.type === "gap" ? null : (
             <React.Fragment key={it.b.id}>
               <span style={{ position: "absolute", left: 0, top: it.topY + 3, width: 44, textAlign: "right", fontSize: 10, color: C.muted, fontFamily: "var(--fl-mono)" }}>{fmtClock(it.b.start)}</span>
               {renderBlock(it.b, it.topY, it.height)}
@@ -1769,18 +1970,19 @@ export default function FocusLogApp({ api }: any) {
     }
     return nowM < morningEnd ? 0 : nowM < workEnd ? 1 : 2;
   })();
-  const renderFullSection = (key: string) => {
-    if (key === "morning") return renderRoutineBlock("morning");
-    if (key === "night") return renderRoutineBlock("night");
+  const renderFullSection = (key: string, hideHeader?: boolean) => {
+    const headColor = dayMode === "relax" ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid;
+    if (key === "morning") return renderRoutineBlock("morning", hideHeader);
+    if (key === "night") return renderRoutineBlock("night", hideHeader);
     if (key === "work") return (
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {workTasks.length > 0 && <div style={SECTION_HEAD}>{"\u{1F31E}"} Work</div>}
+        {workTasks.length > 0 && <div style={{ ...SECTION_HEAD, color: headColor, display: hideHeader ? "none" : undefined }}>{"\u{1F31E}"} Work</div>}
         {workTasks.map((t: any) => renderTaskRow(t))}
       </div>
     );
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <div style={SECTION_HEAD}>{"\u{1F3E1}"} Personal</div>
+        <div style={{ ...SECTION_HEAD, color: headColor, display: hideHeader ? "none" : undefined }}>{"\u{1F3E1}"} Personal</div>
         {personalTasks.map((t: any) => renderTaskRow(t))}
       </div>
     );
@@ -1802,8 +2004,8 @@ export default function FocusLogApp({ api }: any) {
             <div style={{ fontSize: 10, color: C.faint, textTransform: "uppercase", letterSpacing: 0.6 }}>earlier today</div>
             {past.map((s) => (
               <div key={s.key}>
-                <button onClick={() => setExpandedPast((e) => { const n = new Set(e); if (n.has(s.key)) n.delete(s.key); else n.add(s.key); return n; })} style={{ ...SECTION_HEAD, margin: 0, background: "transparent", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 0" }}>{expandedPast.has(s.key) ? "▾" : "▸"} {s.label}</button>
-                {expandedPast.has(s.key) && <div style={{ marginTop: 4 }}>{renderFullSection(s.key)}</div>}
+                <button onClick={() => setExpandedPast((e) => { const n = new Set(e); if (n.has(s.key)) n.delete(s.key); else n.add(s.key); return n; })} style={{ ...SECTION_HEAD, margin: 0, color: dayMode === "relax" ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid, background: "transparent", border: "none", boxShadow: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 0" }}>{expandedPast.has(s.key) ? "▾" : "▸"} {s.label}</button>
+                {expandedPast.has(s.key) && <div style={{ marginTop: 4 }}>{renderFullSection(s.key, true)}</div>}
               </div>
             ))}
           </div>
@@ -1835,7 +2037,7 @@ export default function FocusLogApp({ api }: any) {
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><b style={{ color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" }}>A</b> high</span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><b style={{ color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" }}>B</b> medium</span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><b style={{ color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" }}>C</b> low</span>
-            <span style={{ marginLeft: 4 }}>{"\u{1F451}"} = King {"·"} day starts at {fmtHM(settings.dayStart)}</span>
+            <span style={{ marginLeft: 4 }}><img src={crownImg} alt="King" draggable={false} style={{ width: 15, height: 15, verticalAlign: "-3px" }} /> = King {"·"} day starts at {fmtHM(settings.dayStart)}</span>
           </div>
         </div>
 
@@ -1863,32 +2065,35 @@ export default function FocusLogApp({ api }: any) {
 
         {view === "today" && (
           <div>
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "8px 12px", marginBottom: 12 }}>
-              <span style={{ color: C.ink, fontSize: 16, fontWeight: 700, display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                {tasks.length} tasks {"\u00B7"} {countToday} /
-                {editingGoal ? (
-                  <input
-                    type="text" inputMode="numeric" autoFocus defaultValue={goal}
-                    onBlur={(e) => saveGoal(Number(e.target.value))}
-                    onKeyDown={(e) => { if (e.key === "Enter") saveGoal(Number((e.target as HTMLInputElement).value)); if (e.key === "Escape") setEditingGoal(false); }}
-                    style={{ width: 32, height: 32, fontSize: 16, fontWeight: 700, padding: 0, textAlign: "center", border: `1.5px solid ${C.ink}`, borderRadius: 6, fontFamily: "var(--fl-mono)", boxSizing: "border-box" }}
-                  />
-                ) : (
-                  <button onClick={() => setEditingGoal(true)} title="click to set today's goal" style={{ width: 32, height: 32, border: `1.5px solid ${C.faint}`, background: "transparent", color: C.ink, fontFamily: "var(--fl-mono)", fontSize: 16, fontWeight: 700, cursor: "pointer", borderRadius: 6, padding: 0, boxSizing: "border-box" }}>{goal}</button>
-                )}
-                {"\u{1F345}"} today
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
+              <span style={{ color: C.ink, fontSize: 16, fontWeight: 700, display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+                {tasks.length} tasks {"\u00B7"} {countToday} / {plannedPomos} {"\u{1F345}"}
+                {timelineMode && planEndMin > 0 &&
+                  <span style={{ fontWeight: 600 }}>{" \u00B7 ends " + fmtClock(planEndMin)}{planOverflow > 0 && <span style={{ color: C.worse }}>{" (overflows by " + planOverflow + "m)"}</span>}</span>}
               </span>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }} title={dayMode === "work" ? "Work mode — tap to switch to Relax" : "Relax mode — tap to switch to Work"}>
-                  {!narrowPanel && <span style={{ fontSize: 11.5, fontWeight: 600, color: dayMode === "work" ? MODE_COLORS.work.solid : MODE_COLORS.relax.solid }}>{dayMode === "work" ? "Work" : "Relax"}</span>}
-                  <button onClick={toggleDayMode} aria-label="toggle work or relax mode" style={{ position: "relative", width: 46, height: 26, borderRadius: 13, border: "none", background: dayMode === "work" ? MODE_COLORS.work.solid : MODE_COLORS.relax.solid, cursor: "pointer", padding: 0, flexShrink: 0, transition: "background .15s" }}>
-                    <span style={{ position: "absolute", top: 3, left: dayMode === "work" ? 23 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .15s", boxShadow: "0 1px 3px rgba(0,0,0,.35)" }} />
-                  </button>
-                </span>
-                <button onClick={() => setTimelineMode(!timelineMode)} title={timelineMode ? "back to the list" : "plan on a timeline"} aria-label={timelineMode ? "list view" : "timeline view"} style={{ ...btn(C.ink, !timelineMode), padding: "6px 12px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{timelineMode ? <Rows4Icon size={15} /> : <TimelineIcon size={15} />}</button>
-                <button onClick={doSync} disabled={sync === "loading"} style={{ ...btn(C.ink, true), display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
+                <div style={{ justifySelf: "start", display: "inline-flex", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 999, padding: 4 }}>
+                  {["work", "relax"].map((m) => {
+                    const on = dayMode === m;
+                    const col = m === "work" ? MODE_COLORS.work.solid : MODE_COLORS.relax.solid;
+                    return (
+                      <button key={m} onClick={() => { if (dayMode !== m) toggleDayMode(); }} aria-pressed={on} title={`${m === "work" ? "Work" : "Relax"} mode`}
+                        style={{ border: "none", boxShadow: "none", background: on ? col : "transparent", color: on ? "#fff" : C.muted, borderRadius: 999, padding: "5px 13px", fontSize: 12, fontWeight: 600, cursor: "pointer", lineHeight: 1.2, display: "inline-flex", alignItems: "center", gap: 5 }}>{m === "work" ? <BriefcaseBusinessIcon size={13} /> : <LeafIcon size={13} />} {m === "work" ? "Work" : "Relax"}</button>
+                    );
+                  })}
+                </div>
+                <div style={{ justifySelf: "center", display: "inline-flex", gap: 2, background: C.line, borderRadius: 10, padding: 3 }}>
+                  {[{ k: false, label: "Tasks", icon: <ListTodoIcon size={15} /> }, { k: true, label: "Timeline", icon: <ClockIcon size={15} /> }].map((v: any) => {
+                    const on = timelineMode === v.k;
+                    return (
+                      <button key={v.label} onClick={() => setTimelineMode(v.k)} aria-pressed={on}
+                        style={{ border: "none", boxShadow: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, borderRadius: 8, padding: "5px 13px", fontSize: 12.5, fontWeight: on ? 600 : 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, lineHeight: 1.2, fontFamily: "var(--fl-display)" }}>{v.icon} {v.label}</button>
+                    );
+                  })}
+                </div>
+                <button onClick={doSync} disabled={sync === "loading"} title="sync from Notion" aria-label="sync from Notion" style={{ ...btn(C.ink, true), justifySelf: "end", display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px" }}>
                   <RefreshCwIcon size={14} spin={sync === "loading"} />
-                  {sync === "loading" ? "syncing\u2026" : <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>Sync from <img src={NOTION_LOGO} alt="Notion" style={{ width: 15, height: 15 }} />{!narrowPanel && "Notion"}</span>}
+                  {sync === "loading" ? "\u2026" : <img src={NOTION_LOGO} alt="Notion" style={{ width: 16, height: 16 }} />}
                 </button>
               </div>
             </div>
@@ -1899,7 +2104,7 @@ export default function FocusLogApp({ api }: any) {
               </div>
             )}
             {tasks.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No tasks yet. Set your Notion token in settings, then press sync.</p>}
-            {!timelineMode && tasks.length > 1 && <p style={{ color: C.muted, fontSize: 11, margin: "0 0 8px" }}>Pinned tasks stay on top, then {"\u{1F451}"} King. New tasks arrive ranked Must {"→"} Aim {"→"} Bonus; drag the grip to reorder freely. Hover a row to pin it or move it between Work and Personal.</p>}
+            {!timelineMode && tasks.length > 1 && <p style={{ color: C.muted, fontSize: 11, margin: "0 0 8px" }}>Pinned tasks stay on top, then <img src={crownImg} alt="King" draggable={false} style={{ width: 12, height: 12, verticalAlign: "-2px" }} /> King. New tasks arrive ranked Must {"→"} Aim {"→"} Bonus; drag the grip to reorder freely. Hover a row to pin it or move it between Work and Personal.</p>}
             {timelineMode ? renderTimeline() : renderTodaySections()}
           </div>
         )}
@@ -1917,8 +2122,8 @@ export default function FocusLogApp({ api }: any) {
             {weekAreas.length === 0 ? <p style={{ color: C.muted, textAlign: "center", padding: "40px 0" }}>{weekSessions.length ? "No pomodoros with an Area this week." : "No pomodoros this week."}</p> :
               weekAreas.map((a) => (<GroupChart key={a} group={a} sessions={weekSessions.filter((x) => x.category === a)} settings={settings} />))}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted }}>
-              <span><span style={{ color: settings.beginColor }}>{"\u25CF"}</span> expected</span>
-              <span><span style={{ color: settings.endColor }}>{"\u25CF"}</span> actual</span>
+              <span><span style={{ color: C.ink }}>{"\u25CB"}</span> expected</span>
+              <span><span style={{ color: C.ink }}>{"\u25CF"}</span> actual</span>
               <span><span style={{ color: C.better }}>{"\u2014"}</span> better than expected</span>
               <span><span style={{ color: C.worse }}>{"\u2014"}</span> worse than expected</span>
             </div>
@@ -1932,7 +2137,7 @@ export default function FocusLogApp({ api }: any) {
               <span style={{ fontFamily: "var(--fl-mono)", fontSize: 13 }}>{monthRef.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</span>
               <button onClick={() => setMonthOff((m) => Math.min(0, m + 1))} style={btn(C.muted, true)}>{"\u2192"}</button>
             </div>
-            <Heatmap sessions={sessions} monthRef={monthRef} settings={settings} />
+            <Heatmap sessions={sessions} monthRef={monthRef} settings={settings} onOpenDay={(date: Date) => api.openDailyNote && api.openDailyNote(+date)} />
           </div>
         )}
 
@@ -1978,7 +2183,7 @@ export default function FocusLogApp({ api }: any) {
                           <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
                             <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.better, minWidth: 28 }}>+{s.actual - s.expected}</span>
                             <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{s.task}</span>
-                            <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" }}><span style={{ color: settings.beginColor }}>{s.expected}</span><span style={{ color: C.muted }}>{" → "}</span><span style={{ color: settings.endColor }}>{s.actual}</span></span>
+                            <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" }}><span style={{ color: C.ink }}>{s.expected}</span><span style={{ color: C.muted }}>{" → "}</span><span style={{ color: C.ink }}>{s.actual}</span></span>
                             <span style={{ color: C.muted, fontSize: 11, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap" }}>{fmtDate(s.ts)}</span>
                           </div>
                         ))}
@@ -2049,7 +2254,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={orderedTasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} finished={finished} onSetExpected={setExpectedRating} autoLogDefault={settings.autoLogOnRate !== false} onAutoLogChange={(v: boolean) => api.patchSettings && api.patchSettings({ autoLogOnRate: v })} />}
+        {view === "log" && <LogForm tasks={orderedTasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPickTask={(v: string) => { setPreset(v); api.timer && api.timer.setTask(v); }} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} finished={finished} expected={timer.expected} onSetExpected={setExpectedRating} autoLogDefault={settings.autoLogOnRate !== false} onAutoLogChange={(v: boolean) => api.patchSettings && api.patchSettings({ autoLogOnRate: v })} />}
 
         {view === "break" && (
           <div>
@@ -2080,7 +2285,7 @@ export default function FocusLogApp({ api }: any) {
                     activities.map((a, i) => renderActRow(a, i))}
                 </div>
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
-                  <Scale label="how do you feel now? (1 worse than no rest … 5 a lot better)" value={brk.feeling} onChange={(v: number) => api.timer.setBreakFeeling(v)} color={settings.endColor} />
+                  <Scale label="how do you feel now? (1 worse than no rest … 5 a lot better)" value={brk.feeling} onChange={(v: number) => api.timer.setBreakFeeling(v)} />
                 </div>
               </div>
             )}
@@ -2170,7 +2375,7 @@ export default function FocusLogApp({ api }: any) {
                         <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>start<input type="datetime-local" value={breakDraft.start} onChange={(e) => setBreakDraft({ ...breakDraft, start: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
                         <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>end<input type="datetime-local" value={breakDraft.end} onChange={(e) => setBreakDraft({ ...breakDraft, end: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
                         <div style={{ flexBasis: "100%", display: "flex", alignItems: "flex-end", gap: 8 }}>
-                          <Scale label="feeling" value={breakDraft.feeling} onChange={(v: number) => setBreakDraft({ ...breakDraft, feeling: v })} color={settings.endColor} />
+                          <Scale label="feeling" value={breakDraft.feeling} onChange={(v: number) => setBreakDraft({ ...breakDraft, feeling: v })} />
                           <button onClick={() => setBreakDraft({ ...breakDraft, feeling: null })} style={{ ...btn(C.muted, true), padding: "2px 8px", fontSize: 11, marginBottom: 12 }}>clear</button>
                         </div>
                         <button onClick={saveEditBreak} title="save" aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
@@ -2181,7 +2386,7 @@ export default function FocusLogApp({ api }: any) {
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(b.start)} {fmtTime(b.start)}{"–"}{fmtTime(b.end)}</span>
                         <span style={{ flex: 1, minWidth: 120, overflowWrap: "anywhere" }}>{(b.activities && b.activities.length) ? b.activities.join(", ") : "—"}</span>
                         <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>{(b.areas && b.areas.length) ? b.areas.join(" · ") : ""}</span>
-                        {b.feeling != null && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: settings.endColor, whiteSpace: "nowrap" }}>{b.feeling}/5</span>}
+                        {b.feeling != null && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.ink, whiteSpace: "nowrap" }}>{b.feeling}/5</span>}
                         <button onClick={() => startEditBreak(b)} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
                         <button onClick={() => deleteBreak(b.id)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
                       </div>

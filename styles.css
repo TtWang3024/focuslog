@@ -58,6 +58,9 @@
 }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-act-row:hover .fl-rowact { opacity: 0.65; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-rowact:hover { opacity: 1; }
+/* The per-task lock toggle collapses its space (not just its icon) until the row is hovered. */
+.workspace-leaf-content[data-type="focuslog-view"] .fl-collapse { display: none !important; }
+.workspace-leaf-content[data-type="focuslog-view"] .fl-act-row:hover .fl-collapse { display: inline-flex !important; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-rowdel:hover { color: #C06A57 !important; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-thought:hover .fl-rowact,
 .workspace-leaf-content[data-type="focuslog-view"] .fl-btag:hover .fl-rowact { opacity: 0.65; }
@@ -253,6 +256,24 @@ body.focuslog-float-window .notice { display: none !important; }
 }
 .focuslog-float .flt-rbtn:hover { background: #5b8c5a; border-color: #5b8c5a; color: #fff; }
 .focuslog-float .flt-rbtn.is-on { background: #5b8c5a; border-color: #5b8c5a; color: #fff; font-weight: 700; }
+/* Enjoyment rating (before + after) — 1-4 weather image buttons, matching the React panel.
+   The per-button background colour is set inline (so it wins over the numeric .flt-rbtn rules);
+   here we just size the button, show the image, and emphasise hover / selected via the border. */
+.focuslog-float .flt-rbtn.flt-rbtn-weather {
+  width: 40px; height: 40px; min-width: 0; padding: 4px;
+  border: 1.5px solid rgba(0,0,0,0.14); border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: border-color 0.12s ease, transform 0.08s ease;
+}
+.focuslog-float .flt-rbtn.flt-rbtn-weather img { width: 28px; height: 28px; display: block; pointer-events: none; }
+.focuslog-float .flt-rbtn.flt-rbtn-weather:hover { border-color: #2b2723; color: inherit; transform: translateY(-1px); }
+.focuslog-float .flt-rbtn.flt-rbtn-weather.is-on { border-color: #2b2723; border-width: 2.5px; font-weight: inherit; }
+
+/* Status month calendar — each day cell opens that day's daily note. Hover affordance uses an
+   inset ring + slight lift (box-shadow/transform are not set inline, so they win cleanly). */
+.fl-calday { transition: box-shadow 0.12s ease, transform 0.08s ease; }
+.fl-calday:hover { box-shadow: 0 0 0 2px rgba(0,0,0,0.16) inset; transform: translateY(-1px); }
+.fl-calday:active { transform: translateY(0); }
 
 /* Floating window — break screen (rest timer + activities + feeling) */
 .focuslog-float .flt-break {
@@ -378,7 +399,18 @@ body.focuslog-float-window .notice { display: none !important; }
 .fl-bface-chip.on { background: #e97ba6 !important; border-color: #e97ba6; color: #fff; }
 .fl-bface-chip[data-part="head area"] { background: #2b2723 !important; color: #fff; border-color: rgba(255,255,255,0.25); }   /* a general body part, dark */
 .fl-bface-chip[data-part="head area"].on { background: #ff9b6b !important; border-color: #ff9b6b; color: #fff; }
+/* Touch (no hover): show every point as a bare tappable glow (no labels = no clutter). The touched
+   point's label + the face cluster reveal on tap and hold, because onLeave is a no-op on touch. */
+.fl-bdots.touch { opacity: 1; }
+.fl-bdots.touch .fl-bdot::before { opacity: 0.85; }
+.fl-bface.touch .fl-bface-anchor { opacity: 1; }
 .fl-btag { background: #fdf5ea; border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 6px; }
 .fl-btag-head { display: flex; align-items: center; gap: 6px; }
 .fl-btag-name { font-weight: 600; font-size: 13px; flex: 1; color: #2b2723; }
 .fl-btag input { width: 100%; box-sizing: border-box; font-family: var(--fl-display); font-size: 12.5px; padding: 6px 10px; border-radius: 7px; border: 1px solid #e8dfcf; background: #fff; color: #2b2723; }
+
+/* Settings rows whose textarea (template editors) should sit full-width on its own line below the label. */
+.fl-fullrow { display: block; }
+.fl-fullrow .setting-item-info { margin-bottom: 8px; }
+.fl-fullrow .setting-item-control { width: 100%; padding-right: 0; justify-content: flex-start; }
+.fl-fullrow .setting-item-control textarea { width: 100%; }

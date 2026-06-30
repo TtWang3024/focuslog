@@ -25,6 +25,9 @@ const FACE_CLUSTER = { x: 0.667, y: 0.143, members: ["head area", "see", "smell"
 const SENSE_PARTS = ["see", "smell", "taste", "head area", "listen", "touch"];
 // The five senses (not "head area") get a pink-tinted saved row, to read as senses.
 const PINK_SENSES = ["see", "smell", "taste", "listen", "touch"];
+// Touch devices can't hover, so reveal every point + the face cluster at once (CSS .touch) and let
+// the user tap directly, instead of the hover-to-reveal that flickers and clears on a phone.
+const IS_TOUCH = typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
 
 // Where in the body do you feel it: hover the rabbit, tap a glowing point (up to 3), jot a word.
 // Controlled — `value` is [{ part, note }], reported up via onChange.
@@ -64,7 +67,7 @@ export function BodyMap({ value, onChange, C }: { value: any[]; onChange: (t: an
     setFaceOpen(open);
     setNear(!open && best && bestD < nearR ? best.part : null);
   };
-  const onLeave = () => { setActive(false); setNear(null); setFaceOpen(false); };
+  const onLeave = () => { if (IS_TOUCH) return; setActive(false); setNear(null); setFaceOpen(false); };
 
   const faceSelected = FACE_CLUSTER.members.some((m) => has(m));
   const senses = FACE_CLUSTER.members.filter((m) => m !== "head area");
@@ -72,9 +75,9 @@ export function BodyMap({ value, onChange, C }: { value: any[]; onChange: (t: an
   return (
     <div className="fl-bodymap">
       <div className="fl-bodymap-fig" ref={figRef}
-        onPointerEnter={() => setActive(true)} onPointerMove={onMove} onPointerLeave={onLeave}>
+        onPointerEnter={() => setActive(true)} onPointerDown={onMove} onPointerMove={onMove} onPointerLeave={onLeave}>
         <img src={bodyImg} alt="" draggable={false} />
-        <div className={"fl-bdots" + (active ? " active" : "")}>
+        <div className={"fl-bdots" + (active ? " active" : "") + (IS_TOUCH ? " touch" : "")}>
           {BODY_POINTS.map((p) => (
             <button key={p.part} type="button"
               className={"fl-bdot" + (SENSE_PARTS.includes(p.part) ? " sense" : "") + (near === p.part ? " near" : "") + (has(p.part) ? " on" : "")}
@@ -83,7 +86,7 @@ export function BodyMap({ value, onChange, C }: { value: any[]; onChange: (t: an
               <span className="fl-bdot-label">{p.part}</span>
             </button>
           ))}
-          <div ref={faceRef} className={"fl-bface" + (faceOpen ? " open" : "")} style={{ left: (FACE_CLUSTER.x * 100) + "%", top: (FACE_CLUSTER.y * 100) + "%" }}>
+          <div ref={faceRef} className={"fl-bface" + (faceOpen ? " open" : "") + (IS_TOUCH ? " touch" : "")} style={{ left: (FACE_CLUSTER.x * 100) + "%", top: (FACE_CLUSTER.y * 100) + "%" }}>
             <span className={"fl-bface-anchor" + (faceSelected ? " on" : "")} />
             <div className="fl-bface-pop fl-bface-pop-right">
               {senses.map((m) => (
