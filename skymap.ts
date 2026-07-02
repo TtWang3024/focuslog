@@ -8,6 +8,34 @@
 // Data shapes: stars [hip,ra,dec,mag,bv] · lines [polyline...] · labels [name,ra,dec,rank]
 // · starNames {hip:name} · mw [{l,p:[ring...]}].
 
+import skyStarsData from "./sky-data/sky-stars.json";
+import skyStarNamesData from "./sky-data/sky-starnames.json";
+
+// The proper name of the star a newly-logged pomodoro lights up, for the "you lit up X" notification.
+// Mirrors placeReflections + brightestStarOrder below: the Sky window spans all entries, so the k
+// pomodoros map oldest -> newest onto the k brightest, min-separated stars, and the newest lights the
+// k-th. A standalone copy so createSkyMap stays untouched; keep it in sync with brightestStarOrder.
+export function newestStarName(count: number): string | null {
+  const stars: any[] = skyStarsData as any;
+  if (!count || !stars.length) return null;
+  const D2R = Math.PI / 180, MIN_SEP = 1.5;
+  const cand = stars.map((s: any, i: number) => ({ i, mag: s[3] == null ? 6 : s[3] })).sort((a: any, b: any) => a.mag - b.mag);
+  const minCos = Math.cos(MIN_SEP * D2R);
+  const chosen: number[] = [];
+  for (const c of cand) {
+    if (chosen.length >= count) break;
+    const st = stars[c.i], p = st[2] * D2R, l = st[1] * D2R, sp = Math.sin(p), cp = Math.cos(p);
+    let ok = true;
+    for (const j of chosen) { const sj = stars[j], pj = sj[2] * D2R, lj = sj[1] * D2R; if (sp * Math.sin(pj) + cp * Math.cos(pj) * Math.cos(l - lj) > minCos) { ok = false; break; } }
+    if (ok) chosen.push(c.i);
+  }
+  if (chosen.length < count) { const seen = new Set(chosen); for (const c of cand) { if (chosen.length >= count) break; if (!seen.has(c.i)) { chosen.push(c.i); seen.add(c.i); } } }
+  const idx = chosen[count - 1];
+  if (idx == null) return null;
+  const st = stars[idx];
+  return (skyStarNamesData as any)[String(st[0])] || ("HIP " + st[0]);
+}
+
 export function createSkyMap(canvas: HTMLCanvasElement, opts?: any) {
   opts = opts || {};
   const D2R = Math.PI / 180;

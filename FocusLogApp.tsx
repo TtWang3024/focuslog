@@ -1,6 +1,7 @@
 import * as React from "react";
 import { NOTION_LOGO } from "./notionLogo";
 import { SkyView } from "./SkyView";
+import { newestStarName } from "./skymap";
 import { ReflectPanel } from "./ReflectPanel";
 import breakShortIcon from "./assets/break-short.png";
 import breakLongIcon from "./assets/break-long.png";
@@ -9,6 +10,7 @@ import rateClouds from "./assets/rate-clouds.png";
 import ratePartly from "./assets/rate-partly-sunny.png";
 import rateSun from "./assets/rate-sun.png";
 import crownImg from "./assets/crown.png";
+import starImg from "./assets/star.png";
 const { useState, useEffect, useRef, useCallback } = React;
 // Break-block palette: short break = blue, long break = teal (the note icons match the text colour).
 const BREAK_BG = "#edf3f8", BREAK_STRIPE = "#9bb4c8", BREAK_TEXT = "#5e7d96";
@@ -766,8 +768,9 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   // The "before" rating lives on the timer engine (single source of truth), so the panel, the
   // float, and a quick-log all agree — and resetting the timer clears it for the next pomodoro.
   const setExpected = (v: number) => { onSetExpected && onSetExpected(v); };
-  // The "after" rating: with auto-log on, picking a number logs immediately — no button press.
-  const rateActual = (v: number) => { setAct(v); if (autoLog) buildAndAdd(v, expected); };
+  // The "after" rating just records the score; committing is the deliberate "Light up a star" tap
+  // below (which needs a rating first), so finishing a pomodoro never auto-logs or jumps to a break.
+  const rateActual = (v: number) => setAct(v);
   const toggleAuto = (v: boolean) => { setAutoLog(v); onAutoLogChange && onAutoLogChange(v); };
   const inputStyle: any = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
   const rated = expected >= 1 && expected <= 5;
@@ -840,13 +843,11 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
           {chooseNextControls}
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
           <Scale label="after: how enjoyable was it actually?" value={act} onChange={rateActual} weather />
-          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12.5, color: C.ink, cursor: "pointer" }}>
-            <input type="checkbox" checked={autoLog} onChange={(e) => toggleAuto(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.better, cursor: "pointer" }} />
-            log to Obsidian automatically when I pick a rating
-          </label>
-          {autoLog
-            ? <p style={{ fontSize: 12, color: C.muted, margin: "4px 0 0" }}>Set the options above first — picking a rating logs straight to Obsidian, no button needed.</p>
-            : logBtn}
+          <button onClick={submit} disabled={!act || !canLog}
+            title={!act ? "pick a rating first" : (canLog ? "" : "pick a task first")}
+            style={{ ...btn(C.ink), width: "100%", padding: "10px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (act && canLog) ? 1 : 0.5, cursor: (act && canLog) ? "pointer" : "not-allowed" }}>
+            <img src={starImg} alt="" draggable={false} style={{ width: 16, height: 16 }} /> Light up a star in my Sky
+          </button>
         </div>
       ) : (
         /* ---------- BEFORE the pomodoro: set the expectation, then start the timer ---------- */
@@ -1336,7 +1337,16 @@ export default function FocusLogApp({ api }: any) {
     resetTimer();
     const key = s.pageId || s.task;
     setDoneSess((m: any) => ({ ...m, [key]: (m[key] || 0) + 1 }));
+    // Clicking "Light up a star" logs the pomodoro, then jumps to the break as before. A notice (which
+    // stays up in the break view) names the exact star this pomodoro lit; a left-click on it jumps to
+    // the Sky (Pomodoros) to see the star.
+    const starName = newestStarName(sessions.length + 1);
     if (settings.breakEnabled) { startBreak(); setView("break"); } else { setView("today"); }
+    if (starName) {
+      const msg = "You lit up " + starName + " ✨  Click to see it in your Sky.";
+      if (api.notifyClickable) api.notifyClickable(msg, () => setView("sky"));
+      else if (api.notify) api.notify(msg, 9000);
+    }
     let msg = "Logged.";
     if (s.pageId) {
       try { const act = await api.writeAct(s.pageId); msg += " Act" + (act != null ? " = " + act : " +1") + " written."; }

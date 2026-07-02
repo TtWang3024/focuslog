@@ -1291,8 +1291,13 @@ export default class FocusLogPlugin extends Plugin {
       if (folder && !this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder).catch(() => {});
       file = await this.app.vault.create(path, await this.buildDailyNoteContent(m, format, opts.template));
     }
-    const leaf = this.app.workspace.getMostRecentLeaf() || this.app.workspace.getLeaf("tab");
-    await leaf.openFile(file);
+    // Same pattern as the community Calendar plugin: getUnpinnedLeaf() always resolves to a usable
+    // leaf in the MAIN area — the open note if there is one (jump), else the empty "New tab" leaf,
+    // creating one when the window is empty — and never targets the sidebar tab group the click came
+    // from (getLeaf("tab") did, which is why an empty window needed several clicks).
+    const ws: any = this.app.workspace;
+    const leaf = ws.getUnpinnedLeaf ? ws.getUnpinnedLeaf() : ws.getLeaf(false);
+    await leaf.openFile(file, { active: true });
   }
 
   // Append a pause entry under the daily heading, using the pause template and its placeholders.
@@ -1373,6 +1378,14 @@ export default class FocusLogPlugin extends Plugin {
       appendDaily: (p: any) => self.appendToDailyNote(p),
       openDailyNote: (ts: number) => self.openDailyNoteForDate(ts),
       notify: (msg: string, duration?: number) => new Notice(msg, duration),
+      // A notice you can left-click to run an action (e.g. jump to the Sky). Stays up ~9s.
+      notifyClickable: (msg: string, onClick: () => void) => {
+        const n = new Notice(msg, 9000);
+        try {
+          n.noticeEl.style.cursor = "pointer";
+          n.noticeEl.addEventListener("click", () => { try { onClick(); } catch (e) {} n.hide(); });
+        } catch (e) {}
+      },
       celebrate: () => new CelebrateModal(self.app).open(),
       timer: {
         getState: () => self.timer.getState(),
