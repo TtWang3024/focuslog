@@ -72,6 +72,7 @@ export interface FocusLogSettings {
   dinnerEnabled: boolean;
   dinnerStart: number;
   dinnerMinutes: number;
+  nightRoutineGap: number;
   heatThresholds: string;
   dailyNoteWrite: boolean;
   dailyNoteTrueDate: boolean;
@@ -127,6 +128,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   dinnerEnabled: false,
   dinnerStart: 1110,
   dinnerMinutes: 45,
+  nightRoutineGap: 60,
   heatThresholds: "1,2,4,6,8,10",
   dailyNoteWrite: true,
   dailyNoteTrueDate: true,
@@ -2067,6 +2069,12 @@ class FocusLogSettingTab extends PluginSettingTab {
             await this.plugin.persist();
           })
       );
+
+    const nightGapSet = new Setting(containerEl)
+      .setName("Night routine starts after dinner")
+      .setDesc("On the Timeline, the night routine begins this many minutes after dinner ends. Default 60.");
+    nightGapSet.addText((t) => { t.setPlaceholder("60").setValue(String(this.plugin.data.settings.nightRoutineGap ?? 60)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 0) return; this.plugin.data.settings.nightRoutineGap = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
+    nightGapSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
 
 
     containerEl.createEl("h3", { text: "Daily note" });

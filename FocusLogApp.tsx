@@ -83,10 +83,27 @@ function bandOf(ts: any, s: any) {
   if (m < s.afternoonEnd) return 1;
   return 2;
 }
+const OVERNIGHT_COLOR = "#FFD400"; // bright yellow: a pomodoro after the day-start but before "morning begins"
+const ACCENT = "#6b4423"; // warm chocolate-brown accent: the year in the month header + today's outlined cell
+const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; // fixed 3-letter month labels ("Sep", not the locale's "Sept"), uniform width
+// True for a pomodoro done in the pre-morning stretch [dayStart, morningBegins) — the overnight grind
+// before the active day starts. The window wraps past midnight when the day-start is in the evening
+// (e.g. dayStart 20:00, morningBegins 06:00 → 20:00 through 06:00); no wrap when both are in the
+// morning (e.g. dayStart 04:00, morningBegins 09:00 → 04:00 through 09:00).
+function isOvernight(ts: any, s: any) {
+  const d = new Date(ts);
+  const m = d.getHours() * 60 + d.getMinutes();
+  const a = s.dayStart || 0, b = s.morningBegins ?? 480;
+  if (a === b) return false;
+  return a < b ? (m >= a && m < b) : (m >= a || m < b);
+}
 function timeColor(ts: any, s: any) {
+  if (isOvernight(ts, s)) return OVERNIGHT_COLOR;
   const w = WEEKDAY[logicalDay(ts, s).getDay()];
   return `hsl(${w.h} ${w.s}% ${BAND_L[bandOf(ts, s)]}%)`;
 }
+// Time-of-day label for tooltips: the overnight stretch reads "night", else the morning/afternoon/evening band.
+const bandLabel = (ts: any, s: any) => (isOvernight(ts, s) ? "night" : BAND_NAME[bandOf(ts, s)]);
 const weekdayInk = (wd: number) => { const w = WEEKDAY[wd]; return `hsl(${w.h} ${Math.max(w.s, 4)}% 40%)`; };
 const sameLogicalDay = (a: any, b: any, s: any) => logicalDay(a, s).getTime() === logicalDay(b, s).getTime();
 // Day/time settings are stored as minutes-from-midnight; show/edit them as HH:MM.
@@ -235,34 +252,39 @@ function GroupChart({ group, sessions, settings }: any) {
 
 function Heatmap({ sessions, monthRef, settings, onOpenDay }: any) {
   const year = monthRef.getFullYear(), month = monthRef.getMonth();
-  const byDay: any = {};
-  sessions.forEach((x: any) => {
-    const d = logicalDay(x.ts, settings);
-    if (d.getFullYear() === year && d.getMonth() === month) (byDay[d.getDate()] = byDay[d.getDate()] || []).push(x);
-  });
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const todayK = keyOf(startOfDay(new Date()));   // the real calendar today, outlined in the grid
+  // Group every session by its logical day, keyed by full date, so any cell can be filled, including
+  // the previous/next-month "spillover" days that pad the first and last weeks of the grid.
+  const byKey: any = {};
+  sessions.forEach((x: any) => { const k = keyOf(logicalDay(x.ts, settings)); (byKey[k] = byKey[k] || []).push(x); });
+  const first = new Date(year, month, 1);
+  const lead = settings.weekStartsSunday ? first.getDay() : (first.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const lead = settings.weekStartsSunday ? new Date(year, month, 1).getDay() : (new Date(year, month, 1).getDay() + 6) % 7;
-  const cells: any[] = [];
-  for (let i = 0; i < lead; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  const trail = (7 - ((lead + daysInMonth) % 7)) % 7; // next-month days that complete the final week
+  // Walk a whole number of weeks: prev-month tail (lead), this month, next-month head (trail). JS
+  // Date normalises the out-of-range day-of-month, so day 0 = last of prev month, etc.
+  const cells: Date[] = [];
+  for (let i = 0; i < lead + daysInMonth + trail; i++) cells.push(new Date(year, month, 1 - lead + i));
   const headers = settings.weekStartsSunday ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   return (
     <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginBottom: 20 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 }}>
-        {headers.map((h) => (<div key={h} style={{ textAlign: "center", fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", paddingBottom: 2 }}>{h}</div>))}
-        {cells.map((d, idx) => {
-          if (d === null) return <div key={"b" + idx} />;
-          const date = new Date(year, month, d);
+        {headers.map((h) => (<div key={h} style={{ textAlign: "left", fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", paddingLeft: 4 }}>{h}</div>))}
+        {cells.map((date, idx) => {
+          const inMonth = date.getMonth() === month && date.getFullYear() === year;
+          const isToday = inMonth && keyOf(date) === todayK;
           const wd = date.getDay();
-          const list = (byDay[d] || []).sort((a: any, b: any) => +new Date(a.ts) - +new Date(b.ts));
+          const list = (byKey[keyOf(date)] || []).sort((a: any, b: any) => +new Date(a.ts) - +new Date(b.ts));
           return (
-            <div key={d} className="fl-calday" onClick={() => onOpenDay && onOpenDay(date)}
+            <div key={idx} className="fl-calday" onClick={() => onOpenDay && onOpenDay(date)}
               title={`Open daily note for ${date.toLocaleDateString()}`}
-              style={{ minHeight: 56, border: `1px solid ${C.line}`, borderRadius: 6, padding: 4, background: C.paper, cursor: "pointer" }}>
-              <div style={{ fontSize: 10.5, fontFamily: "var(--fl-mono)", color: weekdayInk(wd), marginBottom: 3 }}>{d}</div>
+              style={{ minHeight: 56, boxSizing: "border-box", border: isToday ? `2.5px solid ${ACCENT}` : `1px solid ${C.line}`, borderRadius: 6, padding: 4, background: C.paper, cursor: "pointer", opacity: inMonth ? 1 : 0.5 }}>
+              <div style={{ fontSize: 10.5, fontFamily: "var(--fl-mono)", color: inMonth ? weekdayInk(wd) : C.faint, marginBottom: 3 }}>{date.getDate()}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-                {list.map((x: any) => (<span key={x.id} title={`${x.task} \u00B7 ${BAND_NAME[bandOf(x.ts, settings)]}`} style={{ width: 9, height: 9, borderRadius: 2, background: timeColor(x.ts, settings) }} />))}
+                {list.map((x: any) => (<span key={x.id} title={`${x.task} \u00B7 ${bandLabel(x.ts, settings)}`} style={{ width: 9, height: 9, borderRadius: 2, background: timeColor(x.ts, settings) }} />))}
               </div>
             </div>
           );
@@ -271,11 +293,12 @@ function Heatmap({ sessions, monthRef, settings, onOpenDay }: any) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center", marginTop: 12, fontSize: 11, color: C.muted }}>
         {[1, 2, 3, 4, 5, 6, 0].map((wd) => (
           <span key={wd} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: `hsl(${WEEKDAY[wd].h} ${WEEKDAY[wd].s}% 52%)` }} />{WEEKDAY[wd].name}
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: `hsl(${WEEKDAY[wd].h} ${WEEKDAY[wd].s}% 52%)` }} />{WEEKDAY[wd].name}
           </span>
         ))}
-        <span style={{ marginLeft: 8 }}>lightness = time:</span>
-        {BAND_L.map((L, i) => (<span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: `hsl(32 50% ${L}%)` }} />{BAND_NAME[i]}</span>))}
+        <span style={{ marginLeft: 16 }}>lightness = time:</span>
+        {BAND_L.map((L, i) => (<span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: `hsl(32 50% ${L}%)` }} />{BAND_NAME[i]}</span>))}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: OVERNIGHT_COLOR }} />night (before morning begins)</span>
       </div>
     </div>
   );
@@ -457,6 +480,12 @@ const catColor = (cat: any) => PAUSE_CAT[catOf(cat)].fill;
 const catBorder = (cat: any) => PAUSE_CAT[catOf(cat)].border;
 
 // Lucide "rotate-ccw", inline so it renders inside the React panel (used for reset).
+function ChevronLeftIcon({ size = 16 }: any) {
+  return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="m15 18-6-6 6-6" /></svg>);
+}
+function ChevronRightIcon({ size = 16 }: any) {
+  return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="m9 18 6-6-6-6" /></svg>);
+}
 function RotateCcwIcon({ size = 16 }: any) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
@@ -894,7 +923,40 @@ export default function FocusLogApp({ api }: any) {
   const [preset, setPreset] = useState("");
   const [weekOff, setWeekOff] = useState(0);
   const [monthOff, setMonthOff] = useState(0);
+  // Scroll the wheel over the "Mon Year" label to spin through months (down = next, up = previous).
+  // React's onWheel is passive, so a native non-passive listener is needed to preventDefault the page
+  // scroll. A SIGNED, keep-the-remainder distance accumulator drives stepping: one month per ~60px of
+  // scroll, so a small movement moves ~1 month and a big one moves proportionally more. It is never
+  // reset on a direction change (a stray opposite-sign trackpad "bounce" only nudges it, never wipes it,
+  // so it can't stick), and a real idle gap starts a fresh gesture. No per-gesture cap or cooldown, so a
+  // continuous scroll never stalls waiting for a pause.
+  const monthLabelRef = useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    const el = monthLabelRef.current;
+    if (!el) return;
+    let acc = 0, lastT = 0;
+    const STEP = 60;             // accumulated scroll (px) per one-month step
+    const IDLE = 250;            // ms; a pause this long starts a fresh gesture
+    const onWheel = (e: WheelEvent) => {
+      let dy = e.deltaY;
+      if (e.deltaMode === 1) dy *= 16;         // line mode -> approx pixels
+      else if (e.deltaMode === 2) dy *= 400;   // page mode -> one firm push
+      if (!dy) return;
+      e.preventDefault();
+      const now = e.timeStamp;
+      if (now - lastT > IDLE) acc = 0;   // a real pause starts a fresh gesture
+      lastT = now;
+      acc += dy;
+      if (Math.abs(acc) < STEP) return;
+      const dir = acc > 0 ? 1 : -1;
+      setMonthOff((m: number) => m + dir);
+      acc -= dir * STEP;                 // keep the remainder: reversible, no cap -> never stalls mid-scroll
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [view, statusSub]);
   const [sync, setSync] = useState("idle");
+  const [pendingSyncRebuild, setPendingSyncRebuild] = useState(false); // sync also rebuilds the timeline (subsumes the old restart), deferred until the fresh tasks land in state
   const [flash, setFlash] = useState("");
   const settings = api.settings;
 
@@ -1264,7 +1326,7 @@ export default function FocusLogApp({ api }: any) {
 
   const doSync = async () => {
     setSync("loading");
-    try { const fresh = await api.sync(); setTasks(fresh); setDoneSess({}); setSync("ok"); setFlash(fresh.length + " tasks loaded from Notion."); }
+    try { const fresh = await api.sync(); setTasks(fresh); setDoneSess({}); setSync("ok"); setPendingSyncRebuild(true); setFlash(fresh.length + " tasks loaded from Notion, timeline rebuilt."); }
     catch (e: any) { setSync("error"); setFlash("Sync failed: " + (e?.message || e)); }
   };
 
@@ -1311,18 +1373,21 @@ export default function FocusLogApp({ api }: any) {
   // get a plot. First-seen order is kept.
   const weekAreas = Array.from(new Set(weekSessions.map((s) => s.category).filter(Boolean)));
 
-  const nowLD = logicalDay(Date.now(), settings);
+  // "Today" for the month grid and the this-month / this-year totals is the real CALENDAR date, not
+  // the day-start-shifted logical day. Otherwise, past the day-start (e.g. 20:00) the reference rolls
+  // into tomorrow and the calendar jumps to next month while the wall clock still says today.
+  const nowCal = startOfDay(new Date());
   const wkStartNow = logicalWeekStart(Date.now(), settings);
   const inWeek = sessions.filter((s) => { const d = logicalDay(s.ts, settings); return d >= wkStartNow && d < new Date(wkStartNow.getTime() + 7 * DAY); });
-  const inMonth = sessions.filter((s) => { const d = logicalDay(s.ts, settings); return d.getMonth() === nowLD.getMonth() && d.getFullYear() === nowLD.getFullYear(); });
-  const inYear = sessions.filter((s) => logicalDay(s.ts, settings).getFullYear() === nowLD.getFullYear());
+  const inMonth = sessions.filter((s) => { const d = logicalDay(s.ts, settings); return d.getMonth() === nowCal.getMonth() && d.getFullYear() === nowCal.getFullYear(); });
+  const inYear = sessions.filter((s) => logicalDay(s.ts, settings).getFullYear() === nowCal.getFullYear());
   const countWeek = inWeek.length;
   const countMonth = inMonth.length;
   const countYear = inYear.length;
   const countToday = sessions.filter((s) => sameLogicalDay(s.ts, Date.now(), settings)).length;
   const sumMin = (arr: any[]) => arr.reduce((a, s) => a + (Number(s.minutes) || 25), 0);
   const hrsOf = (mins: number) => (Math.round(mins / 6) / 10).toFixed(1);
-  const monthRef = new Date(nowLD.getFullYear(), nowLD.getMonth() + monthOff, 1);
+  const monthRef = new Date(nowCal.getFullYear(), nowCal.getMonth() + monthOff, 1);
 
   // Rating summary: how often the actual beat the expected, the average gap, and the biggest
   // positive surprises (dreaded but enjoyed).
@@ -1382,7 +1447,7 @@ export default function FocusLogApp({ api }: any) {
   // Pause stats: most common this week / month, and each tag's typical time of day over all history.
   const topPauseOf = (list: any[]) => { const c: any = {}; list.forEach((p) => (c[p.tag] = (c[p.tag] || 0) + 1)); const e = Object.entries(c).sort((a: any, b: any) => b[1] - a[1])[0]; return e ? { tag: e[0], n: e[1] as number } : null; };
   const pauseWeek = pauses.filter((p) => { const d = logicalDay(p.ts, settings); return d >= wkStartNow && d < new Date(wkStartNow.getTime() + 7 * DAY); });
-  const pauseMonth = pauses.filter((p) => { const d = logicalDay(p.ts, settings); return d.getMonth() === nowLD.getMonth() && d.getFullYear() === nowLD.getFullYear(); });
+  const pauseMonth = pauses.filter((p) => { const d = logicalDay(p.ts, settings); return d.getMonth() === nowCal.getMonth() && d.getFullYear() === nowCal.getFullYear(); });
   const topPauseWeek = topPauseOf(pauseWeek);
   const topPauseMonth = topPauseOf(pauseMonth);
   // Internal vs external pause counts per time band (a pause inherits its tag's category).
@@ -1634,6 +1699,32 @@ export default function FocusLogApp({ api }: any) {
   const snap5 = (m: number) => Math.round(m / 5) * 5;
   const fmtClock = (m: number) => String(Math.floor(m / 60) % 24).padStart(2, "0") + ":" + String(Math.round(m) % 60).padStart(2, "0");
   const clampStart = (m: number, dur: number) => Math.max(tlStart, Math.min(tlEnd - dur, m));
+  // Meals are hard-fixed anchors: no dragged block may occupy their minutes. avoidMeals returns the
+  // free start nearest the requested one, trying the slot before and after each meal (chained meals
+  // and the day-end clamp are handled by dropping candidates that still overlap). Overlaps left by a
+  // cascade or a break edit are cleaned up separately by resolveOverlaps, which also pins meals.
+  const avoidMeals = (start: number, dur: number, blocks: any[], selfId?: string) => {
+    const meals = blocks.filter((m: any) => m.kind === "meal" && m.id !== selfId);
+    const overlapsMeal = (s: number) => meals.some((m: any) => s < m.start + m.dur && s + dur > m.start);
+    const base = clampStart(start, dur);
+    if (!overlapsMeal(base)) return base;
+    const cands: number[] = [clampStart(tlStart, dur), clampStart(tlEnd - dur, dur)];
+    meals.forEach((m: any) => { cands.push(clampStart(m.start - dur, dur)); cands.push(clampStart(m.start + m.dur, dur)); });
+    const free = cands.filter((c) => !overlapsMeal(c)).sort((a, b) => Math.abs(a - start) - Math.abs(b - start));
+    return free.length ? free[0] : base;
+  };
+  // Every blank span between consecutive blocks becomes a fixed-height break block (kind "break",
+  // gap:true) whose length equals the gap, so manually opened blank time reads as a break.
+  const fillGaps = (blocks: any[]) => {
+    const s = blocks.slice().sort((a: any, c: any) => a.start - c.start);
+    const out: any[] = [];
+    for (let i = 0; i < s.length; i++) {
+      out.push(s[i]);
+      const next = s[i + 1];
+      if (next) { const end = s[i].start + s[i].dur; const gap = next.start - end; if (gap > 0) out.push({ id: "gb" + Date.now() + "_" + Math.round(end), kind: "break", gap: true, name: "Break", start: end, dur: gap }); }
+    }
+    return out;
+  };
   const todayBlocks = () => (plans[todayKey] || []);
   // Every plan mutation flows through here, so it also invalidates the undo snapshot — the only
   // caller that wants undo kept (the left-drag) re-sets planUndo right AFTER calling this.
@@ -1653,15 +1744,14 @@ export default function FocusLogApp({ api }: any) {
   // every `longEvery` short ones (the rhythm you set in the toolbar).
   const resolveOverlaps = (blocks: any[]) => {
     const shortB = settings.breakMinutes || 5;
+    const meals = blocks.filter((m: any) => m.kind === "meal").slice().sort((a: any, c: any) => a.start - c.start);
     let cursor = -Infinity, prevTask = false;
     return blocks.slice().sort((a: any, c: any) => a.start - c.start).map((b: any) => {
       const isTask = b.kind === "task";
-      if (b.kind === "meeting") { cursor = Math.max(cursor, b.start + b.dur); prevTask = false; return b; }   // fixed: never moved; tasks flow around it
+      if (b.kind === "meeting" || b.kind === "meal") { cursor = Math.max(cursor, b.start + b.dur); prevTask = false; return b; }   // fixed: never moved; tasks flow around it
       let start = b.start;
-      if (start < cursor) {
-        const gap = isTask && prevTask ? shortB : 0;
-        start = cursor + gap;
-      }
+      if (start < cursor) start = cursor + (isTask && prevTask ? shortB : 0);
+      for (const m of meals) if (start < m.start + m.dur && start + b.dur > m.start) start = m.start + m.dur;   // never sit on a meal (sorted, so one pass clears chained meals)
       cursor = start + b.dur;
       prevTask = isTask;
       return start === b.start ? b : { ...b, start };
@@ -1671,7 +1761,7 @@ export default function FocusLogApp({ api }: any) {
   // and a long break every N pomodoros (and once across noon). Saved as the day's plan.
   const ROUTINE_MIN = 15;
   // Smart rule: a plan never ends on a break — drop any break/long-break left at the tail.
-  const dropTrailingBreaks = (bl: any[]) => { const s = bl.slice().sort((a: any, c: any) => a.start - c.start); while (s.length && (s[s.length - 1].kind === "break" || s[s.length - 1].kind === "longbreak")) s.pop(); return s; };
+  const dropTrailingBreaks = (bl: any[]) => { const s = bl.slice().sort((a: any, c: any) => a.start - c.start); while (s.length && (s[s.length - 1].kind === "break" || s[s.length - 1].kind === "longbreak") && !s[s.length - 1].manual) s.pop(); return s; };
   const mkBreak = (start: number, k: string) => ({ id: (k === "longbreak" ? "lb" : "sb") + Date.now() + "_" + Math.round(start), kind: k, name: k === "longbreak" ? "Long break" : "Break", start, dur: k === "longbreak" ? (settings.longBreakMinutes || 20) : (settings.breakMinutes || 5) });
   const buildInitialPlan = () => {
     const pomo = settings.pomodoroMinutes || 25;
@@ -1696,6 +1786,13 @@ export default function FocusLogApp({ api }: any) {
     });
     return autoBreaksOf(blocks);
   };
+  // Sync now subsumes the old restart: once a sync has loaded fresh tasks into state, rebuild the
+  // day's timeline from them (no prompt). Deferred to an effect so buildInitialPlan sees fresh tasks.
+  useEffect(() => {
+    if (!pendingSyncRebuild) return;
+    setTodayBlocks(buildInitialPlan());
+    setPendingSyncRebuild(false);
+  }, [tasks, pendingSyncRebuild]);
   const setTimelineMode = (on: boolean) => {
     const hasInput = [...workTasks, ...personalTasks].length || (!settings.skipMorningRoutine && (activeMorning || []).length) || (!settings.skipNightRoutine && (activeNight || []).length);
     if (on && !plans[todayKey] && hasInput) setTodayBlocks(buildInitialPlan());
@@ -1716,8 +1813,8 @@ export default function FocusLogApp({ api }: any) {
     const shift = b.dur + shortB;
     // Drop the copy into the next slot right after the original, and push every block that
     // starts after the original down by the copy's footprint, so nothing overlaps.
-    const shifted = blocks.map((x: any) => (x.id !== id && x.start >= b.start + b.dur ? { ...x, start: x.start + shift } : x));
-    setTodayBlocks(resolveOverlaps([...shifted, { ...b, id: "b" + Date.now(), start: b.start + b.dur + shortB }]));
+    const shifted = blocks.map((x: any) => (x.id !== id && x.kind !== "meal" && x.start >= b.start + b.dur ? { ...x, start: x.start + shift } : x));
+    setTodayBlocks(fillGaps(resolveOverlaps([...shifted, { ...b, id: "b" + Date.now(), start: b.start + b.dur + shortB }])));
   };
   const deleteBlock = (id: string) => setTodayBlocks(todayBlocks().filter((b: any) => b.id !== id));
   // Add a blank task block at the end and open it for naming. Lock it (the lock icon before its
@@ -1749,41 +1846,42 @@ export default function FocusLogApp({ api }: any) {
     const shortB = settings.breakMinutes || 5;
     const longB = settings.longBreakMinutes || 20;
     const N = Math.max(3, longEvery || 3);
-    const fixed = blocks.filter((b: any) => b.kind === "meal" || (b.kind === "task" && b.locked)).slice().sort((a: any, c: any) => a.start - c.start);
+    const fixed = blocks.filter((b: any) => b.kind === "meal" || (b.kind === "task" && b.locked) || ((b.kind === "break" || b.kind === "longbreak") && b.manual && !b.gap)).slice().sort((a: any, c: any) => a.start - c.start);
     const flow = blocks.filter((b: any) => (b.kind === "task" && !b.locked) || b.kind === "routine").slice().sort((a: any, c: any) => a.start - c.start);
     const dinnerBlock = blocks.find((b: any) => b.kind === "meal" && b.meal === "dinner");
-    const nightAnchor = dinnerBlock ? dinnerBlock.start + dinnerBlock.dur + 60 : null;   // night routine defaults to 60 min after dinner
+    const nightAnchor = dinnerBlock ? dinnerBlock.start + dinnerBlock.dur + (settings.nightRoutineGap ?? 60) : null;   // night routine starts nightRoutineGap (default 60) min after dinner
     if (!flow.length) {
       // No unlocked work to flow, but locked tasks still earn a long break in any gap after them.
       const lts = fixed.filter((f: any) => f.kind === "task").slice().sort((a: any, c: any) => a.start - c.start);
       const extra: any[] = [];
-      for (let i = 0; i < lts.length - 1; i++) { const end = lts[i].start + lts[i].dur; if (lts[i + 1].start - end >= longB) extra.push(mkBreak(end, "longbreak")); }
-      return dropTrailingBreaks([...blocks, ...extra]);
+      for (let i = 0; i < lts.length - 1; i++) { const end = lts[i].start + lts[i].dur; if (lts[i + 1].start - end >= longB && !fixed.some((f: any) => f.id !== lts[i].id && end < f.start + f.dur && end + longB > f.start)) extra.push(mkBreak(end, "longbreak")); }
+      return fillGaps(dropTrailingBreaks([...blocks, ...extra]));
     }
     const overlapsFixed = (s: number, dur: number) => fixed.some((f: any) => s < f.start + f.dur && s + dur > f.start);
     // Advance past fixed blocks. Meals are a rest in themselves; a locked task earns a long break
     // after it (when there's room), reported in `lb` so the caller drops it in and resets the count.
     const skipFixed = (s: number, dur: number) => {
-      let moved = true, hitMeal = false; const lb: number[] = [];
+      let moved = true, hitMeal = false, hitRest = false; const lb: number[] = [];
       while (moved) {
         moved = false;
         for (const f of fixed) if (s < f.start + f.dur && s + dur > f.start) {
           const end = f.start + f.dur;
           if (f.kind === "meal") { s = end; hitMeal = true; }
+          else if (f.kind === "break" || f.kind === "longbreak") { s = end; hitRest = true; }   // a manual (edited) break IS the rest: reset the rhythm, no extra break against it
           else if (!overlapsFixed(end, longB)) { lb.push(end); s = end + longB; }
           else s = end;
           moved = true;
         }
       }
-      return { s, hitMeal, lb };
+      return { s, hitMeal, hitRest, lb };
     };
-    const rest = (r: any) => r.hitMeal || r.lb.length > 0;
+    const rest = (r: any) => r.hitMeal || r.hitRest || r.lb.length > 0;
     const out: any[] = [...fixed];
     let t = flow[0].start, count = 0;
     flow.forEach((b: any, i: number) => {
-      if (b.night && nightAnchor != null && t < nightAnchor) t = nightAnchor;   // first night-routine step waits until 60 min after dinner
+      if (b.night && nightAnchor != null && t < nightAnchor) t = nightAnchor;   // first night-routine step waits until the dinner-to-night gap has passed
       const r = skipFixed(t, b.dur);
-      if (r.hitMeal) count = 0;
+      if (r.hitMeal || r.hitRest) count = 0;
       r.lb.forEach((ls: number) => { out.push(mkBreak(ls, "longbreak")); count = 0; });   // long break after a locked task
       t = r.s;
       out.push({ ...b, start: t });
@@ -1795,13 +1893,25 @@ export default function FocusLogApp({ api }: any) {
       if (count >= N) { const lb = skipFixed(t, longB); if (rest(lb)) { count = 0; return; } out.push(mkBreak(lb.s, "longbreak")); t = lb.s + longB; count = 0; }
       else if (next.kind === "task") { const sb = skipFixed(t, shortB); if (rest(sb)) { count = 0; return; } out.push(mkBreak(sb.s, "break")); t = sb.s + shortB; }
     });
-    return dropTrailingBreaks(out);
+    return fillGaps(dropTrailingBreaks(out));
   };
   const autoBreaks = () => { const r = autoBreaksOf(todayBlocks()); setTodayBlocks(r); };
   const saveBlockEdit = () => {
     const blk = todayBlocks().find((b: any) => b.id === editBlockId);
     const name = blockDraft.name.trim() || "Untitled";
     const dur = Math.max(5, Math.min(480, Math.round(blockDraft.dur) || 30));
+    if (blk && (blk.kind === "break" || blk.kind === "longbreak")) {
+      // Editing a break's length: cap growth so the break never crosses a pinned meal (which would make
+      // resolveOverlaps fling it past the meal), then shift everything after it by the delta (meals stay
+      // pinned) and re-derive gap fillers. Mark it manual so auto-fix keeps the chosen length.
+      const mealCap = todayBlocks().filter((m: any) => m.kind === "meal" && m.start >= blk.start).reduce((mn: number, m: any) => Math.min(mn, m.start - blk.start), Infinity);
+      const bDur = Math.max(5, Math.min(dur, mealCap));
+      const delta = bDur - blk.dur, end = blk.start + blk.dur;
+      const shifted = todayBlocks().map((b: any) => (b.id === editBlockId ? { ...b, name, dur: bDur, manual: true } : (b.kind !== "meal" && b.start >= end ? { ...b, start: b.start + delta } : b)));
+      setTodayBlocks(fillGaps(resolveOverlaps(shifted)));
+      setEditBlockId(null);
+      return;
+    }
     setTodayBlocks(todayBlocks().map((b: any) => (b.id === editBlockId ? { ...b, name, dur } : b)));
     // A routine block writes its length (and name) back to the routine item, so a rebuild
     // keeps the edited length.
@@ -1822,16 +1932,18 @@ export default function FocusLogApp({ api }: any) {
     if (!d || !cur) { setTlDrag(null); return; }
     const tlTop = tlRef.current ? tlRef.current.getBoundingClientRect().top : d.tlTop;
     const target = snap5(yToMin(tlLayout(blocks).items, clientY - tlTop - d.grab));
-    const newStart = clampStart(target, cur.dur);
+    const newStart = avoidMeals(clampStart(target, cur.dur), cur.dur, blocks, cur.id);
     if (d.button === 2) {
-      // cascade: shift this block + everything after it (but NOT fixed meetings) by one bounded
-      // delta, so internal spacing is preserved and the moved group stays inside [tlStart, tlEnd].
-      const moving = blocks.filter((x: any) => x.start >= cur.start && (x.id === cur.id || (x.kind !== "meeting" && x.kind !== "meal" && !(x.kind === "task" && x.locked))));
+      // cascade: shift this block + everything after it by one bounded delta, keeping internal
+      // spacing (no auto-fix). Auto-generated + gap breaks are dropped and re-derived from the new
+      // gaps; meals, meetings, and locked tasks are never part of the group and are never crossed.
+      const real = blocks.filter((x: any) => !((x.kind === "break" || x.kind === "longbreak") && !x.manual));
+      const moving = real.filter((x: any) => x.start >= cur.start && (x.id === cur.id || (x.kind !== "meeting" && x.kind !== "meal" && !(x.kind === "task" && x.locked))));
       const minStart = Math.min(...moving.map((x: any) => x.start));
       const maxEnd = Math.max(...moving.map((x: any) => x.start + x.dur));
       const delta = Math.max(tlStart - minStart, Math.min(newStart - cur.start, tlEnd - maxEnd));
       const ids = new Set(moving.map((x: any) => x.id));
-      setTodayBlocks(blocks.map((x: any) => (ids.has(x.id) ? { ...x, start: x.start + delta } : x)));
+      setTodayBlocks(fillGaps(resolveOverlaps(real.map((x: any) => (ids.has(x.id) ? { ...x, start: x.start + delta } : x)))));
     } else {
       // move only this block, then auto-fix; keep the pre-move snapshot for undo (set AFTER
       // setTodayBlocks, which clears any prior undo).
@@ -1881,6 +1993,7 @@ export default function FocusLogApp({ api }: any) {
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 10, color: C.muted, flexShrink: 0 }}>{b.dur}m</span>
         {(isTask || b.kind === "routine") && <button onClick={() => openLog(b.name)} className="fl-rowact" title="run a pomodoro" aria-label="run" style={ICON_BTN}><PlayIcon size={12} /></button>}
         {isTask && !b.pageId && <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" title="rename" aria-label="rename" style={ICON_BTN}><PencilIcon size={13} /></button>}
+        {(b.kind === "break" || b.kind === "longbreak") && !b.gap && <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" title="edit break length" aria-label="edit break length" style={ICON_BTN}><PencilIcon size={13} /></button>}
         {isTask
           ? <button onClick={() => duplicateBlock(b.id)} className="fl-rowact" title="duplicate (add a pomodoro)" aria-label="duplicate" style={ICON_BTN}><CopyIcon size={13} /></button>
           : b.kind === "routine" ? <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={13} /></button> : null}
@@ -1921,7 +2034,6 @@ export default function FocusLogApp({ api }: any) {
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
             <button onClick={autoBreaks} title="auto-fix breaks: a short break between tasks and a long-break block every N pomodoros" style={{ ...btn(C.muted, true), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 }}><WandSparklesIcon size={14} /> auto-fix breaks</button>
-            <button onClick={() => { if (window.confirm("Rebuild the day from your tasks and routines? This replaces your current arrangement.")) setTodayBlocks(buildInitialPlan()); }} title="restart: rebuild the day from your tasks + routines (replaces the current arrangement)" aria-label="restart" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", opacity: 0.7 }}><RotateCcwIcon size={14} /></button>
             <button onClick={addBlock} title="add a block to the timeline, then lock it (the lock by its name) if it's fixed" style={{ ...btn(C.ink, true), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 }}><ListPlusIcon size={14} /> add block</button>
             {planUndo && <button onClick={() => { setTodayBlocks(planUndo); setPlanUndo(null); }} title="undo the last auto-fix" style={{ ...btn(C.worse, true), padding: "5px 10px", fontSize: 12 }}>undo</button>}
           </div>
@@ -2091,7 +2203,7 @@ export default function FocusLogApp({ api }: any) {
                     );
                   })}
                 </div>
-                <button onClick={doSync} disabled={sync === "loading"} title="sync from Notion" aria-label="sync from Notion" style={{ ...btn(C.ink, true), justifySelf: "end", display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px" }}>
+                <button onClick={doSync} disabled={sync === "loading"} title="sync from Notion and rebuild the timeline" aria-label="sync from Notion and rebuild the timeline" style={{ ...btn(C.ink, true), justifySelf: "end", display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px" }}>
                   <RefreshCwIcon size={14} spin={sync === "loading"} />
                   {sync === "loading" ? "\u2026" : <img src={NOTION_LOGO} alt="Notion" style={{ width: 16, height: 16 }} />}
                 </button>
@@ -2132,10 +2244,16 @@ export default function FocusLogApp({ api }: any) {
 
         {statusSub === "month" && (
           <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <button onClick={() => setMonthOff((m) => m - 1)} style={btn(C.muted, true)}>{"\u2190"}</button>
-              <span style={{ fontFamily: "var(--fl-mono)", fontSize: 13 }}>{monthRef.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</span>
-              <button onClick={() => setMonthOff((m) => Math.min(0, m + 1))} style={btn(C.muted, true)}>{"\u2192"}</button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingLeft: 13, paddingRight: 8 }}>
+              <span ref={monthLabelRef} title="scroll to change the month" style={{ fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums", fontSize: 16, fontWeight: "var(--h3-weight, 600)" as any, color: C.ink, letterSpacing: "-0.01em", lineHeight: 1, cursor: "ns-resize", userSelect: "none" }}>
+                <span style={{ display: "inline-block", minWidth: "2.3em" }}>{MON3[monthRef.getMonth()]}</span>
+                <span style={{ color: ACCENT, marginLeft: "0.1em" }}>{monthRef.getFullYear()}</span>
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <button onClick={() => setMonthOff((m) => m - 1)} title="previous month" aria-label="previous month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" }}><ChevronLeftIcon size={20} /></button>
+                <button onClick={() => setMonthOff(0)} disabled={monthOff === 0} title="jump to the current month" aria-label="today" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.muted, cursor: monthOff === 0 ? "default" : "pointer", padding: "5px 8px", borderRadius: 7, fontFamily: "var(--fl-display)", fontWeight: 700, fontSize: 13, letterSpacing: "0.02em", opacity: monthOff === 0 ? 0.4 : 1 }}>TODAY</button>
+                <button onClick={() => setMonthOff((m) => m + 1)} title="next month" aria-label="next month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" }}><ChevronRightIcon size={20} /></button>
+              </div>
             </div>
             <Heatmap sessions={sessions} monthRef={monthRef} settings={settings} onOpenDay={(date: Date) => api.openDailyNote && api.openDailyNote(+date)} />
           </div>
@@ -2246,7 +2364,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 11, padding: 4 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 10, padding: 4 }}>
               {([["week", "Week"], ["month", "Month"], ["totals", "Total"]] as [string, string][]).map(([k, lab]) => (
                 <button key={k} onClick={() => setStatusSub(k)} style={segV(statusSub === k)}>{lab}</button>
               ))}

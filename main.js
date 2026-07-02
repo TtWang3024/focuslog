@@ -24458,10 +24458,25 @@ function bandOf(ts, s) {
     return 1;
   return 2;
 }
+var OVERNIGHT_COLOR = "#FFD400";
+var ACCENT = "#6b4423";
+var MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function isOvernight(ts, s) {
+  var _a;
+  const d = new Date(ts);
+  const m = d.getHours() * 60 + d.getMinutes();
+  const a = s.dayStart || 0, b = (_a = s.morningBegins) != null ? _a : 480;
+  if (a === b)
+    return false;
+  return a < b ? m >= a && m < b : m >= a || m < b;
+}
 function timeColor(ts, s) {
+  if (isOvernight(ts, s))
+    return OVERNIGHT_COLOR;
   const w = WEEKDAY[logicalDay(ts, s).getDay()];
   return `hsl(${w.h} ${w.s}% ${BAND_L[bandOf(ts, s)]}%)`;
 }
+var bandLabel = (ts, s) => isOvernight(ts, s) ? "night" : BAND_NAME[bandOf(ts, s)];
 var weekdayInk = (wd) => {
   const w = WEEKDAY[wd];
   return `hsl(${w.h} ${Math.max(w.s, 4)}% 40%)`;
@@ -24576,39 +24591,40 @@ function GroupChart({ group, sessions, settings }) {
 }
 function Heatmap({ sessions, monthRef, settings, onOpenDay }) {
   const year = monthRef.getFullYear(), month = monthRef.getMonth();
-  const byDay = {};
+  const pad = (n) => String(n).padStart(2, "0");
+  const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const todayK = keyOf(startOfDay(/* @__PURE__ */ new Date()));
+  const byKey = {};
   sessions.forEach((x) => {
-    const d = logicalDay(x.ts, settings);
-    if (d.getFullYear() === year && d.getMonth() === month)
-      (byDay[d.getDate()] = byDay[d.getDate()] || []).push(x);
+    const k = keyOf(logicalDay(x.ts, settings));
+    (byKey[k] = byKey[k] || []).push(x);
   });
+  const first = new Date(year, month, 1);
+  const lead = settings.weekStartsSunday ? first.getDay() : (first.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const lead = settings.weekStartsSunday ? new Date(year, month, 1).getDay() : (new Date(year, month, 1).getDay() + 6) % 7;
+  const trail = (7 - (lead + daysInMonth) % 7) % 7;
   const cells = [];
-  for (let i = 0; i < lead; i++)
-    cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++)
-    cells.push(d);
+  for (let i = 0; i < lead + daysInMonth + trail; i++)
+    cells.push(new Date(year, month, 1 - lead + i));
   const headers = settings.weekStartsSunday ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  return /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginBottom: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 } }, headers.map((h) => /* @__PURE__ */ React5.createElement("div", { key: h, style: { textAlign: "center", fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", paddingBottom: 2 } }, h)), cells.map((d, idx) => {
-    if (d === null)
-      return /* @__PURE__ */ React5.createElement("div", { key: "b" + idx });
-    const date = new Date(year, month, d);
+  return /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginBottom: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 } }, headers.map((h) => /* @__PURE__ */ React5.createElement("div", { key: h, style: { textAlign: "left", fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", paddingLeft: 4 } }, h)), cells.map((date, idx) => {
+    const inMonth = date.getMonth() === month && date.getFullYear() === year;
+    const isToday = inMonth && keyOf(date) === todayK;
     const wd = date.getDay();
-    const list = (byDay[d] || []).sort((a, b) => +new Date(a.ts) - +new Date(b.ts));
+    const list = (byKey[keyOf(date)] || []).sort((a, b) => +new Date(a.ts) - +new Date(b.ts));
     return /* @__PURE__ */ React5.createElement(
       "div",
       {
-        key: d,
+        key: idx,
         className: "fl-calday",
         onClick: () => onOpenDay && onOpenDay(date),
         title: `Open daily note for ${date.toLocaleDateString()}`,
-        style: { minHeight: 56, border: `1px solid ${C.line}`, borderRadius: 6, padding: 4, background: C.paper, cursor: "pointer" }
+        style: { minHeight: 56, boxSizing: "border-box", border: isToday ? `2.5px solid ${ACCENT}` : `1px solid ${C.line}`, borderRadius: 6, padding: 4, background: C.paper, cursor: "pointer", opacity: inMonth ? 1 : 0.5 }
       },
-      /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 10.5, fontFamily: "var(--fl-mono)", color: weekdayInk(wd), marginBottom: 3 } }, d),
-      /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 2 } }, list.map((x) => /* @__PURE__ */ React5.createElement("span", { key: x.id, title: `${x.task} \xB7 ${BAND_NAME[bandOf(x.ts, settings)]}`, style: { width: 9, height: 9, borderRadius: 2, background: timeColor(x.ts, settings) } })))
+      /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 10.5, fontFamily: "var(--fl-mono)", color: inMonth ? weekdayInk(wd) : C.faint, marginBottom: 3 } }, date.getDate()),
+      /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 2 } }, list.map((x) => /* @__PURE__ */ React5.createElement("span", { key: x.id, title: `${x.task} \xB7 ${bandLabel(x.ts, settings)}`, style: { width: 9, height: 9, borderRadius: 2, background: timeColor(x.ts, settings) } })))
     );
-  })), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center", marginTop: 12, fontSize: 11, color: C.muted } }, [1, 2, 3, 4, 5, 6, 0].map((wd) => /* @__PURE__ */ React5.createElement("span", { key: wd, style: { display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 10, height: 10, borderRadius: 2, background: `hsl(${WEEKDAY[wd].h} ${WEEKDAY[wd].s}% 52%)` } }), WEEKDAY[wd].name)), /* @__PURE__ */ React5.createElement("span", { style: { marginLeft: 8 } }, "lightness = time:"), BAND_L.map((L, i) => /* @__PURE__ */ React5.createElement("span", { key: i, style: { display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 10, height: 10, borderRadius: 2, background: `hsl(32 50% ${L}%)` } }), BAND_NAME[i]))));
+  })), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center", marginTop: 12, fontSize: 11, color: C.muted } }, [1, 2, 3, 4, 5, 6, 0].map((wd) => /* @__PURE__ */ React5.createElement("span", { key: wd, style: { display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 9, height: 9, borderRadius: 2, background: `hsl(${WEEKDAY[wd].h} ${WEEKDAY[wd].s}% 52%)` } }), WEEKDAY[wd].name)), /* @__PURE__ */ React5.createElement("span", { style: { marginLeft: 16 } }, "lightness = time:"), BAND_L.map((L, i) => /* @__PURE__ */ React5.createElement("span", { key: i, style: { display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 9, height: 9, borderRadius: 2, background: `hsl(32 50% ${L}%)` } }), BAND_NAME[i])), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 9, height: 9, borderRadius: 2, background: OVERNIGHT_COLOR } }), "night (before morning begins)")));
 }
 var RATE_SCALE = [
   { v: 1, img: rate_rain_default, bg: "#BCBCBC" },
@@ -24754,6 +24770,12 @@ var PAUSE_CAT = {
 var catOf = (cat) => cat === "external" ? "external" : "internal";
 var catColor = (cat) => PAUSE_CAT[catOf(cat)].fill;
 var catBorder = (cat) => PAUSE_CAT[catOf(cat)].border;
+function ChevronLeftIcon({ size = 16 }) {
+  return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "m15 18-6-6 6-6" }));
+}
+function ChevronRightIcon({ size = 16 }) {
+  return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "m9 18 6-6-6-6" }));
+}
 function RotateCcwIcon({ size = 16 }) {
   return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }), /* @__PURE__ */ React5.createElement("path", { d: "M3 3v5h5" }));
 }
@@ -24929,7 +24951,39 @@ function FocusLogApp({ api }) {
   const [preset, setPreset] = useState4("");
   const [weekOff, setWeekOff] = useState4(0);
   const [monthOff, setMonthOff] = useState4(0);
+  const monthLabelRef = useRef3(null);
+  useEffect2(() => {
+    const el = monthLabelRef.current;
+    if (!el)
+      return;
+    let acc = 0, lastT = 0;
+    const STEP = 60;
+    const IDLE = 250;
+    const onWheel = (e) => {
+      let dy = e.deltaY;
+      if (e.deltaMode === 1)
+        dy *= 16;
+      else if (e.deltaMode === 2)
+        dy *= 400;
+      if (!dy)
+        return;
+      e.preventDefault();
+      const now = e.timeStamp;
+      if (now - lastT > IDLE)
+        acc = 0;
+      lastT = now;
+      acc += dy;
+      if (Math.abs(acc) < STEP)
+        return;
+      const dir = acc > 0 ? 1 : -1;
+      setMonthOff((m) => m + dir);
+      acc -= dir * STEP;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [view, statusSub]);
   const [sync, setSync] = useState4("idle");
+  const [pendingSyncRebuild, setPendingSyncRebuild] = useState4(false);
   const [flash, setFlash] = useState4("");
   const settings = api.settings;
   const [chooseNext, setChooseNextState] = useState4(settings.chooseNextTask !== false);
@@ -25367,7 +25421,8 @@ ${s.task}`))
       setTasks(fresh);
       setDoneSess({});
       setSync("ok");
-      setFlash(fresh.length + " tasks loaded from Notion.");
+      setPendingSyncRebuild(true);
+      setFlash(fresh.length + " tasks loaded from Notion, timeline rebuilt.");
     } catch (e) {
       setSync("error");
       setFlash("Sync failed: " + ((e == null ? void 0 : e.message) || e));
@@ -25440,7 +25495,7 @@ ${s.task}`))
     return d >= weekStart && d < weekEnd;
   });
   const weekAreas = Array.from(new Set(weekSessions.map((s) => s.category).filter(Boolean)));
-  const nowLD = logicalDay(Date.now(), settings);
+  const nowCal = startOfDay(/* @__PURE__ */ new Date());
   const wkStartNow = logicalWeekStart(Date.now(), settings);
   const inWeek = sessions.filter((s) => {
     const d = logicalDay(s.ts, settings);
@@ -25448,16 +25503,16 @@ ${s.task}`))
   });
   const inMonth = sessions.filter((s) => {
     const d = logicalDay(s.ts, settings);
-    return d.getMonth() === nowLD.getMonth() && d.getFullYear() === nowLD.getFullYear();
+    return d.getMonth() === nowCal.getMonth() && d.getFullYear() === nowCal.getFullYear();
   });
-  const inYear = sessions.filter((s) => logicalDay(s.ts, settings).getFullYear() === nowLD.getFullYear());
+  const inYear = sessions.filter((s) => logicalDay(s.ts, settings).getFullYear() === nowCal.getFullYear());
   const countWeek = inWeek.length;
   const countMonth = inMonth.length;
   const countYear = inYear.length;
   const countToday = sessions.filter((s) => sameLogicalDay(s.ts, Date.now(), settings)).length;
   const sumMin = (arr) => arr.reduce((a, s) => a + (Number(s.minutes) || 25), 0);
   const hrsOf = (mins) => (Math.round(mins / 6) / 10).toFixed(1);
-  const monthRef = new Date(nowLD.getFullYear(), nowLD.getMonth() + monthOff, 1);
+  const monthRef = new Date(nowCal.getFullYear(), nowCal.getMonth() + monthOff, 1);
   const rated = sessions.length;
   const betterCount = sessions.filter((s) => s.actual > s.expected).length;
   const betterPct = rated ? Math.round(100 * betterCount / rated) : 0;
@@ -25513,7 +25568,7 @@ ${s.task}`))
   });
   const pauseMonth = pauses.filter((p) => {
     const d = logicalDay(p.ts, settings);
-    return d.getMonth() === nowLD.getMonth() && d.getFullYear() === nowLD.getFullYear();
+    return d.getMonth() === nowCal.getMonth() && d.getFullYear() === nowCal.getFullYear();
   });
   const topPauseWeek = topPauseOf(pauseWeek);
   const topPauseMonth = topPauseOf(pauseMonth);
@@ -25816,6 +25871,35 @@ ${s.task}`))
   const snap5 = (m) => Math.round(m / 5) * 5;
   const fmtClock = (m) => String(Math.floor(m / 60) % 24).padStart(2, "0") + ":" + String(Math.round(m) % 60).padStart(2, "0");
   const clampStart = (m, dur) => Math.max(tlStart, Math.min(tlEnd - dur, m));
+  const avoidMeals = (start, dur, blocks, selfId) => {
+    const meals = blocks.filter((m) => m.kind === "meal" && m.id !== selfId);
+    const overlapsMeal = (s) => meals.some((m) => s < m.start + m.dur && s + dur > m.start);
+    const base = clampStart(start, dur);
+    if (!overlapsMeal(base))
+      return base;
+    const cands = [clampStart(tlStart, dur), clampStart(tlEnd - dur, dur)];
+    meals.forEach((m) => {
+      cands.push(clampStart(m.start - dur, dur));
+      cands.push(clampStart(m.start + m.dur, dur));
+    });
+    const free = cands.filter((c) => !overlapsMeal(c)).sort((a, b) => Math.abs(a - start) - Math.abs(b - start));
+    return free.length ? free[0] : base;
+  };
+  const fillGaps = (blocks) => {
+    const s = blocks.slice().sort((a, c) => a.start - c.start);
+    const out = [];
+    for (let i = 0; i < s.length; i++) {
+      out.push(s[i]);
+      const next = s[i + 1];
+      if (next) {
+        const end = s[i].start + s[i].dur;
+        const gap = next.start - end;
+        if (gap > 0)
+          out.push({ id: "gb" + Date.now() + "_" + Math.round(end), kind: "break", gap: true, name: "Break", start: end, dur: gap });
+      }
+    }
+    return out;
+  };
   const todayBlocks = () => plans[todayKey] || [];
   const setTodayBlocks = (blocks) => {
     setPlans((p) => ({ ...p, [todayKey]: blocks }));
@@ -25828,19 +25912,21 @@ ${s.task}`))
   const planOverflow = planBlocks0.length && planEndMin > (settings.dayEnds || 1380) ? Math.round(planEndMin - (settings.dayEnds || 1380)) : 0;
   const resolveOverlaps = (blocks) => {
     const shortB = settings.breakMinutes || 5;
+    const meals = blocks.filter((m) => m.kind === "meal").slice().sort((a, c) => a.start - c.start);
     let cursor = -Infinity, prevTask = false;
     return blocks.slice().sort((a, c) => a.start - c.start).map((b) => {
       const isTask = b.kind === "task";
-      if (b.kind === "meeting") {
+      if (b.kind === "meeting" || b.kind === "meal") {
         cursor = Math.max(cursor, b.start + b.dur);
         prevTask = false;
         return b;
       }
       let start = b.start;
-      if (start < cursor) {
-        const gap = isTask && prevTask ? shortB : 0;
-        start = cursor + gap;
-      }
+      if (start < cursor)
+        start = cursor + (isTask && prevTask ? shortB : 0);
+      for (const m of meals)
+        if (start < m.start + m.dur && start + b.dur > m.start)
+          start = m.start + m.dur;
       cursor = start + b.dur;
       prevTask = isTask;
       return start === b.start ? b : { ...b, start };
@@ -25849,7 +25935,7 @@ ${s.task}`))
   const ROUTINE_MIN = 15;
   const dropTrailingBreaks = (bl) => {
     const s = bl.slice().sort((a, c) => a.start - c.start);
-    while (s.length && (s[s.length - 1].kind === "break" || s[s.length - 1].kind === "longbreak"))
+    while (s.length && (s[s.length - 1].kind === "break" || s[s.length - 1].kind === "longbreak") && !s[s.length - 1].manual)
       s.pop();
     return s;
   };
@@ -25876,6 +25962,12 @@ ${s.task}`))
       });
     return autoBreaksOf(blocks);
   };
+  useEffect2(() => {
+    if (!pendingSyncRebuild)
+      return;
+    setTodayBlocks(buildInitialPlan());
+    setPendingSyncRebuild(false);
+  }, [tasks, pendingSyncRebuild]);
   const setTimelineMode = (on) => {
     const hasInput = [...workTasks, ...personalTasks].length || !settings.skipMorningRoutine && (activeMorning || []).length || !settings.skipNightRoutine && (activeNight || []).length;
     if (on && !plans[todayKey] && hasInput)
@@ -25895,8 +25987,8 @@ ${s.task}`))
       return;
     const shortB = settings.breakMinutes || 5;
     const shift = b.dur + shortB;
-    const shifted = blocks.map((x) => x.id !== id && x.start >= b.start + b.dur ? { ...x, start: x.start + shift } : x);
-    setTodayBlocks(resolveOverlaps([...shifted, { ...b, id: "b" + Date.now(), start: b.start + b.dur + shortB }]));
+    const shifted = blocks.map((x) => x.id !== id && x.kind !== "meal" && x.start >= b.start + b.dur ? { ...x, start: x.start + shift } : x);
+    setTodayBlocks(fillGaps(resolveOverlaps([...shifted, { ...b, id: "b" + Date.now(), start: b.start + b.dur + shortB }])));
   };
   const deleteBlock = (id) => setTodayBlocks(todayBlocks().filter((b) => b.id !== id));
   const addBlock = () => {
@@ -25920,27 +26012,28 @@ ${s.task}`))
     return add.length ? [...keep, ...add] : keep;
   };
   const autoBreaksOf = (blocksIn) => {
+    var _a2;
     const blocks = ensureMeals(blocksIn);
     const shortB = settings.breakMinutes || 5;
     const longB = settings.longBreakMinutes || 20;
     const N = Math.max(3, longEvery || 3);
-    const fixed = blocks.filter((b) => b.kind === "meal" || b.kind === "task" && b.locked).slice().sort((a, c) => a.start - c.start);
+    const fixed = blocks.filter((b) => b.kind === "meal" || b.kind === "task" && b.locked || (b.kind === "break" || b.kind === "longbreak") && b.manual && !b.gap).slice().sort((a, c) => a.start - c.start);
     const flow = blocks.filter((b) => b.kind === "task" && !b.locked || b.kind === "routine").slice().sort((a, c) => a.start - c.start);
     const dinnerBlock = blocks.find((b) => b.kind === "meal" && b.meal === "dinner");
-    const nightAnchor = dinnerBlock ? dinnerBlock.start + dinnerBlock.dur + 60 : null;
+    const nightAnchor = dinnerBlock ? dinnerBlock.start + dinnerBlock.dur + ((_a2 = settings.nightRoutineGap) != null ? _a2 : 60) : null;
     if (!flow.length) {
       const lts = fixed.filter((f) => f.kind === "task").slice().sort((a, c) => a.start - c.start);
       const extra = [];
       for (let i = 0; i < lts.length - 1; i++) {
         const end = lts[i].start + lts[i].dur;
-        if (lts[i + 1].start - end >= longB)
+        if (lts[i + 1].start - end >= longB && !fixed.some((f) => f.id !== lts[i].id && end < f.start + f.dur && end + longB > f.start))
           extra.push(mkBreak(end, "longbreak"));
       }
-      return dropTrailingBreaks([...blocks, ...extra]);
+      return fillGaps(dropTrailingBreaks([...blocks, ...extra]));
     }
     const overlapsFixed = (s, dur) => fixed.some((f) => s < f.start + f.dur && s + dur > f.start);
     const skipFixed = (s, dur) => {
-      let moved = true, hitMeal = false;
+      let moved = true, hitMeal = false, hitRest = false;
       const lb = [];
       while (moved) {
         moved = false;
@@ -25950,6 +26043,9 @@ ${s.task}`))
             if (f.kind === "meal") {
               s = end;
               hitMeal = true;
+            } else if (f.kind === "break" || f.kind === "longbreak") {
+              s = end;
+              hitRest = true;
             } else if (!overlapsFixed(end, longB)) {
               lb.push(end);
               s = end + longB;
@@ -25958,16 +26054,16 @@ ${s.task}`))
             moved = true;
           }
       }
-      return { s, hitMeal, lb };
+      return { s, hitMeal, hitRest, lb };
     };
-    const rest = (r) => r.hitMeal || r.lb.length > 0;
+    const rest = (r) => r.hitMeal || r.hitRest || r.lb.length > 0;
     const out = [...fixed];
     let t = flow[0].start, count = 0;
     flow.forEach((b, i) => {
       if (b.night && nightAnchor != null && t < nightAnchor)
         t = nightAnchor;
       const r = skipFixed(t, b.dur);
-      if (r.hitMeal)
+      if (r.hitMeal || r.hitRest)
         count = 0;
       r.lb.forEach((ls) => {
         out.push(mkBreak(ls, "longbreak"));
@@ -26004,7 +26100,7 @@ ${s.task}`))
         t = sb.s + shortB;
       }
     });
-    return dropTrailingBreaks(out);
+    return fillGaps(dropTrailingBreaks(out));
   };
   const autoBreaks = () => {
     const r = autoBreaksOf(todayBlocks());
@@ -26014,6 +26110,15 @@ ${s.task}`))
     const blk = todayBlocks().find((b) => b.id === editBlockId);
     const name = blockDraft.name.trim() || "Untitled";
     const dur = Math.max(5, Math.min(480, Math.round(blockDraft.dur) || 30));
+    if (blk && (blk.kind === "break" || blk.kind === "longbreak")) {
+      const mealCap = todayBlocks().filter((m) => m.kind === "meal" && m.start >= blk.start).reduce((mn, m) => Math.min(mn, m.start - blk.start), Infinity);
+      const bDur = Math.max(5, Math.min(dur, mealCap));
+      const delta = bDur - blk.dur, end = blk.start + blk.dur;
+      const shifted = todayBlocks().map((b) => b.id === editBlockId ? { ...b, name, dur: bDur, manual: true } : b.kind !== "meal" && b.start >= end ? { ...b, start: b.start + delta } : b);
+      setTodayBlocks(fillGaps(resolveOverlaps(shifted)));
+      setEditBlockId(null);
+      return;
+    }
     setTodayBlocks(todayBlocks().map((b) => b.id === editBlockId ? { ...b, name, dur } : b));
     if (blk && blk.kind === "routine" && blk.refId) {
       const upd = (list) => list.map((it) => it.id === blk.refId ? { ...it, name, dur } : it);
@@ -26034,14 +26139,15 @@ ${s.task}`))
     }
     const tlTop = tlRef.current ? tlRef.current.getBoundingClientRect().top : d.tlTop;
     const target = snap5(yToMin(tlLayout(blocks).items, clientY - tlTop - d.grab));
-    const newStart = clampStart(target, cur.dur);
+    const newStart = avoidMeals(clampStart(target, cur.dur), cur.dur, blocks, cur.id);
     if (d.button === 2) {
-      const moving = blocks.filter((x) => x.start >= cur.start && (x.id === cur.id || x.kind !== "meeting" && x.kind !== "meal" && !(x.kind === "task" && x.locked)));
+      const real = blocks.filter((x) => !((x.kind === "break" || x.kind === "longbreak") && !x.manual));
+      const moving = real.filter((x) => x.start >= cur.start && (x.id === cur.id || x.kind !== "meeting" && x.kind !== "meal" && !(x.kind === "task" && x.locked)));
       const minStart = Math.min(...moving.map((x) => x.start));
       const maxEnd = Math.max(...moving.map((x) => x.start + x.dur));
       const delta = Math.max(tlStart - minStart, Math.min(newStart - cur.start, tlEnd - maxEnd));
       const ids = new Set(moving.map((x) => x.id));
-      setTodayBlocks(blocks.map((x) => ids.has(x.id) ? { ...x, start: x.start + delta } : x));
+      setTodayBlocks(fillGaps(resolveOverlaps(real.map((x) => ids.has(x.id) ? { ...x, start: x.start + delta } : x))));
     } else {
       const moved = blocks.map((x) => x.id === cur.id ? { ...x, start: newStart } : x);
       setTodayBlocks(autoBreaksOf(moved));
@@ -26120,6 +26226,10 @@ ${s.task}`))
         setEditBlockId(b.id);
         setBlockDraft({ name: b.name, dur: b.dur });
       }, className: "fl-rowact", title: "rename", "aria-label": "rename", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 13 })),
+      (b.kind === "break" || b.kind === "longbreak") && !b.gap && /* @__PURE__ */ React5.createElement("button", { onClick: () => {
+        setEditBlockId(b.id);
+        setBlockDraft({ name: b.name, dur: b.dur });
+      }, className: "fl-rowact", title: "edit break length", "aria-label": "edit break length", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 13 })),
       isTask ? /* @__PURE__ */ React5.createElement("button", { onClick: () => duplicateBlock(b.id), className: "fl-rowact", title: "duplicate (add a pomodoro)", "aria-label": "duplicate", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(CopyIcon, { size: 13 })) : b.kind === "routine" ? /* @__PURE__ */ React5.createElement("button", { onClick: () => {
         setEditBlockId(b.id);
         setBlockDraft({ name: b.name, dur: b.dur });
@@ -26164,10 +26274,7 @@ ${s.task}`))
         },
         n
       );
-    }))), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" } }, /* @__PURE__ */ React5.createElement("button", { onClick: autoBreaks, title: "auto-fix breaks: a short break between tasks and a long-break block every N pomodoros", style: { ...btn(C.muted, true), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React5.createElement(WandSparklesIcon, { size: 14 }), " auto-fix breaks"), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
-      if (window.confirm("Rebuild the day from your tasks and routines? This replaces your current arrangement."))
-        setTodayBlocks(buildInitialPlan());
-    }, title: "restart: rebuild the day from your tasks + routines (replaces the current arrangement)", "aria-label": "restart", style: { ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", opacity: 0.7 } }, /* @__PURE__ */ React5.createElement(RotateCcwIcon, { size: 14 })), /* @__PURE__ */ React5.createElement("button", { onClick: addBlock, title: "add a block to the timeline, then lock it (the lock by its name) if it's fixed", style: { ...btn(C.ink, true), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React5.createElement(ListPlusIcon, { size: 14 }), " add block"), planUndo && /* @__PURE__ */ React5.createElement("button", { onClick: () => {
+    }))), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" } }, /* @__PURE__ */ React5.createElement("button", { onClick: autoBreaks, title: "auto-fix breaks: a short break between tasks and a long-break block every N pomodoros", style: { ...btn(C.muted, true), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React5.createElement(WandSparklesIcon, { size: 14 }), " auto-fix breaks"), /* @__PURE__ */ React5.createElement("button", { onClick: addBlock, title: "add a block to the timeline, then lock it (the lock by its name) if it's fixed", style: { ...btn(C.ink, true), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React5.createElement(ListPlusIcon, { size: 14 }), " add block"), planUndo && /* @__PURE__ */ React5.createElement("button", { onClick: () => {
       setTodayBlocks(planUndo);
       setPlanUndo(null);
     }, title: "undo the last auto-fix", style: { ...btn(C.worse, true), padding: "5px 10px", fontSize: 12 } }, "undo"))), blocks.length === 0 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: "0 0 8px" } }, "No blocks yet \u2014 sync some tasks and re-open the timeline, or add a block."), /* @__PURE__ */ React5.createElement("div", { ref: tlScrollRef, style: { maxHeight: "62vh", overflowY: "auto", overflowX: "hidden" } }, /* @__PURE__ */ React5.createElement("div", { ref: tlRef, onContextMenu: (e) => e.preventDefault(), style: { position: "relative", height: totalH } }, /* @__PURE__ */ React5.createElement("div", { style: { position: "absolute", left: 48, top: 0, bottom: 0, width: 2, background: C.line } }), items.map((it, i) => it.type === "gap" ? null : /* @__PURE__ */ React5.createElement(React5.Fragment, { key: it.b.id }, /* @__PURE__ */ React5.createElement("span", { style: { position: "absolute", left: 0, top: it.topY + 3, width: 44, textAlign: "right", fontSize: 10, color: C.muted, fontFamily: "var(--fl-mono)" } }, fmtClock(it.b.start)), renderBlock(it.b, it.topY, it.height))), nowY >= 0 && /* @__PURE__ */ React5.createElement("div", { ref: nowRef, style: { position: "absolute", left: 0, right: 0, top: nowY, height: 0, zIndex: 6, pointerEvents: "none" } }, /* @__PURE__ */ React5.createElement("div", { style: { position: "absolute", left: 46, right: 0, top: 0, borderTop: `2px solid ${C.worse}` } }), /* @__PURE__ */ React5.createElement("span", { style: { position: "absolute", left: 0, top: -7, width: 40, textAlign: "right", fontSize: 10, color: C.worse, fontFamily: "var(--fl-mono)", fontWeight: 700 } }, fmtClock(nowMin))))));
@@ -26256,14 +26363,14 @@ ${s.task}`))
       " ",
       v.label
     );
-  })), /* @__PURE__ */ React5.createElement("button", { onClick: doSync, disabled: sync === "loading", title: "sync from Notion", "aria-label": "sync from Notion", style: { ...btn(C.ink, true), justifySelf: "end", display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px" } }, /* @__PURE__ */ React5.createElement(RefreshCwIcon, { size: 14, spin: sync === "loading" }), sync === "loading" ? "\u2026" : /* @__PURE__ */ React5.createElement("img", { src: NOTION_LOGO, alt: "Notion", style: { width: 16, height: 16 } })))), fallingEnjoyment && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 200 } }, "Enjoyment is dipping over your last few pomodoros \\u2014 consider an extra break."), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
+  })), /* @__PURE__ */ React5.createElement("button", { onClick: doSync, disabled: sync === "loading", title: "sync from Notion and rebuild the timeline", "aria-label": "sync from Notion and rebuild the timeline", style: { ...btn(C.ink, true), justifySelf: "end", display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px" } }, /* @__PURE__ */ React5.createElement(RefreshCwIcon, { size: 14, spin: sync === "loading" }), sync === "loading" ? "\u2026" : /* @__PURE__ */ React5.createElement("img", { src: NOTION_LOGO, alt: "Notion", style: { width: 16, height: 16 } })))), fallingEnjoyment && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 200 } }, "Enjoyment is dipping over your last few pomodoros \\u2014 consider an extra break."), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
     startBreak();
     setView("break");
-  }, style: { ...btn(C.ink, true), padding: "3px 10px" } }, "take a break")), tasks.length === 0 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), !timelineMode && tasks.length > 1 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 11, margin: "0 0 8px" } }, "Pinned tasks stay on top, then ", /* @__PURE__ */ React5.createElement("img", { src: crown_default, alt: "King", draggable: false, style: { width: 12, height: 12, verticalAlign: "-2px" } }), " King. New tasks arrive ranked Must ", "\u2192", " Aim ", "\u2192", " Bonus; drag the grip to reorder freely. Hover a row to pin it or move it between Work and Personal."), timelineMode ? renderTimeline() : renderTodaySections()), view === "status" && /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 14, alignItems: "flex-start" } }, /* @__PURE__ */ React5.createElement("div", { style: { flex: 1, minWidth: 0 } }, statusSub === "week" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setWeekOff((w) => w - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, fmtDate(weekStart), " ", "\u2013", " ", fmtDate(new Date(+weekEnd - DAY))), /* @__PURE__ */ React5.createElement("button", { onClick: () => setWeekOff((w) => Math.min(0, w + 1)), style: btn(C.muted, true) }, "\u2192")), weekAreas.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, textAlign: "center", padding: "40px 0" } }, weekSessions.length ? "No pomodoros with an Area this week." : "No pomodoros this week.") : weekAreas.map((a) => /* @__PURE__ */ React5.createElement(GroupChart, { key: a, group: a, sessions: weekSessions.filter((x) => x.category === a), settings })), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted } }, /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink } }, "\u25CB"), " expected"), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink } }, "\u25CF"), " actual"), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.better } }, "\u2014"), " better than expected"), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.worse } }, "\u2014"), " worse than expected"))), statusSub === "month" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setMonthOff((m) => m - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, monthRef.toLocaleDateString(void 0, { month: "long", year: "numeric" })), /* @__PURE__ */ React5.createElement("button", { onClick: () => setMonthOff((m) => Math.min(0, m + 1)), style: btn(C.muted, true) }, "\u2192")), /* @__PURE__ */ React5.createElement(Heatmap, { sessions, monthRef, settings, onOpenDay: (date) => api.openDailyNote && api.openDailyNote(+date) })), statusSub === "totals" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Pomodoro totals"), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 6 } }, "All pomodoros, every project combined."), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around" } }, /* @__PURE__ */ React5.createElement(Stat, { label: "this week", value: countWeek, big: true }), /* @__PURE__ */ React5.createElement(Stat, { label: "this month", value: countMonth, big: true }), /* @__PURE__ */ React5.createElement(Stat, { label: "this year", value: countYear, big: true })), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 } }, /* @__PURE__ */ React5.createElement(Stat, { label: "hours, week", value: hrsOf(sumMin(inWeek)), color: C.muted }), /* @__PURE__ */ React5.createElement(Stat, { label: "hours, month", value: hrsOf(sumMin(inMonth)), color: C.muted }), /* @__PURE__ */ React5.createElement(Stat, { label: "hours, year", value: hrsOf(sumMin(inYear)), color: C.muted }))), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Six-month heatmap"), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 12 } }, "Last 6 months \u2014 pomodoros per day."), /* @__PURE__ */ React5.createElement(ContribHeatmap, { sessions, settings })), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Expected vs actual"), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "Expected vs actual enjoyment."), rated === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No ratings yet. Log a few pomodoros to see your calibration.") : /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 15, lineHeight: 1.5, marginBottom: surprises.length ? 14 : 0 } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 22, color: C.better } }, betterPct, "%"), " of your pomodoros turned out ", /* @__PURE__ */ React5.createElement("span", { style: { color: C.better } }, "more enjoyable"), " than you expected", /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted } }, " (avg gap ", /* @__PURE__ */ React5.createElement("span", { style: { color: avgGapAll > 0 ? C.better : avgGapAll < 0 ? C.worse : C.neutral, fontFamily: "var(--fl-mono)" } }, (avgGapAll >= 0 ? "+" : "") + avgGapAll.toFixed(1)), ").")), surprises.length > 0 && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 } }, "Biggest surprises \u2014 dreaded, then enjoyed"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, surprises.map((s) => /* @__PURE__ */ React5.createElement("div", { key: s.id, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13 } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.better, minWidth: 28 } }, "+", s.actual - s.expected), /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, s.task), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" } }, /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink } }, s.expected), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted } }, " \u2192 "), /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink } }, s.actual)), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 11, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap" } }, fmtDate(s.ts)))))))), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Best time of day"), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "Average enjoyment per band."), !bestBand ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "Not enough data yet.") : /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 15, marginBottom: 12 } }, "Your highest-enjoyment band is ", /* @__PURE__ */ React5.createElement("b", { style: { color: C.ink } }, bestBand.name), " ", /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 13 } }, "(", bestBand.avg.toFixed(1), " / 5)"), "."), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, bandStats.map((b) => {
+  }, style: { ...btn(C.ink, true), padding: "3px 10px" } }, "take a break")), tasks.length === 0 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), !timelineMode && tasks.length > 1 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 11, margin: "0 0 8px" } }, "Pinned tasks stay on top, then ", /* @__PURE__ */ React5.createElement("img", { src: crown_default, alt: "King", draggable: false, style: { width: 12, height: 12, verticalAlign: "-2px" } }), " King. New tasks arrive ranked Must ", "\u2192", " Aim ", "\u2192", " Bonus; drag the grip to reorder freely. Hover a row to pin it or move it between Work and Personal."), timelineMode ? renderTimeline() : renderTodaySections()), view === "status" && /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 14, alignItems: "flex-start" } }, /* @__PURE__ */ React5.createElement("div", { style: { flex: 1, minWidth: 0 } }, statusSub === "week" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setWeekOff((w) => w - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, fmtDate(weekStart), " ", "\u2013", " ", fmtDate(new Date(+weekEnd - DAY))), /* @__PURE__ */ React5.createElement("button", { onClick: () => setWeekOff((w) => Math.min(0, w + 1)), style: btn(C.muted, true) }, "\u2192")), weekAreas.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, textAlign: "center", padding: "40px 0" } }, weekSessions.length ? "No pomodoros with an Area this week." : "No pomodoros this week.") : weekAreas.map((a) => /* @__PURE__ */ React5.createElement(GroupChart, { key: a, group: a, sessions: weekSessions.filter((x) => x.category === a), settings })), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted } }, /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink } }, "\u25CB"), " expected"), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink } }, "\u25CF"), " actual"), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.better } }, "\u2014"), " better than expected"), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.worse } }, "\u2014"), " worse than expected"))), statusSub === "month" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingLeft: 13, paddingRight: 8 } }, /* @__PURE__ */ React5.createElement("span", { ref: monthLabelRef, title: "scroll to change the month", style: { fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums", fontSize: 16, fontWeight: "var(--h3-weight, 600)", color: C.ink, letterSpacing: "-0.01em", lineHeight: 1, cursor: "ns-resize", userSelect: "none" } }, /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-block", minWidth: "2.3em" } }, MON3[monthRef.getMonth()]), /* @__PURE__ */ React5.createElement("span", { style: { color: ACCENT, marginLeft: "0.1em" } }, monthRef.getFullYear())), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setMonthOff((m) => m - 1), title: "previous month", "aria-label": "previous month", style: { background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" } }, /* @__PURE__ */ React5.createElement(ChevronLeftIcon, { size: 20 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => setMonthOff(0), disabled: monthOff === 0, title: "jump to the current month", "aria-label": "today", style: { background: "transparent", border: "none", boxShadow: "none", color: C.muted, cursor: monthOff === 0 ? "default" : "pointer", padding: "5px 8px", borderRadius: 7, fontFamily: "var(--fl-display)", fontWeight: 700, fontSize: 13, letterSpacing: "0.02em", opacity: monthOff === 0 ? 0.4 : 1 } }, "TODAY"), /* @__PURE__ */ React5.createElement("button", { onClick: () => setMonthOff((m) => m + 1), title: "next month", "aria-label": "next month", style: { background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" } }, /* @__PURE__ */ React5.createElement(ChevronRightIcon, { size: 20 })))), /* @__PURE__ */ React5.createElement(Heatmap, { sessions, monthRef, settings, onOpenDay: (date) => api.openDailyNote && api.openDailyNote(+date) })), statusSub === "totals" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Pomodoro totals"), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 6 } }, "All pomodoros, every project combined."), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around" } }, /* @__PURE__ */ React5.createElement(Stat, { label: "this week", value: countWeek, big: true }), /* @__PURE__ */ React5.createElement(Stat, { label: "this month", value: countMonth, big: true }), /* @__PURE__ */ React5.createElement(Stat, { label: "this year", value: countYear, big: true })), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 } }, /* @__PURE__ */ React5.createElement(Stat, { label: "hours, week", value: hrsOf(sumMin(inWeek)), color: C.muted }), /* @__PURE__ */ React5.createElement(Stat, { label: "hours, month", value: hrsOf(sumMin(inMonth)), color: C.muted }), /* @__PURE__ */ React5.createElement(Stat, { label: "hours, year", value: hrsOf(sumMin(inYear)), color: C.muted }))), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Six-month heatmap"), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 12 } }, "Last 6 months \u2014 pomodoros per day."), /* @__PURE__ */ React5.createElement(ContribHeatmap, { sessions, settings })), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Expected vs actual"), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "Expected vs actual enjoyment."), rated === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No ratings yet. Log a few pomodoros to see your calibration.") : /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 15, lineHeight: 1.5, marginBottom: surprises.length ? 14 : 0 } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 22, color: C.better } }, betterPct, "%"), " of your pomodoros turned out ", /* @__PURE__ */ React5.createElement("span", { style: { color: C.better } }, "more enjoyable"), " than you expected", /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted } }, " (avg gap ", /* @__PURE__ */ React5.createElement("span", { style: { color: avgGapAll > 0 ? C.better : avgGapAll < 0 ? C.worse : C.neutral, fontFamily: "var(--fl-mono)" } }, (avgGapAll >= 0 ? "+" : "") + avgGapAll.toFixed(1)), ").")), surprises.length > 0 && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 } }, "Biggest surprises \u2014 dreaded, then enjoyed"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, surprises.map((s) => /* @__PURE__ */ React5.createElement("div", { key: s.id, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 13 } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.better, minWidth: 28 } }, "+", s.actual - s.expected), /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, s.task), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" } }, /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink } }, s.expected), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted } }, " \u2192 "), /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink } }, s.actual)), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 11, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap" } }, fmtDate(s.ts)))))))), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Best time of day"), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "Average enjoyment per band."), !bestBand ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "Not enough data yet.") : /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 15, marginBottom: 12 } }, "Your highest-enjoyment band is ", /* @__PURE__ */ React5.createElement("b", { style: { color: C.ink } }, bestBand.name), " ", /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 13 } }, "(", bestBand.avg.toFixed(1), " / 5)"), "."), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, bandStats.map((b) => {
     const pct = b.avg != null ? b.avg / 5 * 100 : 0;
     const isBest = bestBand && b.band === bestBand.band;
     return /* @__PURE__ */ React5.createElement("div", { key: b.band, style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 70, fontSize: 12, color: C.muted, textTransform: "capitalize" } }, b.name), /* @__PURE__ */ React5.createElement("div", { style: { flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` } }, /* @__PURE__ */ React5.createElement("div", { style: { width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral } })), /* @__PURE__ */ React5.createElement("span", { style: { width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted } }, b.avg != null ? b.avg.toFixed(1) : "\u2014", " \xB7 ", b.count, "\u{1F345}"));
-  })))), /* @__PURE__ */ React5.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React5.createElement("h3", { onClick: () => toggleFold("sessions"), style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 } }, foldedHistory.has("sessions") ? "\u25B8" : "\u25BE", " All sessions"), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), foldedHistory.has("sessions") ? null : sessions.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React5.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React5.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), !foldedHistory.has("sessions") && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion.")))), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, flexShrink: 0, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 11, padding: 4 } }, [["week", "Week"], ["month", "Month"], ["totals", "Total"]].map(([k, lab]) => /* @__PURE__ */ React5.createElement("button", { key: k, onClick: () => setStatusSub(k), style: segV(statusSub === k) }, lab)))), view === "log" && /* @__PURE__ */ React5.createElement(LogForm, { tasks: orderedTasks, preset, onAdd: logPomodoro, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask: (v) => {
+  })))), /* @__PURE__ */ React5.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React5.createElement("h3", { onClick: () => toggleFold("sessions"), style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 } }, foldedHistory.has("sessions") ? "\u25B8" : "\u25BE", " All sessions"), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), foldedHistory.has("sessions") ? null : sessions.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React5.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React5.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), !foldedHistory.has("sessions") && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion.")))), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, flexShrink: 0, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 10, padding: 4 } }, [["week", "Week"], ["month", "Month"], ["totals", "Total"]].map(([k, lab]) => /* @__PURE__ */ React5.createElement("button", { key: k, onClick: () => setStatusSub(k), style: segV(statusSub === k) }, lab)))), view === "log" && /* @__PURE__ */ React5.createElement(LogForm, { tasks: orderedTasks, preset, onAdd: logPomodoro, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask: (v) => {
     setPreset(v);
     api.timer && api.timer.setTask(v);
   }, onPause, pauseActive, paused: timer.paused, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, expected: timer.expected, onSetExpected: setExpectedRating, autoLogDefault: settings.autoLogOnRate !== false, onAutoLogChange: (v) => api.patchSettings && api.patchSettings({ autoLogOnRate: v }) }), view === "break" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 16 } }, /* @__PURE__ */ React5.createElement("span", { style: SECTION_HEAD }, "start a break"), /* @__PURE__ */ React5.createElement("button", { onClick: () => startBreak(settings.breakMinutes), style: { ...btn(C.ink, true), padding: "5px 12px" } }, "short \xB7 ", settings.breakMinutes, "m"), /* @__PURE__ */ React5.createElement("button", { onClick: () => startBreak(settings.longBreakMinutes), style: { ...btn(C.ink, true), padding: "5px 12px" } }, "long \xB7 ", settings.longBreakMinutes, "m")), brk.active && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink } }, String(Math.floor(brk.secs / 60)).padStart(2, "0"), ":", String(brk.secs % 60).padStart(2, "0")), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "flex-end" } }, !brk.finished && /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 4, marginRight: 4 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => api.timer.stepBreak(-1), style: { ...btn(C.muted, true), padding: "4px 9px" } }, "\u2212"), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, minWidth: 34, textAlign: "center" } }, Math.round(brk.secs / 60), "m"), /* @__PURE__ */ React5.createElement("button", { onClick: () => api.timer.stepBreak(1), style: { ...btn(C.muted, true), padding: "4px 9px" } }, "+")), !brk.finished && /* @__PURE__ */ React5.createElement("button", { onClick: () => api.timer.toggleBreakRun(), title: brk.running ? "pause" : "start", "aria-label": brk.running ? "pause" : "start", style: { ...btn(C.ink), display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "7px 13px" } }, brk.running ? /* @__PURE__ */ React5.createElement(PauseIcon, { size: 16 }) : /* @__PURE__ */ React5.createElement(PlayIcon, { size: 16 })), /* @__PURE__ */ React5.createElement("button", { onClick: endBreak, title: brk.finished ? "go back to my task" : "end break", "aria-label": brk.finished ? "go back to my task" : "end break", style: { ...btn(C.muted, true), display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "7px 13px" } }, brk.finished ? /* @__PURE__ */ React5.createElement(ArrowRightIcon, { size: 16 }) : /* @__PURE__ */ React5.createElement(CheckIcon, { size: 16 })))), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, margin: "0 0 8px" } }, "Pick up to 3 \u2014 tap an activity (", brk.picked.length, "/3):"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, activities.length === 0 ? /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "No activities yet \u2014 end the break to add some.") : activities.map((a, i) => renderActRow(a, i))), /* @__PURE__ */ React5.createElement("div", { style: { marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` } }, /* @__PURE__ */ React5.createElement(Scale, { label: "how do you feel now? (1 worse than no rest \u2026 5 a lot better)", value: brk.feeling, onChange: (v) => api.timer.setBreakFeeling(v) }))), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20, display: brk.active ? "none" : void 0 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Break activities"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 } }, activities.length === 0 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "None yet. Add an activity and an area below."), activities.map((a, i) => renderActRow(a, i))), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" } }, /* @__PURE__ */ React5.createElement("input", { value: newAct.area, onChange: (e) => setNewAct({ ...newAct, area: e.target.value }), placeholder: "area / tag", style: { flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", boxSizing: "border-box" } }), /* @__PURE__ */ React5.createElement(AutoTextarea, { value: newAct.name, onChange: (e) => setNewAct({ ...newAct, name: e.target.value }), placeholder: "activity name", style: { flex: 2, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" } }), /* @__PURE__ */ React5.createElement("button", { onClick: addActivity, title: "add", "aria-label": "add", style: { ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(ListPlusIcon, { size: 16 })))), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Break stats"), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "What you reach for on breaks."), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 } }, /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, "Favourites"), favs.length === 0 ? /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "\u2014") : favs.map((a) => /* @__PURE__ */ React5.createElement("div", { key: a.id, style: { fontSize: 13 } }, a.name, " ", /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 11 } }, a.count, "\xD7")))), /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, "Least chosen"), disliked.length === 0 ? /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "\u2014") : disliked.map((a) => /* @__PURE__ */ React5.createElement("div", { key: a.id, style: { fontSize: 13, color: C.muted } }, a.name, " ", /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 11 } }, a.count || 0, "\xD7"))))), /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 } }, "By area"), /* @__PURE__ */ React5.createElement(PieChart, { data: pieData })), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" } }, "Break insights"), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, marginBottom: 10 } }, "What actually leaves you feeling restored."), ratedBreaks.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "Rate a few breaks to see what restores you best.") : /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" } }, "Most restorative activities"), actScore.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No rated breaks had activities yet.") : /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 18 } }, actScore.slice(0, 3).map((x, i) => /* @__PURE__ */ React5.createElement("div", { key: x.id, style: { display: "flex", alignItems: "baseline", gap: 8, fontSize: 13 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 16, color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 12 } }, i + 1, "."), /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, color: C.ink, overflowWrap: "anywhere" } }, x.name, x.n < 3 && /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 10, color: C.muted } }, " (low sample)")), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted } }, x.avg.toFixed(1), " / 5")))), /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" } }, "Best time for breaks"), bestBreakBand ? /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, breakBandStats.map((b) => {
@@ -26344,6 +26451,7 @@ var DEFAULT_SETTINGS = {
   dinnerEnabled: false,
   dinnerStart: 1110,
   dinnerMinutes: 45,
+  nightRoutineGap: 60,
   heatThresholds: "1,2,4,6,8,10",
   dailyNoteWrite: true,
   dailyNoteTrueDate: true,
@@ -28512,6 +28620,19 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.persist();
       })
     );
+    const nightGapSet = new import_obsidian.Setting(containerEl).setName("Night routine starts after dinner").setDesc("On the Timeline, the night routine begins this many minutes after dinner ends. Default 60.");
+    nightGapSet.addText((t) => {
+      var _a2;
+      t.setPlaceholder("60").setValue(String((_a2 = this.plugin.data.settings.nightRoutineGap) != null ? _a2 : 60)).onChange(async (v) => {
+        const n = parseInt(v, 10);
+        if (!Number.isFinite(n) || n < 0)
+          return;
+        this.plugin.data.settings.nightRoutineGap = n;
+        await this.plugin.persist();
+      });
+      t.inputEl.style.width = "4em";
+    });
+    nightGapSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
     containerEl.createEl("h3", { text: "Daily note" });
     new import_obsidian.Setting(containerEl).setName("Append to daily note when logging").setDesc("On each logged pomodoro, write a block into the daily note.").addToggle(
       (t) => t.setValue(this.plugin.data.settings.dailyNoteWrite).onChange(async (v) => {
