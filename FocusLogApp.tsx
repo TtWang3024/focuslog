@@ -11,6 +11,10 @@ import ratePartly from "./assets/rate-partly-sunny.png";
 import rateSun from "./assets/rate-sun.png";
 import crownImg from "./assets/crown.png";
 import starImg from "./assets/star.png";
+import treeSpring from "./assets/tree-spring.png";
+import treeSummer from "./assets/tree-summer.png";
+import treeAutumn from "./assets/tree-autumn.png";
+import treeWinter from "./assets/tree-winter.png";
 const { useState, useEffect, useRef, useCallback } = React;
 // Break-block palette: short break = blue, long break = teal (the note icons match the text colour).
 const BREAK_BG = "#edf3f8", BREAK_STRIPE = "#9bb4c8", BREAK_TEXT = "#5e7d96";
@@ -282,11 +286,11 @@ function Heatmap({ sessions, monthRef, settings, onOpenDay }: any) {
           const list = (byKey[keyOf(date)] || []).sort((a: any, b: any) => +new Date(a.ts) - +new Date(b.ts));
           return (
             <div key={idx} className="fl-calday" onClick={() => onOpenDay && onOpenDay(date)}
-              title={`Open daily note for ${date.toLocaleDateString()}`}
+              aria-label={`Open daily note for ${date.toLocaleDateString()}`}
               style={{ minHeight: 56, boxSizing: "border-box", border: isToday ? `2.5px solid ${ACCENT}` : `1px solid ${C.line}`, borderRadius: 6, padding: 4, background: C.paper, cursor: "pointer", opacity: inMonth ? 1 : 0.5 }}>
               <div style={{ fontSize: 10.5, fontFamily: "var(--fl-mono)", color: inMonth ? weekdayInk(wd) : C.faint, marginBottom: 3 }}>{date.getDate()}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-                {list.map((x: any) => (<span key={x.id} title={`${x.task} \u00B7 ${bandLabel(x.ts, settings)}`} style={{ width: 9, height: 9, borderRadius: 2, background: timeColor(x.ts, settings) }} />))}
+                {list.map((x: any) => (<span key={x.id} aria-label={`${x.task} \u00B7 ${bandLabel(x.ts, settings)}`} style={{ width: 9, height: 9, borderRadius: 2, background: timeColor(x.ts, settings) }} />))}
               </div>
             </div>
           );
@@ -306,6 +310,15 @@ function Heatmap({ sessions, monthRef, settings, onOpenDay }: any) {
   );
 }
 
+// Break feeling: four season trees, deliberately WITHOUT a good/bad axis — sometimes it's hard
+// to tell. They capture the flavour instead: did the break cool you down (Winter) or leave you
+// energised (Summer)? Shared with the float window's break screen.
+export const BREAK_SEASONS = [
+  { v: 1, img: treeSpring, name: "Spring" },
+  { v: 2, img: treeSummer, name: "Summer" },
+  { v: 3, img: treeAutumn, name: "Autumn" },
+  { v: 4, img: treeWinter, name: "Winter" },
+];
 // Enjoyment rating: a 4-step weather scale (rain to sun), each its own colour. Same look before/after.
 const RATE_SCALE = [
   { v: 1, img: rateRain, bg: "#BCBCBC" },
@@ -313,12 +326,16 @@ const RATE_SCALE = [
   { v: 3, img: ratePartly, bg: "#C9EAFF" },
   { v: 4, img: rateSun, bg: "#89D2FF" },
 ];
-function Scale({ value, onChange, label, weather, color }: any) {
+function Scale({ value, onChange, label, weather, seasons, color }: any) {
   return (
     <div style={{ marginBottom: 12 }}>
       <label style={{ color: C.muted, fontSize: 12 }}>{label}</label>
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-        {weather ? RATE_SCALE.map((w) => (
+        {seasons ? BREAK_SEASONS.map((sn) => (
+          <button key={sn.v} onClick={() => onChange(sn.v)} aria-pressed={value === sn.v} aria-label={sn.name} style={{ width: 48, height: 48, borderRadius: 10, border: value === sn.v ? `2.5px solid ${C.ink}` : `1.5px solid ${C.faint}`, background: C.card, cursor: "default", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 5, boxSizing: "border-box" }}>
+            <img src={sn.img} alt={sn.name} draggable={false} style={{ width: 32, height: 32, display: "block" }} />
+          </button>
+        )) : weather ? RATE_SCALE.map((w) => (
           <button key={w.v} onClick={() => onChange(w.v)} aria-pressed={value === w.v} style={{ width: 48, height: 48, borderRadius: 10, border: value === w.v ? `2.5px solid ${C.ink}` : `1.5px solid ${C.faint}`, background: w.bg, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 5, boxSizing: "border-box" }}>
             <img src={w.img} alt={"rating " + w.v} draggable={false} style={{ width: 32, height: 32, display: "block" }} />
           </button>
@@ -370,7 +387,7 @@ function ContribHeatmap({ sessions, settings }: any) {
     const day = new Date(+gridStart + (w * 7 + dow) * DAY);
     const inRange = day >= startMonth && day <= end;
     const k = ymd(day), n = counts[k] || 0;
-    cells.push(<div key={dow + "-" + w} title={inRange ? `${k}: ${n}${"\u{1F345}"}` : ""} style={{ width: CELL, height: CELL, borderRadius: 2, boxSizing: "border-box", background: inRange ? heat(n) : "transparent", border: `1px solid ${inRange ? C.line : "transparent"}` }} />);
+    cells.push(<div key={dow + "-" + w} aria-label={inRange ? `${k}: ${n}${"\u{1F345}"}` : undefined} style={{ width: CELL, height: CELL, borderRadius: 2, boxSizing: "border-box", background: inRange ? heat(n) : "transparent", border: `1px solid ${inRange ? C.line : "transparent"}` }} />);
   }
   const monthLabels: any[] = [];
   let cur = new Date(startMonth);
@@ -394,7 +411,7 @@ function ContribHeatmap({ sessions, settings }: any) {
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
         {[{ c: HEAT_EMPTY, label: "0" }, ...PAL.map((c, i) => ({ c, label: lvlLabel(i) }))].map((it: any, i: number) => (
-          <span key={i} title={`${it.label} pomodoro${it.label === "1" ? "" : "s"}`} style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+          <span key={i} aria-label={`${it.label} pomodoro${it.label === "1" ? "" : "s"}`} style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
             <span style={{ width: CELL, height: CELL, borderRadius: 2, background: it.c, border: `1px solid ${C.line}`, boxSizing: "border-box" }} />
             <span style={{ fontSize: 9, color: C.muted, fontFamily: "var(--fl-mono)" }}>{it.label}</span>
           </span>
@@ -731,7 +748,7 @@ function AutoTextarea({ value, onChange, placeholder, style }: any) {
 
 function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, expected, onSetExpected, autoLogDefault, onAutoLogChange }: any) {
   const [task, setTask] = useState(preset || "");
-  const [act, setAct] = useState(3);
+  const [act, setAct] = useState(0);   // 0 = not rated yet: no weather button pre-highlighted
   const [note, setNote] = useState("");
   const [markDone, setMarkDone] = useState(false);
   const [autoLog, setAutoLog] = useState(autoLogDefault !== false);
@@ -763,6 +780,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
     onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: expectedVal, actual: actualVal, note: note.trim(), minutes: workedMin }, markDone);
     setNote("");
     setMarkDone(false);
+    setAct(0);   // clear the rating so the next pomodoro's finish panel starts unhighlighted
   };
   const submit = () => buildAndAdd(act, expected);
   // The "before" rating lives on the timer engine (single source of truth), so the panel, the
@@ -777,7 +795,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   const hasTask = !!(task && task.trim());
   const canLog = rated && hasTask;
   const blockStart = !running && !paused && !pauseActive && !canLog;
-  const logBtn = <button onClick={submit} disabled={!canLog} title={canLog ? "" : "pick a task and an expected rating first"} style={{ ...btn(C.ink), width: "100%", padding: "10px", opacity: canLog ? 1 : 0.5, cursor: canLog ? "pointer" : "not-allowed" }}>log pomodoro + write Act</button>;
+  const logBtn = <button onClick={submit} disabled={!canLog} aria-label={canLog ? undefined : "pick a task and an expected rating first"} style={{ ...btn(C.ink), width: "100%", padding: "10px", opacity: canLog ? 1 : 0.5, cursor: canLog ? "pointer" : "not-allowed" }}>log pomodoro + write Act</button>;
   const markDoneLabel = (
     <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13, color: C.ink, cursor: "pointer" }}>
       <input type="checkbox" checked={markDone} onChange={(e) => setMarkDone(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.better, cursor: "pointer" }} />
@@ -803,10 +821,10 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          <button disabled={lenLocked || pomoMin <= 5} onMouseDown={() => beginHold(-1)} onMouseUp={endHold} onMouseLeave={endHold} title={lenLocked ? "length is locked while a pomodoro is running" : "shorter — hold to speed up (min 5)"} style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: (lenLocked || pomoMin <= 5) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}>{"−"}</button>
-          <button onClick={running ? onPause : () => onStart(task)} disabled={blockStart} title={blockStart ? "pick a task and an expected rating first" : ""} style={{ ...btn(C.ink), minWidth: 104, opacity: blockStart ? 0.5 : 1, cursor: blockStart ? "not-allowed" : "pointer" }}>{running ? "pause" : `${(paused || pauseActive) ? "resume" : "start"} ${pomoMin}m`}</button>
-          <button disabled={lenLocked || pomoMin >= 30} onMouseDown={() => beginHold(1)} onMouseUp={endHold} onMouseLeave={endHold} title={lenLocked ? "length is locked while a pomodoro is running" : "longer — hold to speed up (max 30)"} style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: (lenLocked || pomoMin >= 30) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}>{"+"}</button>
-          <button onClick={() => { resetTimer(); setTask(""); onPickTask && onPickTask(""); }} title="reset" aria-label="reset" style={{ ...btn(C.muted, true), padding: "7px 11px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><RotateCcwIcon size={15} /></button>
+          <button disabled={lenLocked || pomoMin <= 5} onMouseDown={() => beginHold(-1)} onMouseUp={endHold} onMouseLeave={endHold} aria-label={lenLocked ? "length is locked while a pomodoro is running" : "shorter — hold to speed up (min 5)"} style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: (lenLocked || pomoMin <= 5) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}>{"−"}</button>
+          <button onClick={running ? onPause : () => onStart(task)} disabled={blockStart} aria-label={blockStart ? "pick a task and an expected rating first" : undefined} style={{ ...btn(C.ink), minWidth: 104, opacity: blockStart ? 0.5 : 1, cursor: blockStart ? "not-allowed" : "pointer" }}>{running ? "pause" : `${(paused || pauseActive) ? "resume" : "start"} ${pomoMin}m`}</button>
+          <button disabled={lenLocked || pomoMin >= 30} onMouseDown={() => beginHold(1)} onMouseUp={endHold} onMouseLeave={endHold} aria-label={lenLocked ? "length is locked while a pomodoro is running" : "longer — hold to speed up (max 30)"} style={{ ...btn(C.muted, true), padding: "6px 10px", opacity: (lenLocked || pomoMin >= 30) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}>{"+"}</button>
+          <button onClick={() => { resetTimer(); setTask(""); onPickTask && onPickTask(""); }} aria-label="reset" style={{ ...btn(C.muted, true), padding: "7px 11px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><RotateCcwIcon size={15} /></button>
         </div>
       </div>
       <label style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 14, fontSize: 12.5, color: C.muted, cursor: "pointer" }}>
@@ -844,7 +862,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
           <Scale label="after: how enjoyable was it actually?" value={act} onChange={rateActual} weather />
           <button onClick={submit} disabled={!act || !canLog}
-            title={!act ? "pick a rating first" : (canLog ? "" : "pick a task first")}
+            aria-label={!act ? "pick a rating first" : (canLog ? undefined : "pick a task first")}
             style={{ ...btn(C.ink), width: "100%", padding: "10px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (act && canLog) ? 1 : 0.5, cursor: (act && canLog) ? "pointer" : "not-allowed" }}>
             <img src={starImg} alt="" draggable={false} style={{ width: 16, height: 16 }} /> Light up a star in my Sky
           </button>
@@ -882,8 +900,8 @@ function SessionRow({ s, settings, onEdit, onDelete }: any) {
         <span style={{ color: C.muted }}> {"→"} </span>
         <span style={{ color: C.ink }}>{s.actual}</span>
       </span>
-      <button onClick={() => onEdit(s)} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-      <button onClick={() => onDelete(s)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+      <button onClick={() => onEdit(s)} className="fl-rowact" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+      <button onClick={() => onDelete(s)} className="fl-rowact fl-rowdel" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
     </div>
   );
 }
@@ -1140,8 +1158,8 @@ export default function FocusLogApp({ api }: any) {
             <option value="external">external</option>
           </select>
           <input value={editTagName} onChange={(e) => setEditTagName(e.target.value)} style={{ flex: 1, minWidth: 120, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
-          <button onClick={saveEditTag} title="save" aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
-          <button onClick={() => setEditTagId(null)} title="cancel" aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
+          <button onClick={saveEditTag} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
+          <button onClick={() => setEditTagId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
         </div>
       );
     }
@@ -1151,13 +1169,13 @@ export default function FocusLogApp({ api }: any) {
         onDragOver={(e) => { e.preventDefault(); if (tagOver !== i) setTagOver(i); }}
         onDrop={(e) => { e.preventDefault(); if (tagDrag != null && catOf(pauseTags[tagDrag] && pauseTags[tagDrag].category) === cat) moveTag(tagDrag, i); setTagDrag(null); setTagOver(null); }}
         style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: "#fbf8f1", border: `1px solid ${C.line}`, borderLeft: `4px solid ${catBorder(cat)}`, borderRadius: 6, color: C.ink, opacity: tagDrag === i ? 0.4 : 1, boxShadow: tagOver === i && tagDrag !== null && tagDrag !== i ? `inset 0 2px 0 ${C.ink}` : "none" }}>
-        <span draggable onDragStart={(e) => { setTagDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }} onDragEnd={() => { setTagDrag(null); setTagOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
+        <span draggable onDragStart={(e) => { setTagDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }} onDragEnd={() => { setTagDrag(null); setTagOver(null); }} aria-label="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
           {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
         </span>
         {!tinyPanel && <span style={{ minWidth: 88, flexShrink: 0, display: "flex", alignItems: "center" }}><span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", padding: "1px 8px", borderRadius: 999, background: catColor(cat), border: `1px solid ${catBorder(cat)}`, color: darken(catBorder(cat), 0.5), whiteSpace: "nowrap" }}>{cat}</span></span>}
         <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
-        <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); setEditTagCat(cat); }} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-        <button onClick={() => removePauseTag(t.id)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+        <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); setEditTagCat(cat); }} className="fl-rowact" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+        <button onClick={() => removePauseTag(t.id)} className="fl-rowact fl-rowdel" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
       </div>
     );
   };
@@ -1254,6 +1272,10 @@ export default function FocusLogApp({ api }: any) {
   useEffect(() => {
     if (!api.onRequestLogView) return;
     return api.onRequestLogView(() => setView("log"));
+  }, []);
+  useEffect(() => {
+    if (!api.onRequestSkyView) return;
+    return api.onRequestSkyView(() => setView("sky"));
   }, []);
   // A float quick-log adds a session (and may mark a task Done or choose the next task)
   // outside React; re-read everything it can touch, and adopt its next-task pick as the
@@ -1496,8 +1518,8 @@ export default function FocusLogApp({ api }: any) {
       <div key={a.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap", padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
         <input value={editActDraft.area} onChange={(e) => setEditActDraft({ ...editActDraft, area: e.target.value })} placeholder="area" style={{ flex: 1, minWidth: 70, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
         <AutoTextarea value={editActDraft.name} onChange={(e: any) => setEditActDraft({ ...editActDraft, name: e.target.value })} style={{ flex: 2, minWidth: 110, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" }} />
-        <button onClick={saveEditAct} title="save" aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
-        <button onClick={() => setEditActId(null)} title="cancel" aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
+        <button onClick={saveEditAct} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
+        <button onClick={() => setEditActId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
       </div>
     ) : (
       <div key={a.id}
@@ -1506,15 +1528,15 @@ export default function FocusLogApp({ api }: any) {
         onDragOver={(e) => { e.preventDefault(); if (actOver !== i) setActOver(i); }}
         onDrop={(e) => { e.preventDefault(); moveActivity(actDrag, i); setActDrag(null); setActOver(null); }}
         style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 10px", background: isPicked(a) ? areaColor(a.area) : "#fbf8f1", border: `1px solid ${C.line}`, borderLeft: `${isPicked(a) ? 6 : 4}px solid ${areaBorder(a.area)}`, borderRadius: 6, color: C.ink, cursor: brk.active ? "pointer" : "default", opacity: actDrag === i ? 0.4 : 1, boxShadow: actOver === i && actDrag !== null && actDrag !== i ? `inset 0 2px 0 ${C.ink}` : "none" }}>
-        <span draggable onClick={(e) => e.stopPropagation()} onDragStart={(e) => { setActDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }} onDragEnd={() => { setActDrag(null); setActOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
+        <span draggable onClick={(e) => e.stopPropagation()} onDragStart={(e) => { setActDrag(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }} onDragEnd={() => { setActDrag(null); setActOver(null); }} aria-label="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
           {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
         </span>
         {!tinyPanel && <span style={{ minWidth: 88, flexShrink: 0, display: "flex", alignItems: "center" }}><span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", padding: "1px 8px", borderRadius: 999, background: isPicked(a) ? "#fff" : areaColor(a.area), border: `1px solid ${areaBorder(a.area)}`, color: darken(areaBorder(a.area), 0.62), whiteSpace: "nowrap" }}>#{a.area}</span></span>}
         <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", fontWeight: isPicked(a) ? 700 : 400 }}>{isPicked(a) ? "✓ " : ""}{a.name}</span>
         {!narrowPanel && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted }}>{a.count || 0}{"×"}</span>}
         {!narrowPanel && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>}
-        <button onClick={(e) => { e.stopPropagation(); startEditAct(a); }} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-        <button onClick={(e) => { e.stopPropagation(); removeActivity(a.id); }} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+        <button onClick={(e) => { e.stopPropagation(); startEditAct(a); }} className="fl-rowact" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+        <button onClick={(e) => { e.stopPropagation(); removeActivity(a.id); }} className="fl-rowact fl-rowdel" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
       </div>
     )
   );
@@ -1540,7 +1562,7 @@ export default function FocusLogApp({ api }: any) {
       <div
         key={key}
         className="fl-task-row fl-act-row"
-        title={POWER_LABEL[t.power] || POWER_LABEL.Y}
+        aria-label={POWER_LABEL[t.power] || POWER_LABEL.Y}
         onDragOver={(e) => { e.preventDefault(); if (overIndex !== i) setOverIndex(i); }}
         onDrop={(e) => { e.preventDefault(); moveTask(dragIndex, i); setDragIndex(null); setOverIndex(null); }}
         style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: 6, background: "#fff", border: `1px solid ${isOver ? C.ink : C.line}`, borderLeft: `4px solid ${POWER_COLOR[t.power] || POWER_COLOR.Y}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }}
@@ -1549,28 +1571,28 @@ export default function FocusLogApp({ api }: any) {
           draggable
           onDragStart={(e) => { setDragIndex(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }}
           onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
-          title="drag to reorder"
+          aria-label="drag to reorder"
           style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}
         >
           {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}><span style={{ color: LOAD_COLOR[t.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, marginRight: 6 }} title={LOAD_LABEL[t.load] || LOAD_LABEL.B}>{t.load || "B"}</span>{cat && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "1px 5px", marginRight: 6, whiteSpace: "nowrap" }}>{cat}</span>}{titleText}{t.king ? <img src={crownImg} alt="king" draggable={false} style={{ width: 13, height: 13, marginLeft: 4, verticalAlign: "-2px" }} /> : null}</div>
+          <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, overflowWrap: "anywhere" }}><span style={{ color: LOAD_COLOR[t.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, marginRight: 6 }} aria-label={LOAD_LABEL[t.load] || LOAD_LABEL.B}>{t.load || "B"}</span>{cat && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 4, padding: "1px 5px", marginRight: 6, whiteSpace: "nowrap" }}>{cat}</span>}{titleText}{t.king ? <img src={crownImg} alt="king" draggable={false} style={{ width: 13, height: 13, marginLeft: 4, verticalAlign: "-2px" }} /> : null}</div>
           {hier && <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hier}</div>}
         </div>
-        <button onClick={() => togglePersonal(t.task)} className="fl-rowact" title={personal ? "move to Work" : "move to Personal"} aria-label={personal ? "move to Work" : "move to Personal"} style={ICON_BTN}>{personal ? <BriefcaseIcon size={14} /> : <UserIcon size={14} />}</button>
+        <button onClick={() => togglePersonal(t.task)} className="fl-rowact" aria-label={personal ? "move to Work" : "move to Personal"} style={ICON_BTN}>{personal ? <BriefcaseIcon size={14} /> : <UserIcon size={14} />}</button>
         <button
           onClick={() => toggleFreeze(t.task)}
           className={"fl-lock" + (isFrozen ? " is-locked" : "")}
-          title={isFrozen ? "unpin from the top" : "pin to the top (by name, so it survives daily re-created Notion tasks)"}
+          aria-label={isFrozen ? "unpin from the top" : "pin to the top (by name, so it survives daily re-created Notion tasks)"}
           style={{ background: "transparent", border: "none", boxShadow: "none", height: "auto", cursor: "pointer", padding: 2, color: isFrozen ? C.ink : C.muted, flexShrink: 0, display: "inline-flex" }}
         >
           <LockIcon size={13} open={!isFrozen} />
         </button>
-        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }} title={`${completed} of ${est} done for this task`}>
+        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }} aria-label={`${completed} of ${est} done for this task`}>
           <TomatoPips vivid={done} grey={remaining} />
         </div>
-        <button onClick={() => openLog(t.task)} className="fl-rowact" title="log" aria-label="log" style={ICON_BTN}><SquarePenIcon size={15} /></button>
+        <button onClick={() => openLog(t.task)} className="fl-rowact" aria-label="log" style={ICON_BTN}><SquarePenIcon size={15} /></button>
       </div>
     );
   };
@@ -1606,10 +1628,22 @@ export default function FocusLogApp({ api }: any) {
     const n = editRoutineName.trim();
     if (!n) { setEditRoutineId(null); return; }
     const dur = Math.max(1, Math.min(480, Math.round(editRoutineDur) || 15));
-    routineSaver(which)(routineList(which).map((x: any) => (x.id === editRoutineId ? { ...x, name: n, dur } : x)));
-    // Keep the timeline in step: update the block that references this routine item, then re-flow.
+    const updated = routineList(which).map((x: any) => (x.id === editRoutineId ? { ...x, name: n, dur } : x));
+    routineSaver(which)(updated);
+    // Keep the timeline in step: refresh any block referencing this routine item — a legacy
+    // single-step block directly, or a grouped block via refIds (its length becomes the sum of its
+    // steps' updated lengths, and its step labels refresh) — then re-flow.
+    const byId: any = {}; updated.forEach((x: any) => { byId[x.id] = x; });
     const tb = todayBlocks();
-    if (tb.some((b: any) => b.refId === editRoutineId)) setTodayBlocks(autoBreaksOf(tb.map((b: any) => (b.refId === editRoutineId ? { ...b, name: n, dur } : b))));
+    const touches = (b: any) => b.refId === editRoutineId || (Array.isArray(b.refIds) && b.refIds.indexOf(editRoutineId) !== -1);
+    if (tb.some(touches)) setTodayBlocks(autoBreaksOf(tb.map((b: any) => {
+      if (b.refId === editRoutineId) return { ...b, name: n, dur };
+      if (Array.isArray(b.refIds) && b.refIds.indexOf(editRoutineId) !== -1) {
+        const steps = b.refIds.map((id: string) => byId[id]).filter(Boolean);
+        return { ...b, dur: steps.reduce((s: number, x: any) => s + (x.dur || ROUTINE_MIN), 0) || b.dur, steps: steps.map((x: any) => x.name) };
+      }
+      return b;
+    })));
     setEditRoutineId(null);
   };
   const removeRoutine = (which: string, id: string) => routineSaver(which)(routineList(which).filter((x: any) => x.id !== id));
@@ -1631,7 +1665,10 @@ export default function FocusLogApp({ api }: any) {
         {!hideHeader && <div style={{ ...SECTION_HEAD, color: relax ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid }}>{label}</div>}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {list.length === 0 && <p style={{ color: C.muted, fontSize: 12.5, margin: "0 0 0 2px" }}>None yet — add one below.</p>}
-          {list.map((it: any, i: number) => {
+          {(() => {
+          const groups = groupRoutine(list, settings.routineGroupMinutes || 25);
+          let flat = -1;
+          const renderStepRow = (it: any, i: number) => {
             const done = isRoutineDone(it.id);
             const dragging = !!routineDrag && routineDrag.w === which && routineDrag.i === i;
             const over = !!routineOver && routineOver.w === which && routineOver.i === i && !!routineDrag && !(routineDrag.w === which && routineDrag.i === i);
@@ -1639,10 +1676,10 @@ export default function FocusLogApp({ api }: any) {
               return (
                 <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
                   <input value={editRoutineName} onChange={(e) => setEditRoutineName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveEditRoutine(which); if (e.key === "Escape") setEditRoutineId(null); }} autoFocus style={{ flex: 1, minWidth: 80, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px", fontFamily: "var(--fl-display)" }} />
-                  <input type="number" value={editRoutineDur} onChange={(e) => setEditRoutineDur(Number(e.target.value))} onKeyDown={(e) => { if (e.key === "Enter") saveEditRoutine(which); if (e.key === "Escape") setEditRoutineId(null); }} title="length in minutes" style={{ width: 52, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 6px" }} />
+                  <input type="number" value={editRoutineDur} onChange={(e) => setEditRoutineDur(Number(e.target.value))} onKeyDown={(e) => { if (e.key === "Enter") saveEditRoutine(which); if (e.key === "Escape") setEditRoutineId(null); }} aria-label="length in minutes" style={{ width: 52, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 6px" }} />
                   <span style={{ fontSize: 11, color: C.muted, flexShrink: 0 }}>min</span>
-                  <button onClick={() => saveEditRoutine(which)} title="save" aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
-                  <button onClick={() => setEditRoutineId(null)} title="cancel" aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
+                  <button onClick={() => saveEditRoutine(which)} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
+                  <button onClick={() => setEditRoutineId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
                 </div>
               );
             }
@@ -1651,21 +1688,37 @@ export default function FocusLogApp({ api }: any) {
                 onDragOver={(e) => { e.preventDefault(); if (!routineOver || routineOver.w !== which || routineOver.i !== i) setRoutineOver({ w: which, i }); }}
                 onDrop={(e) => { e.preventDefault(); if (routineDrag && routineDrag.w === which) moveRoutine(which, routineDrag.i, i); setRoutineDrag(null); setRoutineOver(null); }}
                 style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "7px 10px", background: relax ? MODE_COLORS.relax.fill : "#fbf8f1", border: `1px solid ${relax ? MODE_COLORS.relax.border : C.line}`, borderLeft: `4px solid ${C.better}`, borderRadius: 6, color: C.ink, opacity: dragging ? 0.4 : 1, boxShadow: over ? `inset 0 2px 0 ${C.ink}` : "none" }}>
-                <span draggable onDragStart={(e) => { setRoutineDrag({ w: which, i }); e.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => { setRoutineDrag(null); setRoutineOver(null); }} title="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
+                <span draggable onDragStart={(e) => { setRoutineDrag({ w: which, i }); e.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => { setRoutineDrag(null); setRoutineOver(null); }} aria-label="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
                   {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
                 </span>
-                <button onClick={() => toggleRoutineDone(it.id)} title={done ? "mark not done" : "mark done"} aria-label={done ? "mark not done" : "mark done"} style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 5, border: `1.5px solid ${done ? C.better : C.faint}`, background: done ? C.better : "transparent", color: "#fff", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{done && <CheckIcon size={12} />}</button>
+                <button onClick={() => toggleRoutineDone(it.id)} aria-label={done ? "mark not done" : "mark done"} style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 5, border: `1.5px solid ${done ? C.better : C.faint}`, background: done ? C.better : "transparent", color: "#fff", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{done && <CheckIcon size={12} />}</button>
                 <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", textDecoration: done ? "line-through" : "none", color: done ? C.muted : C.ink }}>{it.name}</span>
-                <button onClick={() => openLog(it.name)} className="fl-rowact" title="run a pomodoro" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={13} /></button>
-                <button onClick={() => { setEditRoutineId(it.id); setEditRoutineName(it.name); setEditRoutineDur(it.dur || 15); }} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-                <button onClick={() => removeRoutine(which, it.id)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+                <button onClick={() => openLog(it.name)} className="fl-rowact" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={13} /></button>
+                <button onClick={() => { setEditRoutineId(it.id); setEditRoutineName(it.name); setEditRoutineDur(it.dur || 15); }} className="fl-rowact" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                <button onClick={() => removeRoutine(which, it.id)} className="fl-rowact fl-rowdel" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
               </div>
             );
-          })}
+          };
+          // One header row per pomodoro-sized group, with a play that runs the whole group as a
+          // single pomodoro (named like the timeline block), then the group's step rows.
+          return groups.map((g: any, gi: number) => {
+            const gname = routineGroupName(which, gi, groups.length);
+            return (
+              <React.Fragment key={"g" + gi}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: gi ? 6 : 0, padding: "0 2px" }}>
+                  <button onClick={() => openLog(gname)} aria-label={`run "${gname}" as one pomodoro (${g.dur}m of steps)`} style={{ ...ICON_BTN, color: relax ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid }}><PlayIcon size={14} /></button>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: C.muted, fontFamily: "var(--fl-display)" }}>{gname}</span>
+                  <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>{g.dur}m</span>
+                </div>
+                {g.steps.map((it: any) => { flat++; return renderStepRow(it, flat); })}
+              </React.Fragment>
+            );
+          });
+          })()}
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
           <input value={newVal} onChange={(e) => setNewVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addRoutine(which); }} placeholder={which === "morning" ? "add a morning step" : "add a night step"} style={{ flex: 1, minWidth: 0, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)" }} />
-          <button onClick={() => addRoutine(which)} title="add" aria-label="add" style={{ ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><ListPlusIcon size={16} /></button>
+          <button onClick={() => addRoutine(which)} aria-label="add" style={{ ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><ListPlusIcon size={16} /></button>
         </div>
       </div>
     );
@@ -1770,6 +1823,21 @@ export default function FocusLogApp({ api }: any) {
   // One task block per Work+Personal task from the day start, with short breaks between
   // and a long break every N pomodoros (and once across noon). Saved as the day's plan.
   const ROUTINE_MIN = 15;
+  // Pack consecutive routine steps into pomodoro-sized groups: each group's steps total at most one
+  // pomodoro length (a single longer step gets a group of its own). The groups are what the Timeline
+  // shows and what the play buttons run — one pomodoro per group, named e.g. "Morning routine 2/3".
+  const groupRoutine = (list: any[], pomo: number) => {
+    const groups: { steps: any[]; dur: number }[] = [];
+    let cur: any[] = [], dur = 0;
+    (list || []).forEach((it: any) => {
+      const d = it.dur || ROUTINE_MIN;
+      if (cur.length && dur + d > pomo) { groups.push({ steps: cur, dur }); cur = []; dur = 0; }
+      cur.push(it); dur += d;
+    });
+    if (cur.length) groups.push({ steps: cur, dur });
+    return groups;
+  };
+  const routineGroupName = (which: string, i: number, n: number) => (which === "morning" ? "Morning routine" : "Night routine") + (n > 1 ? " " + (i + 1) + "/" + n : "");
   // Smart rule: a plan never ends on a break — drop any break/long-break left at the tail.
   const dropTrailingBreaks = (bl: any[]) => { const s = bl.slice().sort((a: any, c: any) => a.start - c.start); while (s.length && (s[s.length - 1].kind === "break" || s[s.length - 1].kind === "longbreak") && !s[s.length - 1].manual) s.pop(); return s; };
   const mkBreak = (start: number, k: string) => ({ id: (k === "longbreak" ? "lb" : "sb") + Date.now() + "_" + Math.round(start), kind: k, name: k === "longbreak" ? "Long break" : "Break", start, dur: k === "longbreak" ? (settings.longBreakMinutes || 20) : (settings.breakMinutes || 5) });
@@ -1780,20 +1848,19 @@ export default function FocusLogApp({ api }: any) {
     // Morning routine, then the work + personal pomodoros back-to-back, then the night routine.
     // Breaks, the long-break rhythm, and the lunch/dinner meals are all added by autoBreaksOf, so
     // a rebuild and the auto-fix wand produce the same shape.
-    if (!settings.skipMorningRoutine) (activeMorning || []).forEach((it: any) => {
-      const dur = it.dur || ROUTINE_MIN;
-      blocks.push({ id: "r" + Date.now() + "_" + (seq++), kind: "routine", name: it.name, start: t, dur, refId: it.id });
-      t += dur;
-    });
+    const groupLen = settings.routineGroupMinutes || 25;
+    if (!settings.skipMorningRoutine) { const gs = groupRoutine(activeMorning || [], groupLen); gs.forEach((g: any, gi: number) => {
+      blocks.push({ id: "r" + Date.now() + "_" + (seq++), kind: "routine", name: routineGroupName("morning", gi, gs.length), start: t, dur: g.dur, refIds: g.steps.map((s: any) => s.id), steps: g.steps.map((s: any) => s.name) });
+      t += g.dur;
+    }); }
     [...workTasks, ...personalTasks].forEach((task: any) => {
       blocks.push({ id: "b" + Date.now() + "_" + (seq++), kind: "task", name: task.task, start: t, dur: pomo, pageId: task.id || null, category: task.category || null, load: task.load || null, power: task.power || null });
       t += pomo;
     });
-    if (!settings.skipNightRoutine) (activeNight || []).forEach((it: any) => {
-      const dur = it.dur || ROUTINE_MIN;
-      blocks.push({ id: "r" + Date.now() + "_" + (seq++), kind: "routine", name: it.name, start: t, dur, refId: it.id, night: true });
-      t += dur;
-    });
+    if (!settings.skipNightRoutine) { const gs = groupRoutine(activeNight || [], groupLen); gs.forEach((g: any, gi: number) => {
+      blocks.push({ id: "r" + Date.now() + "_" + (seq++), kind: "routine", name: routineGroupName("night", gi, gs.length), start: t, dur: g.dur, refIds: g.steps.map((s: any) => s.id), steps: g.steps.map((s: any) => s.name), night: true });
+      t += g.dur;
+    }); }
     return autoBreaksOf(blocks);
   };
   // Sync now subsumes the old restart: once a sync has loaded fresh tasks into state, rebuild the
@@ -1969,9 +2036,9 @@ export default function FocusLogApp({ api }: any) {
       return (
         <div key={b.id} style={{ position: "absolute", left: 56, right: 4, top: topY, minHeight: h, boxSizing: "border-box", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6, padding: "4px 6px", display: "flex", alignItems: "center", gap: 6, zIndex: 5 }}>
           <input value={blockDraft.name} autoFocus onChange={(e) => setBlockDraft({ ...blockDraft, name: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") saveBlockEdit(); if (e.key === "Escape") setEditBlockId(null); }} style={{ flex: 1, minWidth: 0, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 5, padding: "3px 6px", fontFamily: "var(--fl-display)" }} />
-          <input type="number" value={blockDraft.dur} onChange={(e) => setBlockDraft({ ...blockDraft, dur: Number(e.target.value) })} title="minutes" style={{ width: 50, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 5, padding: "3px 6px" }} />
-          <button onClick={saveBlockEdit} title="save" aria-label="save" style={{ ...btn(C.ink), padding: "4px 7px", display: "inline-flex" }}><SaveIcon size={13} /></button>
-          <button onClick={() => setEditBlockId(null)} title="cancel" aria-label="cancel" style={{ ...btn(C.muted, true), padding: "4px 7px", display: "inline-flex" }}><CircleXIcon size={13} /></button>
+          <input type="number" value={blockDraft.dur} onChange={(e) => setBlockDraft({ ...blockDraft, dur: Number(e.target.value) })} aria-label="minutes" style={{ width: 50, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 5, padding: "3px 6px" }} />
+          <button onClick={saveBlockEdit} aria-label="save" style={{ ...btn(C.ink), padding: "4px 7px", display: "inline-flex" }}><SaveIcon size={13} /></button>
+          <button onClick={() => setEditBlockId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "4px 7px", display: "inline-flex" }}><CircleXIcon size={13} /></button>
         </div>
       );
     }
@@ -1997,17 +2064,17 @@ export default function FocusLogApp({ api }: any) {
         {b.kind === "meeting" && <span style={{ color: C.muted, display: "inline-flex", flexShrink: 0 }}><LockIcon size={12} /></span>}
         {(b.kind === "break" || b.kind === "longbreak") && <img src={b.kind === "longbreak" ? breakLongIcon : breakShortIcon} alt="" draggable={false} style={{ width: 14, height: 14, flexShrink: 0 }} />}
         {b.kind === "meal" && <span style={{ color: MEAL_TEXT, display: "inline-flex", flexShrink: 0 }}><UtensilsIcon size={13} /></span>}
-        {isTask && <span style={{ color: LOAD_COLOR[b.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, fontSize: 12.5, flexShrink: 0 }} title={LOAD_LABEL[b.load] || LOAD_LABEL.B}>{b.load || "B"}</span>}
-        {isTask && <button onClick={() => toggleLock(b.id)} className={b.locked ? "" : "fl-rowact fl-collapse"} title={b.locked ? "locked to this time, auto-fix won't move it" : "lock to this time"} aria-label={b.locked ? "unlock" : "lock"} style={{ ...ICON_BTN, color: b.locked ? (POWER_COLOR[b.power] || POWER_COLOR.Y) : C.muted }}><LockIcon size={12} open={!b.locked} /></button>}
-        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isTask ? stripLeadingTag(b.name) : b.name}</span>
+        {isTask && <span style={{ color: LOAD_COLOR[b.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, fontSize: 12.5, flexShrink: 0 }} aria-label={LOAD_LABEL[b.load] || LOAD_LABEL.B}>{b.load || "B"}</span>}
+        {isTask && <button onClick={() => toggleLock(b.id)} className={b.locked ? "" : "fl-rowact fl-collapse"} aria-label={b.locked ? "locked to this time, auto-fix won't move it" : "lock to this time"} style={{ ...ICON_BTN, color: b.locked ? (POWER_COLOR[b.power] || POWER_COLOR.Y) : C.muted }}><LockIcon size={12} open={!b.locked} /></button>}
+        <span aria-label={Array.isArray(b.steps) && b.steps.length ? b.steps.join(" · ") : undefined} style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isTask ? stripLeadingTag(b.name) : b.name}{Array.isArray(b.steps) && b.steps.length ? <span style={{ color: C.muted, fontSize: 11 }}> · {b.steps.join(" · ")}</span> : null}</span>
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 10, color: C.muted, flexShrink: 0 }}>{b.dur}m</span>
-        {(isTask || b.kind === "routine") && <button onClick={() => openLog(b.name)} className="fl-rowact" title="run a pomodoro" aria-label="run" style={ICON_BTN}><PlayIcon size={12} /></button>}
-        {isTask && !b.pageId && <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" title="rename" aria-label="rename" style={ICON_BTN}><PencilIcon size={13} /></button>}
-        {(b.kind === "break" || b.kind === "longbreak") && !b.gap && <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" title="edit break length" aria-label="edit break length" style={ICON_BTN}><PencilIcon size={13} /></button>}
+        {(isTask || b.kind === "routine") && <button onClick={() => openLog(b.name)} className="fl-rowact" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={12} /></button>}
+        {isTask && !b.pageId && <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" aria-label="rename" style={ICON_BTN}><PencilIcon size={13} /></button>}
+        {(b.kind === "break" || b.kind === "longbreak") && !b.gap && <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" aria-label="edit break length" style={ICON_BTN}><PencilIcon size={13} /></button>}
         {isTask
-          ? <button onClick={() => duplicateBlock(b.id)} className="fl-rowact" title="duplicate (add a pomodoro)" aria-label="duplicate" style={ICON_BTN}><CopyIcon size={13} /></button>
-          : b.kind === "routine" ? <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={13} /></button> : null}
-        <button onClick={() => deleteBlock(b.id)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={13} /></button>
+          ? <button onClick={() => duplicateBlock(b.id)} className="fl-rowact" aria-label="duplicate (add a pomodoro)" style={ICON_BTN}><CopyIcon size={13} /></button>
+          : (b.kind === "routine" && !b.refIds) ? <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact" aria-label="edit" style={ICON_BTN}><PencilIcon size={13} /></button> : null}
+        <button onClick={() => deleteBlock(b.id)} className="fl-rowact fl-rowdel" aria-label="delete" style={ICON_BTN}><TrashIcon size={13} /></button>
       </div>
     );
   };
@@ -2036,16 +2103,16 @@ export default function FocusLogApp({ api }: any) {
               {[3, 4, 5].map((n) => {
                 const on = (longEvery >= 3 ? longEvery : 3) === n;
                 return (
-                  <button key={n} onClick={() => { setLongEveryState(n); api.patchSettings && api.patchSettings({ longBreakEvery: n }); }} aria-pressed={on} title={`a long break every ${n} pomodoros`}
+                  <button key={n} onClick={() => { setLongEveryState(n); api.patchSettings && api.patchSettings({ longBreakEvery: n }); }} aria-pressed={on} aria-label={`a long break every ${n} pomodoros`}
                     style={{ border: "none", boxShadow: "none", background: on ? C.ink : "transparent", color: on ? "#fff" : C.muted, fontFamily: "var(--fl-mono)", fontSize: 12.5, fontWeight: on ? 600 : 400, padding: "3px 11px", borderRadius: 6, cursor: "pointer", minWidth: 28 }}>{n}</button>
                 );
               })}
             </div>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <button onClick={autoBreaks} title="auto-fix breaks: a short break between tasks and a long-break block every N pomodoros" style={{ ...btn(C.muted, true), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 }}><WandSparklesIcon size={14} /> auto-fix breaks</button>
-            <button onClick={addBlock} title="add a block to the timeline, then lock it (the lock by its name) if it's fixed" style={{ ...btn(C.ink, true), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 }}><ListPlusIcon size={14} /> add block</button>
-            {planUndo && <button onClick={() => { setTodayBlocks(planUndo); setPlanUndo(null); }} title="undo the last auto-fix" style={{ ...btn(C.worse, true), padding: "5px 10px", fontSize: 12 }}>undo</button>}
+            <button onClick={autoBreaks} aria-label="auto-fix breaks: a short break between tasks and a long-break block every N pomodoros" style={{ ...btn(C.muted, true), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 }}><WandSparklesIcon size={14} /> auto-fix breaks</button>
+            <button onClick={addBlock} aria-label="add a block to the timeline, then lock it (the lock by its name) if it's fixed" style={{ ...btn(C.ink, true), padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 }}><ListPlusIcon size={14} /> add block</button>
+            {planUndo && <button onClick={() => { setTodayBlocks(planUndo); setPlanUndo(null); }} aria-label="undo the last auto-fix" style={{ ...btn(C.worse, true), padding: "5px 10px", fontSize: 12 }}>undo</button>}
           </div>
         </div>
         {blocks.length === 0 && <p style={{ color: C.muted, fontSize: 13, margin: "0 0 8px" }}>No blocks yet — sync some tasks and re-open the timeline, or add a block.</p>}
@@ -2199,7 +2266,7 @@ export default function FocusLogApp({ api }: any) {
                     const on = dayMode === m;
                     const col = m === "work" ? MODE_COLORS.work.solid : MODE_COLORS.relax.solid;
                     return (
-                      <button key={m} onClick={() => { if (dayMode !== m) toggleDayMode(); }} aria-pressed={on} title={`${m === "work" ? "Work" : "Relax"} mode`}
+                      <button key={m} onClick={() => { if (dayMode !== m) toggleDayMode(); }} aria-pressed={on} aria-label={`${m === "work" ? "Work" : "Relax"} mode`}
                         style={{ border: "none", boxShadow: "none", background: on ? col : "transparent", color: on ? "#fff" : C.muted, borderRadius: 999, padding: "5px 13px", fontSize: 12, fontWeight: 600, cursor: "pointer", lineHeight: 1.2, display: "inline-flex", alignItems: "center", gap: 5 }}>{m === "work" ? <BriefcaseBusinessIcon size={13} /> : <LeafIcon size={13} />} {m === "work" ? "Work" : "Relax"}</button>
                     );
                   })}
@@ -2213,7 +2280,7 @@ export default function FocusLogApp({ api }: any) {
                     );
                   })}
                 </div>
-                <button onClick={doSync} disabled={sync === "loading"} title="sync from Notion and rebuild the timeline" aria-label="sync from Notion and rebuild the timeline" style={{ ...btn(C.ink, true), justifySelf: "end", display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px" }}>
+                <button onClick={doSync} disabled={sync === "loading"} aria-label="sync from Notion and rebuild the timeline" style={{ ...btn(C.ink, true), justifySelf: "end", display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px" }}>
                   <RefreshCwIcon size={14} spin={sync === "loading"} />
                   {sync === "loading" ? "\u2026" : <img src={NOTION_LOGO} alt="Notion" style={{ width: 16, height: 16 }} />}
                 </button>
@@ -2255,14 +2322,14 @@ export default function FocusLogApp({ api }: any) {
         {statusSub === "month" && (
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, paddingLeft: 13, paddingRight: 8 }}>
-              <span ref={monthLabelRef} title="scroll to change the month" style={{ fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums", fontSize: 16, fontWeight: "var(--h3-weight, 600)" as any, color: C.ink, letterSpacing: "-0.01em", lineHeight: 1, cursor: "ns-resize", userSelect: "none" }}>
+              <span ref={monthLabelRef} aria-label="scroll to change the month" style={{ fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums", fontSize: 16, fontWeight: "var(--h3-weight, 600)" as any, color: C.ink, letterSpacing: "-0.01em", lineHeight: 1, cursor: "ns-resize", userSelect: "none" }}>
                 <span style={{ display: "inline-block", minWidth: "2.3em" }}>{MON3[monthRef.getMonth()]}</span>
                 <span style={{ color: ACCENT, marginLeft: "0.1em" }}>{monthRef.getFullYear()}</span>
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <button onClick={() => setMonthOff((m) => m - 1)} title="previous month" aria-label="previous month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" }}><ChevronLeftIcon size={20} /></button>
-                <button onClick={() => setMonthOff(0)} disabled={monthOff === 0} title="jump to the current month" aria-label="today" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.muted, cursor: monthOff === 0 ? "default" : "pointer", padding: "5px 8px", borderRadius: 7, fontFamily: "var(--fl-display)", fontWeight: 700, fontSize: 13, letterSpacing: "0.02em", opacity: monthOff === 0 ? 0.4 : 1 }}>TODAY</button>
-                <button onClick={() => setMonthOff((m) => m + 1)} title="next month" aria-label="next month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" }}><ChevronRightIcon size={20} /></button>
+                <button onClick={() => setMonthOff((m) => m - 1)} aria-label="previous month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" }}><ChevronLeftIcon size={20} /></button>
+                <button onClick={() => setMonthOff(0)} disabled={monthOff === 0} aria-label="jump to the current month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.muted, cursor: monthOff === 0 ? "default" : "pointer", padding: "5px 8px", borderRadius: 7, fontFamily: "var(--fl-display)", fontWeight: 700, fontSize: 13, letterSpacing: "0.02em", opacity: monthOff === 0 ? 0.4 : 1 }}>TODAY</button>
+                <button onClick={() => setMonthOff((m) => m + 1)} aria-label="next month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" }}><ChevronRightIcon size={20} /></button>
               </div>
             </div>
             <Heatmap sessions={sessions} monthRef={monthRef} settings={settings} onOpenDay={(date: Date) => api.openDailyNote && api.openDailyNote(+date)} />
@@ -2403,8 +2470,8 @@ export default function FocusLogApp({ api }: any) {
                         <button onClick={() => api.timer.stepBreak(1)} style={{ ...btn(C.muted, true), padding: "4px 9px" }}>{"+"}</button>
                       </span>
                     )}
-                    {!brk.finished && <button onClick={() => api.timer.toggleBreakRun()} title={brk.running ? "pause" : "start"} aria-label={brk.running ? "pause" : "start"} style={{ ...btn(C.ink), display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "7px 13px" }}>{brk.running ? <PauseIcon size={16} /> : <PlayIcon size={16} />}</button>}
-                    <button onClick={endBreak} title={brk.finished ? "go back to my task" : "end break"} aria-label={brk.finished ? "go back to my task" : "end break"} style={{ ...btn(C.muted, true), display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "7px 13px" }}>{brk.finished ? <ArrowRightIcon size={16} /> : <CheckIcon size={16} />}</button>
+                    {!brk.finished && <button onClick={() => api.timer.toggleBreakRun()} aria-label={brk.running ? "pause" : "start"} style={{ ...btn(C.ink), display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "7px 13px" }}>{brk.running ? <PauseIcon size={16} /> : <PlayIcon size={16} />}</button>}
+                    <button onClick={endBreak} aria-label={brk.finished ? "go back to my task" : "end break"} style={{ ...btn(C.muted, true), display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "7px 13px" }}>{brk.finished ? <ArrowRightIcon size={16} /> : <CheckIcon size={16} />}</button>
                   </div>
                 </div>
                 <p style={{ color: C.muted, fontSize: 12, margin: "0 0 8px" }}>Pick up to 3 — tap an activity ({brk.picked.length}/3):</p>
@@ -2413,7 +2480,7 @@ export default function FocusLogApp({ api }: any) {
                     activities.map((a, i) => renderActRow(a, i))}
                 </div>
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
-                  <Scale label="how do you feel now? (1 worse than no rest … 5 a lot better)" value={brk.feeling} onChange={(v: number) => api.timer.setBreakFeeling(v)} />
+                  <Scale label="how do you feel after this break?" value={brk.feeling} onChange={(v: number) => api.timer.setBreakFeeling(v)} seasons />
                 </div>
               </div>
             )}
@@ -2427,7 +2494,7 @@ export default function FocusLogApp({ api }: any) {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
                 <input value={newAct.area} onChange={(e) => setNewAct({ ...newAct, area: e.target.value })} placeholder="area / tag" style={{ flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", boxSizing: "border-box" }} />
                 <AutoTextarea value={newAct.name} onChange={(e: any) => setNewAct({ ...newAct, name: e.target.value })} placeholder="activity name" style={{ flex: 2, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" }} />
-                <button onClick={addActivity} title="add" aria-label="add" style={{ ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><ListPlusIcon size={16} /></button>
+                <button onClick={addActivity} aria-label="add" style={{ ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><ListPlusIcon size={16} /></button>
               </div>
             </div>
 
@@ -2503,20 +2570,22 @@ export default function FocusLogApp({ api }: any) {
                         <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>start<input type="datetime-local" value={breakDraft.start} onChange={(e) => setBreakDraft({ ...breakDraft, start: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
                         <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>end<input type="datetime-local" value={breakDraft.end} onChange={(e) => setBreakDraft({ ...breakDraft, end: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
                         <div style={{ flexBasis: "100%", display: "flex", alignItems: "flex-end", gap: 8 }}>
-                          <Scale label="feeling" value={breakDraft.feeling} onChange={(v: number) => setBreakDraft({ ...breakDraft, feeling: v })} />
+                          <Scale label="feeling" value={breakDraft.feeling} onChange={(v: number) => setBreakDraft({ ...breakDraft, feeling: v })} seasons />
                           <button onClick={() => setBreakDraft({ ...breakDraft, feeling: null })} style={{ ...btn(C.muted, true), padding: "2px 8px", fontSize: 11, marginBottom: 12 }}>clear</button>
                         </div>
-                        <button onClick={saveEditBreak} title="save" aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
-                        <button onClick={() => setEditBreakId(null)} title="cancel" aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
+                        <button onClick={saveEditBreak} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
+                        <button onClick={() => setEditBreakId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
                       </div>
                     ) : (
                       <div key={b.id} className="fl-act-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(b.start)} {fmtTime(b.start)}{"–"}{fmtTime(b.end)}</span>
                         <span style={{ flex: 1, minWidth: 120, overflowWrap: "anywhere" }}>{(b.activities && b.activities.length) ? b.activities.join(", ") : "—"}</span>
                         <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>{(b.areas && b.areas.length) ? b.areas.join(" · ") : ""}</span>
-                        {b.feeling != null && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.ink, whiteSpace: "nowrap" }}>{b.feeling}/5</span>}
-                        <button onClick={() => startEditBreak(b)} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-                        <button onClick={() => deleteBreak(b.id)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+                        {b.feeling != null && (BREAK_SEASONS[b.feeling - 1]
+                          ? <img src={BREAK_SEASONS[b.feeling - 1].img} alt={BREAK_SEASONS[b.feeling - 1].name} aria-label={BREAK_SEASONS[b.feeling - 1].name} draggable={false} style={{ width: 16, height: 16, flexShrink: 0 }} />
+                          : <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.ink, whiteSpace: "nowrap" }}>{b.feeling}/5</span>)}
+                        <button onClick={() => startEditBreak(b)} className="fl-rowact" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                        <button onClick={() => deleteBreak(b.id)} className="fl-rowact fl-rowdel" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
                       </div>
                     )
                   ))}
@@ -2551,7 +2620,7 @@ export default function FocusLogApp({ api }: any) {
                   <option value="external">external</option>
                 </select>
                 <input value={newPauseTag} onChange={(e) => setNewPauseTag(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addPauseTag(); }} placeholder="new pause reason" style={{ flex: 1, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px" }} />
-                <button onClick={addPauseTag} title="add" aria-label="add" style={{ ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><ListPlusIcon size={16} /></button>
+                <button onClick={addPauseTag} aria-label="add" style={{ ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><ListPlusIcon size={16} /></button>
               </div>
             </div>
 
@@ -2583,8 +2652,8 @@ export default function FocusLogApp({ api }: any) {
                           <span><span style={{ color: PAUSE_CAT.internal.border }}>internal {s.internal}</span><span style={{ color: C.faint }}> · </span><span style={{ color: PAUSE_CAT.external.border }}>external {s.external}</span></span>
                         </div>
                         <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: C.line }}>
-                          {total > 0 && <div title={`internal ${s.internal}/${total}`} style={{ width: `${(s.internal / total) * 100}%`, background: PAUSE_CAT.internal.border }} />}
-                          {total > 0 && <div title={`external ${s.external}/${total}`} style={{ width: `${(s.external / total) * 100}%`, background: PAUSE_CAT.external.border }} />}
+                          {total > 0 && <div aria-label={`internal ${s.internal}/${total}`} style={{ width: `${(s.internal / total) * 100}%`, background: PAUSE_CAT.internal.border }} />}
+                          {total > 0 && <div aria-label={`external ${s.external}/${total}`} style={{ width: `${(s.external / total) * 100}%`, background: PAUSE_CAT.external.border }} />}
                         </div>
                       </div>
                     );
@@ -2607,16 +2676,16 @@ export default function FocusLogApp({ api }: any) {
                         <select value={pauseDraft.tag} onChange={(e) => setPauseDraft({ ...pauseDraft, tag: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }}>
                           {pauseTags.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
                         </select>
-                        <button onClick={saveEditPause} title="save" aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
-                        <button onClick={() => setEditPauseId(null)} title="cancel" aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
+                        <button onClick={saveEditPause} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
+                        <button onClick={() => setEditPauseId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
                       </div>
                     ) : (
                       <div key={p.id} className="fl-act-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(p.ts)} {fmtTime(p.ts)}</span>
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, minWidth: 34 }}>{p.mins != null ? p.mins + "m" : "—"}</span>
                         <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{p.tag}</span>
-                        <button onClick={() => startEditPause(p)} className="fl-rowact" title="edit" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-                        <button onClick={() => deletePause(p.id)} className="fl-rowact fl-rowdel" title="delete" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+                        <button onClick={() => startEditPause(p)} className="fl-rowact" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                        <button onClick={() => deletePause(p.id)} className="fl-rowact fl-rowdel" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
                       </div>
                     )
                   ))}

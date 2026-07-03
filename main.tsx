@@ -1,7 +1,9 @@
 import { App, ItemView, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath, requestUrl, setIcon } from "obsidian";
 import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
-import FocusLogApp, { MACARON, MODE_COLORS, darken, fmtHM, parseHM } from "./FocusLogApp";
+import FocusLogApp, { MACARON, MODE_COLORS, darken, fmtHM, parseHM, BREAK_SEASONS } from "./FocusLogApp";
+import { newestStarName } from "./skymap";
+import starImg from "./assets/star.png";
 import rateRain from "./assets/rate-rain.png";
 import rateClouds from "./assets/rate-clouds.png";
 import ratePartly from "./assets/rate-partly-sunny.png";
@@ -11,7 +13,7 @@ export const VIEW_TYPE = "focuslog-view";
 export const VIEW_TYPE_FLOAT = "focuslog-float";
 const NOTION_VERSION = "2022-06-28";
 // The enjoyment scale is 1-4 weather buttons, shared verbatim with the React panel's
-// Scale (FocusLogApp). Break feeling stays numeric 1-5 and is NOT in this list.
+// Scale (FocusLogApp). Break feeling uses BREAK_SEASONS (four season trees), not this list.
 const RATE_WEATHER = [
   { v: 1, img: rateRain, bg: "#BCBCBC" },
   { v: 2, img: rateClouds, bg: "#E3EBF1" },
@@ -73,6 +75,7 @@ export interface FocusLogSettings {
   dinnerStart: number;
   dinnerMinutes: number;
   nightRoutineGap: number;
+  routineGroupMinutes: number;
   heatThresholds: string;
   dailyNoteWrite: boolean;
   dailyNoteTrueDate: boolean;
@@ -129,6 +132,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   dinnerStart: 1110,
   dinnerMinutes: 45,
   nightRoutineGap: 60,
+  routineGroupMinutes: 25,
   heatThresholds: "1,2,4,6,8,10",
   dailyNoteWrite: true,
   dailyNoteTrueDate: true,
@@ -367,7 +371,7 @@ interface TimerState {
   breakTotal: number;        // full break length in seconds
   breakStart: number | null; // wall-clock moment the break began (for the breaks log)
   breakPicked: string[];     // activity ids chosen for this break (max 3)
-  breakFeeling: number | null; // the "how do you feel now" rating (1-5)
+  breakFeeling: number | null; // the "how do you feel after this break" season (1-4 = Spring..Winter)
 }
 class TimerEngine {
   private lengthMin: number;
@@ -556,7 +560,7 @@ class TimerEngine {
     else if (this.breakPicked.length < 3) this.breakPicked = [...this.breakPicked, id];
     this.emit();
   }
-  setBreakFeeling(n: number) { this.breakFeeling = Math.max(1, Math.min(5, Math.round(n) || 3)); this.emit(); }
+  setBreakFeeling(n: number) { this.breakFeeling = Math.max(1, Math.min(4, Math.round(n) || 2)); this.emit(); }   // 1-4 = the four seasons (Spring..Winter)
   // Commit the break (activities + feeling → the breaks log via the plugin) and clear
   // the phase. Called when the user ends/skips the break, closing the loop back to setup.
   endBreak() {
@@ -637,6 +641,7 @@ export default class FocusLogPlugin extends Plugin {
   private sessionSubs = new Set<() => void>(); // panel re-reads its sessions when these fire (e.g. a float quick-log)
   private breakSubs = new Set<() => void>();   // panel re-reads activities + breaks when the engine commits a break
   private logViewSubs = new Set<() => void>(); // panel switches to the log tab when these fire
+  private skyViewSubs = new Set<() => void>(); // panel switches to the Sky tab when these fire (star notices)
   private openingFloat = false; // true between asking for a float popout and the window-open handler claiming it
   private doneStatusCache: string | null = null;
 
@@ -771,7 +776,7 @@ export default class FocusLogPlugin extends Plugin {
   // daily note (best-effort), then clear the timer. Optionally mark the task Done in
   // Notion and pre-select the next task. Mirrors the panel's logPomodoro so an open
   // panel stays in sync via notifySessionsChange().
-  async quickLog(actual: number, markDone = false, nextTask = "") {
+  async quickLog(actual: number, markDone = false, nextTask = "", opts?: { delayBreakMs?: number }) {
     const st = this.timer.getState();
     const taskName = (st.taskName || "").trim();
     if (!taskName) return;
@@ -790,10 +795,25 @@ export default class FocusLogPlugin extends Plugin {
     // The chosen next task rides on the engine: the float shows it as the upcoming task
     // and the panel picks it up as its preset.
     if (nextTask) this.timer.setTask(nextTask);
-    // Closed loop: roll straight into the shared break phase (the float renders it next).
-    if (this.data.settings.breakEnabled) this.timer.startBreak();
+    // Closed loop: roll into the shared break phase (the float renders it next). A caller may
+    // delay it briefly — the float does, so its star reveal plays before the break takes over.
+    if (this.data.settings.breakEnabled) {
+      const go = () => { try { this.timer.startBreak(); } catch {} };
+      if (opts && opts.delayBreakMs) window.setTimeout(go, opts.delayBreakMs); else go();
+    }
     this.notifySessionsChange();
-    let msg = "Logged “" + taskName + "” — felt " + s.actual + "/5.";
+    // The float's quick-log lights a star too: name it in a clickable notice. Notices are
+    // hidden inside the float window, so this shows in the MAIN window; clicking it focuses
+    // Obsidian and opens the panel's Sky tab (Pomodoros) on the new star.
+    const starName = newestStarName((this.data.sessions || []).length);
+    if (starName) {
+      const n = new Notice("You lit up " + starName + " ✨  Click to see it in your Sky.", 9000);
+      try { n.noticeEl.addEventListener("click", () => { try { this.focusAndSky(); } catch {} n.hide(); }); } catch {}
+    }
+    // Notices are hidden inside the float window, so flash the star there too (5s banner) —
+    // unless the float is playing its own star reveal (delayBreakMs set), which already shows it.
+    if (!(opts && opts.delayBreakMs)) try { this.floatView()?.flash(starName ? "Logged ✓  You lit up " + starName + " ✨" : "Logged ✓"); } catch {}
+    let msg = "Logged “" + taskName + "” — felt " + s.actual + "/4.";
     if (s.pageId) {
       try { await this.incrementAct(s.pageId); }
       catch (e) { this.data.pending = [...(this.data.pending || []), { sessionId: s.id, pageId: s.pageId, task: s.task }]; await this.persist(); msg += " Act write queued."; }
@@ -813,6 +833,19 @@ export default class FocusLogPlugin extends Plugin {
 
   // ---------- bring the user into the log view (from the float celebration) ----------
   onRequestLogView(fn: () => void): () => void { this.logViewSubs.add(fn); return () => this.logViewSubs.delete(fn); }
+  onRequestSkyView(fn: () => void): () => void { this.skyViewSubs.add(fn); return () => this.skyViewSubs.delete(fn); }
+  // Focus the main window, open the panel, and switch it to the Sky tab (star-notice click).
+  async focusAndSky() {
+    try {
+      const remote = getElectronRemote();
+      const win = remote && remote.getCurrentWindow ? remote.getCurrentWindow() : null;
+      if (win) { try { win.show(); } catch {} try { win.focus(); } catch {} }
+      try { if (remote && remote.app && remote.app.focus) remote.app.focus({ steal: true }); } catch {}
+    } catch {}
+    await this.activateView();
+    // Give a freshly-created panel a moment to subscribe before asking for the Sky tab.
+    window.setTimeout(() => this.skyViewSubs.forEach((fn) => { try { fn(); } catch {} }), 60);
+  }
   async focusAndLog() {
     try {
       const remote = getElectronRemote();
@@ -972,8 +1005,15 @@ export default class FocusLogPlugin extends Plugin {
       const win = this.floatWin;
       if (!win || !win.setBounds || !win.getBounds) return;
       const saved = this.getFloatPhaseBounds(phase);
-      if (saved && saved.w && saved.h) { win.setBounds({ x: Math.round(saved.x), y: Math.round(saved.y), width: Math.round(saved.w), height: Math.round(saved.h) }); return; }
       const d = FLOAT_PHASE_DEFAULTS[phase] || FLOAT_PHASE_DEFAULTS.focus;
+      if (saved && saved.w && saved.h) {
+        // Celebrate self-heal: an old sizing fight could save another phase's smaller geometry
+        // into this slot; never apply a celebrate size below its content default.
+        const w = phase === "celebrate" ? Math.max(saved.w, d.w) : saved.w;
+        const h = phase === "celebrate" ? Math.max(saved.h, d.h) : saved.h;
+        win.setBounds({ x: Math.round(saved.x), y: Math.round(saved.y), width: Math.round(w), height: Math.round(h) });
+        return;
+      }
       const cur = win.getBounds(); // first time in this phase: default size, keep current position
       win.setBounds({ x: cur.x, y: cur.y, width: d.w, height: d.h });
     } catch {}
@@ -1382,7 +1422,7 @@ export default class FocusLogPlugin extends Plugin {
       notifyClickable: (msg: string, onClick: () => void) => {
         const n = new Notice(msg, 9000);
         try {
-          n.noticeEl.style.cursor = "pointer";
+          n.noticeEl.style.cursor = "default";   // plain-arrow preference; the notice text itself says it's clickable
           n.noticeEl.addEventListener("click", () => { try { onClick(); } catch (e) {} n.hide(); });
         } catch (e) {}
       },
@@ -1413,6 +1453,7 @@ export default class FocusLogPlugin extends Plugin {
       onSessionsChange: (fn: () => void) => self.onSessionsChange(fn),
       onBreaksChange: (fn: () => void) => self.onBreaksChange(fn),
       onRequestLogView: (fn: () => void) => self.onRequestLogView(fn),
+      onRequestSkyView: (fn: () => void) => self.onRequestSkyView(fn),
       openFloating: () => self.openFloating(),
       closeFloating: () => self.closeFloating(),
       toggleFloating: () => self.toggleFloating(),
@@ -1475,6 +1516,30 @@ class FloatTimerView extends ItemView {
   private flashT = 0;
   private celebrateT = 0;
   private localTick = 0;
+  private tickWin: any = null;   // the window that owns localTick (interval ids are per-window, so clearing needs the right one)
+  // Idempotent: applies the popout body tag (headers hidden + drag region) once the view
+  // actually lives in a separate window; a no-op while it is still in the main document.
+  private tagFloatWindow() {
+    try {
+      const doc = this.contentEl.ownerDocument;
+      if (doc && doc !== document) {
+        const w = doc.defaultView || this.fwin;
+        const changed = w && w !== this.fwin;
+        this.fwin = w || this.fwin;
+        doc.body.classList.add("focuslog-float-window");
+        // The 500ms tick must live in the popout (main-window timers throttle when it is
+        // hidden). If it was created before the view was adopted into the popout, migrate
+        // it — an interval left on the MAIN window would outlive the popout's close (ids
+        // are per-window, so onClose's clear would miss it) and keep driving the window
+        // geometry as a zombie, fighting the live float in a fast two-position battle.
+        if (changed && this.localTick) {
+          try { (this.tickWin || window).clearInterval(this.localTick); } catch {}
+          this.tickWin = this.fwin;
+          this.localTick = this.fwin.setInterval(() => { this.tagFloatWindow(); this.plugin.timer.poll(); this.render(); this.maybeSaveBounds(); }, 500);
+        }
+      }
+    } catch {}
+  }
   private lastIcon = ""; // avoid re-rendering the play/pause svg every tick
   private lastBrkIcon = ""; // break toggle (pause/play) icon, re-set only on change
   private lastEndIcon = ""; // break end (check/next) icon, re-set only on change
@@ -1483,6 +1548,7 @@ class FloatTimerView extends ItemView {
   private boundsKey = "";      // last seen window geometry (to detect user move/resize)
   private boundsDirty = false; // geometry changed; save once it settles
   private celebrateShown = false; // celebration overlay up → the "celebrate" size phase
+  private revealUntil = 0;   // star-reveal deadline (self-expiring, so a died timer can never wedge the overlay open)
   private curPhase = "";       // "setup" | "focus" | "break" — which screen of the loop is showing
   private skey = "";           // setup task-picker rebuilds only when the task list / selection changes
   private sawRun = false;       // seen a genuinely-live run in THIS window's lifetime (so a paused pomodoro left over from a restart/reopen isn't shown)
@@ -1504,9 +1570,14 @@ class FloatTimerView extends ItemView {
     root.empty();
     root.addClass("focuslog-float");
     this.fwin = (root as any).win || window;
-    // Tag this popout's window so the CSS can hide its tab bar + view header for a
-    // clean, frameless timer — without touching the main window or other popouts.
-    try { this.fwin.document.body.classList.add("focuslog-float-window"); } catch {}
+    // Tag this popout's window so the CSS can hide its tab bar + view header AND enable
+    // the drag region — the body class also carries -webkit-app-region: drag, so without
+    // it the frameless window cannot be MOVED at all. The view can be adopted into the
+    // popout document well after onOpen when the popout is created slowly (e.g. auto-
+    // opened on timer start), so fixed-delay retries are not enough: the 500ms tick below
+    // keeps re-checking until the tag lands. Never tags the main document.
+    this.tagFloatWindow();
+    setTimeout(() => this.tagFloatWindow(), 0);
     const wrap = root.createDiv({ cls: "flt-wrap" });
     // Setup (pre-pomodoro) task picker — shown only when idle, so you choose what's next
     // before the countdown begins.
@@ -1550,7 +1621,10 @@ class FloatTimerView extends ItemView {
     // Drive the engine from THIS window's timeline. Because this popout stays
     // visible (always-on-top), its timers keep firing at full rate even when the
     // main Obsidian window is hidden and throttled — so the countdown never stalls.
-    this.localTick = this.fwin.setInterval(() => { this.plugin.timer.poll(); this.render(); this.maybeSaveBounds(); }, 500);
+    // tickWin remembers which window owns the interval (ids are per-window), so it can
+    // always be cleared; tagFloatWindow migrates it into the popout once adopted.
+    this.tickWin = this.fwin;
+    this.localTick = this.fwin.setInterval(() => { this.tagFloatWindow(); this.plugin.timer.poll(); this.render(); this.maybeSaveBounds(); }, 500);
     this.plugin.notifyFloatChange();
   }
 
@@ -1608,13 +1682,21 @@ class FloatTimerView extends ItemView {
 
     // The celebration stays until tapped; clear it once a new pomodoro starts, a break
     // begins, or the timer resets.
-    if ((s.running || s.breakActive || s.startedAt == null) && this.els.celebrate && this.els.celebrate.hasClass("show")) {
+    if (!(Date.now() < this.revealUntil) && (s.running || s.breakActive || s.startedAt == null) && this.els.celebrate && this.els.celebrate.hasClass("show")) {
       this.els.celebrate.removeClass("show");
       this.els.celebrate.empty();
       this.celebrateShown = false;
     }
     // Size the window to whichever phase is active (setup / focus / pause / break / celebrate).
-    this.plugin.syncFloatPhase(this.celebrateShown);
+    // ONLY the view that really lives in a popout may drive the sizing: a stale float leaf
+    // left behind in the main window also ticks render(), and with its celebrateShown=false
+    // it would fight the live popout's celebrate phase — alternating setBounds every tick,
+    // which showed up as the celebration window "shaking" and clobbered its saved bounds.
+    // Only the CURRENT float leaf, in a still-open popout, may drive the window geometry.
+    // (A view whose popout has closed, or a leftover leaf, must never compete — that fight
+    // showed up as the window rapidly flicking between two positions.)
+    const liveLeaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT)[0];
+    if (this.fwin !== window && !(this.fwin as any)?.closed && liveLeaf && liveLeaf.view === this) this.plugin.syncFloatPhase(this.celebrateShown);
   }
 
   // Show only the controls for the active screen.
@@ -1640,10 +1722,11 @@ class FloatTimerView extends ItemView {
   // ---------- setup screen (pick task + rate before starting) ----------
   refreshSetup(s: TimerState) {
     const tasks = this.plugin.data.tasks || [];
-    // While idle in setup, only preselect the engine's task once a live run has been seen this
-    // lifetime; a paused pomodoro left over from a restart/reopen reaches setup with a stale
-    // taskName, which we drop so the selector shows "— pick a task —".
-    const setupTask = this.sawRun ? (s.taskName || "") : "";
+    // Preselect the engine's task when it is a CURRENT pick: either this window has seen a live
+    // run, or the engine is idle (startedAt == null) — i.e. the task was just chosen in the panel
+    // and no run is in flight, so it must mirror here. Only a leftover run from a restart/reopen
+    // (startedAt set but never witnessed live) is dropped, so the selector shows "— pick a task —".
+    const setupTask = (this.sawRun || s.startedAt == null) ? (s.taskName || "") : "";
     const skey = "S:" + tasks.map((t: any) => t.task + (t.king ? "K" : "")).join("|") + "::" + setupTask;
     if (this.skey !== skey) {
       this.skey = skey;
@@ -1689,11 +1772,13 @@ class FloatTimerView extends ItemView {
     this.els.brkLbl = el.createDiv({ cls: "flt-brk-lbl" });
     this.els.brkActs = el.createDiv({ cls: "flt-brk-acts" });
     const feel = el.createDiv({ cls: "flt-brk-feel" });
-    feel.createDiv({ cls: "flt-setlabel", text: "how do you feel now? (1 worse … 5 a lot better)" });
+    feel.createDiv({ cls: "flt-setlabel", text: "how do you feel after this break?" });
     const fr = feel.createDiv({ cls: "flt-rate" });
-    this.els.brkFeelBtns = [1, 2, 3, 4, 5].map((n) => {
-      const b = fr.createEl("button", { cls: "flt-rbtn", text: String(n) });
-      b.onclick = () => this.plugin.timer.setBreakFeeling(n);
+    this.els.brkFeelBtns = BREAK_SEASONS.map((sn) => {
+      const b = fr.createEl("button", { cls: "flt-rbtn flt-rbtn-weather" });
+      b.setAttribute("aria-label", sn.name);
+      b.createEl("img", { attr: { src: sn.img, alt: sn.name, draggable: "false" } });
+      b.onclick = () => this.plugin.timer.setBreakFeeling(sn.v);
       return b;
     });
     this.bkey = "";
@@ -1753,6 +1838,10 @@ class FloatTimerView extends ItemView {
   // window — not the real size). The break phase remembers its own larger bounds.
   maybeSaveBounds() {
     try {
+      if (this.fwin === window) return;   // a stale main-window leaf must never save float bounds
+      if ((this.fwin as any)?.closed) return;   // nor a view whose popout has already closed
+      const liveLeaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT)[0];
+      if (!liveLeaf || liveLeaf.view !== this) return;   // only the current float leaf saves
       const win = this.plugin.floatWin;
       if (!win || !win.getBounds) return;
       const b = win.getBounds();
@@ -1825,12 +1914,38 @@ class FloatTimerView extends ItemView {
       b.onclick = (ev: any) => {
         if (ev && ev.stopPropagation) ev.stopPropagation();
         const nextTask = sel.value || "";
-        dismiss();
-        this.plugin.quickLog(w.v, done, nextTask);
-        this.flash("Logged ✓");
+        // Star reveal, right here in the celebration: star icon + the star's name + a live
+        // "closes in Ns" countdown (5 -> 1), then the overlay closes itself and the break takes
+        // over. revealUntil keeps the overlay (and its geometry) up — the engine reset would
+        // otherwise clear it at once, and the break jump would move the window mid-reveal.
+        const starName = newestStarName((this.plugin.data.sessions || []).length + 1);
+        this.revealUntil = Date.now() + 5200;
+        el.empty();
+        if (starName) {
+          const line = el.createDiv({ cls: "flt-clabel flt-reveal" });
+          line.createEl("img", { cls: "flt-reveal-star", attr: { src: starImg, alt: "", draggable: "false" } });
+          line.createSpan({ text: "You lit up " + starName });
+        } else {
+          el.createDiv({ cls: "flt-clabel", text: "Logged ✓" });
+        }
+        const hint = el.createDiv({ cls: "flt-cask" });
+        let left = 5;
+        const paintHint = () => hint.setText((starName ? "find it in the Sky tab in Obsidian · " : "") + "closes in " + left + "s");
+        paintHint();
+        const w2 = this.fwin || window;
+        const iv = w2.setInterval(() => { left = Math.max(1, left - 1); paintHint(); }, 1000);
+        this.plugin.quickLog(w.v, done, nextTask, { delayBreakMs: 4800 });
+        w2.setTimeout(() => { w2.clearInterval(iv); this.revealUntil = 0; dismiss(); }, 5000);
       };
     });
-    el.createDiv({ cls: "flt-chint", text: "Tap a rating to log it — or tap outside for the full form" });
+    el.createDiv({ cls: "flt-chint", text: "Tap a rating to log it" });
+    // Explicit controls replace the old tap-anywhere-to-dismiss (which ate clicks meant for
+    // moving the window): a quiet link to the full form, and a ✕ that just closes.
+    const formBtn = el.createEl("button", { cls: "flt-open-form", text: "open the full form in Obsidian" });
+    formBtn.onclick = (ev: any) => { if (ev && ev.stopPropagation) ev.stopPropagation(); dismiss(); this.plugin.focusAndLog(); };
+    const closeBtn = el.createEl("button", { cls: "flt-cclose", text: "✕" });
+    closeBtn.setAttribute("aria-label", "close the celebration without logging");
+    closeBtn.onclick = (ev: any) => { if (ev && ev.stopPropagation) ev.stopPropagation(); dismiss(); };
     const colors = ["#d98324", "#2f6f8f", "#5b8c5a", "#b4533a", "#c9a227"];
     for (let i = 0; i < 24; i++) {
       const piece = el.createSpan({ cls: "fl-piece" });
@@ -1838,8 +1953,6 @@ class FloatTimerView extends ItemView {
       piece.style.background = colors[i % colors.length];
       piece.style.animationDelay = (Math.random() * 0.4).toFixed(2) + "s";
     }
-    // Tapping the background (not a control) brings Obsidian to the front and opens the log view.
-    el.onclick = () => { dismiss(); this.plugin.focusAndLog(); };
   }
 
   async onClose() {
@@ -1853,12 +1966,18 @@ class FloatTimerView extends ItemView {
       if (win && win.getBounds) this.plugin.saveFloatPhaseBounds(this.plugin.floatSizePhase, win.getBounds());
     } catch {}
     try {
+      // Clear the tick on the window that OWNS it (ids are per-window): a clear aimed at the
+      // wrong window silently misses, leaving a zombie interval that keeps driving geometry.
+      (this.tickWin || this.fwin || window).clearInterval(this.localTick);
+      this.tickWin = null;
       const w = this.fwin || window;
-      w.clearInterval(this.localTick);
       w.clearTimeout(this.flashT);
       w.clearTimeout(this.celebrateT);
     } catch {}
+    this.revealUntil = 0;
+    this.celebrateShown = false;
     try { this.fwin && this.fwin.document.body.classList.remove("focuslog-float-window"); } catch {}
+    try { this.containerEl.ownerDocument.body.classList.remove("focuslog-float-window"); } catch {}
     this.fwin = null;
     // Let the panel toggle catch up once the leaf is fully gone.
     try { window.setTimeout(() => this.plugin.notifyFloatChange(), 0); } catch {}
@@ -1968,8 +2087,8 @@ class FocusLogSettingTab extends PluginSettingTab {
     schedRow.style.display = "flex"; schedRow.style.gap = "6px"; schedRow.style.flexWrap = "wrap"; schedRow.style.margin = "8px 0 22px";
     ["M", "T", "W", "T", "F", "S", "S"].forEach((lab, i) => {
       const b = schedRow.createEl("button", { text: lab });
-      b.style.width = "38px"; b.style.height = "38px"; b.style.borderRadius = "9px"; b.style.border = "none"; b.style.color = "#fff"; b.style.fontWeight = "700"; b.style.fontSize = "14px"; b.style.cursor = "pointer";
-      const paint = () => { const rest = this.plugin.data.settings.workDays[i] === false; b.style.background = rest ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid; b.title = rest ? "rest day — tap to make it a working day" : "working day — tap to make it a rest day"; };
+      b.style.width = "38px"; b.style.height = "38px"; b.style.borderRadius = "9px"; b.style.border = "none"; b.style.color = "#fff"; b.style.fontWeight = "700"; b.style.fontSize = "14px"; b.style.cursor = "default";
+      const paint = () => { const rest = this.plugin.data.settings.workDays[i] === false; b.style.background = rest ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid; b.setAttribute("aria-label", rest ? "rest day — tap to make it a working day" : "working day — tap to make it a rest day"); };
       paint();
       b.onclick = async () => { const arr = this.plugin.data.settings.workDays.slice(); arr[i] = arr[i] === false; this.plugin.data.settings.workDays = arr; await this.plugin.persist(); paint(); };
     });
@@ -2082,6 +2201,12 @@ class FocusLogSettingTab extends PluginSettingTab {
             await this.plugin.persist();
           })
       );
+
+    const groupLenSet = new Setting(containerEl)
+      .setName("Routine group length")
+      .setDesc("Morning and night routine steps are packed into groups of at most this many minutes; each group runs as one pomodoro. Independent of the timer's current pomodoro length, so shortening the timer never splits the groups. Default 25.");
+    groupLenSet.addText((t) => { t.setPlaceholder("25").setValue(String(this.plugin.data.settings.routineGroupMinutes ?? 25)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 5) return; this.plugin.data.settings.routineGroupMinutes = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
+    groupLenSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
 
     const nightGapSet = new Setting(containerEl)
       .setName("Night routine starts after dinner")

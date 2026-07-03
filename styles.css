@@ -22,7 +22,7 @@
   right: auto !important;
   margin: 0 0 0 8px !important;
   opacity: 0.55;
-  cursor: pointer;
+  cursor: default;
 }
 .workspace-leaf-content[data-type="focuslog-view"] input[type="datetime-local"]::-webkit-datetime-edit {
   padding-left: 0;
@@ -77,15 +77,25 @@
    drag handle (buttons stay clickable), with a little top room to clear the dots. */
 body.focuslog-float-window .workspace-tab-header-container,
 body.focuslog-float-window .view-header { display: none !important; }
+/* Fallback that needs no JS: hide the float view's OWN header wherever the leaf lives,
+   and the tab strip of any tab group whose only content is the float (always true in the
+   popout). Other groups and the main window's headers are untouched. */
+.workspace-leaf-content[data-type="focuslog-float"] .view-header { display: none !important; }
+.workspace-tabs:has(.workspace-leaf-content[data-type="focuslog-float"]):not(:has(.workspace-leaf-content:not([data-type="focuslog-float"]))) .workspace-tab-header-container { display: none !important; }
 body.focuslog-float-window .focuslog-float .flt-wrap { -webkit-app-region: drag; padding-top: 18px; }
 /* Anything interactive or scrollable must opt out of window-drag, or the OS treats a
    press inside it as "move the window" and the scroll stutters / gets stuck. */
 body.focuslog-float-window .focuslog-float .flt-btn,
 body.focuslog-float-window .focuslog-float .flt-chip,
-body.focuslog-float-window .focuslog-float .flt-celebrate,
 body.focuslog-float-window .focuslog-float .flt-picker,
 body.focuslog-float-window .focuslog-float .flt-break,
 body.focuslog-float-window .focuslog-float .flt-brk-acts { -webkit-app-region: no-drag; }
+/* The celebration BACKGROUND is a drag handle (so the window can be moved while it's up);
+   only its interactive children opt out of window-drag. */
+body.focuslog-float-window .focuslog-float .flt-celebrate .flt-copts,
+body.focuslog-float-window .focuslog-float .flt-celebrate .flt-rate,
+body.focuslog-float-window .focuslog-float .flt-celebrate .flt-open-form,
+body.focuslog-float-window .focuslog-float .flt-celebrate .flt-cclose { -webkit-app-region: no-drag; }
 
 /* Obsidian mirrors Notice toasts into every window; in the tiny float they appear
    as a dark box over the timer, and the float has its own flash banner for the
@@ -140,7 +150,7 @@ body.focuslog-float-window .notice { display: none !important; }
   color: #2b2723;
   border-radius: 7px;
   padding: 5px 12px;
-  cursor: pointer;
+  cursor: default;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -185,7 +195,7 @@ body.focuslog-float-window .notice { display: none !important; }
   border: 1.5px solid #e4ddcf;
   border-radius: 8px;
   padding: 4px 10px;
-  cursor: pointer;
+  cursor: default;
   color: #2b2723;
   opacity: 0.55;
   /* Long tag names: wrap inside the chip instead of overflowing a fixed-height button. */
@@ -207,11 +217,19 @@ body.focuslog-float-window .notice { display: none !important; }
   justify-content: center;
   padding: 0 18px;            /* breathing room from the window edges */
   box-sizing: border-box;
-  background: rgba(253, 251, 246, 0.94);
+  background: #fdfbf6;   /* fully opaque: the timer beneath must not ghost through */
   overflow: hidden;
-  cursor: pointer;
+  cursor: default;
 }
 .focuslog-float .flt-celebrate.show { display: flex; }
+/* Explicit celebration controls (background clicks no longer dismiss): a small ✕ to close,
+   and a quiet link to the full form in the main panel. */
+.focuslog-float .flt-celebrate .flt-cclose { position: absolute; top: 4px; right: 6px; z-index: 2; background: transparent; border: none; box-shadow: none; color: #8a8175; font-size: 13px; padding: 3px 7px; }
+.focuslog-float .flt-celebrate .flt-cclose:hover { color: #2b2723; }
+.focuslog-float .flt-celebrate .flt-open-form { margin-top: 6px; background: transparent; border: none; box-shadow: none; color: #5e7d96; font-size: 11px; text-decoration: underline; padding: 2px 6px; }
+/* Star reveal after logging: star icon + name on one line, countdown hint beneath. */
+.focuslog-float .flt-celebrate .flt-reveal { display: flex; align-items: center; gap: 8px; }
+.focuslog-float .flt-celebrate .flt-reveal-star { width: 22px; height: 22px; display: block; }
 .focuslog-float .flt-celebrate .flt-chint { font-size: 11px; color: #8a8175; margin-top: 8px; }
 .focuslog-float .flt-celebrate .flt-pop { font-size: clamp(30px, 13vh, 52px); animation: fl-pop 0.5s cubic-bezier(.2,1.4,.4,1) both; }
 .focuslog-float .flt-celebrate .flt-clabel { font-family: 'Baloo 2', sans-serif; font-weight: 600; font-size: 18px; color: #5b8c5a; margin-top: 2px; }
@@ -220,7 +238,7 @@ body.focuslog-float-window .notice { display: none !important; }
 .focuslog-float .flt-celebrate .flt-rbtn {
   width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid #cfc7b8;
   background: #fffefc; color: #2b2723; font-family: 'JetBrains Mono', monospace;
-  font-size: 14px; cursor: pointer; padding: 0;
+  font-size: 14px; cursor: default; padding: 0;
 }
 .focuslog-float .flt-celebrate .flt-rbtn:hover { background: #5b8c5a; border-color: #5b8c5a; color: #fff; }
 .focuslog-float .flt-celebrate .flt-copts { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 8px; z-index: 1; width: 100%; }
@@ -228,11 +246,11 @@ body.focuslog-float-window .notice { display: none !important; }
    emoji before the text. Still a checkbox (empty by default) so it stays a clear toggle. */
 .focuslog-float .flt-celebrate .flt-donebox {
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  width: 100%; box-sizing: border-box; cursor: pointer;
+  width: 100%; box-sizing: border-box; cursor: default;
   font-family: 'Baloo 2', system-ui, sans-serif; font-size: 13px; font-weight: 600; color: #7a3b53;
   background: #f8e1ec; border: 1px solid #e3a9c5; border-radius: 7px; padding: 6px 12px;
 }
-.focuslog-float .flt-celebrate .flt-donebox input { width: 15px; height: 15px; accent-color: #c75b92; cursor: pointer; margin: 0; flex-shrink: 0; }
+.focuslog-float .flt-celebrate .flt-donebox input { width: 15px; height: 15px; accent-color: #c75b92; cursor: default; margin: 0; flex-shrink: 0; }
 .focuslog-float .flt-celebrate .flt-next {
   width: 100%; font-size: 11px; border: 1px solid #cfc7b8; border-radius: 6px;
   background: #fffefc; color: #2b2723; padding: 4px 6px;
@@ -243,7 +261,7 @@ body.focuslog-float-window .notice { display: none !important; }
   -webkit-app-region: no-drag;
   max-width: 100%; width: 100%; font-size: 12px;
   border: 1px solid #cfc7b8; border-radius: 7px;
-  background: #fffefc; color: #2b2723; padding: 6px 8px; cursor: pointer;
+  background: #fffefc; color: #2b2723; padding: 6px 8px; cursor: default;
 }
 .focuslog-float .flt-setrate { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 100%; }
 .focuslog-float .flt-setlabel { font-size: 11px; color: #8a8175; text-align: center; }
@@ -252,7 +270,7 @@ body.focuslog-float-window .notice { display: none !important; }
   -webkit-app-region: no-drag;
   font-family: 'Baloo 2', sans-serif; font-size: 13px; min-width: 30px;
   border: 1px solid #cfc7b8; background: #fffefc; color: #2b2723;
-  border-radius: 7px; padding: 4px 9px; cursor: pointer; transition: background 0.12s ease;
+  border-radius: 7px; padding: 4px 9px; cursor: default; transition: background 0.12s ease;
 }
 .focuslog-float .flt-rbtn:hover { background: #5b8c5a; border-color: #5b8c5a; color: #fff; }
 .focuslog-float .flt-rbtn.is-on { background: #5b8c5a; border-color: #5b8c5a; color: #fff; font-weight: 700; }
@@ -279,7 +297,7 @@ body.focuslog-float-window .notice { display: none !important; }
 .focuslog-float .flt-break {
   -webkit-app-region: no-drag;
   width: 100%; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px;
-  overflow: hidden; padding: 2px;
+  overflow: hidden; padding: 2px 2px 34px;   /* bottom clearance: the flash banner overlays the window bottom and must not cover the season buttons */
 }
 .focuslog-float .flt-brk-head { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
 .focuslog-float .flt-brktime {
@@ -295,7 +313,7 @@ body.focuslog-float-window .notice { display: none !important; }
    with a coloured left bar + an #area pill, tappable to toggle (✓ + fill when on). */
 .focuslog-float .flt-brk-acts { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .focuslog-float .flt-brk-row {
-  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  display: flex; align-items: center; gap: 8px; cursor: default;
   background: #fbf8f1; border: 1px solid #e4ddcf; border-left: 4px solid #ccc;
   border-radius: 6px; padding: 6px 10px; font-size: 13px; color: #2b2723;
 }
@@ -338,8 +356,8 @@ body.focuslog-float-window .notice { display: none !important; }
 .fl-cx-ico-left   { left: 5px;   top: 50%; transform: translateY(-50%); }
 .fl-cx-ico-right  { right: 5px;  top: 50%; transform: translateY(-50%); }
 /* quadrant cells flush together; tags centred in each */
-.fl-cx-cell { min-width: 0; min-height: 158px; padding: 28px 16px; display: flex; flex-wrap: wrap; gap: 7px 9px; cursor: pointer; align-content: center; justify-content: center; align-items: center; }
-.fl-cx-chip { font-family: var(--fl-display); font-size: 13px; padding: 5px 11px; border-radius: 16px; background: #fff; border: 1.5px solid; cursor: pointer; font-weight: 600; line-height: 1.2; max-width: 100%; box-sizing: border-box; text-align: center; overflow-wrap: anywhere; }
+.fl-cx-cell { min-width: 0; min-height: 158px; padding: 28px 16px; display: flex; flex-wrap: wrap; gap: 7px 9px; cursor: default; align-content: center; justify-content: center; align-items: center; }
+.fl-cx-chip { font-family: var(--fl-display); font-size: 13px; padding: 5px 11px; border-radius: 16px; background: #fff; border: 1.5px solid; cursor: default; font-weight: 600; line-height: 1.2; max-width: 100%; box-sizing: border-box; text-align: center; overflow-wrap: anywhere; }
 .fl-cx-chip.on { color: #fff !important; }
 
 /* Thought pills: text dead-centre; the bin fades in on hover in a reserved right slot, balanced by a left spacer. */
@@ -349,7 +367,7 @@ body.focuslog-float-window .notice { display: none !important; }
   font-family: var(--fl-display); font-size: 12.5px; font-weight: 600; color: #2b2723; line-height: 1.2;
 }
 .fl-thought .fl-thought-text { grid-column: 2; text-align: center; white-space: nowrap; }
-.fl-thought .fl-rowact { grid-column: 3; justify-self: center; padding: 0; color: #8a8175; display: inline-flex; align-items: center; cursor: pointer; }
+.fl-thought .fl-rowact { grid-column: 3; justify-self: center; padding: 0; color: #8a8175; display: inline-flex; align-items: center; cursor: default; }
 
 /* ---------- Pause reflection: body map (ported from Hold to Pause) ---------- */
 .fl-bodymap { display: flex; gap: 14px; align-items: flex-start; }
@@ -361,7 +379,7 @@ body.focuslog-float-window .notice { display: none !important; }
 /* the glow lives on ::before so the button never scales — its label stays a constant size */
 .fl-bdot {
   position: absolute; width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; padding: 0;
-  border: none !important; background: transparent !important; box-shadow: none !important; cursor: pointer;
+  border: none !important; background: transparent !important; box-shadow: none !important; cursor: default;
 }
 .fl-bdot::before {
   content: ""; position: absolute; inset: 0; border-radius: 50%; opacity: 0.34; transform: scale(0.82);
@@ -394,7 +412,7 @@ body.focuslog-float-window .notice { display: none !important; }
 .fl-bface.open .fl-bface-pop { display: flex; }
 .fl-bface-chip {
   font-family: var(--fl-display); font-size: 12px; white-space: nowrap; padding: 4px 11px; border-radius: 999px;
-  border: 1px solid #e8a9c0; background: #f8d7e3 !important; color: #111; cursor: pointer; text-decoration: none;   /* full pink + thin border (beat Obsidian's button bg) */
+  border: 1px solid #e8a9c0; background: #f8d7e3 !important; color: #111; cursor: default; text-decoration: none;   /* full pink + thin border (beat Obsidian's button bg) */
 }
 .fl-bface-chip.on { background: #e97ba6 !important; border-color: #e97ba6; color: #fff; }
 .fl-bface-chip[data-part="head area"] { background: #2b2723 !important; color: #fff; border-color: rgba(255,255,255,0.25); }   /* a general body part, dark */
@@ -414,3 +432,13 @@ body.focuslog-float-window .notice { display: none !important; }
 .fl-fullrow .setting-item-info { margin-bottom: 8px; }
 .fl-fullrow .setting-item-control { width: 100%; padding-right: 0; justify-content: flex-start; }
 .fl-fullrow .setting-item-control textarea { width: 100%; }
+
+/* Plain-arrow cursor over clickable things (user preference): hover styling signals
+   clickability instead of the OS pointing hand. Only the pointer cursor is overridden;
+   grab (drag), text (inputs), ns-resize (month scroll) and not-allowed keep their meaning. */
+.workspace-leaf-content[data-type="focuslog-view"] [style*="cursor: pointer"],
+.workspace-leaf-content[data-type="focuslog-view"] [style*="cursor:pointer"],
+.workspace-leaf-content[data-type="focuslog-float"] [style*="cursor: pointer"],
+.workspace-leaf-content[data-type="focuslog-float"] [style*="cursor:pointer"],
+.focuslog-celebrate [style*="cursor: pointer"],
+.focuslog-celebrate [style*="cursor:pointer"] { cursor: default !important; }
