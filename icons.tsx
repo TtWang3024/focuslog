@@ -11,3 +11,21 @@ export function Trash({ size = 13 }: any) {
     </svg>
   );
 }
+
+// A small info icon that reveals a formatted hover card anchored under its top-right corner —
+// the same pattern as the Timeline's how-it-works intro. The card content is the children.
+export function InfoHover({ C, label, width = 330, children }: any) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex", flexShrink: 0 }} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <span aria-label={open ? undefined : label} style={{ display: "inline-flex", color: C.muted }}>
+        <svg xmlns="http://www.w3.org/2000/svg" width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+      </span>
+      {open && (
+        <div style={{ position: "absolute", right: 0, top: 22, width, maxWidth: "84vw", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 16px", zIndex: 60, boxShadow: "0 6px 24px rgba(0,0,0,0.16)", fontSize: 12.5, fontWeight: 400, color: C.ink, lineHeight: 1.5, textAlign: "left" }}>
+          {children}
+        </div>
+      )}
+    </span>
+  );
+}

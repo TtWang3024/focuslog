@@ -1,6 +1,6 @@
 import * as React from "react";
 import { BodyMap } from "./BodyMap";
-import { Trash } from "./icons";
+import { Trash, InfoHover } from "./icons";
 import sunIcon from "./assets/sun.png";
 import moonIcon from "./assets/moon.png";
 import cactusIcon from "./assets/cactus.png";
@@ -70,16 +70,26 @@ export function ReflectPanel({ feelings, C, onSave }: { feelings: any; C: any; o
   };
 
   return (
-    <div className="fl-reflect" style={{ marginTop: 10, background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
+        {saved && <span style={{ fontSize: 12, color: C.better }}>{"saved ✓"}</span>}
+        <InfoHover C={C} label="how reflections work" width={330}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Reflect</div>
+          <div>A quiet moment: notice what is going on inside and save it. Each reflection also lights a silver star in your Sky.</div>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+            <li><b>Thought</b>: name what's pulling at you (optional); press Enter to add each one.</li>
+            <li><b>Body</b>: mark where you feel it on the body map (up to 3 places).</li>
+            <li><b>Mood</b>: place how it feels, pleasant or unpleasant, high or low energy (up to {MOOD_MAX} words).</li>
+          </ul>
+        </InfoHover>
         <button type="button" onClick={save} disabled={!hasContent}
-          style={{ padding: "8px 18px", borderRadius: 999, border: "none", background: hasContent ? C.ink : C.line, color: hasContent ? C.paper : C.muted, fontSize: 13.5, fontWeight: 600, cursor: hasContent ? "pointer" : "default", fontFamily: "var(--fl-display)" }}>
+          style={{ padding: "8px 18px", borderRadius: 999, border: "none", boxShadow: "none", background: hasContent ? "#6b4423" : C.line, color: hasContent ? C.paper : C.muted, fontSize: 13.5, fontWeight: 600, cursor: hasContent ? "pointer" : "default", fontFamily: "var(--fl-display)" }}>
           Lighten up one reflection star
         </button>
-        {saved && <span style={{ fontSize: 12, color: C.better }}>{"saved ✓"}</span>}
       </div>
+      <div className="fl-reflect" style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
 
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 5 }}>What's pulling at you? (optional)</div>
+      <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 8px" }}>Thought</h3>
       <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addThought(); } }}
         placeholder="name a thought, press Enter"
         style={{ width: "100%", boxSizing: "border-box", padding: "6px 10px", borderRadius: 8, border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12.5, fontFamily: "var(--fl-display)" }} />
@@ -94,10 +104,10 @@ export function ReflectPanel({ feelings, C, onSave }: { feelings: any; C: any; o
         </div>
       )}
 
-      <div style={{ fontSize: 12, color: C.muted, margin: "14px 0 8px" }}>Where do you feel it? (up to 3)</div>
+      <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "16px 0 8px" }}>Body</h3>
       <BodyMap value={body} onChange={setBody} C={C} />
 
-      <div style={{ fontSize: 12, color: C.muted, margin: "14px 0 8px" }}>How does it feel? (up to {MOOD_MAX})</div>
+      <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "16px 0 8px" }}>Mood</h3>
       <div className="fl-cx">
         <div className="fl-cx-grid">
           {quadrant("tl")}{quadrant("tr")}{quadrant("bl")}{quadrant("br")}
@@ -108,6 +118,7 @@ export function ReflectPanel({ feelings, C, onSave }: { feelings: any; C: any; o
         <img className="fl-cx-ico fl-cx-ico-bottom" src={moonIcon} alt="low energy" title="low energy" />
         <img className="fl-cx-ico fl-cx-ico-left" src={cactusIcon} alt="unpleasant" title="unpleasant" />
         <img className="fl-cx-ico fl-cx-ico-right" src={lilyIcon} alt="pleasant" title="pleasant" />
+      </div>
       </div>
     </div>
   );

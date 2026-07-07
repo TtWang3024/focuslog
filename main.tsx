@@ -1,8 +1,12 @@
-import { App, ItemView, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath, requestUrl, setIcon } from "obsidian";
+import { App, ItemView, Menu, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath, requestUrl, setIcon } from "obsidian";
 import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
 import FocusLogApp, { MACARON, MODE_COLORS, darken, fmtHM, parseHM, BREAK_SEASONS } from "./FocusLogApp";
 import { newestStarName } from "./skymap";
+
+// Lucide minus/plus for the float's stepper buttons (sized by the .flt-btn svg rule).
+const FLT_MINUS = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>`;
+const FLT_PLUS = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`;
 import starImg from "./assets/star.png";
 import rateRain from "./assets/rate-rain.png";
 import rateClouds from "./assets/rate-clouds.png";
@@ -76,6 +80,8 @@ export interface FocusLogSettings {
   dinnerMinutes: number;
   nightRoutineGap: number;
   routineGroupMinutes: number;
+  addBlockEnabled: boolean;
+  showAreaTimeline: boolean;
   heatThresholds: string;
   dailyNoteWrite: boolean;
   dailyNoteTrueDate: boolean;
@@ -133,6 +139,8 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   dinnerMinutes: 45,
   nightRoutineGap: 60,
   routineGroupMinutes: 25,
+  addBlockEnabled: false,
+  showAreaTimeline: true,
   heatThresholds: "1,2,4,6,8,10",
   dailyNoteWrite: true,
   dailyNoteTrueDate: true,
@@ -642,6 +650,8 @@ export default class FocusLogPlugin extends Plugin {
   private breakSubs = new Set<() => void>();   // panel re-reads activities + breaks when the engine commits a break
   private logViewSubs = new Set<() => void>(); // panel switches to the log tab when these fire
   private skyViewSubs = new Set<() => void>(); // panel switches to the Sky tab when these fire (star notices)
+  private activeDailySubs = new Set<(ts: number | null) => void>(); // Month calendar outline follows the focused daily note
+  private activeDailyTs: number | null = null;
   private openingFloat = false; // true between asking for a float popout and the window-open handler claiming it
   private doneStatusCache: string | null = null;
 
@@ -699,6 +709,9 @@ export default class FocusLogPlugin extends Plugin {
     // Catch our float popout the instant its OS window is created, so we can size
     // and place it before its first visible frame (no large-window-then-jump).
     this.registerEvent(this.app.workspace.on("window-open", () => this.onFloatWindowOpen()));
+    // The Month calendar's chocolate outline follows the daily note you focus (today when none is).
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.updateActiveDaily()));
+    this.app.workspace.onLayoutReady(() => this.updateActiveDaily());
 
     this.registerView(VIEW_TYPE, (leaf) => new FocusLogView(leaf, this));
     this.registerView(VIEW_TYPE_FLOAT, (leaf) => new FloatTimerView(leaf, this));
@@ -834,6 +847,27 @@ export default class FocusLogPlugin extends Plugin {
   // ---------- bring the user into the log view (from the float celebration) ----------
   onRequestLogView(fn: () => void): () => void { this.logViewSubs.add(fn); return () => this.logViewSubs.delete(fn); }
   onRequestSkyView(fn: () => void): () => void { this.skyViewSubs.add(fn); return () => this.skyViewSubs.delete(fn); }
+  // Parse the active file as a daily note (same name format + folder the calendar opens) and tell
+  // subscribers when it changes. null = the focused file is not a daily note.
+  private updateActiveDaily() {
+    let ts: number | null = null;
+    try {
+      const f: any = this.app.workspace.getActiveFile();
+      const moment = (window as any).moment;
+      if (f && moment) {
+        const s = this.data.settings;
+        const dn: any = (this.app as any).internalPlugins?.getPluginById?.("daily-notes");
+        const opts = dn?.instance?.options || {};
+        const format = (s.dailyTitleFormat || opts.format || "YYYY-MM-DD").trim();
+        const folder = (s.dailyNoteFolder || opts.folder || "").trim();
+        const okFolder = !folder || (f.parent && normalizePath(f.parent.path) === normalizePath(folder));
+        if (okFolder) { const m = moment(f.basename, format, true); if (m.isValid()) ts = m.valueOf(); }
+      }
+    } catch (e) { ts = null; }
+    if (ts !== this.activeDailyTs) { this.activeDailyTs = ts; this.activeDailySubs.forEach((fn) => { try { fn(ts); } catch {} }); }
+  }
+  getActiveDaily(): number | null { return this.activeDailyTs; }
+  onActiveDaily(fn: (ts: number | null) => void): () => void { this.activeDailySubs.add(fn); return () => this.activeDailySubs.delete(fn); }
   // Focus the main window, open the panel, and switch it to the Sky tab (star-notice click).
   async focusAndSky() {
     try {
@@ -1158,7 +1192,10 @@ export default class FocusLogPlugin extends Plugin {
     const known = tasks
       .filter((t) => prevIndex[t.id] !== undefined)
       .sort((a, b) => prevIndex[a.id] - prevIndex[b.id]);
-    const ordered = [...fresh, ...known];
+    // LOCAL tasks (created with the Timeline's add-block button) live alongside Notion tasks and
+    // survive every sync, so the plugin also works without a Notion database at all.
+    const locals = (this.data.tasks || []).filter((t: any) => t.local);
+    const ordered = [...fresh, ...known, ...locals];
     this.data.tasks = ordered;
     await this.persist();
     return ordered;
@@ -1311,6 +1348,54 @@ export default class FocusLogPlugin extends Plugin {
   // path with the same folder/format logic as appendToDailyNote, creates it if missing (only when
   // "Create new daily note if missing" is on), and opens it in the MAIN editor area rather than the
   // right-sidebar leaf the panel lives in (so the click never replaces the panel itself).
+  // The daily note file for the calendar date of ts (same name format and folder that
+  // openDailyNoteForDate uses), or null — drives the calendar's two-brown date numbers + day menu.
+  dailyNoteFileFor(ts: number): TFile | null {
+    try {
+      const s = this.data.settings;
+      const moment = (window as any).moment;
+      if (!moment) return null;
+      const d = new Date(ts);
+      const m = moment(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+      const dn: any = (this.app as any).internalPlugins?.getPluginById?.("daily-notes");
+      const opts = dn?.instance?.options || {};
+      const format = (s.dailyTitleFormat || opts.format || "YYYY-MM-DD").trim();
+      const folder = (s.dailyNoteFolder || opts.folder || "").trim();
+      const path = normalizePath((folder ? folder + "/" : "") + m.format(format) + ".md");
+      const f = this.app.vault.getAbstractFileByPath(path);
+      return f instanceof TFile ? f : null;
+    } catch (e) { return null; }
+  }
+  dailyNoteExists(ts: number): boolean { return !!this.dailyNoteFileFor(ts); }
+  // Right-click menu for a calendar day: file actions when its daily note exists, plus the
+  // caller-supplied work/relax flip. Delete goes to the trash (recoverable), like the file menu.
+  openDayMenu(ts: number, ev: MouseEvent, extra?: { flipLabel?: string; onFlip?: () => void }) {
+    const menu = new Menu();
+    const file = this.dailyNoteFileFor(ts);
+    if (file) {
+      menu.addItem((i: any) => i.setTitle("Reveal in Finder").setIcon("folder-open").onClick(() => {
+        try { (this.app as any).showInFolder(file.path); } catch (e) { new Notice("Focus Log: cannot reveal in the system explorer."); }
+      }));
+      menu.addItem((i: any) => i.setTitle("Reveal in Obsidian files").setIcon("folder-tree").onClick(() => {
+        try {
+          const fe: any = (this.app as any).internalPlugins?.getEnabledPluginById?.("file-explorer");
+          if (fe && fe.revealInFolder) fe.revealInFolder(file); else new Notice("Focus Log: the core Files plugin is not enabled.");
+        } catch (e) {}
+      }));
+      menu.addSeparator();
+      menu.addItem((i: any) => i.setTitle("Delete daily note").setIcon("trash").onClick(async () => {
+        try {
+          const fm: any = this.app.fileManager as any;
+          if (fm.trashFile) await fm.trashFile(file); else await this.app.vault.trash(file, true);
+          new Notice("Deleted " + file.basename + ".");
+        } catch (e) { new Notice("Focus Log: could not delete the note."); }
+      }));
+      menu.addSeparator();
+    }
+    if (extra && extra.onFlip) menu.addItem((i: any) => i.setTitle(extra.flipLabel || "Flip work/relax").setIcon("repeat").onClick(() => extra.onFlip && extra.onFlip()));
+    menu.showAtMouseEvent(ev);
+  }
+
   async openDailyNoteForDate(ts: number) {
     const s = this.data.settings;
     const moment = (window as any).moment;
@@ -1417,6 +1502,8 @@ export default class FocusLogPlugin extends Plugin {
       setDone: (pageId: string) => self.setTaskDone(pageId),
       appendDaily: (p: any) => self.appendToDailyNote(p),
       openDailyNote: (ts: number) => self.openDailyNoteForDate(ts),
+      hasDailyNote: (ts: number) => self.dailyNoteExists(ts),
+      openDayMenu: (ts: number, ev: MouseEvent, extra?: any) => self.openDayMenu(ts, ev, extra),
       notify: (msg: string, duration?: number) => new Notice(msg, duration),
       // A notice you can left-click to run an action (e.g. jump to the Sky). Stays up ~9s.
       notifyClickable: (msg: string, onClick: () => void) => {
@@ -1454,6 +1541,8 @@ export default class FocusLogPlugin extends Plugin {
       onBreaksChange: (fn: () => void) => self.onBreaksChange(fn),
       onRequestLogView: (fn: () => void) => self.onRequestLogView(fn),
       onRequestSkyView: (fn: () => void) => self.onRequestSkyView(fn),
+      getActiveDaily: () => self.getActiveDaily(),
+      onActiveDaily: (fn: (ts: number | null) => void) => self.onActiveDaily(fn),
       openFloating: () => self.openFloating(),
       closeFloating: () => self.closeFloating(),
       toggleFloating: () => self.toggleFloating(),
@@ -1588,9 +1677,11 @@ class FloatTimerView extends ItemView {
     // One row: − , a play/pause toggle (icon), + , and reset (rotate-ccw icon).
     const row = wrap.createDiv({ cls: "flt-row" });
     this.els.row = row;
-    this.els.minus = row.createEl("button", { cls: "flt-btn flt-step", text: "−" });
+    this.els.minus = row.createEl("button", { cls: "flt-btn flt-step" });
+    this.els.minus.innerHTML = FLT_MINUS;
     this.els.primary = row.createEl("button", { cls: "flt-btn flt-primary" });
-    this.els.plus = row.createEl("button", { cls: "flt-btn flt-step", text: "+" });
+    this.els.plus = row.createEl("button", { cls: "flt-btn flt-step" });
+    this.els.plus.innerHTML = FLT_PLUS;
     this.els.reset = row.createEl("button", { cls: "flt-btn flt-icon" });
     setIcon(this.els.reset, "rotate-ccw");
     this.els.reset.setAttribute("aria-label", "reset");
@@ -1760,9 +1851,11 @@ class FloatTimerView extends ItemView {
     const head = el.createDiv({ cls: "flt-brk-head" });
     this.els.brkTime = head.createDiv({ cls: "flt-brktime" });
     const ctrls = head.createDiv({ cls: "flt-brk-ctrls" });
-    this.els.brkMinus = ctrls.createEl("button", { cls: "flt-btn flt-step", text: "−" });
+    this.els.brkMinus = ctrls.createEl("button", { cls: "flt-btn flt-step" });
+    this.els.brkMinus.innerHTML = FLT_MINUS;
     this.els.brkToggle = ctrls.createEl("button", { cls: "flt-btn flt-brk-toggle flt-icon" });
-    this.els.brkPlus = ctrls.createEl("button", { cls: "flt-btn flt-step", text: "+" });
+    this.els.brkPlus = ctrls.createEl("button", { cls: "flt-btn flt-step" });
+    this.els.brkPlus.innerHTML = FLT_PLUS;
     this.els.brkEnd = ctrls.createEl("button", { cls: "flt-btn flt-brk-end flt-icon" });
     this.lastBrkIcon = ""; this.lastEndIcon = "";
     this.els.brkMinus.onclick = () => this.plugin.timer.stepBreak(-1);
@@ -1822,10 +1915,10 @@ class FloatTimerView extends ItemView {
       row.style.borderLeftColor = col.border;
       if (on) row.style.background = col.fill;
       const pcol = row.createDiv({ cls: "flt-brk-pillcol" });
-      const pill = pcol.createSpan({ cls: "flt-brk-pill", text: "#" + (a.area || "Other") });
+      const pill = pcol.createSpan({ cls: "flt-brk-pill", text: a.area || "Other" });
       pill.style.background = col.fill;
-      pill.style.borderColor = col.border;
-      pill.style.color = darken(col.border, 0.62);
+      pill.style.color = "#2b2723";
+      pill.style.border = "1px solid " + col.border;   // thin border, like the Plan form's Area tags
       row.createDiv({ cls: "flt-brk-name", text: (on ? "✓ " : "") + a.name });
       row.onclick = () => this.plugin.timer.toggleBreakPick(a.id);
     });
@@ -2035,65 +2128,7 @@ class FocusLogSettingTab extends PluginSettingTab {
         })
       );
 
-    new Setting(containerEl)
-      .setName("Show category in the today list")
-      .setDesc("Show each task's Area as a chip in the panel's today view. Off hides the chip and keeps the full task title.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.data.settings.showCategoryInView).onChange(async (v) => {
-          this.plugin.data.settings.showCategoryInView = v;
-          await this.plugin.persist();
-        })
-      );
-
-    containerEl.createEl("h3", { text: "Groups and routines" });
-
-    new Setting(containerEl)
-      .setName("Personal areas")
-      .setDesc("Comma-separated Notion Areas that belong in the Personal group (e.g. Health, Home). Tasks in these Areas show under Personal instead of Work.")
-      .addText((t) =>
-        t.setPlaceholder("Health, Home")
-          .setValue((this.plugin.data.settings.personalAreas || []).join(", "))
-          .onChange(async (v) => {
-            this.plugin.data.settings.personalAreas = v.split(",").map((s) => s.trim()).filter(Boolean);
-            await this.plugin.persist();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Skip morning routine")
-      .setDesc("Hide the morning routine block at the top of the today view.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.data.settings.skipMorningRoutine).onChange(async (v) => {
-          this.plugin.data.settings.skipMorningRoutine = v;
-          await this.plugin.persist();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Skip night routine")
-      .setDesc("Hide the night routine block at the bottom of the today view.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.data.settings.skipNightRoutine).onChange(async (v) => {
-          this.plugin.data.settings.skipNightRoutine = v;
-          await this.plugin.persist();
-        })
-      );
-
-    containerEl.createEl("h3", { text: "Active schedule" });
-    const schedDesc = containerEl.createEl("p", { text: "Working days (orange) open the today view in Work mode; rest days (dark green) open in Relax mode with your relax routines. Tap a day to flip it — the switch in the today view overrides just one day." });
-    schedDesc.style.fontSize = "12px"; schedDesc.style.color = "var(--text-muted)"; schedDesc.style.marginTop = "4px";
-    if (!this.plugin.data.settings.workDays) this.plugin.data.settings.workDays = [true, true, true, true, true, true, true];
-    const schedRow = containerEl.createDiv();
-    schedRow.style.display = "flex"; schedRow.style.gap = "6px"; schedRow.style.flexWrap = "wrap"; schedRow.style.margin = "8px 0 22px";
-    ["M", "T", "W", "T", "F", "S", "S"].forEach((lab, i) => {
-      const b = schedRow.createEl("button", { text: lab });
-      b.style.width = "38px"; b.style.height = "38px"; b.style.borderRadius = "9px"; b.style.border = "none"; b.style.color = "#fff"; b.style.fontWeight = "700"; b.style.fontSize = "14px"; b.style.cursor = "default";
-      const paint = () => { const rest = this.plugin.data.settings.workDays[i] === false; b.style.background = rest ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid; b.setAttribute("aria-label", rest ? "rest day — tap to make it a working day" : "working day — tap to make it a rest day"); };
-      paint();
-      b.onclick = async () => { const arr = this.plugin.data.settings.workDays.slice(); arr[i] = arr[i] === false; this.plugin.data.settings.workDays = arr; await this.plugin.persist(); paint(); };
-    });
-
-    containerEl.createEl("h3", { text: "Day and time bands" });
+    containerEl.createEl("h3", { text: "My day" });
 
     new Setting(containerEl)
       .setName("Day starts at (HH:MM)")
@@ -2144,7 +2179,7 @@ class FocusLogSettingTab extends PluginSettingTab {
       .setDesc("Auto-place a lunch block on the Timeline. Tasks flow around it and it counts as a long rest, so no long break right after.");
     lunchSet.addToggle((t) => t.setValue(this.plugin.data.settings.lunchEnabled).onChange(async (v) => { this.plugin.data.settings.lunchEnabled = v; await this.plugin.persist(); }));
     lunchSet.addText((t) => { t.setPlaceholder("13:30").setValue(fmtHM(this.plugin.data.settings.lunchStart)).onChange(async (v) => { const n = parseHM(v); if (n == null) return; this.plugin.data.settings.lunchStart = n; await this.plugin.persist(); }); t.inputEl.style.width = "5.5em"; });
-    lunchSet.controlEl.createEl("span", { text: "24h hh:mm", attr: { style: "font-size:11px;color:var(--text-muted);margin:0 12px 0 5px" } });
+    lunchSet.controlEl.createEl("span", { text: "HH:MM", attr: { style: "font-size:11px;color:var(--text-muted);margin:0 12px 0 5px" } });
     lunchSet.addText((t) => { t.setPlaceholder("60").setValue(String(this.plugin.data.settings.lunchMinutes)).onChange(async (v) => { const n = parseInt(v, 10); if (!n || n < 5) return; this.plugin.data.settings.lunchMinutes = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
     lunchSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
 
@@ -2153,9 +2188,178 @@ class FocusLogSettingTab extends PluginSettingTab {
       .setDesc("Auto-place a dinner block on the Timeline. Same rules as lunch.");
     dinnerSet.addToggle((t) => t.setValue(this.plugin.data.settings.dinnerEnabled).onChange(async (v) => { this.plugin.data.settings.dinnerEnabled = v; await this.plugin.persist(); }));
     dinnerSet.addText((t) => { t.setPlaceholder("17:30").setValue(fmtHM(this.plugin.data.settings.dinnerStart)).onChange(async (v) => { const n = parseHM(v); if (n == null) return; this.plugin.data.settings.dinnerStart = n; await this.plugin.persist(); }); t.inputEl.style.width = "5.5em"; });
-    dinnerSet.controlEl.createEl("span", { text: "24h hh:mm", attr: { style: "font-size:11px;color:var(--text-muted);margin:0 12px 0 5px" } });
+    dinnerSet.controlEl.createEl("span", { text: "HH:MM", attr: { style: "font-size:11px;color:var(--text-muted);margin:0 12px 0 5px" } });
     dinnerSet.addText((t) => { t.setPlaceholder("60").setValue(String(this.plugin.data.settings.dinnerMinutes)).onChange(async (v) => { const n = parseInt(v, 10); if (!n || n < 5) return; this.plugin.data.settings.dinnerMinutes = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
     dinnerSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
+
+    if (!this.plugin.data.settings.workDays) this.plugin.data.settings.workDays = [true, true, true, true, true, true, true];
+    const schedSet = new Setting(containerEl)
+      .setName("Work and relax days")
+      .setDesc("Working days (orange) open the today view in Work mode; rest days (dark green) open in Relax mode with your relax routines. Tap a day to flip it — the switch in the today view overrides just one day.");
+    const schedRow = schedSet.infoEl.createDiv();
+    schedRow.style.display = "flex"; schedRow.style.gap = "6px"; schedRow.style.flexWrap = "wrap"; schedRow.style.marginTop = "10px";
+    ["M", "T", "W", "T", "F", "S", "S"].forEach((lab, i) => {
+      const b = schedRow.createEl("button", { text: lab });
+      b.style.width = "36px"; b.style.height = "36px"; b.style.borderRadius = "9px"; b.style.border = "none"; b.style.color = "#fff"; b.style.fontWeight = "700"; b.style.fontSize = "14px"; b.style.cursor = "default"; b.style.padding = "0"; b.style.boxShadow = "none";
+      const paint = () => { const rest = this.plugin.data.settings.workDays[i] === false; b.style.background = rest ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid; b.setAttribute("aria-label", rest ? "rest day — tap to make it a working day" : "working day — tap to make it a rest day"); };
+      paint();
+      b.onclick = async () => { const arr = this.plugin.data.settings.workDays.slice(); arr[i] = arr[i] === false; this.plugin.data.settings.workDays = arr; await this.plugin.persist(); paint(); };
+    });
+
+    containerEl.createEl("h3", { text: "Focus and breaks" });
+
+    new Setting(containerEl)
+      .setName("Take a break after logging")
+      .setDesc("After logging a pomodoro, open the Break view instead of returning straight to the today list.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.breakEnabled).onChange(async (v) => {
+          this.plugin.data.settings.breakEnabled = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Start the break automatically")
+      .setDesc("On: the break timer starts on its own. Off: you start it manually in the Break view.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.breakAutoStart).onChange(async (v) => {
+          this.plugin.data.settings.breakAutoStart = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Break length (minutes)")
+      .setDesc("How long the break timer runs.")
+      .addText((t) =>
+        t.setValue(String(this.plugin.data.settings.breakMinutes)).onChange(async (v) => {
+          this.plugin.data.settings.breakMinutes = Math.max(1, Math.min(60, parseInt(v, 10) || 5));
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Long break length (minutes)")
+      .setDesc("The long break's length in minutes. Used in two places: the Break view's 'long' start button, and the Timeline's auto-fix when it inserts a long rest.")
+      .addText((t) =>
+        t.setValue(String(this.plugin.data.settings.longBreakMinutes)).onChange(async (v) => {
+          const n = Math.max(5, Math.min(120, parseInt(v, 10) || 20));
+          this.plugin.data.settings.longBreakMinutes = n;
+          await this.plugin.persist();
+        })
+      );
+
+    containerEl.createEl("h3", { text: "Plan view" });
+
+    new Setting(containerEl)
+      .setName("Show category in the today list")
+      .setDesc("Show each task's Area as a chip in the panel's today view. Off hides the chip and keeps the full task title.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.showCategoryInView).onChange(async (v) => {
+          this.plugin.data.settings.showCategoryInView = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Personal areas")
+      .setDesc("Comma-separated Areas that belong in the Personal group (e.g. Health, Home). Tasks in these Areas show under Personal instead of Project, including manual tasks added with the Timeline's add-block button, matched by their Area tag. Personal tasks wear the light oat-milk Area tag (Project tags are dark mocha).")
+      .addText((t) =>
+        t.setPlaceholder("Health, Home")
+          .setValue((this.plugin.data.settings.personalAreas || []).join(", "))
+          .onChange(async (v) => {
+            this.plugin.data.settings.personalAreas = v.split(",").map((s) => s.trim()).filter(Boolean);
+            await this.plugin.persist();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Skip morning routine")
+      .setDesc("Hide the morning routine block at the top of the today view.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.skipMorningRoutine).onChange(async (v) => {
+          this.plugin.data.settings.skipMorningRoutine = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Skip night routine")
+      .setDesc("Hide the night routine block at the bottom of the today view.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.skipNightRoutine).onChange(async (v) => {
+          this.plugin.data.settings.skipNightRoutine = v;
+          await this.plugin.persist();
+        })
+      );
+
+    const groupLenSet = new Setting(containerEl)
+      .setName("Routine group length")
+      .setDesc("Morning and night routine steps are packed into groups of at most this many minutes; each group runs as one pomodoro. Independent of the timer's current pomodoro length, so shortening the timer never splits the groups. Default 25.");
+    groupLenSet.addText((t) => { t.setPlaceholder("25").setValue(String(this.plugin.data.settings.routineGroupMinutes ?? 25)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 5) return; this.plugin.data.settings.routineGroupMinutes = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
+    groupLenSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
+
+    const nightGapSet = new Setting(containerEl)
+      .setName("Night routine starts after dinner")
+      .setDesc("On the Timeline, the night routine begins this many minutes after dinner ends. Default 60.");
+    nightGapSet.addText((t) => { t.setPlaceholder("60").setValue(String(this.plugin.data.settings.nightRoutineGap ?? 60)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 0) return; this.plugin.data.settings.nightRoutineGap = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
+    nightGapSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
+
+    new Setting(containerEl)
+      .setName("Show Area tags on the Timeline")
+      .setDesc("Show each task's Notion Area tag on its timeline block — including manual blocks added with the add-block button. Default on.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.showAreaTimeline !== false).onChange(async (v) => {
+          this.plugin.data.settings.showAreaTimeline = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Add block button")
+      .setDesc("Show the 'add block' button on the Timeline toolbar. A manual block gets a name, an ExecutionPower colour, a CognitiveLoad letter, an Area-style tag, and its own length. Off by default.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.addBlockEnabled === true).onChange(async (v) => {
+          this.plugin.data.settings.addBlockEnabled = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Long break every")
+      .setDesc("How many pomodoros between long breaks when the Timeline's auto-fix packs your day. Meals and commitments count as rests and restart the count. Also adjustable from the Timeline toolbar.")
+      .addDropdown((d) =>
+        d.addOption("2", "2 pomodoros").addOption("3", "3 pomodoros").addOption("4", "4 pomodoros")
+          .setValue(String(this.plugin.data.settings.longBreakEvery))
+          .onChange(async (v) => {
+            this.plugin.data.settings.longBreakEvery = parseInt(v, 10) || 3;
+            await this.plugin.persist();
+          })
+      );
+
+    containerEl.createEl("h3", { text: "Floating timer" });
+
+    new Setting(containerEl)
+      .setName("Open the floating window when a pomodoro starts")
+      .setDesc("A small always-on-top window that shows the countdown over your other apps. You can also toggle it any time from the ribbon clock or the “Toggle floating timer” command. It stays in sync with the panel — start, pause, or reset from either.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.floatOnStart).onChange(async (v) => {
+          this.plugin.data.settings.floatOnStart = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Keep it above other apps")
+      .setDesc("Pin the floating window on top of every other window. If your Obsidian build doesn't allow this, the window still opens — it just won't stay in front.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.floatAlwaysOnTop).onChange(async (v) => {
+          this.plugin.data.settings.floatAlwaysOnTop = v;
+          await this.plugin.persist();
+        })
+      );
+
+    containerEl.createEl("h3", { text: "Status calendar" });
 
     new Setting(containerEl)
       .setName("Start the week on Sunday")
@@ -2176,44 +2380,6 @@ class FocusLogSettingTab extends PluginSettingTab {
           await this.plugin.persist();
         })
       );
-
-    containerEl.createEl("h3", { text: "Timeline" });
-
-    new Setting(containerEl)
-      .setName("Long break length (minutes)")
-      .setDesc("The longer break inserted between work stretches when the Timeline auto-stacks your day.")
-      .addText((t) =>
-        t.setValue(String(this.plugin.data.settings.longBreakMinutes)).onChange(async (v) => {
-          const n = Math.max(5, Math.min(120, parseInt(v, 10) || 20));
-          this.plugin.data.settings.longBreakMinutes = n;
-          await this.plugin.persist();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Long break every")
-      .setDesc("How many pomodoros between long breaks when the Timeline auto-stacks (a noon long break is also added).")
-      .addDropdown((d) =>
-        d.addOption("2", "2 pomodoros").addOption("3", "3 pomodoros").addOption("4", "4 pomodoros")
-          .setValue(String(this.plugin.data.settings.longBreakEvery))
-          .onChange(async (v) => {
-            this.plugin.data.settings.longBreakEvery = parseInt(v, 10) || 3;
-            await this.plugin.persist();
-          })
-      );
-
-    const groupLenSet = new Setting(containerEl)
-      .setName("Routine group length")
-      .setDesc("Morning and night routine steps are packed into groups of at most this many minutes; each group runs as one pomodoro. Independent of the timer's current pomodoro length, so shortening the timer never splits the groups. Default 25.");
-    groupLenSet.addText((t) => { t.setPlaceholder("25").setValue(String(this.plugin.data.settings.routineGroupMinutes ?? 25)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 5) return; this.plugin.data.settings.routineGroupMinutes = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
-    groupLenSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
-
-    const nightGapSet = new Setting(containerEl)
-      .setName("Night routine starts after dinner")
-      .setDesc("On the Timeline, the night routine begins this many minutes after dinner ends. Default 60.");
-    nightGapSet.addText((t) => { t.setPlaceholder("60").setValue(String(this.plugin.data.settings.nightRoutineGap ?? 60)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 0) return; this.plugin.data.settings.nightRoutineGap = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
-    nightGapSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
-
 
     containerEl.createEl("h3", { text: "Daily note" });
 
@@ -2329,6 +2495,19 @@ class FocusLogSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setClass("fl-fullrow")
+      .setName("Pause block template")
+      .setDesc("Written to the daily note when you tag a pause. Placeholders: {date} {pomodoro-start} {pause-start} {pause-end} {pomodoro-resume} {pause-tag}. ({pause-end} and {pomodoro-resume} are both the moment you resumed or reset.) Manage pause tags in the panel's Pause tab.")
+      .addTextArea((t) => {
+        t.setValue(this.plugin.data.settings.pauseTemplate).onChange(async (v) => {
+          this.plugin.data.settings.pauseTemplate = v;
+          await this.plugin.persist();
+        });
+        t.inputEl.rows = 5;
+        t.inputEl.style.width = "100%";
+      });
+
+    new Setting(containerEl)
       .setName("Write the category tag to the daily note")
       .setDesc("Expand the {tag} placeholder to a tag like #Notion/En when logging. Off leaves {tag} blank without editing your template.")
       .addToggle((t) =>
@@ -2366,81 +2545,13 @@ class FocusLogSettingTab extends PluginSettingTab {
           this.plugin.data.settings.counterPrefix = v;
           await this.plugin.persist();
         });
-        t.inputEl.style.width = "100%";
-      });
-
-    containerEl.createEl("h3", { text: "Break" });
-
-    new Setting(containerEl)
-      .setName("Take a break after logging")
-      .setDesc("After logging a pomodoro, open the Break view instead of returning straight to the today list.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.data.settings.breakEnabled).onChange(async (v) => {
-          this.plugin.data.settings.breakEnabled = v;
-          await this.plugin.persist();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Start the break automatically")
-      .setDesc("On: the break timer starts on its own. Off: you start it manually in the Break view.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.data.settings.breakAutoStart).onChange(async (v) => {
-          this.plugin.data.settings.breakAutoStart = v;
-          await this.plugin.persist();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Break length (minutes)")
-      .setDesc("How long the break timer runs.")
-      .addText((t) =>
-        t.setValue(String(this.plugin.data.settings.breakMinutes)).onChange(async (v) => {
-          this.plugin.data.settings.breakMinutes = Math.max(1, Math.min(60, parseInt(v, 10) || 5));
-          await this.plugin.persist();
-        })
-      );
-
-    containerEl.createEl("h3", { text: "Floating timer" });
-
-    new Setting(containerEl)
-      .setName("Open the floating window when a pomodoro starts")
-      .setDesc("A small always-on-top window that shows the countdown over your other apps. You can also toggle it any time from the ribbon clock or the “Toggle floating timer” command. It stays in sync with the panel — start, pause, or reset from either.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.data.settings.floatOnStart).onChange(async (v) => {
-          this.plugin.data.settings.floatOnStart = v;
-          await this.plugin.persist();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Keep it above other apps")
-      .setDesc("Pin the floating window on top of every other window. If your Obsidian build doesn't allow this, the window still opens — it just won't stay in front.")
-      .addToggle((t) =>
-        t.setValue(this.plugin.data.settings.floatAlwaysOnTop).onChange(async (v) => {
-          this.plugin.data.settings.floatAlwaysOnTop = v;
-          await this.plugin.persist();
-        })
-      );
-
-    containerEl.createEl("h3", { text: "Pause" });
-
-    new Setting(containerEl)
-      .setClass("fl-fullrow")
-      .setName("Pause block template")
-      .setDesc("Written to the daily note when you tag a pause. Placeholders: {date} {pomodoro-start} {pause-start} {pause-end} {pomodoro-resume} {pause-tag}. ({pause-end} and {pomodoro-resume} are both the moment you resumed or reset.) Manage pause tags in the panel's Pause tab.")
-      .addTextArea((t) => {
-        t.setValue(this.plugin.data.settings.pauseTemplate).onChange(async (v) => {
-          this.plugin.data.settings.pauseTemplate = v;
-          await this.plugin.persist();
-        });
-        t.inputEl.rows = 5;
-        t.inputEl.style.width = "100%";
+        t.inputEl.style.width = "22em";
       });
 
     containerEl.createEl("p", {
       text: "Reopen the Focus Log panel after changing settings here so the panel picks up the new values.",
       cls: "setting-item-description",
     });
+
   }
 }

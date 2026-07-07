@@ -1,5 +1,6 @@
 import * as React from "react";
 import { createSkyMap } from "./skymap";
+import { InfoHover } from "./icons";
 import skyStars from "./sky-data/sky-stars.json";
 import skyLines from "./sky-data/sky-constellations.json";
 import skyLabels from "./sky-data/sky-labels.json";
@@ -116,14 +117,15 @@ export function SkyView({ sessions, reflections, C }: { sessions: any[]; reflect
 
   const seg = (on: boolean): any => ({ padding: "4px 12px", borderRadius: 8, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 12.5, fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: "var(--fl-display)" });
   const empty = mode === "reflection" ? "Save your first reflection to light a star." : "Log your first pomodoro to light a star.";
-  const hint = mode === "reflection"
-    ? "Each reflection you save lights a silver star, brighter when it's recent. Drag to roam, scroll to zoom."
-    : "Each pomodoro you log lights a star, brighter when it's recent. Drag to roam, scroll to zoom.";
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-        <div style={{ fontSize: 12.5, color: C.muted, flex: 1, minWidth: 200 }}>{hint}</div>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <InfoHover C={C} label="about your Sky" width={330}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Your Sky</div>
+          <div><b>Pomodoros</b> lights an amber star for every pomodoro you log; <b>Reflections</b> is a second, silver sky with one star per reflection you save. Recent stars shine brighter.</div>
+          <div style={{ marginTop: 6 }}>Drag to roam and scroll to zoom. Hover a star for its story, or near a constellation for its name.</div>
+        </InfoHover>
         <div style={{ display: "inline-flex", gap: 2, background: C.line, borderRadius: 10, padding: 3, flexShrink: 0 }}>
           <button type="button" style={seg(mode === "pomodoro")} onClick={() => setMode("pomodoro")}>Pomodoros</button>
           <button type="button" style={seg(mode === "reflection")} onClick={() => setMode("reflection")}>Reflections</button>
