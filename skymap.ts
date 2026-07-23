@@ -129,7 +129,7 @@ export function createSkyMap(canvas: HTMLCanvasElement, opts?: any) {
       const st = stars[order[i]];
       const recency = end > start ? Math.max(0, Math.min(1, (r.ts - start) / (end - start))) : 1;
       placed.push({
-        id: r.id, text: r.text, ts: r.ts, ra: st[1], dec: st[2], recency,
+        id: r.id, text: r.text, ts: r.ts, ra: st[1], dec: st[2], recency, claimed: !!r.claimed,
         name: starNames[String(st[0])] || ("HIP " + st[0])
       });
     }
@@ -266,21 +266,28 @@ export function createSkyMap(canvas: HTMLCanvasElement, opts?: any) {
       const a = 0.45 + p.recency * 0.55;
       const dot = r / 3;
       const slv = refTint === "silver";
+      const clm = !slv && p.claimed;            // claimed pomodoro: a warmer, quieter copper
       ctx.beginPath();                          // halo (outer glow)
       ctx.fillStyle = slv
         ? (isLight ? `rgba(110,118,140,${0.16 + p.recency * 0.18})` : `rgba(200,206,222,${0.12 + p.recency * 0.13})`)
+        : clm
+        ? (isLight ? `rgba(190,95,45,${0.13 + p.recency * 0.15})` : `rgba(255,170,120,${0.10 + p.recency * 0.11})`)
         : (isLight ? `rgba(210,130,20,${0.16 + p.recency * 0.18})` : `rgba(255,205,110,${0.12 + p.recency * 0.13})`);
       ctx.arc(q.x, q.y, r * 1.2, 0, 6.2832);
       ctx.fill();
       ctx.beginPath();                          // core
       ctx.fillStyle = slv
         ? (isLight ? `rgba(95,103,125,${a})` : `rgba(214,219,233,${a})`)
+        : clm
+        ? (isLight ? `rgba(175,85,35,${a * 0.92})` : `rgba(255,190,150,${a * 0.92})`)
         : (isLight ? `rgba(200,120,15,${a})` : `rgba(255,224,150,${a})`);
       ctx.arc(q.x, q.y, dot, 0, 6.2832);
       ctx.fill();
       ctx.beginPath();                          // bright center
       ctx.fillStyle = slv
         ? (isLight ? `rgba(64,70,92,${a})` : `rgba(240,243,250,${a})`)
+        : clm
+        ? (isLight ? `rgba(105,50,15,${a * 0.92})` : `rgba(255,240,228,${a * 0.92})`)
         : (isLight ? `rgba(120,65,0,${a})` : `rgba(255,255,255,${a})`);
       ctx.arc(q.x, q.y, dot * 0.42, 0, 6.2832);
       ctx.fill();

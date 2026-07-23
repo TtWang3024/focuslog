@@ -36,7 +36,7 @@ export function SkyView({ sessions, reflections, C }: { sessions: any[]; reflect
   const entries = useMemo(() => {
     const src = mode === "reflection" ? (reflections || []) : (sessions || []);
     return src
-      .map((s: any) => ({ id: String(s.id), text: mode === "reflection" ? reflectionLabel(s) : (s.task || "pomodoro"), ts: new Date(s.ts).getTime() }))
+      .map((s: any) => ({ id: String(s.id), text: mode === "reflection" ? reflectionLabel(s) : ((s.task || "pomodoro") + (s.claimed ? " (claimed)" : "")), ts: new Date(s.ts).getTime(), claimed: mode !== "reflection" && !!s.claimed }))
       .filter((e: any) => !isNaN(e.ts));
   }, [sessions, reflections, mode]);
 
@@ -123,7 +123,7 @@ export function SkyView({ sessions, reflections, C }: { sessions: any[]; reflect
       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <InfoHover C={C} label="about your Sky" width={330}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Your Sky</div>
-          <div><b>Pomodoros</b> lights an amber star for every pomodoro you log; <b>Reflections</b> is a second, silver sky with one star per reflection you save. Recent stars shine brighter.</div>
+          <div><b>Pomodoros</b> lights an amber star for every pomodoro you log; <b>Reflections</b> is a second, silver sky with one star per reflection you save. Recent stars shine brighter. Work you claim after the fact lights a quieter copper star: same sky, different instrument.</div>
           <div style={{ marginTop: 6 }}>Drag to roam and scroll to zoom. Hover a star for its story, or near a constellation for its name.</div>
         </InfoHover>
         <div style={{ display: "inline-flex", gap: 2, background: C.line, borderRadius: 10, padding: 3, flexShrink: 0 }}>
