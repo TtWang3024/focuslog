@@ -86,6 +86,7 @@ export interface FocusLogSettings {
   dailyNoteWrite: boolean;
   dailyNoteTrueDate: boolean;
   dailyHeading: string;
+  calibrationHeading: string;
   dailyCreateHeading: boolean;
   dailyTemplate: string;
   createDailyIfMissing: boolean;
@@ -145,6 +146,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   dailyNoteWrite: true,
   dailyNoteTrueDate: true,
   dailyHeading: "\u{1F33B} Today",
+  calibrationHeading: "Calibration",
   dailyCreateHeading: true,
   dailyTemplate:
     "- [ ] <mark class=\"hltr-yellow\">{date}</mark> {start} - {end} \u{1F345} {tag}\n    - {task}{hierarchy}\n    - {note}",
@@ -236,6 +238,9 @@ interface PluginData {
   pauses: any[];
   breaks: any[];
   reflections: any[];
+  calibrations: any[];
+  areaOptions: string[];
+  quickParents: { id: string; name: string }[];
   feelings: any;
   morningRoutine: any[];
   nightRoutine: any[];
@@ -277,14 +282,26 @@ function fieldValue(page: any, field: string): number {
   const ms = page?.properties?.[field]?.multi_select || [];
   return ms.reduce((a: number, o: any) => a + optValue(o.name), 0);
 }
-// Total estimate = sum of all three Est fields.
-function estTotalOf(page: any): number {
-  return fieldValue(page, "1 Est_T") + fieldValue(page, "2 Est_T") + fieldValue(page, "3 Est_T");
+// Guess multi-select: base tomatoes/boxes, plus up to two "+ …" re-estimate rounds. Each round
+// is capped at two — beyond that the task must be split. optValue turns emoji into pip counts.
+function guessOf(page: any): { base: number; plus: number[] } {
+  const ms = page?.properties?.["Guess"]?.multi_select || [];
+  let base = 0; const plus: number[] = [];
+  for (const o of ms) {
+    const name = o.name || "";
+    if (name.trim().startsWith("+")) plus.push(optValue(name)); else base += optValue(name);
+  }
+  return { base, plus: plus.slice(0, 2) };
 }
-function mapLoad(name: string | null): string {
-  if (!name) return "B";
-  const c = name[0];
-  return c === "A" || c === "B" || c === "C" ? c : "B";
+// Notion Status select -> short code. Only exploring/executing surface in the task list.
+function mapStatus(name: string | null): string | null {
+  if (!name) return null;
+  const n = name.toLowerCase();
+  if (n.includes("explor")) return "exploring";
+  if (n.includes("execut")) return "executing";
+  if (n.includes("split")) return "split";
+  if (n.includes("solv")) return "solved";
+  return null;
 }
 // ExecutionPower select -> colour code. Default to Aim Today (yellow) when unset.
 function mapPower(name: string | null): string {
@@ -585,13 +602,18 @@ class TimerEngine {
     this.emit();
   }
 
+  // Emit only when the DISPLAYED second flips: polls can arrive at several Hz from two windows
+  // whose intervals drift against the wall-clock second, and per-poll emits made the digits
+  // advance in uneven bursts (a second lingering ~1.5s, then a quick catch-up).
+  private lastPollSecs = -1;
+  private lastPollBreak = -1;
   private ensureTick() {
     // Tell Electron not to throttle this window's timers while a pomodoro or break runs,
     // otherwise a backgrounded window's setInterval is clamped to ~1/minute and the
     // countdown jumps a minute at a time. Restored to normal when nothing is ticking.
     this.plugin.setBackgroundThrottle(false);
     if (this.iv != null) return;
-    this.iv = window.setInterval(() => this.poll(), 500);
+    this.iv = window.setInterval(() => this.poll(), 200);
   }
   private stopTick() {
     // Keep the clock alive while either the pomodoro or a break still needs it.
@@ -610,8 +632,9 @@ class TimerEngine {
     let changed = false;
     if (this.running) {
       const s = this.secsNow();
-      if (this.total > 900 && s <= 900 && !this.fired[900]) { this.fired[900] = true; this.plugin.timerNotify("15 minutes left. Still on this task?"); }
-      if (this.total > 300 && s <= 300 && !this.fired[300]) { this.fired[300] = true; this.plugin.timerNotify("5 minutes left. Stay with it."); }
+      if (this.total > 900 && s <= 900 && !this.fired[900]) { this.fired[900] = true; this.plugin.timerNotify("15 minutes left. Are you still on the task?"); }
+      if (this.total > 600 && s <= 600 && !this.fired[600]) { this.fired[600] = true; this.plugin.timerNotify("10 minutes left. Are you still on the task?"); }
+      if (this.total > 300 && s <= 300 && !this.fired[300]) { this.fired[300] = true; this.plugin.timerNotify("5 minutes left. Are you still on the task?"); }
       if (s <= 0 && !this.fired[0]) {
         this.fired[0] = true;
         this.frozenSecs = 0;
@@ -622,7 +645,7 @@ class TimerEngine {
         this.plugin.timerDone();
         return;
       }
-      changed = true;
+      if (s !== this.lastPollSecs) { this.lastPollSecs = s; changed = true; }
     }
     if (this.breakRunning) {
       if (this.breakSecsNow() <= 0) {
@@ -634,7 +657,8 @@ class TimerEngine {
         this.plugin.breakDone();
         return;
       }
-      changed = true;
+      const bs = this.breakSecsNow();
+      if (bs !== this.lastPollBreak) { this.lastPollBreak = bs; changed = true; }
     }
     if (changed) this.emit();
   }
@@ -667,6 +691,9 @@ export default class FocusLogPlugin extends Plugin {
       pauses: loaded.pauses || [],
       breaks: loaded.breaks || [],
       reflections: loaded.reflections || [],
+      calibrations: loaded.calibrations || [],
+      areaOptions: loaded.areaOptions || [],
+      quickParents: loaded.quickParents || [],
       feelings: loaded.feelings || JSON.parse(JSON.stringify(DEFAULT_FEELINGS)),
       morningRoutine: loaded.morningRoutine || DEFAULT_MORNING.map((a) => ({ ...a })),
       nightRoutine: loaded.nightRoutine || DEFAULT_NIGHT.map((a) => ({ ...a })),
@@ -719,6 +746,8 @@ export default class FocusLogPlugin extends Plugin {
     this.addRibbonIcon("timer", "Toggle floating timer", () => this.toggleFloating());
     this.addCommand({ id: "open-focus-log", name: "Open Focus Log", callback: () => this.activateView() });
     this.addCommand({ id: "toggle-floating-timer", name: "Toggle floating timer", callback: () => this.toggleFloating() });
+    // Lets external automation open the view via the URL obsidian://focuslog
+    this.registerObsidianProtocolHandler("focuslog", () => this.activateView());
     this.addSettingTab(new FocusLogSettingTab(this.app, this));
   }
 
@@ -829,7 +858,7 @@ export default class FocusLogPlugin extends Plugin {
     let msg = "Logged “" + taskName + "” — felt " + s.actual + "/4.";
     if (s.pageId) {
       try { await this.incrementAct(s.pageId); }
-      catch (e) { this.data.pending = [...(this.data.pending || []), { sessionId: s.id, pageId: s.pageId, task: s.task }]; await this.persist(); msg += " Act write queued."; }
+      catch (e) { this.data.pending = [...(this.data.pending || []), { sessionId: s.id, pageId: s.pageId, task: s.task }]; await this.persist(); msg += " Spend write queued."; }
     }
     if (markDone && s.pageId) {
       try {
@@ -1142,9 +1171,9 @@ export default class FocusLogPlugin extends Plugin {
     // also required Date == today, which hid every Daily task.
     const filter = {
       or: [
-        { property: "Status", select: { equals: "\u{1F33B} Today" } },
-        { property: "Status", select: { equals: "1\uFE0F\u20E3 King" } },
-        { property: "Status", select: { equals: "\u{1F331} Daily" } },
+        { property: "Schedule", select: { equals: "\u{1F33B} Today" } },
+        { property: "Schedule", select: { equals: "1\uFE0F\u20E3 King" } },
+        { property: "Schedule", select: { equals: "\u{1F331} Daily" } },
       ],
     };
     // Page through every match — Notion returns at most 100 rows per request and sets
@@ -1159,20 +1188,56 @@ export default class FocusLogPlugin extends Plugin {
       pages.push(...(json.results || []));
       cursor = json.has_more ? json.next_cursor : undefined;
     } while (cursor);
+    // Refresh the Area choices for the add-block editor from the database schema, so the
+    // dropdown always mirrors the Notion Area options.
+    try {
+      const db = await this.notionFetch(`/databases/${this.data.settings.databaseId}`);
+      const prop = db?.properties?.[this.data.settings.categoryProperty || "Area"];
+      const opts = (prop?.select?.options || prop?.multi_select?.options || []).map((o: any) => o.name).filter(Boolean);
+      if (opts.length) { this.data.areaOptions = opts; await this.persist(); }
+    } catch (e) {}
+    // Refresh the quick-add parent choices: BIG TASKs are the pages whose Guess carries the
+    // mountain marker (the user's own Today views hide them), and only while their Schedule is
+    // 🌻 Today or 🎯 This week — Later / Done / Archived / Legacy big tasks stay out of the list.
+    // Queried live each sync, so the list follows the database as it evolves.
+    try {
+      const bt: any[] = [];
+      let bc: string | undefined = undefined;
+      do {
+        const body: any = { filter: { and: [
+          { property: "Guess", multi_select: { contains: "\u{1F3D4}️" } },
+          { or: [
+            { property: "Schedule", select: { equals: "\u{1F33B} Today" } },
+            { property: "Schedule", select: { equals: "\u{1F3AF} This week" } },
+          ] },
+        ] }, page_size: 100 };
+        if (bc) body.start_cursor = bc;
+        const j: any = await this.notionFetch(`/databases/${this.data.settings.databaseId}/query`, "POST", body);
+        bt.push(...(j.results || []));
+        bc = j.has_more ? j.next_cursor : undefined;
+      } while (bc);
+      this.data.quickParents = bt
+        .map((p: any) => ({ id: p.id, name: plainTitle(p) }))
+        .filter((x: any) => x.name);
+      await this.persist();
+    } catch (e) {}
     const cache: Record<string, any> = {};
     const tasks: any[] = [];
     for (const p of pages) {
       const task = plainTitle(p);
       if (!task) continue;
       const h = await this.resolveHierarchy(p, cache);
+      const g = guessOf(p);
       tasks.push({
         task,
-        load: mapLoad(selectName(p, "CognitiveLoad")),
+        status: mapStatus(selectName(p, "Status")),
         power: mapPower(selectName(p, "ExecutionPower")),
-        king: (selectName(p, "Status") || "").includes("King"),
+        king: (selectName(p, "Schedule") || "").includes("King"),
         category: categoryName(p, this.data.settings.categoryProperty) || null,
-        pomodoros: estTotalOf(p),
-        act: numberProp(p, "Act"),
+        pomodoros: g.base + g.plus.reduce((a, b) => a + b, 0),
+        guessBase: g.base,
+        guessPlus: g.plus,
+        act: numberProp(p, "Spend"),
         url: p.url,
         id: p.id,
         parent: h.parent,
@@ -1227,12 +1292,58 @@ export default class FocusLogPlugin extends Plugin {
     return { parent: immediate, ancestor: top };
   }
 
-  // Read current Act, then PATCH only that one property (+1).
+  // Read current Spend, then PATCH only that one property (+1).
   async incrementAct(pageId: string): Promise<number> {
     const page = await this.notionFetch(`/pages/${pageId}`);
-    const next = numberProp(page, "Act") + 1;
-    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Act: { number: next } } });
+    const next = numberProp(page, "Spend") + 1;
+    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Spend: { number: next } } });
     return next;
+  }
+
+  // Claimed work: add n pomodoros to Spend in one read + one PATCH.
+  async incrementActBy(pageId: string, n: number): Promise<number> {
+    const page = await this.notionFetch(`/pages/${pageId}`);
+    const next = numberProp(page, "Spend") + Math.max(1, Math.round(n || 1));
+    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Spend: { number: next } } });
+    return next;
+  }
+
+  // Quick-add from the panel. The public API cannot apply Notion page templates, so this
+  // replicates the user's two templates exactly: no parent = "Common task" (Area Task, ⏳ icon);
+  // a parentId = "This is sub tasks under BIG TASK" (Area Pro, 🐾 icon, Parent item relation).
+  // Both get Schedule 🌻 Today, Status Exploring, ExecutionPower 🌤️ Aim Today, empty Guess —
+  // the same values the real templates preset. One-way push: nothing is pulled back.
+  async createTask(name: string, parentId?: string | null, guess?: number): Promise<any> {
+    const sub = !!parentId;
+    const props: any = {
+      Task: { title: [{ text: { content: name } }] },
+      Schedule: { select: { name: "\u{1F33B} Today" } },
+      Status: { select: { name: "Exploring" } },
+      ExecutionPower: { select: { name: "\u{1F324}️ Aim Today" } },
+    };
+    // Optional initial Guess, entered as a plain number: 1-3 become 🍅 strings, 4 becomes one 📦
+    // (the same values optValue reads back), so the pip display round-trips exactly.
+    const g = Math.max(0, Math.min(4, Math.round(guess || 0)));
+    if (g) props.Guess = { multi_select: [{ name: g === 4 ? "\u{1F4E6}" : "\u{1F345}".repeat(g) }] };
+    props[this.data.settings.categoryProperty || "Area"] = { select: { name: sub ? "Pro" : "Task" } };
+    if (sub) props["Parent item"] = { relation: [{ id: parentId }] };
+    const page = await this.notionFetch(`/pages`, "POST", {
+      parent: { database_id: this.data.settings.databaseId },
+      icon: { type: "emoji", emoji: sub ? "\u{1F43E}" : "⏳" },
+      properties: props,
+    });
+    const parentName = sub ? (((this.data.quickParents || []).find((x: any) => x.id === parentId) || {}) as any).name || null : null;
+    // Mirror queryToday's task shape and put the newcomer on top, so the panel updates
+    // instantly without pulling from Notion (Sync stays manual; the timeline is not rebuilt).
+    const t = {
+      task: name, status: "exploring", power: "Y", king: false,
+      category: sub ? "Pro" : "Task", pomodoros: g, guessBase: g, guessPlus: [],
+      act: 0, url: page.url, id: page.id,
+      parent: parentName, ancestor: parentName, group: parentName || name,
+    };
+    this.data.tasks = [t, ...(this.data.tasks || [])];
+    await this.persist();
+    return t;
   }
 
   // Resolve the Status option that means "done": an explicit setting wins, otherwise
@@ -1242,7 +1353,7 @@ export default class FocusLogPlugin extends Plugin {
     if (override) return override;
     if (this.doneStatusCache) return this.doneStatusCache;
     const db = await this.notionFetch(`/databases/${this.data.settings.databaseId}`);
-    const status = db?.properties?.["Status"];
+    const status = db?.properties?.["Schedule"];
     const opts = status?.select?.options || status?.status?.options || [];
     const match = opts.find((o: any) => /done|complete|finish/i.test(o.name || ""));
     if (!match) throw new Error("No 'Done' status option found. Set the Done status value in Focus Log settings.");
@@ -1250,10 +1361,10 @@ export default class FocusLogPlugin extends Plugin {
     return match.name;
   }
 
-  // Set a task page's Status select to the resolved done value.
+  // Set a task page's Schedule select to the resolved done value (Done moved to Schedule).
   async setTaskDone(pageId: string): Promise<string> {
     const name = await this.resolveDoneStatus();
-    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Status: { select: { name } } } });
+    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Schedule: { select: { name } } } });
     return name;
   }
 
@@ -1455,6 +1566,89 @@ export default class FocusLogPlugin extends Plugin {
     await this.app.vault.process(file, (data: string) => insertUnderHeading(data, s.dailyHeading, block, s.dailyCreateHeading));
   }
 
+  // Add one "+ 🍅" re-estimate round to a task's Guess multi-select. The caller enforces the
+  // two-round cap in the UI; this re-checks against Notion's current value to be safe.
+  async addGuessRound(pageId: string, count = 1): Promise<number> {
+    const page = await this.notionFetch(`/pages/${pageId}`);
+    const ms = (page?.properties?.["Guess"]?.multi_select || []).map((o: any) => o.name);
+    const rounds = ms.filter((n: string) => (n || "").trim().startsWith("+")).length;
+    if (rounds >= 2) throw new Error("Two extra rounds already: split the task.");
+    const optName = count >= 4 ? "+ \u{1F4E6}" : "+ " + "\u{1F345}".repeat(Math.max(1, Math.min(3, count)));
+    const next = [...ms, optName];
+    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Guess: { multi_select: next.map((name: string) => ({ name })) } } });
+    return rounds + 1;
+  }
+
+  // Write a calibration entry to the daily note under its own "Calibration" heading:
+  // time, task, parents, guess vs spend, the reason chip and the optional note.
+  async appendCalibrationToDailyNote(e: { ts: number; task: string; hierarchy?: string; guess: number; spend: number; direction: string; reason: string; note?: string }) {
+    const s = this.data.settings;
+    if (!s.dailyNoteWrite) return;
+    const moment = (window as any).moment;
+    if (!moment) throw new Error("moment unavailable");
+    const fileDate = s.dailyNoteTrueDate ? new Date(e.ts) : new Date(e.ts - dayShiftHours(s.dayStart) * 3600000);
+    const m = moment(new Date(fileDate.getFullYear(), fileDate.getMonth(), fileDate.getDate()));
+    const dn: any = (this.app as any).internalPlugins?.getPluginById?.("daily-notes");
+    const opts = dn?.instance?.options || {};
+    const format = opts.format || "YYYY-MM-DD";
+    const folder = (opts.folder || "").trim();
+    const path = normalizePath((folder ? folder + "/" : "") + m.format(format) + ".md");
+    let file = this.app.vault.getAbstractFileByPath(path) as TFile;
+    if (!file) {
+      if (folder && !this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder).catch(() => {});
+      file = await this.app.vault.create(path, "# " + s.dailyHeading + "\n");
+    }
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const d = new Date(e.ts);
+    const line = `- ${pad(d.getHours())}:${pad(d.getMinutes())} **${e.task}**${e.hierarchy ? " (" + e.hierarchy + ")" : ""} · guess ${e.guess} → spend ${e.spend} · ${e.reason}${e.note ? ": " + e.note : ""}`;
+    await this.app.vault.process(file, (data: string) => insertUnderHeading(data, this.data.settings.calibrationHeading || "Calibration", line, true));
+  }
+
+  // ---------- restart → Reflect countdown ----------
+  // Owned by the core so BOTH surfaces mirror ONE state: the float shows the countdown on its
+  // own face (where the eyes are), the panel shows its overlay, cancel anywhere cancels both.
+  // Deadline-based (not tick-decrement) so the main window's background throttling can't
+  // stretch the five seconds — the float's unthrottled 500ms poll drives expiry when hidden.
+  reflectCountdown: { deadline: number; task: string; lastLeft: number } | null = null;
+  private rcTimer: number | null = null;
+  reflectCountCb: ((st: { left: number; task: string } | null) => void) | null = null;
+  reflectGoCb: ((task: string) => void) | null = null;
+  beginReflectCountdown(task: string) {
+    this.clearRc();
+    this.reflectCountdown = { deadline: Date.now() + 5000, task: task || "", lastLeft: 5 };
+    this.emitRc();
+    this.rcTimer = window.setInterval(() => this.pollReflectCountdown(), 250);
+  }
+  cancelReflectCountdown() { this.clearRc(); this.emitRc(); }
+  private clearRc() {
+    if (this.rcTimer != null) { window.clearInterval(this.rcTimer); this.rcTimer = null; }
+    this.reflectCountdown = null;
+  }
+  private emitRc() {
+    const rc = this.reflectCountdown;
+    if (this.reflectCountCb) try { this.reflectCountCb(rc ? { left: rc.lastLeft, task: rc.task } : null); } catch (e) {}
+  }
+  pollReflectCountdown() {
+    const rc = this.reflectCountdown;
+    if (!rc) return;
+    const left = Math.ceil((rc.deadline - Date.now()) / 1000);
+    if (left <= 0) {
+      const task = rc.task;
+      this.clearRc();
+      this.emitRc();
+      // Best-effort: bring the main window forward and reveal the panel, then hand the panel
+      // the task so it opens Reflect seeded. If the panel view is closed, nothing to reveal.
+      try {
+        window.focus();
+        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE);
+        if (leaves.length) this.app.workspace.revealLeaf(leaves[0]);
+      } catch (e) {}
+      if (this.reflectGoCb) try { this.reflectGoCb(task); } catch (e) {}
+      return;
+    }
+    if (left !== rc.lastLeft) { rc.lastLeft = left; this.emitRc(); }
+  }
+
   // ---------- bridge handed to the React app ----------
   makeApi() {
     const self = this;
@@ -1470,6 +1664,9 @@ export default class FocusLogPlugin extends Plugin {
         pauses: self.data.pauses || [],
         breaks: self.data.breaks || [],
         reflections: self.data.reflections || [],
+        calibrations: self.data.calibrations || [],
+        areaOptions: self.data.areaOptions || [],
+        quickParents: self.data.quickParents || [],
         feelings: self.data.feelings || {},
         morningRoutine: self.data.morningRoutine || [],
         nightRoutine: self.data.nightRoutine || [],
@@ -1485,6 +1682,9 @@ export default class FocusLogPlugin extends Plugin {
       savePauses: async (arr: any[]) => { self.data.pauses = arr; await self.persist(); },
       saveBreaks: async (arr: any[]) => { self.data.breaks = arr; await self.persist(); },
       saveReflections: async (arr: any[]) => { self.data.reflections = arr; await self.persist(); },
+      saveCalibrations: async (arr: any[]) => { self.data.calibrations = arr; await self.persist(); },
+      addGuessRound: (pageId: string, count?: number) => self.addGuessRound(pageId, count),
+      appendCalibration: (e: any) => self.appendCalibrationToDailyNote(e),
       saveFeelings: async (obj: any) => { self.data.feelings = obj; await self.persist(); },
       saveMorningRoutine: async (arr: any[]) => { self.data.morningRoutine = arr; await self.persist(); },
       saveNightRoutine: async (arr: any[]) => { self.data.nightRoutine = arr; await self.persist(); },
@@ -1498,7 +1698,14 @@ export default class FocusLogPlugin extends Plugin {
       saveTasks: async (arr: any[]) => { self.data.tasks = arr; await self.persist(); },
       patchSettings: async (partial: Partial<FocusLogSettings>) => { self.data.settings = Object.assign({}, self.data.settings, partial); await self.persist(); },
       sync: () => self.queryToday(),
+      createTask: (name: string, parentId?: string | null, guess?: number) => self.createTask(name, parentId, guess),
+      beginReflectCountdown: (task: string) => self.beginReflectCountdown(task),
+      cancelReflectCountdown: () => self.cancelReflectCountdown(),
+      onReflectCount: (cb: (st: { left: number; task: string } | null) => void) => { self.reflectCountCb = cb; },
+      onReflectGo: (cb: (task: string) => void) => { self.reflectGoCb = cb; },
+      getQuickParents: () => self.data.quickParents || [],
       writeAct: (pageId: string) => self.incrementAct(pageId),
+      writeActBy: (pageId: string, n: number) => self.incrementActBy(pageId, n),
       setDone: (pageId: string) => self.setTaskDone(pageId),
       appendDaily: (p: any) => self.appendToDailyNote(p),
       openDailyNote: (ts: number) => self.openDailyNoteForDate(ts),
@@ -1624,7 +1831,7 @@ class FloatTimerView extends ItemView {
         if (changed && this.localTick) {
           try { (this.tickWin || window).clearInterval(this.localTick); } catch {}
           this.tickWin = this.fwin;
-          this.localTick = this.fwin.setInterval(() => { this.tagFloatWindow(); this.plugin.timer.poll(); this.render(); this.maybeSaveBounds(); }, 500);
+          this.localTick = this.fwin.setInterval(() => { this.tagFloatWindow(); this.plugin.timer.poll(); this.render(); this.maybeSaveBounds(); }, 200);
         }
       }
     } catch {}
@@ -1704,7 +1911,21 @@ class FloatTimerView extends ItemView {
       if (!st.paused && !(st.expected >= 1)) { this.flash("Rate it first."); return; }
       this.plugin.timer.start();
     };
-    this.els.reset.onclick = () => this.plugin.timer.reset();
+    this.els.reset.onclick = () => {
+      // Restarting a LIVE pomodoro opens the restart→Reflect countdown on this float's own
+      // face (the surface being looked at); an idle reset stays a plain reset.
+      const st = this.plugin.timer.getState();
+      const live = st.running || st.paused;
+      const tname = st.taskName || "";
+      this.plugin.timer.reset();
+      if (live) this.plugin.beginReflectCountdown(tname);
+    };
+    // The countdown face: covers the whole float, making everything beneath unclickable.
+    this.els.rcWrap = wrap.createDiv({ cls: "flt-rc" });
+    this.els.rcWrap.createDiv({ cls: "flt-rc-title", text: "Off to Reflect in" });
+    this.els.rcNum = this.els.rcWrap.createDiv({ cls: "flt-rc-num" });
+    this.els.rcCancel = this.els.rcWrap.createEl("button", { cls: "flt-btn flt-rc-cancel", text: "cancel, keep this task" });
+    this.els.rcCancel.onclick = () => this.plugin.cancelReflectCountdown();
 
     this.unsub = this.plugin.timer.subscribe(() => this.render());
     this.render();
@@ -1715,7 +1936,7 @@ class FloatTimerView extends ItemView {
     // tickWin remembers which window owns the interval (ids are per-window), so it can
     // always be cleared; tagFloatWindow migrates it into the popout once adopted.
     this.tickWin = this.fwin;
-    this.localTick = this.fwin.setInterval(() => { this.tagFloatWindow(); this.plugin.timer.poll(); this.render(); this.maybeSaveBounds(); }, 500);
+    this.localTick = this.fwin.setInterval(() => { this.tagFloatWindow(); this.plugin.timer.poll(); this.render(); this.maybeSaveBounds(); }, 200);
     this.plugin.notifyFloatChange();
   }
 
@@ -1732,6 +1953,15 @@ class FloatTimerView extends ItemView {
   }
 
   render() {
+    // The restart→Reflect countdown owns the float while active: poll it (this float's own
+    // unthrottled tick drives expiry when the main window sleeps), mirror it, skip the rest.
+    this.plugin.pollReflectCountdown();
+    const rc = this.plugin.reflectCountdown;
+    if (this.els.rcWrap) {
+      this.els.rcWrap.toggleClass("is-on", !!rc);
+      if (rc && this.els.rcNum) this.els.rcNum.setText(String(Math.max(1, rc.lastLeft)));
+    }
+    if (rc) return;
     const s = this.plugin.timer.getState();
     if (s.running) this.sawRun = true; // mark this lifetime as having a genuinely-live run
     const phase = this.phaseOf(s);
@@ -1746,6 +1976,9 @@ class FloatTimerView extends ItemView {
       const ss = String(s.secs % 60).padStart(2, "0");
       this.els.time.setText(mm + ":" + ss);
       this.els.time.toggleClass("is-done", s.secs === 0);
+      const totalS = (s.lengthMin || 25) * 60;
+      const alertRed = s.running && s.secs > 0 && (s.secs <= 60 || [900, 600, 300].some((mk: number) => totalS > mk && s.secs <= mk && s.secs >= mk - 2));
+      this.els.time.toggleClass("is-alert", alertRed);
       this.els.task.setText(s.taskName || "Focus");
       const wantIcon = s.running ? "pause" : "play";
       if (this.lastIcon !== wantIcon) { setIcon(this.els.primary, wantIcon); this.lastIcon = wantIcon; }
@@ -2110,7 +2343,7 @@ class FocusLogSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Done status value")
-      .setDesc("Optional. The exact Status option to set when you tick “mark done” while logging. Leave blank to auto-detect an option whose name contains “Done”.")
+      .setDesc("Optional. The exact Schedule option to set when you tick “mark done” while logging. Leave blank to auto-detect an option whose name contains “Done” (e.g. 🎉Done).")
       .addText((t) =>
         t.setPlaceholder("auto-detect").setValue(this.plugin.data.settings.doneStatus).onChange(async (v) => {
           this.plugin.data.settings.doneStatus = v.trim();
@@ -2317,7 +2550,7 @@ class FocusLogSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Add block button")
-      .setDesc("Show the 'add block' button on the Timeline toolbar. A manual block gets a name, an ExecutionPower colour, a CognitiveLoad letter, an Area-style tag, and its own length. Off by default.")
+      .setDesc("Show the 'add block' button on the Timeline toolbar. A manual block gets a name, an ExecutionPower colour, an Area-style tag, and its own length. Off by default.")
       .addToggle((t) =>
         t.setValue(this.plugin.data.settings.addBlockEnabled === true).onChange(async (v) => {
           this.plugin.data.settings.addBlockEnabled = v;
@@ -2523,6 +2756,16 @@ class FocusLogSettingTab extends PluginSettingTab {
       .addText((t) =>
         t.setPlaceholder("Notion").setValue(this.plugin.data.settings.tagNamespace).onChange(async (v) => {
           this.plugin.data.settings.tagNamespace = v.trim();
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Calibration heading")
+      .setDesc("First-level heading (#) the calibration lines append under; created at the end of the note when missing. The leading # is added automatically.")
+      .addText((t) =>
+        t.setValue(this.plugin.data.settings.calibrationHeading || "Calibration").onChange(async (v) => {
+          this.plugin.data.settings.calibrationHeading = v.trim();
           await this.plugin.persist();
         })
       );

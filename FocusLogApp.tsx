@@ -180,12 +180,29 @@ function Stat({ label, value, color, big }: any) {
     </div>
   );
 }
-function TomatoPips({ vivid, grey }: any) {
+// Guess-aware pips: base tomatoes plain, the first "+" round on a yellow wash, the second on
+// orange; undone pips are dim (the grey "finished early" ones stay clickable). Hovering a
+// coloured pip shows the saved calibration reason; hovering a grey one invites the reflection.
+function TomatoPips({ vivid, grey, base, plus, overInfo, underInfo, onGrey }: any) {
+  const total = vivid + grey;
+  if (!total) return <span style={{ fontSize: 11, color: C.muted }}>{"\u2014"}</span>;
+  const b = base != null && base > 0 ? base : total;
+  const p1 = (plus && plus[0]) || 0;
+  const p2 = (plus && plus[1]) || 0;
   const items: any[] = [];
-  for (let i = 0; i < vivid; i++) items.push(<span key={"v" + i} style={{ fontSize: 13 }}>{"\u{1F345}"}</span>);
-  for (let i = 0; i < grey; i++) items.push(<span key={"g" + i} style={{ fontSize: 13, opacity: 0.28 }}>{"\u{1F345}"}</span>);
-  if (!items.length) return <span style={{ fontSize: 11, color: C.muted }}>{"\u2014"}</span>;
-  return <span style={{ letterSpacing: 1 }}>{items}</span>;
+  for (let i = 0; i < total; i++) {
+    const doneOne = i < vivid;
+    const round = i < b ? 0 : i < b + p1 ? 1 : i < b + p1 + p2 ? 2 : 0;
+    const bg = round === 1 ? "#FBEFC9" : round === 2 ? "#F8D8B4" : "transparent";
+    const label = round === 1 ? (overInfo && overInfo[0] ? "round 1: " + overInfo[0] : "extra round 1 (+\u{1F345})")
+      : round === 2 ? (overInfo && overInfo[1] ? "round 2: " + overInfo[1] : "extra round 2 (+\u{1F345}): if it grows again, split the task")
+      : (!doneOne && onGrey ? (underInfo ? "finished early: " + underInfo : "finished early? click to reflect on why it was lighter") : undefined);
+    items.push(
+      <span key={i} onClick={!doneOne ? onGrey : undefined} role={!doneOne && onGrey ? "button" : undefined} aria-label={label}
+        style={{ fontSize: 13, opacity: doneOne ? 1 : round === 0 ? 0.28 : 0.5, background: bg, borderRadius: 4, padding: round === 0 ? 0 : "0 1px", cursor: !doneOne && onGrey ? "pointer" : "default" }}>{"\u{1F345}"}</span>
+    );
+  }
+  return <span style={{ letterSpacing: 1, display: "inline-flex", gap: 1, alignItems: "center" }}>{items}</span>;
 }
 const btn = (color: string, ghost?: boolean): any => ({
   padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${color}`, background: ghost ? "transparent" : color,
@@ -557,11 +574,23 @@ function LockIcon({ size = 13, open = false }: any) {
     </svg>
   );
 }
+function SunRoutineIcon({ size = 14 }: any) {
+  return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" /></svg>);
+}
+function MoonRoutineIcon({ size = 14 }: any) {
+  return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></svg>);
+}
 function MinusIcon({ size = 16 }: any) {
   return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 12h14" /></svg>);
 }
 function PlusIcon({ size = 16 }: any) {
   return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 12h14" /><path d="M12 5v14" /></svg>);
+}
+function ExploreIcon({ size = 13 }: any) {
+  return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" /></svg>);
+}
+function HammerIcon({ size = 13 }: any) {
+  return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9" /><path d="m18 15 4-4" /><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5" /></svg>);
 }
 function BookmarkIcon({ size = 13, filled = false }: any) {
   return (
@@ -761,6 +790,14 @@ function WandSparklesIcon({ size = 14 }: any) {
     </svg>
   );
 }
+function Undo2Icon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" />
+    </svg>
+  );
+}
 
 function Rows4Icon({ size = 15 }: any) {
   return (
@@ -867,13 +904,13 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   return (
     <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
-        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink }}>{mm}:{ss}</span>
+        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : ((running && secs > 0 && (secs <= 60 || [900, 600, 300].some((mk: number) => pomoMin * 60 > mk && secs <= mk && secs >= mk - 2))) ? C.worse : C.ink) }}>{mm}:{ss}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <InfoHover C={C} label="how the Focus form works" width={360}>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>Focus</div>
             <div>Pick a task, set your expected feeling, and run the timer; when it finishes you rate how it actually went and the pomodoro is logged.</div>
             <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-              <li><b>Task</b>: today's tasks from the Plan; "Act +1" writes back to this task's Notion page.</li>
+              <li><b>Task</b>: today's tasks from the Plan; each pomodoro adds +1 to that task's Spend in Notion.</li>
               <li><b>Feeling</b>: the four weathers, rain to full sun; your before and after ratings are both saved.</li>
               <li><b>Timer</b>: the round buttons set 5 to 30 minutes (hold to speed up); the length locks while a pomodoro runs; the circle arrow resets the timer and task.</li>
               <li><b>Pause</b>: pausing asks for a reason, yellow for internal, blue for external; it is recorded in the Pause view.</li>
@@ -991,6 +1028,24 @@ export default function FocusLogApp({ api }: any) {
   const init = api.getInitial();
   const [sessions, setSessions] = useState<any[]>(init.sessions);
   const [tasks, setTasks] = useState<any[]>(init.tasks);
+  // Quick-add: capture box state + the BIG TASK parent choices discovered at sync (Guess 🏔️).
+  const [quickParents, setQuickParents] = useState<any[]>(init.quickParents || []);
+  const [qaName, setQaName] = useState("");
+  const [qaParent, setQaParent] = useState("");
+  const [qaGuess, setQaGuess] = useState("1");
+  const [qaBusy, setQaBusy] = useState(false);
+  // Back door: claim work done off the timer. Recorded with a mark, counted like the rest.
+  const [claimOpen, setClaimOpen] = useState(false);
+  const [clTask, setClTask] = useState("");
+  const [clMins, setClMins] = useState(25);
+  const [clSince, setClSince] = useState("");
+  const [clBusy, setClBusy] = useState(false);
+  const [clParent, setClParent] = useState("");
+  const [clGuess, setClGuess] = useState("1");
+  const [clCreating, setClCreating] = useState(false);
+  const [clMealEdits, setClMealEdits] = useState<any>({});
+  const [reflectSeed, setReflectSeed] = useState("");
+  const [reflectCount, setReflectCount] = useState<{ left: number; task: string } | null>(null);
   const [pending, setPending] = useState<any[]>(init.pending);
   const [doneSess, setDoneSess] = useState<any>({});
   const [view, setView] = useState("today");
@@ -1118,13 +1173,17 @@ export default function FocusLogApp({ api }: any) {
   const [newMorning, setNewMorning] = useState("");
   const [newNight, setNewNight] = useState("");
   const [routineDrag, setRoutineDrag] = useState<{ w: string; i: number } | null>(null);
+  const [unfoldedDone, setUnfoldedDone] = useState<any>({});   // finished routine groups the user re-opened
   const [routineOver, setRoutineOver] = useState<{ w: string; i: number } | null>(null);
   // Timeline (daily plan): timelineMode swaps the today list for the time axis.
   const [timelineMode, setTimelineModeState] = useState(false);
   const [plans, setPlans] = useState<any>(init.plans || {});
   const [tlDrag, setTlDrag] = useState<{ id: string; grab: number; button: number; y: number; tlTop: number; downY?: number } | null>(null);
-  const [planUndo, setPlanUndo] = useState<any[] | null>(null);
-  useEffect(() => { if (!planUndo) return; const tm = window.setTimeout(() => setPlanUndo(null), 8000); return () => window.clearTimeout(tm); }, [planUndo]);
+  // Timeline undo: a stack of up to three day-photos, pushed by setTodayBlocks itself, so EVERY
+  // user edit (drags, auto-fix, add/delete/edit/duplicate, lock, pin release) is one undo step.
+  // System writes (sync rebuild, routine mirroring, settings re-flow, the undo restore) pass
+  // silent=true, so a step is always something the user did on the timeline.
+  const [planUndo, setPlanUndo] = useState<any[][]>([]);
   const [editBlockId, setEditBlockId] = useState<string | null>(null);
   const [blockDraft, setBlockDraft] = useState<{ name: string; dur: number; start?: string; power?: string; load?: string; category?: string }>({ name: "", dur: 30 });
   const tlRef = useRef<HTMLDivElement | null>(null);
@@ -1235,8 +1294,8 @@ export default function FocusLogApp({ api }: any) {
         </span>
         {!tinyPanel && <span style={{ minWidth: 88, flexShrink: 0, display: "flex", alignItems: "center" }}><span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", padding: "1px 8px", borderRadius: 999, background: catColor(cat), border: `1px solid ${catBorder(cat)}`, color: "#2b2723", whiteSpace: "nowrap" }}>{cat}</span></span>}
         <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{t.name}</span>
-        <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); setEditTagCat(cat); }} className="fl-rowact" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-        <button onClick={() => removePauseTag(t.id)} className="fl-rowact fl-rowdel" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+        <button onClick={() => { setEditTagId(t.id); setEditTagName(t.name); setEditTagCat(cat); }} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+        <button onClick={() => removePauseTag(t.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
       </div>
     );
   };
@@ -1285,6 +1344,9 @@ export default function FocusLogApp({ api }: any) {
   const pauseTag = timer.pauseTag || "";
   const setPauseTag = (t: string) => api.timer.setPauseTag(t);
   const [reflections, setReflections] = useState<any[]>(init.reflections || []);
+  const [calibrations, setCalibrations] = useState<any[]>(init.calibrations || []);
+  const [calibDraft, setCalibDraft] = useState<any>(null);   // the "+ 🍅" / finished-early popup model
+  const [areaOptions, setAreaOptions] = useState<string[]>(init.areaOptions || []);   // Notion Area options for the add-block dropdown
   const reflectFeelings = init.feelings && Object.keys(init.feelings).length ? init.feelings : {};
   const onSaveReflection = (r: any) => {
     const entry = { id: "rf" + Date.now(), ts: new Date().toISOString(), tag: pauseTag || "", thoughts: r.thoughts || [], body: r.body || [], mood: r.mood || [] };
@@ -1295,6 +1357,23 @@ export default function FocusLogApp({ api }: any) {
   };
 
   const resetTimer = () => api.timer.reset();
+  // Restarting a LIVE pomodoro is a fork in the day ("this isn't what I want to be doing").
+  // The HARD 5-second countdown is owned by the plugin core, so the float mirrors it on its
+  // own face and cancel on either surface cancels both. Expiry lands here via onReflectGo.
+  // Only manual reset buttons take this path; logging and next-task handoffs reset silently.
+  const restartTimer = () => {
+    const live = running || timer.paused;
+    const tname = timer.task || preset;
+    resetTimer();
+    if (live && api.beginReflectCountdown) api.beginReflectCountdown(tname || "");
+  };
+  useEffect(() => {
+    if (api.onReflectCount) api.onReflectCount((st: any) => setReflectCount(st));
+    if (api.onReflectGo) api.onReflectGo((task: string) => {
+      setReflectSeed(task ? "restarted: " + task : "restarted a pomodoro");
+      setView("reflect");
+    });
+  }, []);
   const changePomo = (n: number) => api.timer.setLength(n);
   const stepPomo = (delta: number) => api.timer.step(delta);
   const onStart = (taskName?: string) => api.timer.start(typeof taskName === "string" ? taskName : undefined);
@@ -1410,10 +1489,37 @@ export default function FocusLogApp({ api }: any) {
 
   const doSync = async () => {
     setSync("loading");
-    try { const fresh = await api.sync(); setTasks(fresh); setDoneSess({}); setSync("ok"); setPendingSyncRebuild(true); setFlash(fresh.length + " tasks loaded from Notion, timeline rebuilt."); }
+    try { const fresh = await api.sync(); setTasks(fresh); setDoneSess({}); setSync("ok"); setPendingSyncRebuild(true); if (api.getInitial) setAreaOptions(api.getInitial().areaOptions || []); if (api.getQuickParents) setQuickParents(api.getQuickParents()); setFlash(fresh.length + " tasks loaded from Notion, timeline rebuilt."); }
     catch (e: any) { setSync("error"); setFlash("Sync failed: " + (e?.message || e)); }
   };
 
+  // ---------- Calibration (guess vs reality, blame-free) ----------
+  // "Over": the task answered that it is bigger than it looked; adds a "+ 🍅" round to Notion's
+  // Guess (max two, then split). "Under": finished early — a gift; nothing is written to Notion.
+  const openOverCalib = (t: any) => {
+    const rounds = (t.guessPlus || []).length;
+    if (rounds >= 2) { api.notify && api.notify("Two extra rounds already: time to split this task.", 6000); return; }
+    setCalibDraft({ mode: "over", pageId: t.id, task: t.task, hierarchy: hierarchyText(t), category: t.category || null, guess: t.pomodoros || 0, spend: t.act || 0, round: rounds + 1, count: 1, reason: "", note: "" });
+  };
+  const openUnderCalib = (t: any, spendOverride?: number) => {
+    setCalibDraft({ mode: "under", pageId: t.id, task: t.task, hierarchy: hierarchyText(t), category: t.category || null, guess: t.pomodoros || 0, spend: spendOverride != null ? spendOverride : (t.act || 0), reason: "", note: "", spare: "" });
+  };
+  const saveCalibration = async () => {
+    const d = calibDraft; if (!d || !d.reason) return;
+    let round = d.round;
+    if (d.mode === "over" && d.pageId && api.addGuessRound) {
+      try { round = await api.addGuessRound(d.pageId, d.count || 1); }
+      catch (e: any) { api.notify && api.notify("Could not add the + \u{1F345}: " + (e?.message || e), 6000); return; }
+      const nt = tasks.map((t: any) => (t.id === d.pageId ? { ...t, guessPlus: [...(t.guessPlus || []), d.count || 1], pomodoros: (t.pomodoros || 0) + (d.count || 1) } : t));
+      setTasks(nt); api.saveTasks && api.saveTasks(nt);
+    }
+    const entry = { id: Date.now(), ts: Date.now(), pageId: d.pageId || null, task: d.task, hierarchy: d.hierarchy || "", category: d.category || null, guess: d.guess, spend: d.spend, direction: d.mode, round: d.mode === "over" ? round : null, reason: d.reason, note: (d.note || "").trim(), spare: d.spare || null };
+    const arr = [...calibrations, entry];
+    setCalibrations(arr); api.saveCalibrations && api.saveCalibrations(arr);
+    if (api.appendCalibration) { try { await api.appendCalibration(entry); } catch (e) {} }
+    setCalibDraft(null);
+    api.notify && api.notify(d.mode === "over" ? "+ \u{1F345} added and calibration saved." : "Calibration saved.", 4000);
+  };
   const logPomodoro = async (s: any, markDone?: boolean) => {
     persist([...sessions, s]);
     api.timer.commitPendingPause(); // write any open pause before clearing the timer
@@ -1431,16 +1537,29 @@ export default function FocusLogApp({ api }: any) {
       else if (api.notify) api.notify(msg, 9000);
     }
     let msg = "Logged.";
+    let newSpend: number | null = null;
     if (s.pageId) {
-      try { const act = await api.writeAct(s.pageId); msg += " Act" + (act != null ? " = " + act : " +1") + " written."; }
-      catch (e: any) { savePending([...pending, { sessionId: s.id, pageId: s.pageId, task: s.task }]); msg += " Act write queued."; }
+      try { const act = await api.writeAct(s.pageId); newSpend = act != null ? act : null; msg += " Spend" + (act != null ? " = " + act : " +1") + " written."; }
+      catch (e: any) { savePending([...pending, { sessionId: s.id, pageId: s.pageId, task: s.task }]); msg += " Spend write queued."; }
     } else { msg += " No Notion page linked."; }
     if (markDone && s.pageId && api.setDone) {
       try {
+        const meta = tasks.find((t) => t.id === s.pageId);
         const name = await api.setDone(s.pageId);
         const nt = tasks.filter((t) => t.id !== s.pageId);
         setTasks(nt); api.saveTasks(nt);
         msg += " Status set to " + name + ".";
+        // Finished under the guess: offer the blame-free reflection (the spare tomato is a gift).
+        const spendNow = newSpend != null ? newSpend : ((meta && meta.act) || 0) + 1;
+        const target = (meta && meta.pomodoros) || 0;
+        if (meta && target > 0 && spendNow < target) openUnderCalib(meta, spendNow);
+        else if (meta && target > 0 && spendNow === target) {
+          // Landed exactly on the guess: record it silently so the calibration score also
+          // counts the quiet wins, not only the days the guess missed.
+          const onEntry = { id: Date.now(), ts: Date.now(), pageId: meta.id || null, task: meta.task, hierarchy: hierarchyText(meta), category: meta.category || null, guess: target, spend: spendNow, direction: "on", round: null, reason: "on target", note: "", spare: null };
+          const arr = [...calibrations, onEntry];
+          setCalibrations(arr); api.saveCalibrations && api.saveCalibrations(arr);
+        }
       } catch (e: any) { msg += " Mark-done failed: " + (e?.message || e); }
     }
     if (api.appendDaily) {
@@ -1452,10 +1571,23 @@ export default function FocusLogApp({ api }: any) {
   const retryPending = async () => {
     if (!pending.length) return;
     setFlash("Retrying " + pending.length + "\u2026");
-    const still: any[] = [];
-    for (const p of pending) { try { await api.writeAct(p.pageId); } catch (e) { still.push(p); } }
+    const still: any[] = [], gone: any[] = [];
+    for (const p of pending) {
+      try { await api.writeAct(p.pageId); }
+      catch (e: any) {
+        // A dead target will never succeed (deleted or archived page, e.g. yesterday's
+        // re-created daily task): drop it and say so, instead of a forever retry button.
+        // The pomodoro itself is safe in the local log; only Notion's Spend misses one.
+        const msg = String((e && e.message) || e || "");
+        if (/Notion 404|object_not_found|Could not find|archived/i.test(msg)) gone.push(p); else still.push(p);
+      }
+    }
     savePending(still);
-    setFlash(still.length ? still.length + " still pending." : "All pending writes pushed.");
+    const bits: string[] = [];
+    if (gone.length) bits.push("Dropped " + gone.length + " write" + (gone.length > 1 ? "s" : "") + " to a deleted Notion page (" + gone.map((x: any) => x.task || "unknown task").join(", ") + "); the pomodoro stays in your local log.");
+    if (still.length) bits.push(still.length + " still pending.");
+    if (!bits.length) bits.push("All pending writes pushed.");
+    setFlash(bits.join(" "));
   };
 
   const weekStart = new Date(logicalWeekStart(Date.now(), settings).getTime() + weekOff * 7 * DAY);
@@ -1558,6 +1690,182 @@ export default function FocusLogApp({ api }: any) {
   const tagColor = (n: any) => MACARON[tagIdx(n)].fill;
   const tagBorder = (n: any) => MACARON[tagIdx(n)].border;
   const openLog = (leafTask: string) => { setPreset(leafTask); setView("log"); };
+  // Quick-add: one box that creates the Notion page (using the user's template presets), mirrors
+  // it into the task list instantly, drops a placed 25-minute block at NOW on today's plan, and
+  // arms the Focus form, so capturing a spontaneous task costs one Enter.
+  const quickAdd = async () => {
+    const name = qaName.trim();
+    if (!name || qaBusy || !api.createTask) return;
+    setQaBusy(true);
+    try {
+      const g = Math.max(0, Math.min(4, Math.round(Number(qaGuess) || 0)));
+      const t = await api.createTask(name, qaParent || null, g);
+      setTasks((prev: any[]) => [t, ...prev]);
+      const bl = todayBlocks();
+      if (bl.length) {
+        const d = new Date();
+        let m = d.getHours() * 60 + d.getMinutes();
+        const mid = (tlStart + tlEnd) / 2;
+        if (Math.abs(m + 1440 - mid) < Math.abs(m - mid)) m += 1440;   // after-midnight tail of an evening-start day
+        const start = avoidMeals(clampStart(snap5(m), 25), 25, bl);
+        setTodayBlocks(resolveOverlaps([...bl, { id: "qa" + Date.now(), kind: "task", pageId: t.id, name: t.task, power: t.power || "Y", status: t.status, category: t.category, start, dur: 25, created: Date.now(), placed: true }]));
+      }
+      setQaName("");
+      openLog(t.task);
+      api.notify && api.notify('"' + t.task + '" is in Notion and on today’s plan at now.');
+    } catch (e) {
+      api.notify && api.notify("Could not create the task in Notion. Check the token and database in settings.");
+    }
+    setQaBusy(false);
+  };
+  // Tomato conversion for claims, counting the breaks a real run would have contained (the
+  // user's formula): t(n) = n·pomodoro + (n-1)·short break + one long break. Pick the n whose
+  // t(n) lies nearest the claimed minutes; ties go DOWN (when unsure, claim the smaller number).
+  const tomatoesFor = (mins: number) => {
+    const pomo = settings.pomodoroMinutes || 25;
+    const sb = settings.breakMinutes || 5;
+    const lb = settings.longBreakMinutes || 20;
+    let best = 1, bestD = Infinity;
+    for (let k = 1; k <= 40; k++) {
+      const t = k * pomo + (k - 1) * sb + lb;
+      const d0 = Math.abs(t - mins);
+      if (d0 < bestD) { bestD = d0; best = k; }
+      if (t > mins + pomo + lb) break;
+    }
+    return best;
+  };
+  // Claim finished work (the back door): a recorder, not a simulator. Spend and stars use the
+  // rounded pomodoro count (min 1); the Timeline block keeps the REAL span; the live break
+  // counter is never touched; everything claimed wears a mark so future-you knows the instrument.
+  const doClaim = async () => {
+    const name = clTask.trim();
+    if (!name || clBusy) return;
+    setClBusy(true);
+    const meta = tasks.find((t: any) => t.task === name) || null;
+    const now = Date.now();
+    let mins = clMins;
+    if (clSince) {
+      const mm = clSince.match(/^(\d{1,2}):(\d{2})$/);
+      if (mm) {
+        const d = new Date();
+        let diff = d.getHours() * 60 + d.getMinutes() - (Number(mm[1]) * 60 + Number(mm[2]));
+        if (diff < 0) diff += 1440;   // started before midnight
+        if (diff > 0) mins = Math.min(diff, 8 * 60);
+      }
+    }
+    mins = Math.max(5, Math.round(mins));
+    const bl = todayBlocks();
+    const d1 = new Date(now);
+    let nowTl = d1.getHours() * 60 + d1.getMinutes();
+    const mid = (tlStart + tlEnd) / 2;
+    if (Math.abs(nowTl + 1440 - mid) < Math.abs(nowTl - mid)) nowTl += 1440;
+    // Stacking several claims: the first claim hugs now; each further claim slides in just
+    // before the ones already there, so back-to-back chunks land most-recent-closest-to-now.
+    let endTl = nowTl, sguard = 0, movedFlag = true;
+    const claimedBl = bl.filter((x: any) => x.claimed);
+    while (movedFlag && sguard++ < 20) {
+      movedFlag = false;
+      for (const cb of claimedBl) if (cb.start < endTl && cb.start + cb.dur > endTl - mins) { endTl = Math.min(endTl, cb.start); movedFlag = true; }
+    }
+    const startTl = endTl - mins;
+    // The MORNING routine and commitments cannot be worked through: refuse, log NOTHING.
+    // Meals are different: the claim SPLITS around them (the popup fields give actual times).
+    // The NIGHT routine is different too: it simply hasn't happened yet, so it is put off,
+    // slid later past the pinned claim by resolveOverlaps, instead of blocking the claim.
+    const clash = bl.find((x: any) => ((x.kind === "routine" && !x.night) || x.kind === "meeting" || (x.kind === "task" && x.locked)) && x.start < endTl && x.start + x.dur > startTl);
+    if (clash) {
+      api.notify && api.notify("Nothing logged: that span overlaps “" + (clash.name || clash.kind) + "”. Adjust the time, or claim the chunks around it separately.", 8000);
+      setClBusy(false);
+      return;
+    }
+    const parseTlClock = (s0: string, ref: number) => {
+      const m2 = (s0 || "").match(/^(\d{1,2}):(\d{2})$/);
+      if (!m2) return null;
+      let v = Number(m2[1]) * 60 + Number(m2[2]);
+      if (Math.abs(v + 1440 - ref) < Math.abs(v - ref)) v += 1440;
+      return v;
+    };
+    const mealsCovered = bl
+      .filter((x: any) => x.kind === "meal" && x.start < endTl && x.start + x.dur > startTl)
+      .map((x: any) => {
+        const ed = clMealEdits[x.id] || {};
+        const as0 = parseTlClock(ed.start, x.start);
+        return { ...x, aStart: as0 != null ? as0 : x.start, aLen: Math.max(5, Math.min(240, Math.round(Number(ed.len)) || x.dur)) };
+      })
+      .sort((a: any, b: any) => a.aStart - b.aStart);
+    // Carve the worked segments around the ACTUAL meal times; slivers under 3 min are dropped.
+    let segs: { s: number; e: number }[] = [{ s: startTl, e: endTl }];
+    for (const m3 of mealsCovered) {
+      const out0: { s: number; e: number }[] = [];
+      for (const g of segs) {
+        const a = Math.max(g.s, m3.aStart), b2 = Math.min(g.e, m3.aStart + m3.aLen);
+        if (b2 <= a) { out0.push(g); continue; }
+        if (a - g.s >= 3) out0.push({ s: g.s, e: a });
+        if (g.e - b2 >= 3) out0.push({ s: b2, e: g.e });
+      }
+      segs = out0;
+    }
+    if (!segs.length) {
+      api.notify && api.notify("Nothing logged: after the meal there is no worked time left in that span.", 8000);
+      setClBusy(false);
+      return;
+    }
+    const workedMins = segs.reduce((s2, g) => s2 + (g.e - g.s), 0);
+    const n = tomatoesFor(workedMins);
+    const realTs = (tl: number) => now - (nowTl - tl) * 60000;
+    // ONE session and ONE star per claim, however long: the stats and the Sky count deep-work
+    // sittings, while Notion's Spend still receives the full rounded tomato count (n) so the
+    // calibration data stays in real tomatoes.
+    const newSess: any[] = [{ id: now, ts: realTs(segs[segs.length - 1].e), minutes: workedMins, task: name, hierarchy: meta ? hierarchyText(meta) : "", note: "", category: (meta && meta.category) || null, pageId: (meta && meta.id) || null, claimed: true }];
+    persist([...sessions, ...newSess]);
+    // The pips read "done today" from doneSess, so a claim must feed it in TOMATOES,
+    // exactly like n live pomodoros would have.
+    const dsKey = (meta && meta.id) || name;
+    setDoneSess((m: any) => ({ ...m, [dsKey]: (m[dsKey] || 0) + n }));
+    let msg = "Claimed: " + n + " \u{1F345} on “" + name + "”" + (mealsCovered.length ? " around " + mealsCovered.map((x: any) => x.name).join(" and ") : "") + ". It counts.";
+    let newSpend: number | null = null;
+    if (meta && meta.id && api.writeActBy) {
+      try { newSpend = await api.writeActBy(meta.id, n); msg += " Spend = " + newSpend + "."; }
+      catch (e) { const q = [...pending]; for (let i = 0; i < n; i++) q.push({ sessionId: now, pageId: meta.id, task: name }); savePending(q); msg += " Spend write queued."; }
+      const finalAct = newSpend != null ? newSpend : ((meta.act || 0) + n);
+      setTasks((prev: any[]) => prev.map((t: any) => (t.id === meta.id ? { ...t, act: finalAct } : t)));
+    }
+    if (bl.length) {
+      const mealIds = new Set(mealsCovered.map((x: any) => x.id));
+      const withMeals = bl.map((x: any) => { if (!mealIds.has(x.id)) return x; const mc: any = mealsCovered.find((y: any) => y.id === x.id); return { ...x, start: mc.aStart, dur: mc.aLen }; });
+      const claimBlocks = segs.map((g, i) => ({ id: "cl" + now + "_" + i, kind: "task", pageId: (meta && meta.id) || undefined, name, power: (meta && meta.power) || "Y", status: meta ? meta.status : undefined, category: (meta && meta.category) || undefined, start: g.s, dur: g.e - g.s, created: now, placed: true, claimed: true }));
+      // Put off the night routine EXPLICITLY: a night block starting exactly at the claim's own
+      // start ties with it in resolveOverlaps' start-order walk and would slip through untouched,
+      // leaving an overlap. The whole hit night group slides as one unit to after the claim,
+      // keeping its internal spacing; resolveOverlaps then settles everything else.
+      const nightHit = withMeals.filter((x: any) => x.kind === "routine" && x.night && x.start < endTl && x.start + x.dur > startTl);
+      let shifted = withMeals;
+      if (nightHit.length) {
+        const m0 = Math.min(...nightHit.map((x: any) => x.start));
+        const delta = endTl - m0;
+        shifted = withMeals.map((x: any) => (x.kind === "routine" && x.night && x.start >= m0 ? { ...x, start: x.start + delta } : x));
+      }
+      setTodayBlocks(resolveOverlaps([...shifted, ...claimBlocks]));
+    }
+    if (api.appendDaily) {
+      try {
+        for (const g of segs) await api.appendDaily({ ts: realTs(g.e), minutes: Math.round(g.e - g.s), task: name, hierarchy: meta ? hierarchyText(meta) : "", note: "#FocusLog/claimed", category: (meta && meta.category) || null });
+        msg += " Added to daily note.";
+      } catch (e: any) { msg += " Daily note skipped: " + (e?.message || e); }
+    }
+    const starName = newestStarName(sessions.length + newSess.length);
+    if (starName && api.notifyClickable) api.notifyClickable("You lit up " + starName + " ✨ (claimed). Click to see your Sky.", () => setView("sky"));
+    setFlash(msg);
+    setClaimOpen(false);
+    setClBusy(false);
+    // pushed past the guess? the same gentle, fully skippable reflection as a live pomodoro
+    if (meta) {
+      const target = meta.pomodoros || 0;
+      const spendNow = newSpend != null ? newSpend : (meta.act || 0) + n;
+      // pass the FRESH spend: meta is the pre-claim object, and the popup records its act
+      if (target > 0 && spendNow > target) openOverCalib({ ...meta, act: spendNow });
+    }
+  };
 
   // Panel width, so manager rows can shed metadata on narrow panels: below 520px
   // drop the count and last-used date; below 400px drop the tag pill too — the
@@ -1596,8 +1904,8 @@ export default function FocusLogApp({ api }: any) {
         <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", fontWeight: isPicked(a) ? 700 : 400 }}>{isPicked(a) ? "✓ " : ""}{a.name}</span>
         {!narrowPanel && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted }}>{a.count || 0}{"×"}</span>}
         {!narrowPanel && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.muted, minWidth: 48, textAlign: "right" }}>{a.lastUsed ? fmtDate(a.lastUsed) : "—"}</span>}
-        <button onClick={(e) => { e.stopPropagation(); startEditAct(a); }} className="fl-rowact" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-        <button onClick={(e) => { e.stopPropagation(); removeActivity(a.id); }} className="fl-rowact fl-rowdel" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+        <button onClick={(e) => { e.stopPropagation(); startEditAct(a); }} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+        <button onClick={(e) => { e.stopPropagation(); removeActivity(a.id); }} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
       </div>
     )
   );
@@ -1619,6 +1927,9 @@ export default function FocusLogApp({ api }: any) {
     const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
     const isFrozen = frozenNames.includes(t.task);
     const personal = isPersonal(t);
+    // Latest saved calibration per "+" round (and the finished-early one) feed the pip tooltips.
+    const overInfo = [1, 2].map((r) => { const e = [...calibrations].reverse().find((c: any) => c.pageId === t.id && c.direction === "over" && c.round === r); return e ? e.reason + (e.note ? ": " + e.note : "") : null; });
+    const underCal = [...calibrations].reverse().find((c: any) => c.pageId === t.id && c.direction === "under");
     return (
       <div
         key={key}
@@ -1638,10 +1949,12 @@ export default function FocusLogApp({ api }: any) {
           {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 6, rowGap: 2 }}><span style={{ color: LOAD_COLOR[t.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, flexShrink: 0 }} aria-label={LOAD_LABEL[t.load] || LOAD_LABEL.B}>{t.load || "B"}</span>{cat && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: personal ? TAG_COFFEE.personal.text : TAG_COFFEE.project.text, background: personal ? TAG_COFFEE.personal.bg : TAG_COFFEE.project.bg, border: `1px solid ${personal ? TAG_COFFEE.personal.border : TAG_COFFEE.project.border}`, borderRadius: 999, height: 16, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: "0 7px", whiteSpace: "nowrap", flexShrink: 0 }}>{cat}</span>}<span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{titleText}</span>{t.king ? <img src={crownImg} alt="king" draggable={false} style={{ width: 13, height: 13, flexShrink: 0 }} /> : null}</div>
+          <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 6, rowGap: 2 }}>{t.status === "exploring" ? <span style={{ color: MODE_COLORS.relax.solid, display: "inline-flex", flexShrink: 0 }} aria-label="Exploring"><ExploreIcon size={13} /></span> : t.status === "executing" ? <span style={{ color: MODE_COLORS.work.solid, display: "inline-flex", flexShrink: 0 }} aria-label="Executing"><HammerIcon size={13} /></span> : null}{cat &&<span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: personal ? TAG_COFFEE.personal.text : TAG_COFFEE.project.text, background: personal ? TAG_COFFEE.personal.bg : TAG_COFFEE.project.bg, border: `1px solid ${personal ? TAG_COFFEE.personal.border : TAG_COFFEE.project.border}`, borderRadius: 999, height: 16, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: "0 7px", whiteSpace: "nowrap", flexShrink: 0 }}>{cat}</span>}<span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{titleText}</span>{t.king ? <img src={crownImg} alt="king" draggable={false} style={{ width: 13, height: 13, flexShrink: 0 }} /> : null}</div>
           {hier && <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hier}</div>}
         </div>
-        <button onClick={() => togglePersonal(t.task)} className="fl-rowact" aria-label={personal ? "move to Project" : "move to Personal"} style={ICON_BTN}>{personal ? <BriefcaseIcon size={14} /> : <UserIcon size={14} />}</button>
+        <button onClick={() => togglePersonal(t.task)} className="fl-rowact fl-collapse" aria-label={personal ? "move to Project" : "move to Personal"} style={ICON_BTN}>{personal ? <BriefcaseIcon size={14} /> : <UserIcon size={14} />}</button>
+        {t.id && <button onClick={() => openOverCalib(t)} className="fl-rowact fl-collapse" aria-label="the task grew: add a + tomato round (max two, then split)" style={{ ...ICON_BTN, fontSize: 12, whiteSpace: "nowrap" }}>{"+\u{1F345}"}</button>}
+        <button onClick={() => openLog(t.task)} className="fl-rowact fl-collapse" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={14} /></button>
         <button
           onClick={() => toggleFreeze(t.task)}
           className={"fl-lock" + (isFrozen ? " is-locked" : "")}
@@ -1651,9 +1964,8 @@ export default function FocusLogApp({ api }: any) {
           <BookmarkIcon size={13} filled={isFrozen} />
         </button>
         <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }} aria-label={`${completed} of ${est} done for this task`}>
-          <TomatoPips vivid={done} grey={remaining} />
+          <TomatoPips vivid={done} grey={remaining} base={t.guessBase} plus={t.guessPlus} overInfo={overInfo} underInfo={underCal ? underCal.reason + (underCal.note ? ": " + underCal.note : "") : null} onGrey={t.id ? () => openUnderCalib(t) : undefined} />
         </div>
-        <button onClick={() => openLog(t.task)} className="fl-rowact" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={14} /></button>
       </div>
     );
   };
@@ -1679,10 +1991,31 @@ export default function FocusLogApp({ api }: any) {
   };
   const routineSaver = (which: string) => (dayMode === "relax" ? (which === "morning" ? saveRelaxMorning : saveRelaxNight) : (which === "morning" ? saveMorning : saveNight));
   const routineList = (which: string) => (which === "morning" ? activeMorning : activeNight);
+  // Keep the timeline's routine blocks in step with the Tasks-view lists the moment a step is
+  // added, removed or reordered: regroup the new list and rebuild that routine's blocks in place.
+  // The first group keeps its old start, the rest chain after; auto-fix re-flows the day around them.
+  const refreshRoutineBlocks = (which: string, list: any[]) => {
+    const tb = todayBlocks();
+    const isMine = (b: any) => b.kind === "routine" && (which === "night" ? !!b.night : !b.night);
+    const olds = tb.filter(isMine).sort((a: any, b: any) => a.start - b.start);
+    if (!olds.length) return;   // that routine isn't on today's plan
+    const groups = groupRoutine(list, settings.routineGroupMinutes || 25);
+    let t = olds[0].start;
+    const fresh: any[] = groups.map((g: any, gi: number) => {
+      const start = Math.max(olds[gi] ? olds[gi].start : t, t);
+      const blk: any = { id: "r" + Date.now() + "_" + gi, kind: "routine", name: routineGroupName(which, gi, groups.length), start, dur: g.dur, refIds: g.steps.map((x: any) => x.id), steps: g.steps.map((x: any) => x.name) };
+      if (which === "night") blk.night = true;
+      t = start + g.dur;
+      return blk;
+    });
+    setTodayBlocks(autoBreaksOf([...tb.filter((b: any) => !isMine(b)), ...fresh]), true);
+  };
   const addRoutine = (which: string) => {
     const name = (which === "morning" ? newMorning : newNight).trim();
     if (!name) return;
-    routineSaver(which)([...routineList(which), { id: "r" + Date.now(), name }]);
+    const next = [...routineList(which), { id: "r" + Date.now(), name }];
+    routineSaver(which)(next);
+    refreshRoutineBlocks(which, next);
     if (which === "morning") setNewMorning(""); else setNewNight("");
   };
   const saveEditRoutine = (which: string) => {
@@ -1704,16 +2037,17 @@ export default function FocusLogApp({ api }: any) {
         return { ...b, dur: steps.reduce((s: number, x: any) => s + (x.dur || ROUTINE_MIN), 0) || b.dur, steps: steps.map((x: any) => x.name) };
       }
       return b;
-    })));
+    })), true);
     setEditRoutineId(null);
   };
-  const removeRoutine = (which: string, id: string) => routineSaver(which)(routineList(which).filter((x: any) => x.id !== id));
+  const removeRoutine = (which: string, id: string) => { const next = routineList(which).filter((x: any) => x.id !== id); routineSaver(which)(next); refreshRoutineBlocks(which, next); };
   const moveRoutine = (which: string, from: number, to: number) => {
     if (from === to) return;
     const a = [...routineList(which)];
     const [m] = a.splice(from, 1);
     a.splice(to, 0, m);
     routineSaver(which)(a);
+    refreshRoutineBlocks(which, a);
   };
   const renderRoutineBlock = (which: string, hideHeader?: boolean) => {
     const list = routineList(which);
@@ -1754,9 +2088,9 @@ export default function FocusLogApp({ api }: any) {
                 </span>
                 <button onClick={() => toggleRoutineDone(it.id)} aria-label={done ? "mark not done" : "mark done"} style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 5, border: `1.5px solid ${done ? (relax ? C.better : MODE_COLORS.work.solid) : C.faint}`, background: done ? (relax ? C.better : MODE_COLORS.work.solid) : "transparent", color: "#fff", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{done && <CheckIcon size={12} />}</button>
                 <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", textDecoration: done ? "line-through" : "none", color: done ? C.muted : C.ink }}>{it.name}</span>
-                <button onClick={() => openLog(it.name)} className="fl-rowact" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={13} /></button>
-                <button onClick={() => { setEditRoutineId(it.id); setEditRoutineName(it.name); setEditRoutineDur(it.dur || 15); }} className="fl-rowact" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-                <button onClick={() => removeRoutine(which, it.id)} className="fl-rowact fl-rowdel" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+                <button onClick={() => openLog(it.name)} className="fl-rowact fl-collapse" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={13} /></button>
+                <button onClick={() => { setEditRoutineId(it.id); setEditRoutineName(it.name); setEditRoutineDur(it.dur || 15); }} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                <button onClick={() => removeRoutine(which, it.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
               </div>
             );
           };
@@ -1764,12 +2098,31 @@ export default function FocusLogApp({ api }: any) {
           // single pomodoro (named like the timeline block), then the group's step rows.
           return groups.map((g: any, gi: number) => {
             const gname = routineGroupName(which, gi, groups.length);
+            const gKey = which + ":" + gi;
+            const gDone = g.steps.length > 0 && g.steps.every((it: any) => isRoutineDone(it.id));
+            const tick = relax ? C.better : MODE_COLORS.work.solid;
+            // A fully ticked group folds to one line; click it to peek at (or untick) the steps.
+            if (gDone && !unfoldedDone[gKey]) {
+              flat += g.steps.length;
+              return (
+                <div key={"g" + gi} onClick={() => setUnfoldedDone((m: any) => ({ ...m, [gKey]: true }))} role="button" aria-label={`finished — click to show the ${g.steps.length} steps`}
+                  style={{ display: "flex", alignItems: "center", gap: 6, marginTop: gi ? 6 : 0, padding: "0 2px", cursor: "pointer" }}>
+                  <span style={{ fontSize: 10, color: C.muted, width: 14, textAlign: "center" }}>{"▸"}</span>
+                  <span style={{ color: tick, display: "inline-flex" }}><CheckIcon size={13} /></span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: C.muted, fontFamily: "var(--fl-display)", textDecoration: "line-through" }}>{gname}</span>
+                  <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>{g.dur}m</span>
+                </div>
+              );
+            }
             return (
               <React.Fragment key={"g" + gi}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: gi ? 6 : 0, padding: "0 2px" }}>
-                  <button onClick={() => openLog(gname)} aria-label={`run "${gname}" as one pomodoro (${g.dur}m of steps)`} style={{ ...ICON_BTN, color: relax ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid }}><PlayIcon size={14} /></button>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: C.muted, fontFamily: "var(--fl-display)" }}>{gname}</span>
+                  {gDone
+                    ? <span onClick={() => setUnfoldedDone((m: any) => ({ ...m, [gKey]: false }))} role="button" aria-label="fold the finished group" style={{ fontSize: 10, color: C.muted, width: 14, textAlign: "center", cursor: "pointer", flexShrink: 0 }}>{"▾"}</span>
+                    : <span style={{ width: 14, flexShrink: 0 }} />}
+                  <span style={{ fontSize: 12, fontWeight: 600, color: C.muted, fontFamily: "var(--fl-display)", textDecoration: gDone ? "line-through" : "none" }}>{gname}</span>
                   <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>{g.dur}m</span>
+                  <button onClick={() => openLog(gname)} aria-label={`run "${gname}" as one pomodoro (${g.dur}m of steps)`} style={{ ...ICON_BTN, color: relax ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid, marginLeft: "auto" }}><PlayIcon size={14} /></button>
                 </div>
                 {g.steps.map((it: any) => { flat++; return renderStepRow(it, flat); })}
               </React.Fragment>
@@ -1822,7 +2175,7 @@ export default function FocusLogApp({ api }: any) {
         items.push({ type: "gap", t0: prevEnd, t1: b.start, minutes: b.start - prevEnd, topY: y, height: gh });
         y += gh;
       }
-      const h = b.kind === "break" ? SHORT_BREAK_H : b.kind === "longbreak" ? LONG_BREAK_H : (b.kind === "meal" || (b.kind === "task" && !b.pageId)) ? Math.max(MIN_BLOCK_H, 25 * PX_PER_MIN) : Math.max(MIN_BLOCK_H, b.dur * PX_PER_MIN);
+      const h = b.kind === "break" ? SHORT_BREAK_H : b.kind === "longbreak" ? LONG_BREAK_H : (b.kind === "meal" || b.claimed || (b.kind === "task" && !b.pageId)) ? Math.max(MIN_BLOCK_H, 25 * PX_PER_MIN) : Math.max(MIN_BLOCK_H, b.dur * PX_PER_MIN);
       items.push({ type: "block", b, t0: b.start, t1: b.start + b.dur, topY: y, height: h });
       y += h;
       prevEnd = b.start + b.dur;
@@ -1868,9 +2221,13 @@ export default function FocusLogApp({ api }: any) {
     return -1;
   };
   const todayBlocks = () => (plans[todayKey] || []);
-  // Every plan mutation flows through here, so it also invalidates the undo snapshot — the only
-  // caller that wants undo kept (the left-drag) re-sets planUndo right AFTER calling this.
-  const setTodayBlocks = (blocks: any[]) => { setPlans((p: any) => ({ ...p, [todayKey]: blocks })); api.savePlan && api.savePlan(todayKey, blocks); setPlanUndo(null); };
+  // Every plan mutation flows through here. Unless silent, the PREVIOUS list is pushed as an
+  // undo step first (max three), so undo means "revert my last action, whatever it was".
+  const setTodayBlocks = (blocks: any[], silent?: boolean) => {
+    if (!silent) { const prev = todayBlocks(); setPlanUndo((u) => [...u, prev].slice(-3)); }
+    setPlans((p: any) => ({ ...p, [todayKey]: blocks }));
+    api.savePlan && api.savePlan(todayKey, blocks);
+  };
   // Header day-summary: the pomodoro count comes from the timeline (task blocks; duplicates add up),
   // falling back to remaining task estimates when there's no plan. "ends" is the last block's end;
   // it overflows when that runs past your day-end (settings.dayEnds).
@@ -1926,8 +2283,12 @@ export default function FocusLogApp({ api }: any) {
     // their lengths. Everything else is rebuilt fresh: Notion task blocks arrive unlocked and
     // unpinned (Notion re-creates them), routine groups regroup, and ALL breaks are deleted —
     // none are auto-inserted either (insertBreaks: false); press auto-fix to add the rhythm.
+    // Manual commitments only survive syncs on the calendar day they were created: yesterday
+    // evening's add-blocks vanish when the new morning's sync runs (blocks without a stamp are
+    // treated as stale and dropped too).
+    const sameDayCreated = (b: any) => !!b.created && new Date(b.created).toDateString() === new Date().toDateString();
     const survivors = todayBlocks()
-      .filter((b: any) => b.kind === "meal" || (b.kind === "task" && b.locked && !b.pageId))
+      .filter((b: any) => b.kind === "meal" || (b.claimed && sameDayCreated(b)) || (b.kind === "task" && b.locked && !b.pageId && sameDayCreated(b)))
       .map((b: any) => { const nb: any = { ...b }; delete nb.placed; return nb; });
     const blocks: any[] = [...survivors];
     let t = tlStart, seq = 0;
@@ -1944,7 +2305,7 @@ export default function FocusLogApp({ api }: any) {
     [...workTasks, ...personalTasks].filter((task: any) => !survivors.some((s: any) => s.kind === "task" && !s.pageId && s.name === task.task)).forEach((task: any) => {
       // Task blocks are always the standard 25 minutes on the timeline; the current Focus length
       // is recorded (pomoLen) without shaping the block.
-      blocks.push({ id: "b" + Date.now() + "_" + (seq++), kind: "task", name: task.task, start: t, dur: 25, pomoLen: pomo, pageId: task.id || null, category: task.category || null, load: task.load || null, power: task.power || null });
+      blocks.push({ id: "b" + Date.now() + "_" + (seq++), kind: "task", name: task.task, start: t, dur: 25, pomoLen: pomo, pageId: task.id || null, category: task.category || null, status: task.status || null, power: task.power || null });
       t += 25;
     });
     // Seed the night routine at its dinner anchor (dinner end + gap): the engine's anchor only
@@ -1964,18 +2325,18 @@ export default function FocusLogApp({ api }: any) {
   // day's timeline from them (no prompt). Deferred to an effect so buildInitialPlan sees fresh tasks.
   useEffect(() => {
     if (!pendingSyncRebuild) return;
-    setTodayBlocks(buildInitialPlan());
+    setTodayBlocks(buildInitialPlan(), true);
     setPendingSyncRebuild(false);
   }, [tasks, pendingSyncRebuild]);
   const setTimelineMode = (on: boolean) => {
     const hasInput = [...workTasks, ...personalTasks].length || (!settings.skipMorningRoutine && (activeMorning || []).length) || (!settings.skipNightRoutine && (activeNight || []).length);
-    if (on && !plans[todayKey] && hasInput) setTodayBlocks(buildInitialPlan());
+    if (on && !plans[todayKey] && hasInput) setTodayBlocks(buildInitialPlan(), true);
     else if (on && plans[todayKey]) {
       // A lunch/dinner toggle in settings only takes effect through autoBreaksOf; if the plan's
       // meals no longer match the settings, re-flow once on open so the change applies.
       const cur = plans[todayKey];
       const hasLunch = cur.some((b: any) => b.meal === "lunch"), hasDinner = cur.some((b: any) => b.meal === "dinner");
-      if (!!settings.lunchEnabled !== hasLunch || !!settings.dinnerEnabled !== hasDinner) setTodayBlocks(autoBreaksOf(cur));
+      if (!!settings.lunchEnabled !== hasLunch || !!settings.dinnerEnabled !== hasDinner) setTodayBlocks(autoBreaksOf(cur), true);
     }
     setTimelineModeState(on);
   };
@@ -2007,7 +2368,7 @@ export default function FocusLogApp({ api }: any) {
     const pomo = settings.pomodoroMinutes || 25;
     const last = todayBlocks().reduce((m: number, b: any) => Math.max(m, b.start + b.dur), tlStart);
     const id = "b" + Date.now();
-    setTodayBlocks([...todayBlocks(), { id, kind: "task", name: "New task", start: clampStart(snap5(last + (settings.breakMinutes || 5)), pomo), dur: pomo, power: "Y", load: "B" }]);
+    setTodayBlocks([...todayBlocks(), { id, kind: "task", name: "New task", start: clampStart(snap5(last + (settings.breakMinutes || 5)), pomo), dur: pomo, power: "Y", load: "B", created: Date.now() }]);
     setEditBlockId(id); setBlockDraft({ name: "New task", dur: pomo, power: "Y", load: "B", category: "" });
   };
   const toggleLock = (id: string) => setTodayBlocks(todayBlocks().map((b: any) => (b.id === id ? { ...b, locked: !b.locked } : b)));
@@ -2148,9 +2509,9 @@ export default function FocusLogApp({ api }: any) {
   const autoBreaks = () => {
     const prev = todayBlocks();
     const pomo = settings.pomodoroMinutes || 25;
-    const sized = prev.map((b: any) => (b.kind === "task" && b.pageId ? { ...b, dur: 25, pomoLen: pomo } : b));
+    // Claimed blocks are HISTORY with real spans: the wand must never re-size them to 25.
+    const sized = prev.map((b: any) => (b.kind === "task" && b.pageId && !b.claimed ? { ...b, dur: 25, pomoLen: pomo } : b));
     setTodayBlocks(autoBreaksOf(sized));
-    setPlanUndo(prev);
   };
   const saveBlockEdit = () => {
     const blk = todayBlocks().find((b: any) => b.id === editBlockId);
@@ -2197,6 +2558,61 @@ export default function FocusLogApp({ api }: any) {
   // Drop a dragged block. LEFT-drag (button 0): move just this block, then auto-fix the break
   // rhythm (saving the prior plan so it's undoable). RIGHT-drag (button 2): cascade — move this
   // block and everything starting at/after it by the same delta, keeping their spacing, no auto-fix.
+  // Left-drag landing rule, shared by the live insertion bar and the drop itself: place the
+  // grabbed block at newStart, then GLUE it back to the end of the previous block (hopping any
+  // anchor it may not overlap), so pure reordering never leaves a blank in front of the block.
+  const tlAnchorish = (x: any) => x.kind === "meal" || x.kind === "meeting" || (x.kind === "task" && (x.locked || x.placed));
+  const lgGlue = (blocks: any[], cur: any, newStart: number) => {
+    const movedArr = blocks.map((x: any) => (x.id === cur.id ? { ...x, start: newStart } : x));
+    const D: any = movedArr.find((x: any) => x.id === cur.id);
+    const anchors = movedArr.filter(tlAnchorish);
+    const prevEnd = movedArr.reduce((m: number, x: any) => (x.id !== cur.id && x.start + x.dur <= D.start ? Math.max(m, x.start + x.dur) : m), -1);
+    if (prevEnd >= 0 && D.start > prevEnd) {
+      let s = prevEnd, guard = 0;
+      while (guard++ < 30) { const hit = anchors.find((f: any) => s < f.start + f.dur && s + D.dur > f.start); if (!hit) break; s = hit.start + hit.dur; }
+      if (s < D.start) D.start = s;
+    }
+    return { movedArr, D, anchors };
+  };
+  // The SEAT model for left-dragging a FREE task (unlocked, unpinned): free tasks of the same
+  // length are interchangeable seats. lgLanding picks one of three outcomes:
+  //   rotate: the drop crossed another seat-task's midpoint. Tasks permute among their existing
+  //           start times; breaks, meals, routines, pinned and odd-length blocks are furniture
+  //           and never move, so the day keeps the exact same set of times.
+  //   nudge:  no order change. Only the grabbed block's start moves, clamped into the free
+  //           pocket between solid neighbours around the drop point.
+  //   none:   the pocket is too small to hold the block, so the drop is a no-op.
+  const seatPeers = (blocks: any[], cur: any) =>
+    blocks.filter((x: any) => x.kind === "task" && !x.locked && !x.placed && x.dur === cur.dur)
+      .sort((a: any, b: any) => a.start - b.start);
+  // A "pocket" is the free span (breaks only) between the solid blocks around time t. When t is
+  // inside a solid it snaps to the nearer edge, so a drop on a block's lower half means the
+  // pocket after it. loSolid/hiSolid say whether an edge is a real block (pad it with a break)
+  // or the open morning / open tail (leave it blank: the day just starts or ends there).
+  const pocketOf = (blocks: any[], cur: any, t0: number) => {
+    const solids = blocks.filter((x: any) => x.id !== cur.id && x.kind !== "break" && x.kind !== "longbreak");
+    let t = t0;
+    const inS = solids.find((s: any) => t > s.start && t < s.start + s.dur);
+    if (inS) t = t < inS.start + inS.dur / 2 ? inS.start : inS.start + inS.dur;
+    const dayLo = Math.min(tlStart, tlLeadOf(blocks));
+    const loB = solids.reduce((m: number, s: any) => (s.start + s.dur <= t ? Math.max(m, s.start + s.dur) : m), -Infinity);
+    const hiB = solids.reduce((m: number, s: any) => (s.start >= t ? Math.min(m, s.start) : m), Infinity);
+    return { lo: Math.max(dayLo, loB), hi: Math.min(tlEnd, hiB), loSolid: loB > -Infinity, hiSolid: hiB < Infinity, t };
+  };
+  const lgLanding = (blocks: any[], cur: any, rawT: number): any => {
+    const peers = seatPeers(blocks, cur);
+    const others = peers.filter((x: any) => x.id !== cur.id);
+    const oldIdx = others.filter((x: any) => x.start < cur.start).length;
+    const newIdx = others.filter((x: any) => x.start + x.dur / 2 <= rawT).length;
+    if (newIdx !== oldIdx) {
+      const seats = peers.map((x: any) => x.start);
+      const order = others.slice(); order.splice(newIdx, 0, cur);
+      return { mode: "rotate", start: seats[newIdx], order, seats };
+    }
+    const pk = pocketOf(blocks, cur, rawT);
+    if (pk.hi - pk.lo < cur.dur) return { mode: "none", start: cur.start };
+    return { mode: "nudge", start: Math.max(pk.lo, Math.min(pk.hi - cur.dur, pk.t)), pk };
+  };
   const onTlDrop = (b: any, clientY: number) => {
     const d = tlDrag;
     const blocks = todayBlocks();
@@ -2206,8 +2622,8 @@ export default function FocusLogApp({ api }: any) {
     if (d.downY != null && Math.abs(clientY - d.downY) < 4) { setTlDrag(null); return; }
     const tlTop = tlRef.current ? tlRef.current.getBoundingClientRect().top : d.tlTop;
     const target = snapDrop(yToMin(tlLayout(blocks).items, clientY - tlTop - d.grab));
-    const newStart = avoidMeals(clampStart(target, cur.dur), cur.dur, blocks, cur.id);
     if (d.button === 2) {
+      const newStart = avoidMeals(clampStart(target, cur.dur), cur.dur, blocks, cur.id);
       // cascade: shift this block + everything after it by one bounded delta, keeping internal
       // spacing (no auto-fix). Auto-generated + gap breaks are dropped and re-derived from the new
       // gaps; meals, meetings, and locked tasks are never part of the group and are never crossed.
@@ -2220,45 +2636,98 @@ export default function FocusLogApp({ api }: any) {
       // A right-drag is the deliberate "place this here" gesture: the GRABBED task becomes a
       // placed anchor that auto-fix will keep in position (the tail moved only to keep spacing,
       // so it is not marked). Release = click the pin on the block; Sync/rebuild clears all.
-      const shifted = resolveOverlaps(blocks.map((x: any) => {
+      const movedMap = blocks.map((x: any) => {
         if (!ids.has(x.id)) return x;
         const nb: any = { ...x, start: x.start + delta };
         if (x.id === cur.id && x.kind === "task" && !x.locked) nb.placed = true;
         return nb;
-      }));
+      });
+      let pre = movedMap;
+      const curMoved = movedMap.find((x: any) => x.id === cur.id);
+      if (delta < 0 && curMoved) {
+        // Dragging UP eats the stationary break(s) directly in front: they shrink by the
+        // distance moved (re-classified short/long by the new length) and disappear when
+        // fully consumed. Auto-fix can regrow any missing rests later.
+        const sb0 = settings.breakMinutes || 5;
+        pre = movedMap
+          .map((x: any) => {
+            if (ids.has(x.id) || (x.kind !== "break" && x.kind !== "longbreak")) return x;
+            if (x.start >= curMoved.start && x.start + x.dur <= cur.start) return null;
+            if (x.start < curMoved.start && x.start + x.dur > curMoved.start) {
+              const nd = curMoved.start - x.start;
+              if (nd < 1) return null;
+              return { ...x, dur: nd, kind: nd > sb0 ? "longbreak" : "break", name: (x.name === "Break" || x.name === "Long break") ? (nd > sb0 ? "Long break" : "Break") : x.name };
+            }
+            return x;
+          })
+          .filter(Boolean);
+      }
+      const shifted = resolveOverlaps(pre);
       // The gap the drag opened IN FRONT of the grabbed task hardens into a persistent break the
       // user owns: auto-fix keeps its length; longer than the short-break setting reads as long.
       const outBlocks = shifted.slice();
       const curNew = shifted.find((x: any) => x.id === cur.id);
       if (curNew) {
-        const prevEnd = shifted.reduce((m: number, x: any) => (x.id !== cur.id && x.start + x.dur <= curNew.start ? Math.max(m, x.start + x.dur) : m), -1);
-        const gap = prevEnd >= 0 ? curNew.start - prevEnd : 0;
-        if (gap > 0) {
-          const shortB = settings.breakMinutes || 5;
-          outBlocks.push({ id: "gb" + Date.now(), kind: gap > shortB ? "longbreak" : "break", name: gap > shortB ? "Long break" : "Break", start: prevEnd, dur: gap });
-        }
+        // The void the drag opened runs from the end of the last block still in front of the OLD
+        // position up to the new start. Crossing an anchor (lunch, dinner, a commitment) splits
+        // it, and EVERY free segment hardens into a persistent break, not just the last one
+        // (which used to leave the emptied stretch before the meal blank). A segment that begins
+        // exactly at an existing break's end JOINS that break instead of stacking a second one.
+        const shortB = settings.breakMinutes || 5;
+        const others = shifted.filter((x: any) => x.id !== cur.id);
+        const lowBound = Math.min(cur.start, curNew.start);
+        let pt = others.reduce((m: number, x: any) => (x.start + x.dur <= lowBound ? Math.max(m, x.start + x.dur) : m), -1);
+        if (pt < 0) pt = lowBound;
+        const mk = (s: number, e: number) => {
+          const g = e - s;
+          if (g <= 0) return;
+          const prevBr = outBlocks.find((x: any) => (x.kind === "break" || x.kind === "longbreak") && Math.abs(x.start + x.dur - s) < 0.5);
+          if (prevBr) {
+            // The joined length decides the kind: a short break flips to a long one (icon,
+            // height and default name included) once it grows past the short-break setting.
+            const total = e - prevBr.start;
+            const long = total > shortB;
+            outBlocks[outBlocks.indexOf(prevBr)] = { ...prevBr, dur: total, kind: long ? "longbreak" : "break", name: (prevBr.name === "Break" || prevBr.name === "Long break") ? (long ? "Long break" : "Break") : prevBr.name };
+            return;
+          }
+          outBlocks.push({ id: "gb" + Date.now() + "_" + Math.round(s), kind: g > shortB ? "longbreak" : "break", name: g > shortB ? "Long break" : "Break", start: s, dur: g });
+        };
+        const between = others.filter((x: any) => x.start + x.dur > pt && x.start < curNew.start).sort((a: any, b: any) => a.start - b.start);
+        for (const x of between) { mk(pt, Math.min(x.start, curNew.start)); pt = Math.max(pt, x.start + x.dur); if (pt >= curNew.start) break; }
+        if (pt < curNew.start) mk(pt, curNew.start);
       }
-      setTodayBlocks(outBlocks);
+      setTodayBlocks(outBlocks);    } else if (cur.kind === "task" && !cur.locked && !cur.placed) {
+      // Left-drag on a free task: the SEAT model (see lgLanding). A reorder permutes tasks among
+      // their existing start times and moves nothing else; a nudge moves only this block inside
+      // its pocket and rebuilds the break padding there; a no-fit drop changes nothing.
+      const land: any = lgLanding(blocks, cur, target);
+      if (land.mode === "rotate") {
+        const seatAt = new Map(land.order.map((x: any, i: number) => [x.id, land.seats[i]]));
+        setTodayBlocks(blocks.map((x: any) => (seatAt.has(x.id) ? { ...x, start: seatAt.get(x.id) } : x)));      } else if (land.mode === "nudge" && land.start !== cur.start) {
+        const shortB = settings.breakMinutes || 5;
+        const npk = land.pk, opk = pocketOf(blocks, cur, cur.start);
+        const pks = npk.lo === opk.lo ? [npk] : [npk, opk];
+        const isBrk = (x: any) => x.kind === "break" || x.kind === "longbreak";
+        const inPk = (x: any, pk: any) => x.start >= pk.lo - 0.5 && x.start + x.dur <= pk.hi + 0.5;
+        const out = blocks
+          .map((x: any) => (x.id === cur.id ? { ...x, start: land.start } : x))
+          .filter((x: any) => !(isBrk(x) && pks.some((pk: any) => inPk(x, pk))));
+        const mk = (s: number, e: number) => { const g = e - s; if (g > 0.5) out.push({ id: "gb" + Date.now() + "_" + Math.round(s), kind: g > shortB ? "longbreak" : "break", name: g > shortB ? "Long break" : "Break", start: s, dur: g }); };
+        pks.forEach((pk: any) => {
+          const inside = land.start >= pk.lo - 0.5 && land.start + cur.dur <= pk.hi + 0.5;
+          if (inside) { if (pk.loSolid) mk(pk.lo, land.start); if (pk.hiSolid) mk(land.start + cur.dur, pk.hi); }
+          else if (pk.loSolid && pk.hiSolid) mk(pk.lo, pk.hi);   // the emptied pocket reads as one break you own
+        });
+        setTodayBlocks(out);      }
     } else {
-      // Left-drag: pure reordering, NEVER a break. The dropped task always CONNECTS to the end of
-      // the previous block (any blank in front is closed by pulling the task earlier — never later
-      // than the drop; if an anchor sits there, it glues right after the anchor). Whatever it lands
-      // on is pushed to start at its end, chaining forward gaplessly. Anchors never move. Gaps and
-      // breaks are made with the RIGHT-drag only.
-      const isAnchor = (x: any) => x.kind === "meal" || x.kind === "meeting" || (x.kind === "task" && (x.locked || x.placed));
-      const movedArr = blocks.map((x: any) => (x.id === cur.id ? { ...x, start: newStart } : x));
-      const D: any = movedArr.find((x: any) => x.id === cur.id);
-      const anchors = movedArr.filter(isAnchor);
-      const prevEnd = movedArr.reduce((m: number, x: any) => (x.id !== cur.id && x.start + x.dur <= D.start ? Math.max(m, x.start + x.dur) : m), -1);
-      if (prevEnd >= 0 && D.start > prevEnd) {
-        let s = prevEnd, guard = 0;
-        while (guard++ < 30) { const hit = anchors.find((f: any) => s < f.start + f.dur && s + D.dur > f.start); if (!hit) break; s = hit.start + hit.dur; }
-        if (s < D.start) D.start = s;
-      }
+      // Left-drag on a meal, routine or pinned block keeps the old GLUE: connect to the end of
+      // the previous block (hopping anchors), then chain-push whatever it lands on, gaplessly.
+      const newStart = avoidMeals(clampStart(target, cur.dur), cur.dur, blocks, cur.id);
+      const { movedArr, D, anchors } = lgGlue(blocks, cur, newStart);
       const moved = movedArr.sort((a: any, c: any) => a.start - c.start);
       let cursor = D.start + D.dur;
       const resolved = moved.map((x: any) => {
-        if (x.id === cur.id || isAnchor(x)) return x;
+        if (x.id === cur.id || tlAnchorish(x)) return x;
         if (x.start + x.dur <= D.start) return x;   // entirely before the drop: untouched
         if (x.start >= cursor) return x;            // clear of the drop and its chain: untouched
         let s = cursor, guard = 0;
@@ -2266,9 +2735,7 @@ export default function FocusLogApp({ api }: any) {
         cursor = s + x.dur;
         return { ...x, start: s };
       });
-      setTodayBlocks(resolved);
-      setPlanUndo(blocks);
-    }
+      setTodayBlocks(resolved);    }
     setTlDrag(null);
   };
   const renderBlock = (b: any, topY: number, h: number) => {
@@ -2283,12 +2750,10 @@ export default function FocusLogApp({ api }: any) {
                 <button key={p} onClick={() => setBlockDraft({ ...blockDraft, power: p })} aria-pressed={blockDraft.power === p} aria-label={"ExecutionPower: " + POWER_LABEL[p]} style={{ width: 20, height: 20, borderRadius: 6, border: blockDraft.power === p ? `2px solid ${C.ink}` : `1px solid ${C.faint}`, background: POWER_COLOR[p], padding: 0, boxSizing: "border-box" }} />
               ))}
             </span>
-            <span style={{ display: "inline-flex", gap: 3, flexShrink: 0 }}>
-              {["A", "B", "C"].map((l) => (
-                <button key={l} onClick={() => setBlockDraft({ ...blockDraft, load: l })} aria-pressed={blockDraft.load === l} aria-label={"CognitiveLoad: " + LOAD_LABEL[l]} style={{ width: 20, height: 20, borderRadius: 6, border: blockDraft.load === l ? `2px solid ${LOAD_COLOR[l]}` : `1px solid ${C.faint}`, background: "transparent", color: LOAD_COLOR[l], fontFamily: "var(--fl-mono)", fontWeight: 700, fontSize: 11, padding: 0, boxSizing: "border-box" }}>{l}</button>
-              ))}
-            </span>
-            <input value={blockDraft.category ?? ""} onChange={(e) => setBlockDraft({ ...blockDraft, category: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") saveBlockEdit(); if (e.key === "Escape") setEditBlockId(null); }} placeholder="Area tag" aria-label="Area tag, like a Notion Area" style={{ width: 76, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 5, padding: "3px 6px", fontFamily: "var(--fl-display)", flexShrink: 0 }} />
+            <select value={blockDraft.category ?? ""} onChange={(e) => setBlockDraft({ ...blockDraft, category: e.target.value })} aria-label="Area tag, mirroring your Notion Area options" style={{ width: 96, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 5, padding: "3px 4px", fontFamily: "var(--fl-display)", flexShrink: 0 }}>
+              <option value="">no area</option>
+              {Array.from(new Set([...(areaOptions || []), ...tasks.map((t: any) => t.category).filter(Boolean), ...((blockDraft.category ?? "") ? [blockDraft.category] : [])])).map((a: any) => (<option key={a} value={a}>{a}</option>))}
+            </select>
           </>}
           {b.kind === "meal" && <input value={blockDraft.start ?? ""} onChange={(e) => setBlockDraft({ ...blockDraft, start: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") saveBlockEdit(); if (e.key === "Escape") setEditBlockId(null); }} aria-label="start time (24h HH:MM)" placeholder="18:30" style={{ width: 58, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 5, padding: "3px 6px", fontFamily: "var(--fl-mono)" }} />}
           <input type="number" value={blockDraft.dur} onChange={(e) => setBlockDraft({ ...blockDraft, dur: Number(e.target.value) })} aria-label="minutes" style={{ width: 50, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 5, padding: "3px 6px" }} />
@@ -2324,15 +2789,18 @@ export default function FocusLogApp({ api }: any) {
         onPointerUp={(e) => { if (tlDrag && tlDrag.id === b.id) { try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch (err) {} onTlDrop(b, e.clientY); } }}
         onPointerCancel={(e) => { try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch (err) {} setTlDrag(null); }}
         onContextMenu={(e) => e.preventDefault()}
-        style={{ position: "absolute", left: 108, right: 4, top: blkTop, height: h, boxSizing: "border-box", opacity: tlDrag && tlDrag.id !== b.id ? 0.5 : 1, background: isTask ? "#fdfbf5" : (b.kind === "break" ? BREAK_BG : b.kind === "longbreak" ? LBREAK_BG : b.kind === "meal" ? MEAL_BG : b.kind === "routine" ? ROUTINE_THEME[b.night ? "night" : "morning"][dayMode === "relax" ? "relax" : "work"] : "#fbf8f1"), border: `1px solid ${C.line}`, borderLeft: `4px solid ${isTask ? (POWER_COLOR[b.power] || POWER_COLOR.Y) : (b.kind === "routine" ? ROUTINE_THEME[b.night ? "night" : "morning"].bar : b.kind === "break" ? BREAK_STRIPE : b.kind === "longbreak" ? LBREAK_STRIPE : b.kind === "meal" ? MEAL_STRIPE : C.muted)}`, borderRadius: 6, padding: "2px 8px", cursor: (b.kind === "meeting" || b.kind === "break" || b.kind === "longbreak") ? "default" : (dragging ? "grabbing" : "grab"), display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: b.kind === "break" ? BREAK_TEXT : b.kind === "longbreak" ? LBREAK_TEXT : b.kind === "meal" ? MEAL_TEXT : C.ink, zIndex: dragging ? 20 : 1, boxShadow: dragging ? "0 4px 14px rgba(0,0,0,0.18)" : "none", touchAction: "none", userSelect: "none", overflow: "hidden" }}>
+        style={{ position: "absolute", left: 108, right: 4, top: blkTop, height: h, boxSizing: "border-box", opacity: tlDrag && tlDrag.id !== b.id ? 0.5 : 1, background: isTask ? "#fdfbf5" : (b.kind === "break" ? BREAK_BG : b.kind === "longbreak" ? LBREAK_BG : b.kind === "meal" ? MEAL_BG : b.kind === "routine" ? ROUTINE_THEME[b.night ? "night" : "morning"][dayMode === "relax" ? "relax" : "work"] : "#fbf8f1"), border: `1px solid ${C.line}`, borderLeft: `4px ${b.claimed ? "dashed" : "solid"} ${isTask ? (POWER_COLOR[b.power] || POWER_COLOR.Y) : (b.kind === "routine" ? ROUTINE_THEME[b.night ? "night" : "morning"].bar : b.kind === "break" ? BREAK_STRIPE : b.kind === "longbreak" ? LBREAK_STRIPE : b.kind === "meal" ? MEAL_STRIPE : C.muted)}`, borderRadius: 6, padding: "2px 8px", cursor: (b.kind === "meeting" || b.kind === "break" || b.kind === "longbreak") ? "default" : (dragging ? "grabbing" : "grab"), display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: b.kind === "break" ? BREAK_TEXT : b.kind === "longbreak" ? LBREAK_TEXT : b.kind === "meal" ? MEAL_TEXT : C.ink, zIndex: dragging ? 20 : 1, boxShadow: dragging ? "0 4px 14px rgba(0,0,0,0.18)" : "none", touchAction: "none", userSelect: "none", overflow: "hidden" }}>
+        {b.claimed && <span aria-label="claimed: logged after the fact, off the timer" style={{ fontSize: 10, flexShrink: 0, lineHeight: 1 }}>{"✋"}</span>}
         {b.kind === "meeting" && <span style={{ color: C.muted, display: "inline-flex", flexShrink: 0 }}><LockIcon size={12} /></span>}
         {(b.kind === "break" || b.kind === "longbreak") && <img src={b.kind === "longbreak" ? breakLongIcon : breakShortIcon} alt="" draggable={false} style={{ width: 14, height: 14, flexShrink: 0 }} />}
         {b.kind === "meal" && <span style={{ color: MEAL_TEXT, display: "inline-flex", flexShrink: 0 }}><UtensilsIcon size={13} /></span>}
-        {isTask && <span style={{ color: LOAD_COLOR[b.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, fontSize: 12.5, flexShrink: 0 }} aria-label={LOAD_LABEL[b.load] || LOAD_LABEL.B}>{b.load || "B"}</span>}
+        {b.kind === "routine" && <span style={{ color: ROUTINE_THEME[b.night ? "night" : "morning"].bar, display: "inline-flex", flexShrink: 0 }} aria-label={b.night ? "night routine" : "morning routine"}>{b.night ? <MoonRoutineIcon size={13} /> : <SunRoutineIcon size={13} />}</span>}
+        {isTask && (b.status === "exploring" || b.status === "executing") && <span style={{ color: b.status === "exploring" ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid, display: "inline-flex", flexShrink: 0 }} aria-label={b.status === "exploring" ? "Status: Exploring — still finding the shape" : "Status: Executing — the path is known"}>{b.status === "exploring" ? <ExploreIcon size={12} /> : <HammerIcon size={12} />}</span>}
         {isTask && b.category && settings.showAreaTimeline !== false && <span style={{ fontSize: 10, fontFamily: "var(--fl-mono)", color: personalBlk ? TAG_COFFEE.personal.text : TAG_COFFEE.project.text, background: personalBlk ? TAG_COFFEE.personal.bg : TAG_COFFEE.project.bg, border: `1px solid ${personalBlk ? TAG_COFFEE.personal.border : TAG_COFFEE.project.border}`, borderRadius: 999, height: 16, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: "0 7px", whiteSpace: "nowrap", flexShrink: 0 }}>{b.category}</span>}
         {isTask && <button onClick={() => toggleLock(b.id)} className={b.locked ? "" : "fl-rowact fl-collapse"} aria-label={b.locked ? "commitment: fixed at this time, and auto-fix adds a long break after it and restarts the pomodoro count. Click to release." : "make this a commitment: fix it at this time, with a long break after it and a fresh pomodoro count"} style={{ ...ICON_BTN, color: b.locked ? (POWER_COLOR[b.power] || POWER_COLOR.Y) : C.muted }}><LockIcon size={12} open={!b.locked} /></button>}
         {isTask && b.placed && <button onClick={() => setTodayBlocks(todayBlocks().map((x: any) => { if (x.id !== b.id) return x; const nb: any = { ...x }; delete nb.placed; return nb; }))} aria-label="placed (by right-drag): auto-fix keeps it exactly here, position only, the break rhythm is unchanged. Click to release it back into the flow." style={{ ...ICON_BTN, color: POWER_COLOR[b.power] || POWER_COLOR.Y }}><PinIcon size={12} /></button>}
-        <span aria-label={Array.isArray(b.steps) && b.steps.length ? b.steps.join(" · ") : undefined} style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isTask ? stripLeadingTag(b.name) : b.name}{Array.isArray(b.steps) && b.steps.length ? <span style={{ color: C.muted, fontSize: 11 }}> · {b.steps.join(" · ")}</span> : null}</span>
+        <span aria-label={Array.isArray(b.steps) && b.steps.length ? b.steps.join(" · ") : undefined} style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: (b.kind === "routine" && Array.isArray(b.refIds) && b.refIds.length > 0 && b.refIds.every((id: string) => isRoutineDone(id))) ? "line-through" : "none" }}>{isTask ? stripLeadingTag(b.name) : b.name}{Array.isArray(b.steps) && b.steps.length ? <span style={{ color: C.muted, fontSize: 11 }}> · {b.steps.join(" · ")}</span> : null}</span>
+        {isTask && b.pageId && <button onClick={() => { const t = tasks.find((x: any) => x.id === b.pageId); if (t) openOverCalib(t); }} className="fl-rowact fl-collapse" aria-label="the task grew: add a + tomato round (max two, then split)" style={{ ...ICON_BTN, fontSize: 11, whiteSpace: "nowrap" }}>{"+\u{1F345}"}</button>}
         {(isTask || b.kind === "routine") && <button onClick={() => openLog(b.name)} className="fl-rowact fl-collapse" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={12} /></button>}
         {isTask && !b.pageId && <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur, power: b.power || "Y", load: b.load || "B", category: b.category || "" }); }} className="fl-rowact fl-collapse" aria-label="edit name, power, load, tag and length" style={ICON_BTN}><PencilIcon size={13} /></button>}
         {(b.kind === "break" || b.kind === "longbreak") && <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur }); }} className="fl-rowact fl-collapse" aria-label="edit break length (auto-fix keeps it)" style={ICON_BTN}><PencilIcon size={13} /></button>}
@@ -2379,7 +2847,9 @@ export default function FocusLogApp({ api }: any) {
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
             <button onClick={autoBreaks} aria-label="auto-fix: pack the day in your order around commitments, pins and meals, glue your breaks, and add only the missing rests" style={{ ...btn(ACCENT), width: 30, height: 30, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><WandSparklesIcon size={14} /></button>
-            {planUndo && <button onClick={() => { setTodayBlocks(planUndo); setPlanUndo(null); }} aria-label="undo the last auto-fix or drag" style={{ ...btn(C.worse, true), padding: "5px 10px", fontSize: 12 }}>undo</button>}
+            <button onClick={() => { if (!planUndo.length) return; const snap = planUndo[planUndo.length - 1]; const rest = planUndo.slice(0, -1); setTodayBlocks(snap, true); setPlanUndo(rest); }} disabled={planUndo.length === 0}
+              aria-label={planUndo.length ? `undo your last plan edit (${planUndo.length} step${planUndo.length > 1 ? "s" : ""} stored)` : "nothing to undo yet: every plan edit stores a step, up to three"}
+              style={{ ...btn(ACCENT, true), width: 30, height: 30, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: planUndo.length ? 1 : 0.35, cursor: planUndo.length ? "pointer" : "default" }}><Undo2Icon size={14} /></button>
             {settings.addBlockEnabled === true && <button onClick={addBlock} aria-label="add a manual block: name, power colour, load letter, Area tag and length; lock it if it's a commitment" style={{ ...btn(ACCENT), width: 30, height: 30, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><ListPlusIcon size={14} /></button>}
           </div>
         </div>
@@ -2412,6 +2882,22 @@ export default function FocusLogApp({ api }: any) {
             const gy = Math.max(0, tlDrag.y - tlDrag.grab);
             const gm = snapDrop(yToMin(items, gy));
             return <span style={{ position: "absolute", left: 42, top: gy - 7, width: 54, textAlign: "right", fontSize: 12.5, fontWeight: 700, color: C.ink, background: C.paper, borderRadius: 4, zIndex: 30, pointerEvents: "none" }}>{fmtClock(gm)}</span>;
+          })()}
+          {tlDrag && tlDrag.button !== 2 && (() => {
+            // Landing bar (left-drag only): marks the exact start the block will get on release.
+            // For a free task that is its SEAT, i.e. the top edge of the task whose place it
+            // takes in the rotation, or its nudged time inside the free pocket; for meals,
+            // routines and pinned blocks it is the old glue boundary.
+            const cur = blocks.find((x: any) => x.id === tlDrag.id);
+            if (!cur || !items.length) return null;
+            const gy = Math.max(0, tlDrag.y - tlDrag.grab);
+            const rawT = snapDrop(yToMin(items, gy));
+            const landing = (cur.kind === "task" && !cur.locked && !cur.placed)
+              ? lgLanding(blocks, cur, rawT).start
+              : lgGlue(blocks, cur, avoidMeals(clampStart(rawT, cur.dur), cur.dur, blocks, cur.id)).D.start;
+            let by = minToY(items, landing);
+            if (by < 0) by = landing <= items[0].t0 ? items[0].topY : items[items.length - 1].topY + items[items.length - 1].height;
+            return <div style={{ position: "absolute", left: 100, right: 0, top: by - 1.5, height: 3, background: ACCENT, borderRadius: 999, zIndex: 25, pointerEvents: "none" }} />;
           })()}
           {items.map((it: any, i: number) => it.type !== "block" ? null : (
             <React.Fragment key={it.b.id}>
@@ -2517,10 +3003,9 @@ export default function FocusLogApp({ api }: any) {
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G }} />Bonus If Done</span>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" }}>
-            <span>Letter = CognitiveLoad:</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><b style={{ color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" }}>A</b> high</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><b style={{ color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" }}>B</b> medium</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><b style={{ color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" }}>C</b> low</span>
+            <span>Icon = Status:</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ color: MODE_COLORS.relax.solid, display: "inline-flex" }}><ExploreIcon size={12} /></span> Exploring</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ color: MODE_COLORS.work.solid, display: "inline-flex" }}><HammerIcon size={12} /></span> Executing</span>
             <span style={{ marginLeft: 4 }}><img src={crownImg} alt="King" draggable={false} style={{ width: 15, height: 15, verticalAlign: "-3px" }} /> = King {"·"} day starts at {fmtHM(settings.dayStart)}</span>
           </div>
         </div>
@@ -2534,13 +3019,169 @@ export default function FocusLogApp({ api }: any) {
 
         <div style={{ marginBottom: 20, overflowX: "auto" }}>
           <div style={{ display: "inline-flex", gap: 2, background: C.line, borderRadius: 12, padding: 4 }}>
-            {([["log", "Focus"], ["break", "Break"], ["pause", "Pause"], ["reflect", "Reflect"], ["today", "Plan"], ["status", "Status"], ["sky", "Sky"]] as [string, string][]).map(([t, lab]) => (<button key={t} onClick={() => setView(t)} style={seg(view === t)}>{lab}</button>))}
+            {([["log", "Focus"], ["break", "Break"], ["pause", "Pause"], ["reflect", "Reflect"], ["calibrate", "Calibrate"], ["today", "Plan"], ["status", "Stats"], ["sky", "Sky"]] as [string, string][]).map(([t, lab]) => (<button key={t} onClick={() => setView(t)} style={seg(view === t)}>{lab}</button>))}
           </div>
         </div>
 
+        {calibDraft && (() => {
+          const d = calibDraft;
+          const over = d.mode === "over";
+          const REASONS = over
+            ? ["hidden scope", "interrupted", "low energy", "perfectionism", "learning curve", "waiting on someone"]
+            : ["overestimated it", "knew more than I thought", "smaller scope", "good flow", "cut scope on purpose"];
+          const chipStyle = (on: boolean): any => ({ padding: "3px 11px", borderRadius: 999, border: on ? `1px solid ${over ? "#D9A521" : "#3E78B2"}` : `1px solid ${over ? "#D9A521" : "#3E78B2"}`, background: on ? (over ? "#D9A521" : "#3E78B2") : (over ? "#FBEFC9" : "#DCEAF6"), color: on ? "#fdfbf6" : "#2b2723", fontSize: 12, cursor: "pointer", boxShadow: "none", fontFamily: "var(--fl-display)" });
+          return (
+            <div style={{ position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }} onClick={() => setCalibDraft(null)}>
+              <div onClick={(e) => e.stopPropagation()} style={{ background: C.card, borderRadius: 12, border: `1px solid ${C.line}`, padding: 16, width: "min(440px, 92vw)", boxShadow: "0 8px 30px rgba(0,0,0,0.2)" }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: C.ink, overflowWrap: "anywhere" }}>{over ? "The task grew: " : "Finished early: "}{stripLeadingTag(d.task)}</div>
+                <div style={{ fontSize: 12, color: C.muted, fontFamily: "var(--fl-mono)", margin: "4px 0 10px" }}>
+                  {"guess " + d.guess + " · spend " + d.spend + (over ? " · adding round " + d.round + " of 2" : " · " + Math.max(1, d.guess - d.spend) + " \u{1F345} back")}
+                </div>
+                {over && d.round === 2 && <div style={{ fontSize: 11.5, color: "#c96f22", margin: "0 0 8px" }}>Second extra round: if it still doesn't fit, consider splitting the task.</div>}
+                {over && <>
+                  <div style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>how much bigger?</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                    {[1, 2, 3, 4].map((n) => (
+                      <button key={n} onClick={() => setCalibDraft({ ...d, count: n })} aria-label={n === 4 ? "add one box (4 pomodoros)" : "add " + n + " pomodoro" + (n > 1 ? "s" : "")}
+                        style={{ padding: "3px 11px", borderRadius: 999, border: `1px solid ${(d.count || 1) === n ? "#c96f22" : C.faint}`, background: (d.count || 1) === n ? "#F8D8B4" : "#fffefc", color: "#2b2723", fontSize: 12, cursor: "pointer", boxShadow: "none", fontFamily: "var(--fl-display)" }}>
+                        {n === 4 ? "\u{1F4E6}" : "\u{1F345}".repeat(n)}
+                      </button>
+                    ))}
+                  </div>
+                </>}
+                <div style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>{over ? "what showed up?" : "what made it lighter?"}</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                  {REASONS.map((r) => (<button key={r} onClick={() => setCalibDraft({ ...d, reason: r })} style={chipStyle(d.reason === r)}>{r}</button>))}
+                </div>
+                {!over && <>
+                  <div style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>the spare tomato goes to…</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                    {["a bonus task", "a longer break", "bank it"].map((r) => (<button key={r} onClick={() => setCalibDraft({ ...d, spare: r })} style={{ padding: "3px 11px", borderRadius: 999, border: `1px solid ${MODE_COLORS.relax.border}`, background: d.spare === r ? MODE_COLORS.relax.solid : MODE_COLORS.relax.fill, color: d.spare === r ? "#fdfbf6" : "#2b2723", fontSize: 12, cursor: "pointer", boxShadow: "none", fontFamily: "var(--fl-display)" }}>{r}</button>))}
+                  </div>
+                </>}
+                <input value={d.note || ""} onChange={(e) => setCalibDraft({ ...d, note: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter" && d.reason) saveCalibration(); if (e.key === "Escape") setCalibDraft(null); }} placeholder="optional: one line about it (doubles as the lesson)" style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "6px 10px", marginBottom: 12, fontFamily: "var(--fl-display)" }} />
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button onClick={() => setCalibDraft(null)} style={{ ...btn(C.muted, true), borderRadius: 999, padding: "5px 14px", fontSize: 12.5 }}>cancel</button>
+                  <button onClick={saveCalibration} disabled={!d.reason} style={{ ...btn(C.ink), borderRadius: 999, padding: "5px 16px", fontSize: 12.5, opacity: d.reason ? 1 : 0.5, cursor: d.reason ? "pointer" : "default" }}>{over ? "add + " + ((d.count || 1) === 4 ? "\u{1F4E6}" : "\u{1F345}".repeat(d.count || 1)) : "save"}</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {view === "sky" && <SkyView sessions={sessions} reflections={reflections} C={C} />}
 
-        {view === "reflect" && <ReflectPanel feelings={reflectFeelings} C={C} onSave={onSaveReflection} />}
+        {view === "reflect" && <ReflectPanel feelings={reflectFeelings} C={C} onSave={onSaveReflection} seed={reflectSeed} onSeedUsed={() => setReflectSeed("")} />}
+
+        {view === "calibrate" && (() => {
+          // Calibration surfaces tasks whose reality diverged from the guess: extra "+" rounds,
+          // an early finish (Spend below the base guess), or a final Split/Solved status. The
+          // reflection column fills in later, when adding a "+ tomato" in the plugin prompts for it.
+          const STATUS_META: any = { split: { label: "Split", color: C.muted }, solved: { label: "Solved", color: MODE_COLORS.relax.solid }, executing: { label: "Executing", color: MODE_COLORS.work.solid }, exploring: { label: "Exploring", color: MODE_COLORS.relax.solid } };
+          const calibList = (tasks || []).filter((t: any) => (t.guessPlus && t.guessPlus.length) || t.status === "split" || t.status === "solved" || (t.act > 0 && t.guessBase && t.act < t.guessBase));
+          // Patterns: one final entry per task (the latest), hits = within one tomato of the guess.
+          const perTask: any = {};
+          calibrations.forEach((e: any) => { perTask[e.pageId || e.task] = e; });
+          const finals: any[] = Object.values(perTask);
+          const hits = finals.filter((e: any) => Math.abs((e.spend || 0) - (e.guess || 0)) <= 1).length;
+          const pct = finals.length ? Math.round((hits / finals.length) * 100) : null;
+          const recent5 = finals.slice(-5);
+          const improving = finals.length >= 8 && recent5.filter((e: any) => Math.abs((e.spend || 0) - (e.guess || 0)) <= 1).length / recent5.length > hits / finals.length;
+          const countReasons = (dir: string) => { const c: any = {}; calibrations.filter((e: any) => e.direction === dir).forEach((e: any) => { c[e.reason] = (c[e.reason] || 0) + 1; }); return Object.entries(c).sort((a: any, b: any) => (b[1] as number) - (a[1] as number)).slice(0, 3); };
+          const grew = countReasons("over");
+          const shrank = countReasons("under");
+          const areaAgg: any = {};
+          finals.forEach((e: any) => { if (e.category && e.guess > 0) (areaAgg[e.category] = areaAgg[e.category] || []).push((e.spend || 0) / e.guess); });
+          const multipliers = Object.entries(areaAgg).map(([a, xs]: any) => [a, xs.reduce((s: number, x: number) => s + x, 0) / xs.length] as [string, number]).sort((a, b) => b[1] - a[1]).slice(0, 4);
+          const statCard = (title: string, body: any) => (
+            <div style={{ background: "#fffefc", border: `1px solid ${C.line}`, borderRadius: 8, padding: "10px 14px", minWidth: 170, flex: 1 }}>
+              <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>{title}</div>
+              <div style={{ fontSize: 12.5, color: C.ink }}>{body}</div>
+            </div>
+          );
+          return (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 8 }}>
+                <InfoHover C={C} label="what Calibrate is" width={360}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Calibrate</div>
+                  <div>Compare what you guessed against what a task really took, so your estimates get sharper over time.</div>
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                    <li><b>Guess</b>: the tomatoes you planned (📦 counts as 4).</li>
+                    <li><b>Rounds</b>: how many "+" re-guesses you added (at most two, then the task must split).</li>
+                    <li><b>Spend</b>: the pomodoros Notion actually recorded.</li>
+                    <li><b>Status</b>: the final Split or Solved.</li>
+                    <li><b>Reflection</b>: why the task grew or shrank, one chip plus an optional line, captured when you add a "+ 🍅" (hover a task's tomatoes) or finish early (click a grey tomato, or mark done under the guess).</li>
+                  </ul>
+                </InfoHover>
+              </div>
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
+                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>How your guesses land</h3>
+                {pct == null ? (
+                  <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>No calibrations yet. Add a {"+\u{1F345}"} when a task grows, or click a grey tomato when one finishes early, and your calibration score builds from there.</p>
+                ) : (
+                  <div style={{ fontSize: 15, color: C.ink, marginBottom: (grew.length || shrank.length || multipliers.length) ? 12 : 0 }}>
+                    <span style={{ color: MODE_COLORS.relax.solid, fontSize: 22, fontWeight: 700 }}>{pct}%</span>
+                    {" of your calibrated tasks landed within one "}{"\u{1F345}"}
+                    {improving && <span style={{ color: C.muted }}> (and improving)</span>}
+                    <span style={{ color: C.muted, fontSize: 12 }}>{" · " + finals.length + " task" + (finals.length === 1 ? "" : "s")}</span>
+                  </div>
+                )}
+                {(grew.length > 0 || shrank.length > 0 || multipliers.length > 0) && (
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    {grew.length > 0 && statCard("when tasks grew", grew.map(([r, n]: any) => r + " ×" + n).join(" · "))}
+                    {shrank.length > 0 && statCard("when tasks shrank", shrank.map(([r, n]: any) => r + " ×" + n).join(" · "))}
+                    {multipliers.length > 0 && statCard("area multipliers", multipliers.map(([a, v]) => a + " ×" + v.toFixed(1)).join(" · "))}
+                  </div>
+                )}
+              </div>
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Today's tasks</h3>
+                {calibList.length === 0 ? (
+                  <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>Nothing to calibrate yet. Tasks that overran their guess, finished early, or ended Split or Solved will appear here.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {calibList.map((t: any) => {
+                      const rounds = (t.guessPlus || []).length;
+                      const meta = t.status ? STATUS_META[t.status] : null;
+                      const over = t.act > (t.pomodoros || 0);
+                      const under = t.act > 0 && t.guessBase && t.act < t.guessBase;
+                      return (
+                        <div key={t.id || t.task} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 11px", borderRadius: 8, background: "#fdfbf5", border: `1px solid ${C.line}` }}>
+                          <div style={{ flex: 1, minWidth: 140 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, overflowWrap: "anywhere" }}>{stripLeadingTag(t.task)}</div>
+                            {hierarchyText(t) && <div style={{ fontSize: 11, color: C.muted }}>{hierarchyText(t)}</div>}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, flexShrink: 0 }}>
+                            <span aria-label="guessed pomodoros">guess {t.pomodoros || 0}</span>
+                            {rounds > 0 && <span aria-label="extra + rounds" style={{ color: rounds >= 2 ? "#c96f22" : "#b8941f" }}>+{rounds}</span>}
+                            <span aria-label="actual pomodoros" style={{ color: over ? "#c96f22" : under ? C.muted : C.ink }}>spend {t.act || 0}</span>
+                            {meta && <span style={{ color: meta.color, fontFamily: "var(--fl-display)", fontWeight: 600 }}>{meta.label}</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              {calibrations.length > 0 && (
+                <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 14 }}>
+                  <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Recent calibrations</h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {calibrations.slice(-20).reverse().map((e: any) => (
+                      <div key={e.id} className="fl-act-row" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "7px 11px", borderRadius: 8, background: "#fdfbf5", border: `1px solid ${C.line}`, fontSize: 12.5, color: C.ink }}>
+                        <span style={{ flex: 1, minWidth: 140, fontWeight: 600, overflowWrap: "anywhere" }}>{stripLeadingTag(e.task)}</span>
+                        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, flexShrink: 0 }}>guess {e.guess} {"→"} spend {e.spend}</span>
+                        <span style={{ background: e.direction === "over" ? "#FBEFC9" : "#DCEAF6", border: `1px solid ${e.direction === "over" ? "#D9A521" : "#3E78B2"}`, color: "#2b2723", borderRadius: 999, padding: "1px 9px", fontSize: 11, flexShrink: 0 }}>{e.reason}</span>
+                        <button onClick={() => { const arr = calibrations.filter((x: any) => x.id !== e.id); setCalibrations(arr); api.saveCalibrations && api.saveCalibrations(arr); }} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete this calibration entry (the Notion Guess rounds and the daily-note line are not touched)" style={ICON_BTN}><TrashIcon size={13} /></button>
+                        {e.note && <span style={{ color: C.muted, fontSize: 11, flexBasis: "100%" }}>{e.note}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {view === "today" && (
           <div>
@@ -2569,7 +3210,7 @@ export default function FocusLogApp({ api }: any) {
                         <div style={{ fontWeight: 700, marginBottom: 4 }}>How the Timeline works</div>
                         <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Moving blocks</div>
                         <ul style={{ margin: 0, paddingLeft: 18 }}>
-                          <li>Left-drag a task: pure reordering — it glues to the end of the block above your drop, whatever it lands on moves to after it, and no break is ever created.</li>
+                          <li>Left-drag a task: reordering by seats. Tasks of the same length trade start times (the chocolate bar shows the seat you'll take), and nothing else in the day moves: breaks, meals, routines and pinned blocks stay put. A drag that crosses no task just nudges that one block inside its free pocket, and the break padding around it stretches or shrinks to fit.</li>
                           <li>Right-drag: move a block plus everything after it; the grabbed task is pinned, and the gap opened in front becomes a break you own.</li>
                         </ul>
                         <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Breaks are yours</div>
@@ -2607,11 +3248,12 @@ export default function FocusLogApp({ api }: any) {
                       <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>What's here</div>
                       <ul style={{ margin: 0, paddingLeft: 18 }}>
                         <li>Today's tasks from Notion, plus any local tasks added with the Timeline's add-block button (those survive sync, so the plugin also works without Notion).</li>
+                        <li>The capture box creates a task straight in Notion using your template presets: ⏳ Common task, or 🐾 a sub-task under a BIG TASK (the mountain-marked pages scheduled Today or This week, refreshed at each sync). The little number is your initial Guess: 1 to 3 become 🍅s, 4 becomes one 📦 box, empty means no guess. It also drops the task on today's plan at now and opens the pomodoro form. Push only: your timeline is never rebuilt by it.</li>
                         <li>Grouped into Project and Personal by your Personal Areas and names settings, with the morning and night routines around them.</li>
                       </ul>
                       <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Reading a row</div>
                       <ul style={{ margin: 0, paddingLeft: 18 }}>
-                        <li>The coloured letter is cognitive load: A high, B medium, C low. The chip beside it is the Notion Area.</li>
+                        <li>The little icon is the Notion Status: a green search while Exploring, an orange hammer while Executing. The chip beside it is the Notion Area.</li>
                         <li>A crown marks the King task; bookmarked tasks sort first, then the King, then the rest (new tasks arrive ranked Must, then Aim, then Bonus).</li>
                         <li>The tomatoes count today's pomodoros on that task: bright are done, grey still planned.</li>
                       </ul>
@@ -2638,11 +3280,31 @@ export default function FocusLogApp({ api }: any) {
             </div>
             {fallingEnjoyment && (
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-                <span style={{ flex: 1, minWidth: 200 }}>Enjoyment is dipping over your last few pomodoros \u2014 consider an extra break.</span>
+                <span style={{ flex: 1, minWidth: 200 }}>Enjoyment is dipping over your last few pomodoros, consider an extra break.</span>
                 <button onClick={() => { startBreak(); setView("break"); }} style={{ ...btn(ACCENT, true), padding: "3px 10px" }}>take a break</button>
               </div>
             )}
             {tasks.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No tasks yet. Set your Notion token in settings, then press sync.</p>}
+            {!timelineMode && !!api.createTask && !!settings.notionToken && (
+              <div style={{ display: "flex", gap: 6, alignItems: "center", margin: "0 0 12px" }}>
+                <input value={qaName} onChange={(e) => setQaName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") quickAdd(); }}
+                  placeholder="capture a task: Enter = into Notion + do now"
+                  style={{ flex: 1, minWidth: 0, border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 999, padding: "6px 12px", fontFamily: "var(--fl-display)" }} />
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 2, border: `1px solid ${C.line}`, background: C.paper, borderRadius: 999, padding: "0 6px 0 9px", height: 30, boxSizing: "border-box", flexShrink: 0 }}>
+                  <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1 }}>{"\u{1F345}"}</span>
+                  <input type="number" min={1} max={4} value={qaGuess} onChange={(e) => setQaGuess(e.target.value)}
+                    aria-label="initial Guess in pomodoros: 1 to 3 write tomatoes, 4 writes one box; empty = no guess"
+                    style={{ width: 28, border: "none", boxShadow: "none", background: "transparent", color: C.ink, fontSize: 12.5, textAlign: "center", fontFamily: "var(--fl-mono)", padding: 0 }} />
+                </span>
+                <select value={qaParent} onChange={(e) => setQaParent(e.target.value)} aria-label="where it goes in Notion: a common task, or a sub-task under a BIG TASK"
+                  style={{ maxWidth: 150, border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 999, padding: "6px 8px", fontFamily: "var(--fl-display)", flexShrink: 0 }}>
+                  <option value="">{"⏳ Common task"}</option>
+                  {quickParents.map((p: any) => (<option key={p.id} value={p.id}>{"\u{1F43E} " + p.name}</option>))}
+                </select>
+                <button onClick={quickAdd} disabled={qaBusy || !qaName.trim()} aria-label="create it in Notion with your template presets, drop it on today's plan at now, and open the pomodoro form"
+                  style={{ ...btn(ACCENT), width: 30, height: 30, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: qaBusy || !qaName.trim() ? 0.5 : 1, flexShrink: 0 }}><ListPlusIcon size={14} /></button>
+              </div>
+            )}
             {timelineMode ? <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>{renderTimeline()}</div> : renderTodaySections()}
           </div>
         )}
@@ -2835,7 +3497,97 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        {view === "log" && <LogForm tasks={orderedTasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={resetTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPickTask={(v: string) => { setPreset(v); api.timer && api.timer.setTask(v); }} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} finished={finished} expected={timer.expected} onSetExpected={setExpectedRating} autoLogDefault={settings.autoLogOnRate !== false} onAutoLogChange={(v: boolean) => api.patchSettings && api.patchSettings({ autoLogOnRate: v })} />}
+        {reflectCount && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 95, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => (api.cancelReflectCountdown ? api.cancelReflectCountdown() : setReflectCount(null))}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "min(340px, 92vw)", background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: 18, textAlign: "center", boxShadow: "0 10px 30px rgba(0,0,0,0.25)" }}>
+              <div style={{ fontFamily: "var(--fl-display)", fontSize: 15, fontWeight: 700, color: C.ink }}>Off to Reflect in</div>
+              <div style={{ fontFamily: "var(--fl-mono)", fontSize: 44, fontWeight: 700, color: ACCENT, lineHeight: 1.2, margin: "6px 0 2px", fontVariantNumeric: "tabular-nums" }}>{reflectCount.left}</div>
+              <button onClick={() => (api.cancelReflectCountdown ? api.cancelReflectCountdown() : setReflectCount(null))} style={{ ...btn(C.muted, true), padding: "6px 16px", fontSize: 12.5, borderRadius: 999, marginTop: 10, maxWidth: "100%", overflowWrap: "anywhere" }}>{reflectCount.task ? "cancel, continue on “" + stripLeadingTag(reflectCount.task) + "”" : "cancel"}</button>
+            </div>
+          </div>
+        )}
+        {claimOpen && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setClaimOpen(false)}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 92vw)", background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: 18, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" }}>
+              <div style={{ fontWeight: 700, fontSize: 15.5, color: C.ink, marginBottom: 2, fontFamily: "var(--fl-display)" }}>Claim finished work</div>
+              <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 10 }}>Work done off the timer still counts. Rough is fine; when unsure, claim the smaller number.</div>
+              <input list="fl-claim-tasks" value={clTask} onChange={(e) => setClTask(e.target.value)} placeholder="which task? pick or type freely"
+                style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "7px 10px", fontFamily: "var(--fl-display)", marginBottom: 10 }} />
+              <datalist id="fl-claim-tasks">{tasks.map((t: any) => (<option key={t.id || t.task} value={t.task} />))}</datalist>
+              {clTask.trim() !== "" && !tasks.some((t: any) => t.task === clTask.trim()) && !!api.createTask && !!settings.notionToken && (
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>not in your list yet:</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 2, border: `1px solid ${C.line}`, background: C.paper, borderRadius: 999, padding: "0 6px 0 9px", height: 28, boxSizing: "border-box", flexShrink: 0 }}>
+                    <span aria-hidden="true" style={{ fontSize: 11, lineHeight: 1 }}>{"\u{1F345}"}</span>
+                    <input type="number" min={1} max={4} value={clGuess} onChange={(e) => setClGuess(e.target.value)} aria-label="initial Guess in pomodoros" style={{ width: 26, border: "none", boxShadow: "none", background: "transparent", color: C.ink, fontSize: 12, textAlign: "center", fontFamily: "var(--fl-mono)", padding: 0 }} />
+                  </span>
+                  <select value={clParent} onChange={(e) => setClParent(e.target.value)} aria-label="where it goes in Notion: a common task, or a sub-task under a BIG TASK" style={{ maxWidth: 150, border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 999, padding: "5px 8px", fontFamily: "var(--fl-display)", flexShrink: 0 }}>
+                    <option value="">{"⏳ Common task"}</option>
+                    {quickParents.map((p: any) => (<option key={p.id} value={p.id}>{"\u{1F43E} " + p.name}</option>))}
+                  </select>
+                  <button onClick={async () => { if (clCreating) return; setClCreating(true); try { const g = Math.max(0, Math.min(4, Math.round(Number(clGuess) || 0))); const t = await api.createTask(clTask.trim(), clParent || null, g); setTasks((prev: any[]) => [t, ...prev]); api.notify && api.notify('"' + t.task + '" is in Notion.'); } catch (e) { api.notify && api.notify("Could not create the task in Notion."); } setClCreating(false); }} disabled={clCreating}
+                    style={{ ...btn(ACCENT, true), padding: "4px 10px", fontSize: 12, borderRadius: 999, opacity: clCreating ? 0.6 : 1 }}>add to Notion</button>
+                </div>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                {[25, 50, 75].map((m) => {
+                  const on = clMins === m && !clSince;
+                  return <button key={m} onClick={() => { setClMins(m); setClSince(""); }} aria-pressed={on} style={{ ...btn(on ? ACCENT : C.muted, !on), padding: "4px 10px", fontSize: 12, borderRadius: 999 }}>{"~" + m + "m"}</button>;
+                })}
+                <span style={{ fontSize: 12, color: C.muted, marginLeft: 4 }}>or since</span>
+                <input type="time" value={clSince} onChange={(e) => setClSince(e.target.value)} aria-label="when you started; the length is measured from here to now"
+                  style={{ border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 8, padding: "3px 6px", fontFamily: "var(--fl-mono)" }} />
+              </div>
+              {(() => {
+                // Meals inside the current span: confirm when they ACTUALLY happened. The claim
+                // splits around them, and the meal block moves to the time typed here.
+                const bl0 = todayBlocks();
+                if (!bl0.length) return null;
+                const d2 = new Date();
+                let nt = d2.getHours() * 60 + d2.getMinutes();
+                const mid0 = (tlStart + tlEnd) / 2;
+                if (Math.abs(nt + 1440 - mid0) < Math.abs(nt - mid0)) nt += 1440;
+                let mm0 = clMins;
+                if (clSince) {
+                  const m2 = clSince.match(/^(\d{1,2}):(\d{2})$/);
+                  if (m2) { let diff = d2.getHours() * 60 + d2.getMinutes() - (Number(m2[1]) * 60 + Number(m2[2])); if (diff < 0) diff += 1440; if (diff > 0) mm0 = Math.min(diff, 8 * 60); }
+                }
+                const st0 = nt - Math.max(5, Math.round(mm0));
+                const covered = bl0.filter((x: any) => x.kind === "meal" && x.start < nt && x.start + x.dur > st0);
+                if (!covered.length) return null;
+                return (
+                  <div style={{ border: `1px solid ${C.line}`, background: C.paper, borderRadius: 8, padding: "8px 10px", marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>That span crosses a meal. When did it actually happen? The claim splits around it, and only the worked minutes count.</div>
+                    {covered.map((m4: any) => (
+                      <div key={m4.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                        <span style={{ fontSize: 12.5, color: C.ink, minWidth: 60 }}>{m4.name}</span>
+                        <input type="time" value={(clMealEdits[m4.id] && clMealEdits[m4.id].start) ?? fmtClock(m4.start % 1440)} onChange={(e) => setClMealEdits((p: any) => ({ ...p, [m4.id]: { ...(p[m4.id] || {}), start: e.target.value } }))} aria-label={m4.name + " actual start time"}
+                          style={{ border: `1px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 12, borderRadius: 8, padding: "3px 6px", fontFamily: "var(--fl-mono)" }} />
+                        <input type="number" min={5} max={240} value={(clMealEdits[m4.id] && clMealEdits[m4.id].len) ?? m4.dur} onChange={(e) => setClMealEdits((p: any) => ({ ...p, [m4.id]: { ...(p[m4.id] || {}), len: e.target.value } }))} aria-label={m4.name + " actual length in minutes"}
+                          style={{ width: 52, border: `1px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 12, borderRadius: 8, padding: "3px 6px", textAlign: "center", fontFamily: "var(--fl-mono)" }} />
+                        <span style={{ fontSize: 11.5, color: C.muted }}>min</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button onClick={() => setClaimOpen(false)} style={{ ...btn(C.muted, true), padding: "5px 12px", fontSize: 12.5 }}>cancel</button>
+                <button onClick={doClaim} disabled={clBusy || !clTask.trim()} style={{ ...btn(ACCENT), padding: "5px 14px", fontSize: 12.5, opacity: clBusy || !clTask.trim() ? 0.6 : 1 }}>claim it</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {view === "log" && <LogForm tasks={orderedTasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={restartTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPickTask={(v: string) => { setPreset(v); api.timer && api.timer.setTask(v); }} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} finished={finished} expected={timer.expected} onSetExpected={setExpectedRating} autoLogDefault={settings.autoLogOnRate !== false} onAutoLogChange={(v: boolean) => api.patchSettings && api.patchSettings({ autoLogOnRate: v })} />}
+        {view === "log" && (
+          <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ minWidth: 200, flex: 1 }}>
+              <div style={{ fontFamily: "var(--fl-display)", fontSize: 15, fontWeight: 700, color: C.ink }}>It still counts</div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Focus that happened off the timer still moved your goal. Claim it and let it count.</div>
+            </div>
+            <button onClick={() => { setClaimOpen(true); setClTask(preset || ""); setClMins(25); setClSince(""); setClMealEdits({}); }} aria-label="log work you already did off the timer: Spend, timeline, star and daily note, all marked as claimed" style={{ ...btn(C.muted, true), padding: "5px 14px", fontSize: 12.5, borderRadius: 999, flexShrink: 0 }}>{"✋ claim finished work"}</button>
+          </div>
+        )}
 
         {view === "break" && (
           <div>
@@ -2968,8 +3720,8 @@ export default function FocusLogApp({ api }: any) {
                         {b.feeling != null && (BREAK_SEASONS[b.feeling - 1]
                           ? <img src={BREAK_SEASONS[b.feeling - 1].img} alt={BREAK_SEASONS[b.feeling - 1].name} aria-label={BREAK_SEASONS[b.feeling - 1].name} draggable={false} style={{ width: 16, height: 16, flexShrink: 0 }} />
                           : <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.ink, whiteSpace: "nowrap" }}>{b.feeling}/5</span>)}
-                        <button onClick={() => startEditBreak(b)} className="fl-rowact" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-                        <button onClick={() => deleteBreak(b.id)} className="fl-rowact fl-rowdel" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+                        <button onClick={() => startEditBreak(b)} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                        <button onClick={() => deleteBreak(b.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
                       </div>
                     )
                   ))}
@@ -3078,8 +3830,8 @@ export default function FocusLogApp({ api }: any) {
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(p.ts)} {fmtTime(p.ts)}</span>
                         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, minWidth: 34 }}>{p.mins != null ? p.mins + "m" : "—"}</span>
                         <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{p.tag}</span>
-                        <button onClick={() => startEditPause(p)} className="fl-rowact" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-                        <button onClick={() => deletePause(p.id)} className="fl-rowact fl-rowdel" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+                        <button onClick={() => startEditPause(p)} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                        <button onClick={() => deletePause(p.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
                       </div>
                     )
                   ))}

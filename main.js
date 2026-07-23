@@ -1101,7 +1101,7 @@ var require_react_development = __commonJS({
           var dispatcher = resolveDispatcher();
           return dispatcher.useRef(initialValue);
         }
-        function useEffect3(create, deps) {
+        function useEffect4(create, deps) {
           var dispatcher = resolveDispatcher();
           return dispatcher.useEffect(create, deps);
         }
@@ -1884,7 +1884,7 @@ var require_react_development = __commonJS({
         exports.useContext = useContext;
         exports.useDebugValue = useDebugValue;
         exports.useDeferredValue = useDeferredValue;
-        exports.useEffect = useEffect3;
+        exports.useEffect = useEffect4;
         exports.useId = useId;
         exports.useImperativeHandle = useImperativeHandle;
         exports.useInsertionEffect = useInsertionEffect;
@@ -23722,6 +23722,7 @@ function createSkyMap(canvas, opts) {
         ra: st[1],
         dec: st[2],
         recency,
+        claimed: !!r.claimed,
         name: starNames[String(st[0])] || "HIP " + st[0]
       });
     }
@@ -23878,16 +23879,17 @@ function createSkyMap(canvas, opts) {
       const a = 0.45 + p.recency * 0.55;
       const dot = r / 3;
       const slv = refTint === "silver";
+      const clm = !slv && p.claimed;
       ctx.beginPath();
-      ctx.fillStyle = slv ? isLight ? `rgba(110,118,140,${0.16 + p.recency * 0.18})` : `rgba(200,206,222,${0.12 + p.recency * 0.13})` : isLight ? `rgba(210,130,20,${0.16 + p.recency * 0.18})` : `rgba(255,205,110,${0.12 + p.recency * 0.13})`;
+      ctx.fillStyle = slv ? isLight ? `rgba(110,118,140,${0.16 + p.recency * 0.18})` : `rgba(200,206,222,${0.12 + p.recency * 0.13})` : clm ? isLight ? `rgba(190,95,45,${0.13 + p.recency * 0.15})` : `rgba(255,170,120,${0.1 + p.recency * 0.11})` : isLight ? `rgba(210,130,20,${0.16 + p.recency * 0.18})` : `rgba(255,205,110,${0.12 + p.recency * 0.13})`;
       ctx.arc(q.x, q.y, r * 1.2, 0, 6.2832);
       ctx.fill();
       ctx.beginPath();
-      ctx.fillStyle = slv ? isLight ? `rgba(95,103,125,${a})` : `rgba(214,219,233,${a})` : isLight ? `rgba(200,120,15,${a})` : `rgba(255,224,150,${a})`;
+      ctx.fillStyle = slv ? isLight ? `rgba(95,103,125,${a})` : `rgba(214,219,233,${a})` : clm ? isLight ? `rgba(175,85,35,${a * 0.92})` : `rgba(255,190,150,${a * 0.92})` : isLight ? `rgba(200,120,15,${a})` : `rgba(255,224,150,${a})`;
       ctx.arc(q.x, q.y, dot, 0, 6.2832);
       ctx.fill();
       ctx.beginPath();
-      ctx.fillStyle = slv ? isLight ? `rgba(64,70,92,${a})` : `rgba(240,243,250,${a})` : isLight ? `rgba(120,65,0,${a})` : `rgba(255,255,255,${a})`;
+      ctx.fillStyle = slv ? isLight ? `rgba(64,70,92,${a})` : `rgba(240,243,250,${a})` : clm ? isLight ? `rgba(105,50,15,${a * 0.92})` : `rgba(255,240,228,${a * 0.92})` : isLight ? `rgba(120,65,0,${a})` : `rgba(255,255,255,${a})`;
       ctx.arc(q.x, q.y, dot * 0.42, 0, 6.2832);
       ctx.fill();
       drawnRefs.push({ x: q.x, y: q.y, r: Math.max(10, r * 1.2), data: p });
@@ -24040,7 +24042,7 @@ function SkyView({ sessions, reflections, C: C2 }) {
   const [clabel, setClabel] = useState2(null);
   const entries = useMemo(() => {
     const src = mode === "reflection" ? reflections || [] : sessions || [];
-    return src.map((s) => ({ id: String(s.id), text: mode === "reflection" ? reflectionLabel(s) : s.task || "pomodoro", ts: new Date(s.ts).getTime() })).filter((e) => !isNaN(e.ts));
+    return src.map((s) => ({ id: String(s.id), text: mode === "reflection" ? reflectionLabel(s) : (s.task || "pomodoro") + (s.claimed ? " (claimed)" : ""), ts: new Date(s.ts).getTime(), claimed: mode !== "reflection" && !!s.claimed })).filter((e) => !isNaN(e.ts));
   }, [sessions, reflections, mode]);
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -24145,7 +24147,7 @@ function SkyView({ sessions, reflections, C: C2 }) {
   }, [entries, mode]);
   const seg = (on) => ({ padding: "4px 12px", borderRadius: 8, border: "none", background: on ? C2.card : "transparent", color: on ? C2.ink : C2.muted, fontSize: 12.5, fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: "var(--fl-display)" });
   const empty = mode === "reflection" ? "Save your first reflection to light a star." : "Log your first pomodoro to light a star.";
-  return /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", { style: { display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ React2.createElement(InfoHover, { C: C2, label: "about your Sky", width: 330 }, /* @__PURE__ */ React2.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Your Sky"), /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("b", null, "Pomodoros"), " lights an amber star for every pomodoro you log; ", /* @__PURE__ */ React2.createElement("b", null, "Reflections"), " is a second, silver sky with one star per reflection you save. Recent stars shine brighter."), /* @__PURE__ */ React2.createElement("div", { style: { marginTop: 6 } }, "Drag to roam and scroll to zoom. Hover a star for its story, or near a constellation for its name.")), /* @__PURE__ */ React2.createElement("div", { style: { display: "inline-flex", gap: 2, background: C2.line, borderRadius: 10, padding: 3, flexShrink: 0 } }, /* @__PURE__ */ React2.createElement("button", { type: "button", style: seg(mode === "pomodoro"), onClick: () => setMode("pomodoro") }, "Pomodoros"), /* @__PURE__ */ React2.createElement("button", { type: "button", style: seg(mode === "reflection"), onClick: () => setMode("reflection") }, "Reflections"))), /* @__PURE__ */ React2.createElement("div", { ref: wrapRef, style: { position: "relative", width: "100%", height: "min(68vh, 560px)", minHeight: 340, borderRadius: 12, overflow: "hidden", border: `1px solid ${C2.line}` } }, /* @__PURE__ */ React2.createElement("canvas", { ref: canvasRef, style: { width: "100%", height: "100%", display: "block", cursor: "grab", touchAction: "none" } }), tip && /* @__PURE__ */ React2.createElement("div", { style: { position: "absolute", left: tip.x + 12, top: tip.y + 12, pointerEvents: "none", background: C2.card, border: `1px solid ${C2.line}`, borderRadius: 8, padding: "5px 9px", fontSize: 12, color: C2.ink, maxWidth: 220, boxShadow: "0 2px 10px rgba(0,0,0,0.18)" } }, /* @__PURE__ */ React2.createElement("div", { style: { fontWeight: 600, overflowWrap: "anywhere" } }, tip.title), /* @__PURE__ */ React2.createElement("div", { style: { fontSize: 11, color: C2.muted } }, tip.sub)), clabel && /* @__PURE__ */ React2.createElement("div", { style: { position: "absolute", left: clabel.x, top: clabel.y, transform: "translate(-50%, -50%)", pointerEvents: "none", background: C2.card, border: `1px solid ${C2.line}`, borderRadius: 6, padding: "2px 8px", fontSize: 12.5, color: C2.ink, whiteSpace: "nowrap", boxShadow: "0 1px 6px rgba(0,0,0,0.18)" } }, clabel.name), !entries.length && /* @__PURE__ */ React2.createElement("div", { style: { position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C2.muted, fontSize: 13, textAlign: "center", padding: 20, pointerEvents: "none" } }, empty)));
+  return /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("div", { style: { display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ React2.createElement(InfoHover, { C: C2, label: "about your Sky", width: 330 }, /* @__PURE__ */ React2.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Your Sky"), /* @__PURE__ */ React2.createElement("div", null, /* @__PURE__ */ React2.createElement("b", null, "Pomodoros"), " lights an amber star for every pomodoro you log; ", /* @__PURE__ */ React2.createElement("b", null, "Reflections"), " is a second, silver sky with one star per reflection you save. Recent stars shine brighter. Work you claim after the fact lights a quieter copper star: same sky, different instrument."), /* @__PURE__ */ React2.createElement("div", { style: { marginTop: 6 } }, "Drag to roam and scroll to zoom. Hover a star for its story, or near a constellation for its name.")), /* @__PURE__ */ React2.createElement("div", { style: { display: "inline-flex", gap: 2, background: C2.line, borderRadius: 10, padding: 3, flexShrink: 0 } }, /* @__PURE__ */ React2.createElement("button", { type: "button", style: seg(mode === "pomodoro"), onClick: () => setMode("pomodoro") }, "Pomodoros"), /* @__PURE__ */ React2.createElement("button", { type: "button", style: seg(mode === "reflection"), onClick: () => setMode("reflection") }, "Reflections"))), /* @__PURE__ */ React2.createElement("div", { ref: wrapRef, style: { position: "relative", width: "100%", height: "min(68vh, 560px)", minHeight: 340, borderRadius: 12, overflow: "hidden", border: `1px solid ${C2.line}` } }, /* @__PURE__ */ React2.createElement("canvas", { ref: canvasRef, style: { width: "100%", height: "100%", display: "block", cursor: "grab", touchAction: "none" } }), tip && /* @__PURE__ */ React2.createElement("div", { style: { position: "absolute", left: tip.x + 12, top: tip.y + 12, pointerEvents: "none", background: C2.card, border: `1px solid ${C2.line}`, borderRadius: 8, padding: "5px 9px", fontSize: 12, color: C2.ink, maxWidth: 220, boxShadow: "0 2px 10px rgba(0,0,0,0.18)" } }, /* @__PURE__ */ React2.createElement("div", { style: { fontWeight: 600, overflowWrap: "anywhere" } }, tip.title), /* @__PURE__ */ React2.createElement("div", { style: { fontSize: 11, color: C2.muted } }, tip.sub)), clabel && /* @__PURE__ */ React2.createElement("div", { style: { position: "absolute", left: clabel.x, top: clabel.y, transform: "translate(-50%, -50%)", pointerEvents: "none", background: C2.card, border: `1px solid ${C2.line}`, borderRadius: 6, padding: "2px 8px", fontSize: 12.5, color: C2.ink, whiteSpace: "nowrap", boxShadow: "0 1px 6px rgba(0,0,0,0.18)" } }, clabel.name), !entries.length && /* @__PURE__ */ React2.createElement("div", { style: { position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C2.muted, fontSize: 13, textAlign: "center", padding: 20, pointerEvents: "none" } }, empty)));
 }
 
 // ReflectPanel.tsx
@@ -24316,9 +24318,15 @@ var THOUGHT_COLORS = [
   "rgb(213,144,179)",
   "rgb(144,213,213)"
 ];
-function ReflectPanel({ feelings, C: C2, onSave }) {
+function ReflectPanel({ feelings, C: C2, onSave, seed, onSeedUsed }) {
   const [thoughts, setThoughts] = useState4([]);
   const [draft, setDraft] = useState4("");
+  React4.useEffect(() => {
+    if (seed) {
+      setDraft(seed);
+      onSeedUsed && onSeedUsed();
+    }
+  }, [seed]);
   const [body, setBody] = useState4([]);
   const [moods, setMoods] = useState4([]);
   const [saved, setSaved] = useState4(false);
@@ -24449,7 +24457,7 @@ var tree_autumn_default = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAgAAAAI
 var tree_winter_default = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAIABJREFUeJzs3Xd4HOW1+PHvzO5qVVZd7kWWm9wbzcbGxqbZYAwEDCkECD3JDQnkhpDce5Nckh8JgRQgNySEkoTewQ6EDgZ3bIN7t2XLRbasXna1uzPz+2NkcJMsaWZ2tpzP8+wjsLRnjqTVvmfeqiCEEPGlGBgElAADWz92B/KBvNaP+a1fGwRCrf/dBFS1Pg4Be4GtrY9twG5Aj8l3IEQCUNxOQAiR0gqAqcCpRzwKHbpWE7ASWAYsbf2416FrCSGEEOIIHuAs4JeYDXAUMFx8rAfuA6YDPge/byGEECLlKMBE4EHgAO42+O096oAngfMA1ZGfhBBCCJECegD/A2zH/ca9s49y4NfAENt/KkIIIUSSmgD8FWjG/Ybc6kMD5gPn2voTEkIIIZLIFOAj3G+0nXosA76CTJ4WQgghABgNvID7DXSsHsuBGbb85IRwkVSyQsSfHsDgIx4DMdfB5wE5QG7rIx1z4poORIBGzDXxe4B9mOve97Z+XNP6b3bqDfwOuIrUfC95E/gxsM7tRIQQQiSebOAc4GfAv4EanLtzrcBstH6F2ZVd1MWcvcAPMIsPt+/G3X6EMScLZnTxZymEECKFjAf+F1iBu+vgNcxx7V8AZ2Cu0T+ZU4DPXcw5Xh9bMQs5IYQQ4gsKMA14ACjD/caqrcch4G/AmSf4HlTM7u6WOMgzXh868DDSGyCEECkvD7gZc4zY7caps4/NmD0DxUBPzOEJt3NKlMcGzImRQgghUswZwD8xD6pxuzGy+ogC9XGQR6I9GoHrEEIIkRLOwNw0xu3GRx7x8/gr5qRJIYQQSWgM5jp4HfcbHHnE3+MtzOWbQsSVVFy7K4RdegG/J3XXwTtGVVUGDx7M2LFjKSkpoaSkhP79+1NUVEROTg6BQAC/3w9ANBqlsbGRuro69u/fT2VlJWVlZWzatIlNmzaxZcsWWlpaXP6O+ByYjRw/LOKIvGkJ0Xke4DuYR9rmupxLUvD5fEyaNInzzjuPyZMnM27cOLKzs22JHQ6HWblyJYsWLWLhwoV89NFHNDU12RK7k7Zj7iC4242LC3EsKQCE6JxTgb9grocXFqSnp3PRRRdx1VVXcd555xEIBGJy3WAwyLvvvsvrr7/O/Pnzqampicl1W5UB01s/CiGESAAq8FPMLXfdHlNO6MfYsWONv/3tb0ZVVZURiURcfdTX1xuPP/64ceaZZ8byZ7ALGHSiF5kQQoj40hN4lzhoPBP1oSiKMWfOHOO9995zvdFv67Fq1SrjyiuvNFRVjcXPZBvm+Q5CCCHi1AXAAeKgEU3UxwUXXGAsW7bM9Qa+o4/169cbV199dSwKgU+B2Ix7CHECMgdAiLb9CPgNZve/6KRRo0bx4IMPctZZZ7mdSpesWLGC22+/naVLlzp5mX8DczA3XBIipjpy+IcQqcYD/AlzzF+K5E7KzMzk7rvv5rHHHqOkpMTtdLqsd+/efOtb36KkpIRPPvmEYDDoxGWGAPmYhYAQMSVvbkIcLQt4BvOuzDU+n4/Ro0czZMgQSkpKGDhwICUlJRQWFhIIBMjIyMDv95OZmUljYyP19fXU1tZSX1/Pvn372Lx5M1u3bmXLli1s2bKF5ubmmOQ9ceJEnnzySQYMGBCT68XKvn37uPXWW/n3vx1rp78GPOdUcCFORAoAIb5UiHkndlqsL5yZmcm0adOYNGkSkydP5tRTTyUzM9OW2NFolFWrVrFgwQIWLFjAokWLaGxstCX2Yaqqcuedd/Lzn/8crzd5d7595JFHuOOOO5zYWKgRcyvpDXYHFqItUgAIYcoF3ieG6/sDgQCzZs3iK1/5CrNmzSIrKysm141EIrz//vs8++yzvP7665Y3xcnLy+PZZ5/l3HPPtSnD+LZ8+XKuuuoq9uzZY3fojZj7TMSmu0akPCkAhDBnYr8DTIrFxSZMmMD3vvc9Lr/8cjIy3D06vrGxkddff52///3vfPTRR51+/sCBA5k3bx6lpaX2JxfHDhw4wNy5c1myZIndoR8Evm93UCFORAoAkeoygTeAs528iMfj4ZJLLuG2225j8uTJTl6qy5YvX869997L/PnzMQzjpF8/depUnn/+eYqKimKQXfxpbm7mq1/9qt3zAnTMnQI/tjOoECciBYBIZV7M43tnOnmR2bNn8+tf/5phw4Y5eRnbbNiwgfvuu48XXniBcDh83Odzc3O58847ueOOO5J6vL8jIpEIN954I88884ydYbcDYwFXDiwQqUMKAJHK/gD8wKngp5xyCvfeey/Tpk1z6hKOqqio4K233mLNmjUEg0FycnI444wzmDlzpm0TFJOBpmlce+21PP/883aGvR9zHwohHCMFgEhV1wJ/dyJwIBDgt7/9LTfeeCOKIn9iqSASiTB37lzeeOMNu0KGgVHAVrsCCnEseXcS8SobKAWGAsNbP/bDnLCXhbl5ShaQBtRibq1aC+zDPHN9D+as6jWtHxuOiH06sABItzvpyZMn88QTTyT0Bjiia4LBIBdccIGdEwPnAZfYFUyIY0kBIOJFNjAV87z0GcAY7NuCV8csBBYAy4D7gD42xQbMjXt++ctfcvvtt6OqsnNwqqqoqGDSpEl2LhE8D3jPrmBCHEkKAOGmHOAK4JvAFMxJeQmnoKCA5557junTp7udiogDK1euZPr06XZtHbwCFzamEqlBzgIQsaZgnrD3S+BR4HJgAAl64E5paSnvvfceEyZMcDsVESd69+5NYWEhb775pi3hgOWYxwcLYSvpARCx4gHmAj/B7N5PeDNmzOD5558nLy/P7VREnDEMg8suu8yuSYGLgfjcPEIkNCkAhNM8wDXAXZgT+ZLCOeecw6uvvur6Tn4ifh08eJDx48dz8OBBO8KdA3xgRyAhDpMhAOGkU4BXgO9gHrSTFKZMmcJrr70Ws737RWLKysqie/fuvP7663aEKwSetSOQEIdJD4BwQiHwa+AGEnRsvy1Tp05l/vz5shGO6BDDMJgxYwYLFy60GkoDBgK7rWclhCmp3pxFXLgY2ATcRJK9voYOHcrLL78sjb/oMEVReOihh/B4LHe2eoAbbUhJiC/IEICwixf4GfAw5gY9SSU7O5u33nqLfv36uZ2KSDDdu3dnx44drFmzxmqooZinBerWsxJChgCEPYqB54CJbifiBFVVefXVV7nwwgvdTkUkqB07djBy5Eii0ajVULOAt2xISQjpARCWTcDcYS9pD4T/xS9+wfXXX+92GiKB5efns2vXLj7//HOroUKYJ1gKYZn0AAgrzgZex9zRLymNGzeOxYsX4/P53E5FJLhNmzYxZswYDMOwEuYQ0Auw3JUgRFJN0hIxdSnwb5K48U9LS+OJJ56Qxl/YYtiwYXYcDV2EeWaGEJZJASC64grgJRw4TS+e/PSnP2XUqFFupyGSyLe//W07wsyxI4gQMgQgOmsG8CbgdzsRJ02YMIGFCxfK3X+cM0isN7FIJEK/fv2oqqqyEmY1MM6mlEQKS8jT14RrJgCvEsPGv6CggFNOOYVTTjmF8ePH06tXL/Lz88nLy6OgoADDMKiurqampoaamhoqKirYsGEDa9asYdGiRVRWVnbpms8884w0/i4xAE03iOoGmgGaYaDpBroBhgE6BscOoyuYa+4VDDyqgqooeBTwqioeFbyKghIHlYLP5+OSSy7h8ccftxJmNOZmW5aqCCHi4E9CJIhizFPJujt5EUVRmDJlCpdeeimzZs1iyJAhXY5lGAYbNmzgX//6F6+88gqrVq066XOKi4t57bXXpOs/hnTDIKyZj2hrw29pmlwbvKqCz6OQpqr4VPCo7rz9vf/++8ycOdNqmK9gFuNCdJkUAKIjfMDHOLjOPz8/n5tuuokbbriBgQMHOnKNdevW8be//Y2XXnrpuANaunXrxk033cSPfvQjAoGAI9cXX9IMCEV1WqI6Ed2J5v7kPAr4vSrpXhVfDIuBaDRKr169qK2ttRLmD8AdNqUkUpQUAKIj7gd+6ETggoICfvzjH3PzzTfHrOHVNI21a9dSVlYGwMCBAxk5cqQd27WKduiGQShqEIzqRF1q9NviURX8HoVMnwdPDN4VL7/8cubNm2clxEfAdHuyEalKCgBxMhdjrvW39bXi8Xj4zne+w//8z/+Qn59vZ2gRZyK6QXPEvNuPr2b/xHwehczWngGn/OlPf+L222+3EqIKc0mgEF0mBYBoTyHmwT62vtGMGDGCRx99lNNOO83OsCLOtER1miLudfFb5VEgK81Dule1/Y1y3bp1jB8/3mqYvsBeG9IRKUr2ARDt+Q02N/5XX301ixcvlsY/iYU1g+pglNoWLWEbfzDnKdS3aFQFo4Si9n4fw4cPt+NUydF25CJSlxQAoi0TAds2wPd4PDz44IM88cQTZGUl3WGBArPBrA1p1ISiCd3wH0vTDepaolQFo4Q1e74vj8fDiBEjrIYZZEcuInXJPgDiRDzAn7GpQMzIyODZZ5/loosusiNc0ju8Dl5rXQcfbV0DrxmGuY+8opjr4VsXwysKmJ3UBmrrenePouBVW9fCe1RHJ7YZBjRFNJojiTHG31VR3aAmFCXdqxJIU/FY3FhgzJgxrFixwkqIPpYSEClPCgBxItcAlgcowWz8X3nlFc4991w7wiUl3TCIaAYR3SCsG0S1k6yDP2YXHMMArfUZ2hefO/JrNBSOWAffuhbejo1xIrpBXSiKTTfGCSEU1QlrBtlp1iYKWtnjopUUAMISKQDEsTzAXXYE8nq9PPfcc9L4n0Cs18EbmI21OSMfQMOnKl+sg+9KD0FjWKMpotucaWLQDYO6Fo2W1kJA7UI11bdvX6tpSAEgLJECQBxrLjDUjkAPPPAAF154oR2hkoKmG4Q0g1CcrIOP6AaRsEZj2CwGMnwqfo9y0sbscONn13h4IjN7A3Ty0714O7mZkA0FQE+rAURqkwJAHEkBfmJHoOuuu46bb77ZjlAJ7/A6+FA0fu+WI7pBpMUcKvB7VTJ9J94dL6Kbjb8WBwVMvNANqA5GyfF7Sfd2vAjo3bu31UvLbFphiRQA4kjnA2OsBhk2bBgPPPCADekktmBUJ5hg6+ANzLvaUFQnzaOQ5fOQ1jo+EIrq1Ie14w7iEebPra4lSlRXCaR1bEdJG5YBZlgNIFKbFADiSNfaEeShhx6y480tYbVoOo3h+Ojmt8I8oCeKr3XyYHOKjvd3RlNERzcg2+856eZBGRmW228pAIQlUgCIw3KAS6wGufrqqzn77LOtZ5OANAMaWjRatORqKA9PHhQdE4yaRUBuevtFgPQACLfJVsDisOuBx6wEyM3NZd26dfTsmVpzkwwDGsIawTge4xex5/eo5Po9bS63DIfDdmyKdRWwpfXRbDWYSC3SAyAO+6bVAHfeeWfKNf6puA5edEyLplPXAnnpJ54T0NTUZMdlnm/9aAC7gE+B5Uc8QnZcRCQn6QEQANlANRYKwszMTHbu3ElBQYF9WcUxA2hK4XXwouMyvCo5/uOLgPLycgYOHOjkpYPAIuBd4C1gjZMXE4lHzgIQAFOx2Bv09a9/PWUaf6112Zc0/qIjglGdxrB23L83NDQ4fekM4FzgXmA1sBm4Bxjn9IVFYpACQADMsBrgu9/9rh15xL3DJ90l+gx/EVtNJ9gHory8PNZpDMXc5+MzYD3wY2w+7VMkFikABMB0K0+eOHEio0aNsiuXuBWM6tSGol8cwiNEZ9SHtaMKxz179riYDSMwj/veDfwFKHUzGeEOKQBENjDWSoCZM2falEr8amjRqG/Rkvq0O+Esw4DaUPSLjZRc6AE4kQzgFmAD8DpwmrvpiFiSAkCUYvF1cMEFF9iUSnyqa4nSLEv8hA00Axoi5nwAm1YB2EUF5mCuHHgXm04DFfFNCgBhqeuvqKiICRMm2JVL3Klv0QhF5b5f2CfYOh8gLS3N7VTaci6wAngU6O5yLsJBUgAISwXAtGnTUNXkfBnVt8jmPsIZDWGd0WMsH7vhJBW4AXPlwG2Yx4SLJJOc79yiMywVAEOGDLErj7giO/sJJ+mGwalnnoXf73c7lZPJAx7A3E9ghMu5CJtJASAsHUo+aNAgu/KIG8GoLgffCMdlF3Tja9/4httpdNQZwCrgLqQ3IGlIASByrDw52QqAiG7Q0HL8pi1COOEnP/8VxcXFbqfRUX7g18B7QG+XcxE2kAJABKw8uaSkxK48XKfpBrUhWeonYicrN48nn32ebt0Taq7d2Zi9Aee6nIewSAoAkW3lyXl5eXbl4SoDqG3RZJMfEXMDR4xh3nsLmDLN0n5csdYD83yB77udiOg6OQxItABdXo8UCoXweBJ/SLBRDvYRcWDhgg+Z98pLLF20kIp9+2hujqu9AtryN+C7QMTtRETnSAGQujKACcBCK0GCwSBerzOnSuuGQVQHzTCIaAaaYaAbtN6lKxitd+uKoqBgoCgKqgJeRcHrUfAoCl4V1LYOZG8V0c39/YWIRw0N9eiaTk11FYcqKzl0qJKyHdvZuX0b27ZsYf2a1TQ2On6w0Mm8DVwOJETFIkxSAKSOPGAWcBbmjN7RgM9q0OrqarKzLY0ifMEAwppOWDMIa4ZtB+74VIU0j0KaR8XnUY560Rsgh/uIhKZpGtu3buHTpUv45KMPWPTxR9RUV7uRyhLgIqDGjYuLzpMCILn1AS5tfUzDhgb/WDt27KBfv36WYkQ0g2BUp0UzHB+DVxWFdI9Chk/FqyrS9S+SjqZpLF+yiH+99gpvznuNyoMHY3n5NcA5wKFYXlR0jRQAyUfFnJ37beBiHF6zu2jRIk4//fROP88AQq3r7d26+/aqCppuyKx/kbSikQjvvf1vnvr7Y3z8wfvoekyK3c8wiwDpCYhzsgogefiB72Fu3fk25l2/47Pzdu/e3ennBKM6VcEo9S2aq13vUWn8RZLz+nzMnD2Hp156nQ+WruSrV1+Lz/kzCMZjrhCwtMeIcJ4UAInPC9wIbAEeBAbH8uLr16/v8NeGNeOLhl+TMXchYmrw0FLu/9PDLPpsHV+9+lqnV++cDryIA8OOwj5SACS2izDP8f4b0N+NBDZu3HjSr9ENg7oWjZqQTLYTwm29+/Tl/j89zLuLljN1+jlOXup84M9OXkBYIwVAYuoJPAf8C3D1NJ79+/e3+/mwZlAd0gjJwTpCxJWhw4bzzKvz+b/H/kG3Hj2cusyNwJ1OBRfWSAGQeK7DvOu/yuU8AGhpaWnzc41h865fuvuFiF+XXD6XD5as5KJLLnPqEvdgTgoUcUYKgMSRCfwDeALIdzmXLwwYMOC4fzMMqGuR5XVCJIr8ggL++o+nue/3D5Cenm53eA/wLBZPHhX2c2YLN2G3ocBLmJv3xJWpU6ce9f+6YR6oE5G7fiHikhYKUrN+LTUb19GwYxt12zfTtGsXTXv3oAebuEU1eFKFanvr926Yw5bTADluM07IPgDxbwbwKnG4pCYzM5MdO3ZQWFgImI1/TcjdpX1CiKMFKw9ycOlCDi75hMqVy6jbvBE92v7W180G/COkU6bZ/rf8U8wjhUUckAIgvl2K2XVme5+cHe677z5+8IMfANL4C2dpoSDBygOEa+sI19cSaWzAiHx59ownPQOP348vO4f0bt1JL+yGx/6u7MRgGFStXsWed95k73tvUrNhXZfCRIEXQjqro7b+TUeAM4EVdgYVXSMFQPy6FfgTMdjMpyuuvPJK/vnPf+LxeDAMqAlFpdtfWNa0ZzfVaz+nbstGajdvpLFsO0179xCq6vzOsml5+WQPKCF7wCByBg0hf/Q4CkaOIbNXHwcyd1/N+rWUvfo8Za+/RPP+vbbENIAXQzor7S0CPgdOw6wxhIukAIhPNwN/IQ5/Pz6fjzvuuIO7774bVTXnkNa1yDI/0TX1O7ZS8dH7VCxdyKGVywkeaH9ZqR3Su/egx8Qp9Jh0Fj2nTCO7JKZ7Z9kq0tTAzpefZ+uTj1K7seObcnWGQ0XA7cAf7QwoOi/uGhjB5cDzxNGdv6qqFBcXM3v2bG6++WaGDRv2xeeaIzoNYZnTIzrG0HUOrVzOrn+9wt53/k1jeZnbKZEzaCh9z7uQfrMupuiUzp9r4YbGPbvY+Mif2PnCM0Qa6x2/ng48HdJZZ18R0AAMB+zpqhBdIgVAfDkHeANzX3/HKYrCiBEjmDRpEkOHDqW0tJRBgwYRCATIysoiLy+PmpoacnJyTrhtaFgzqAlJL544ucZdO9j27JPsfPlZ27qnnRAoHsjAy79KydyvEeg3wO10jlO3ZRPr/nQ/u+e9fNKJfHaLAo8GdXbaNzHwSeAau4KJzpMCIH4MAT4Fcp28SHp6OhdffDGXXXYZ06ZNo3v37l2KYxhQFYxg/yRhkTQMg73vv82mR/+PikULzBdNglBUld4zzqf02lvodfY5oLj7VtlYXsaa3/2asleew4jNiX4n1GzAQ0HNriWCOjABWG1LNNFpUgDEh0xgCTDGqQsMHz6c2267jSuuuIK8vDzL8RpaNJpl3F+cgB6NsvOVZ9n48IPUbd3kdjqW5Q0fycj/+E+KZ1+G4uwBOseJNNaz9ve/YfPf/4oeDsf02m3Zpxv8uVkncvIv7Yi3gZn2hBKdJQVAfHgSuNqJwOPGjeOnP/0pl1xyyReT9qyK6AbVQen6F0czdJ2yV19g7R/vpWHnNrfTsV3OoKGMvfN/6H/hJc73CBgGO156ms9+/QtCBw84e60uWBExeLHFthuAqcAndgUTHScFgPu+BTxud9CCggLuuecevvWtb9nW8B9WE4oSlr7/LgnX1hCur0VraSEaDAGger34All4/Bn48wtQnT+v3XYHly1ixc9+RM36tW6n4riiCacx4We/ptupZzgSv7G8jGX/+R/msEkceyqks9aeSYFvYp5sKmJMCgB39QLWY/Pe/ldddRV//OMfKSoqsjMsAC2aTm1IZv23p7G8jJp1a8ytVst20Fi2g6a95bRUHerQxC1fIIfM3n0I9C8mUDyQvKHDyB85htzS4XgzMmPwHXRc6OABVv7vXZTNezmhxvgtUxQGX3UN4/7rbvz5BfbENAw2/+NvfP7/fkY02GRPTAc1GfCHZo0G6792A3MuwOeWI4lOkQLAXS9hLvuzRUZGBn/4wx+44YYb7Ap5nKpgVHb7O0bN+rUcWLyAA4s+5uCnSwjX1TpyHcXjIX/UGHqcMYUeZ06lx+SprhYEO158mpW/uMux7zcR+AsKOfWX9zPgkissxQlVHWLpHbey9/23bcosNj6PGjwbsmUo4GkcGgYVbZMCwD2XAa/YFax3797Mnz+fMWMcm0cod/+tDF3n4NKFlP97HnveeZOmveWu5OFJz6DH5LPod8HF9L/oUtJyrU/u7IhEbaycVDznck77f7/vUm/AgSWfsOg/rid4oMKBzJz3aFBnq/UhwRbM0wI7v+Wj6DIpANzhAzYAtmxBVlJSwltvvcXAgQPtCNem2pBGi5a6M/8bd+9k+3NPsfPlZ11r9Nui+v30mXEBg756Db2nn4di87yPwyoWLWDxbTfFZMe+RJPZqw9n/eWfndpMaPNjf2bVL/8r5mv67VSpw++bNWx4Z7gTuM96GNFRUgC441bgYTsCjRgxgvfee49u3brZEa5Nmm5wKEVn/ld88iGbH3uYvR+87eoa7I4KFA9k6DU3MPjqb+HLyrYnqGGw4eE/8Pm9d2No0gvUFsXn45T//hWlN3yn3a/Tw2GW/fg2drz4dIwyc9ZLLTqfRiz3AmzDPPpcxhhjRAqA2MsEtgK9rQbq378/CxYsoG/fvtazOonGsEZTJP4bPzvte/8d1vzhHqo+X+l2Kl2SlpdP6fW3MuyG71gaHogGm1n2n9+l7PWXbMwuuQ266hpO//UfTriiI9JQz8c3fj3uZ/l3Rq0B9zVpdpzuMxFYZj2M6Ii42W8+hdyGDRP/8vPzef/99x3v9j+sIayTKnP/Dq1czie3fpMND/+BYEXidnVroRAHlyxk29NPoHg8FI4ej+L1dipGS3UVH159Gfs+es+hLJNTzfrVVH66lL7nX3TUscTBA/t578qLOPRZcp2Gm65AjQH7rN8jNGJuDiRiQHoAYsuDefdfYiWIoii89NJLzJkzx56sTiJVuv+DFftYefdP2TX/laRc0hboW8yEu++l3/kdW3LduGcXH37jK9Rv3+JwZskrb9gIznlmHunde9C0t5z3r7qYhrLtbqfliEodftesWe2/3wv0BzumFIiTkR6A2LoY+LbVILfddhu33XabDel0TEgzknrjH0PX2frPR/n4xm9QvTZ5lyKH6+vY9fpL1GxYR/fTJuLLzmnzaxt37eDdKy6kcffOGGaYfEKHKtnzzpvkjxjFx9d/Lal/nlkK7NagytpbRQ7wL2CfLUmJdkkPQGy9DZxvJUBpaSmrVq0iLYa7xdW2aLQk6b7/TXvLWfz9mzm4dKHbqcSULyeX0//f7xlw2ZXHfa5x1w7enXsRzfv2uJCZSGTrogZPWt8X4OfA3TakI05CegBipxh4EItF1zPPPMPgwbasHuywxoiejD3i7Jr3Mh9eewUN27e6nUrM6S0tlP97Hg07ttFr2gw8aeYJ1M379/Lu5bOk8RddUqQqLIsYWDy2KAN4zJaERLucWSwsTuQrWGz8r7rqKmbMmGFTOh2jGQZaks3+06NRPrvn5yz8znVE6uvcTsdVZa+9yFuzplG3ZRORhno+uvaKuNvjQCQOFRjttdyxfBrmUIBwmAwBxM4i4MyuPtnj8bBmzRqGDh1qY0onl2y7/7VUV/HxzVenXJf/yfgCOQSKi1PiMB/hrB2awV+DlocBLgDesSEd0Q7pAYiNXpjrW7vs8ssvj3njD5BMc/8ay8t457LzpfE/gUhjvTT+whYDPAqZ1m8tu3yzJDpOCoDYuBCLP+sf/ehHNqXSOcnS/V+zfi3vzDlHlrQJ4TAVGOSxXAFMsiEVcRKd2xVEdNVkK0/Thq57AAAgAElEQVQeN24c48aNsyuXTjly8p+haTSWl9FUvpumfeU0791LY/luosEmIk0NGFENLdiMYRj48/JJyy8gLTePtNw8cgYNJW/ocHIGDYn5effVa1fz/tcuJlxbE9PrCpGqhngU1kYt3Tw4d6qZ+IIUALFhqTvr6qvdOSUz1NTMtjf+xd5PPqJ6/RrqNm0gGmy2FFP1eskeMIiiCafTc9oMek45m/TCIpsyPl71ujW8/9XZKX1krRCxVmx9fVlPoBtQaTmSaJNMAnReIeaLuEs/a0VR2L17Nz179rQ3qxOIRiJUbt7MjrffZOM/H6d+d5nj11RUlfyRo+lz3oUMnPt1Av0G2Ba7Yec23rnsfEKH5D1EiFjSgZ83aYStjSDOAD60JSFxQlIAOG8m8O+uPnn06NGsWrXKxnSOFgmH2bviU9Y8+he2vfaSq1vgKqpK94lTGHTl1fS76BK8GZldjhU8UME7l55HY3mZfQkKITrsL0GdndZmEd8EPGpTOuIEZAjAeUOsPHn69Ol25fEFwzA4uGkTKx/8HZuefzpu9r03dJ0Diz/mwOKPSf/lTxl+y/cYct3N+DIDnYqjt7Tw8U1fl8ZfCBd1U2GntRXE/WxKRbRBVgE4z9JxfWeddZZdeRAOhlj7/HP8dXgJT585nk3PPRU3jf+xQlWH+Oyen/P6xFGs/9P9RJoaOvzcZXf9gEOrPnUwOyHEyXRTLXcwF9uRh2ibFADOs1QAjBw50nICwfoGlvz+t/xfv0LevfU6mg9UWI4ZKy3VVXz+m/9l/rRTKX/z9ZN+/bann2DHi0/FIDMhRHsKrA8w97YhDdEOmQPgvLXAqK480efzUV9fj7eTZ7gf1lRTw6Jf/YJ1j/+1S8+PR33Onclpv/odWX37H/e5ui2beOuiaZZXKgghrCvTDB62tiPgCsxtgYVDpAfAeXldfWJJSUmXGv+WYIgFv/wFfx3YK6kaf4C9773Fv6afftxdvt7SwsLvXCuNvxBxIluxfH+Zb0ceom0yCdB5WV19YlFR59bH67rOxtde5f3v3kA0FOrqZeNeNNjEktu/TeWnyzj17vvwpKez/v9+T+2mDW6nJoRolWG9fznXhjREO6QAcF7nprAf+cRAx596cOsW5l15KfVlO7p6uYSz7Zm/U7Puc0bf8V+s+9P9bqcjhDiCDY1LbLcMTUFSADjL1/roko4UAJFIhIW/+gWfPfi7rl4moVWt+ZyPrpvrdhpCiGNYPxUY6/sJinZJARDHlJOMoR3cvJlXLj6f5soDMcpICCFiRuaoOUx+wM6KAOGuPrmh4cRr33Xd4NO//pmnJo6Vxl8IEZes7QEEmDsKCwdJD4DzmujiWNaJCoCmujpen3sJFZ8utZqXEEI4JmJ9j7EmG9IQ7ZACwHlNdHE5S1VV1VH/X7FuHS+cfxbRYNCOvIQQwjFB6wWArOl1mBQAzqsB+nbliTt37iQSieD1evns70/w0R3fsTk1IeJfWl4+/u49ULJz0Xw+okBE12kJRwiHw0Q0jWg4cvRz/H58Xg8+n5c0rw+/14NX11FDIbSmekJ798qeEQ5rtL7NeKMdeYi2SQHgvJ3A6K48MRKJsHXrVnY+9Hs2Pyfb24rkpqalkVlcgppfRBNwqLaWveW7aKqshspqe6+lKHTv1ZtuPXqQl5VFuhYlum8vzfvKbb1OvFJUlbSibqQVFKIEsomqXqIKRHWdSDRKOBJB1w0UXSctIx0Ar+ohzePBqyh4dA0lFCRSVUXLwf3o0ehx12iw3gMgE5wcJgWA8ywtzH/061fSd9c2u3IRIm4oPh+BQUPR8go4WF/P9s1bCG3YFJNr64ZBxb69VOzbe9S/FxQV0b94AEUZGej799K0e2dM8nGSmpZG1sDBGDn5NOo6lYeqKN9dRmRvBey1fi6I1+ulW8++9OzRnbz0TLxN9TSX7aSqpt5q6P2WkxPtkgLAedutPPmzLVvo65fFGiI5eAPZZJaOoMaAjRvX07R2ndspHaX60CGqDx364v979u7DwJIBZIVCNGxcixGJtP3keKEoBAYPxSjoRmVDA1u3bCa0dr1jl4tGo+zfU87+PV/2niiKQnlWNoTrrITeZzk50S4pAJy31cqTt9mwlkYIN6lpfgKjxnIwGmXjunWElybOCpYjewly8/MZOX4EWc1NNGxYi6HHzyo1RVUJDB1OMCePLdu2UblhExCb3pQTMQyDfXWWGn+AXXbkItompwE6rxCopIs/awX4rywP2fKbEgkmMGgILUXdWbNuPfW1NW6nY6ueffsyomQg0S0baKmuOvkTHOLv3gO1ZAjrt2yl8mD8HPNtAPNbdI6fGdAp5wLv25GPODFpVmJjIzCsq0+e7Vc5yye/KhH/FFUle8wE9oTCbFy72u10HOfz+xk3fjy59bU0bN0cs+vmjBpLpeph7eefo2nx101Yb8B7Ycs9JH2BvSf9KtFl0qrExmPA9V19cm9V4fuZMg9AxC/F5yMw4XQ27NnDvrIyt9Nxxahx4+lpaDRsWOvMBRSFnLGnUNbYyNaNG525hk12agafRS0tA6jHPErd+loC0SYpAGLjeswioMtuy1Tpo8qvS8QXRVXJPuUM1paXU1GeGkvoTqZ05Cj6eRQaNto3wTFn7Clsqa5h1w5Lc4pjZlnEYK9uqe3+EJhhUzqiDdKixEYvYA8Wzl4Y41X4Rrr0Aoj4kTvuVDYdqmL3ztQ5grozxp96Gvk1h2jaXdblGIGBg9mflsmGBBtO+TCsU2Pt3v23wI/tyUa0RQqA2PkEmNLVJyvADzM9dJMaQLgss28x1fmFrF610u1U4p7X6+WMMyaibFhLpLHj6+J92Tlow0aydOnSuFpt0BkNBlToBvt1gyq90335VwAvO5KY+IKctxw7ecAFVgI0GmZPgBBu8KSn4z9tEos3bWLfHunu7whd1ykv301jdg4lI0bRsv/kc9pyxp3K2vpGtmzeBNa303WNX4FCVaHYozDYq5CrggeFsMdrRHW9vTcyA/g+chiQ46QAiJ39mC/qLrfgB3QY4FEolLkAIsayS4ez3ZvO2tWr43LWebwLNjezY+9eCsefQjYQbTp+m3tfbh7REWP45NPlBJuTq+3zALmKQh+Pwrdu+fZrby9f/m3gEFAAFB3z5WuB+2OdYyqSDuXY2QW8bTXI69bX1grRYYrPR2DydD7cvJU9ZYm/La7b1qxcyYr6BnJOnXjUv2cPKWVbehafLl/mUmaxoXo8DJo48XfAAuBHwHBgCHA75pr/CPCeexmmFrmVjK3ZwHyrQSb7FObI9sDCYZl9iynzprFz6xa3U0lKZ0w6E+/GtfhHjePj5cuIhsNup+S44gmnNf9hybKsdr4kF8gA4mdXoyQmrUhsvYHFrYEBFkUM1llbYytEu3InnM7yqipp/B20bMliPtfgg4WfpETjD9B31JiT9YLWIY1/zEgBEFsG8Gc7Ar3UonMwMScHizimer2knTGFd5cvp6m+we10kl5TQ+r8jP3Z2ZScNuUut/MQX5IhgNhLB7YA/awGylXg25ke8uW3KGzgzcyicXApq1fK8j5hvwmXXr7jv59/cZDbeYgvSQ9A7IWAX9kRqM6AJ4IajTIaICxK796D/T36SOMvHNN/3Gm/dDsHcTS5d3SHB1iHhQOCjlSgwo3pHgqlnBNdEBg0mM+q6qiuPOh2KiJJDTj19IbfL1qa43Ye4mjSZLhDA2wbC6vW4eGgZnXvbZGCsoeUsuLAIWn8haNKp537R7dzEMeTHgB3vQDMtSuYF5jlV5kiRweLDsgePoolZWUy2U84auDpExvu+3hRnqIoMm05zkgPgLu+B1TbFSwKzG/ReTqky7wA0a6ckaNZuG27NP7CUYqiMOr8Wf8rjX98kltF910D/MPuoBkKzExTOcOnyC9ZHCVr4CA+PVBJQ22d26mIJDf0rGmVv3nvw+5u5yFOTHoA3PdPHCgAgga82qLzQLPOmqjR2ZO4RJLK6j+Az6tqpfEXjvOm+Rk44bQb3c5DtE1uDuNDBrAEGOvUBbqpMMWnMsarkJliv3XF58NfUIgvrwAlIxPSM4gq0KLr6IZCJNKCoXoIB0MYQDgSxevz4PWopHl9eL0+PAp4PR68ioI3GoFgE9HaOkIHK9BaQm5/ix2SXtSdTYqXA/tOfiKdEFZNvOrqJXf+859nup2HaFuKNQVxbRCwAvPYYMd4gWFehdFehUEehewkegUoPh+ZffrhLexGxO+nPhiiovIgFeXlaFFnjlBSFIX8om4Udu9Bt7xcslQV6mpo3l12whPf3OLx+6nsP4itG9a7nYpIAT1Kh4W//uPf9jzrG7Nr3M5FtC2J3v6TwnTgTczdAmOihwr9PQrdFIXuqnl+d5oCfsx5BGED0uL0VeLNCpA1pJRwVoCKymq2b99CJBQfd+Oqx0Of/sX06NmDfK+PyO6dBPftcScZRcGYMJHlSxe7c32RUjxeLxf+6L+/+61f/MyWbc+Fc+L0rT2lXQa8iLlZUFzwAt1UhVFehYk+hYBLrxrV6yUwYhThQC77q6rZvnkjWiTiTjJd0H/wYAb06Yu/+iD1mzbG7LpZE6fywScLYnY94axmA+oNg2YDmgxzvk8Ig7ABYUAzzENHopiTvDyATzE/mv+tkA5kKRBQIKAoZCngt+nvesIlly//7xdePOOYfy7E3PhsGFDa+rEACADZmD2fASANqMX8FuqA/cBBYC/mQWobgE3AbnuyTW1SAMSn64FHicPfT4YCs9NUTo3RXgNqWho5o8bSlJHJ+g0bqDmYHBvWDCodzoBuhYQ3byBc61wvac7I0Xywdj2apjl2DeGckAHVhkGVDjWGQZ0OTpW8XqBAVShUoUiBfFXB28kYxRNObRh23Q09b7nllj7AOa2PqYDdKwEOYM6bWgR8CKwCmevcWXHXwIgv3AD8lTjqCTjShWkq0xwcG8gZPY6G9Cw2bFhPvYMNpNsyAtmccdpp6BvW0FJdZWvstLx8Nql+Kg/stzWucI4OHNINDuhwQDeod7FJU4E8FYoUhT4epd1DxwygMTffWBXR/1VVUzMW6B+jNA+rwBw+fQ14C+fqpKQiBUB8mwM8h7lKIK4owE0ZKoM89r2EPOnp+IeNYnvlIXaX7bQtbiII5OVy+vhTCK9eRaTBhiV6ikJ4zAQ+W7HCeizhKAM4qBvs1WGfZhB2O6E2ZCnQR1Xo61HIa/2zbzRgl2awW4egETc34JWY75uPA5+7nEtckwIg/k3DrGodXR3QFb1UhR9kWttKQlFVAoNLacrJY/Wa1TQ3NdmUXWIq6tWbU/r1pfazTy3FyTl9Mu8uWmhTVsIJzQaUaQa7dINg3LSdHRNQzMnB1fG/v98C4AFgHuYZLOIIUgAkhkGYEwPHu53Isb6ToVLcyV4Ab0Ym2SNG05iezuZNm6mskC7qIymKwsRJZ6JuWNOlpYTpPXuxsr6Rxrp6B7ITVlXpsFUz2K/LBl0xtBn4Beb5K/FftsSIFACJIx24F7jN7USOdGGayvSAn7SCQnzZOYCBmpGFrut40vzmX5rHi+71EcWgtqmZTevX0xJqdjnz+Ne3pIShXg9NZds79bzQmFNYvVK6/uPNAd1go2Ykwl1zMlsL/Bj4t9uJxAMpABLPNzC7tArdTgRgWCCTMUaUqEMb7aS63PwCTu/fl/oNazv29adN4p3Fst4/nlTqBhs0cya/iBvzgNuBHW4n4qa4nGEu2rUW+BuQD5zici7kalG6S0emY1pCQSqCzQwZPISWQ5Xtfq03K8Ca2gaCzak9jyJehAz4LGqwVku8Mf4UUArcgrl1wlJSdAmhHAaUmGowX7yzMDfFcE2amxdPEc31DSzfu5/MPu2vrPKOGU91ZXLsk5DIDGCbZvBOWKdcT8l2JVGkA78FPsacZ5VypABIbG8BI4ErgW1uJJAhg0gxUVddxS5/JmraiUuujF59WLLc2soBYV21Dh+EzRM4ZVAsYUzG3EjocrcTiTUpABKfjrlCYCTwbczZrjEjBUDs7Ni8kYxTJp3wc429+xEOBWOckThMB9ZFDRZEdOrkpj8R5WC+j94Pnd4AMWHJ23fyUTAPFfo2cAngc/Ji56ap5MirKGbS0jOYlJ9D6NCXXf1ZAwby4fadGLrMMnNDowHLIzq10vAni7eAuUD8HOfpEOkBSD4G8AHmC7g/ZiHwNjizwZij1YU4TjgUxBhcetS/1Rd2l8bfJRW6wYdhafyTzExgMdDH7UScJvduqSMH84V9FjARGIsN7ffFflWKgBjLK+rGsMYaDE0jq7iEj3buQpfDfmJuQ9RgkyYtfxLbjtmbWu52Ik6RHoDUUY+5C9b3gNMwC4LJVoPKOtLYqz1USfbQYQA0FvWUxj/GDGCVNP6pYBDwCTDA5TwckzKTHcRxQpjdXBoW2nHpQnKHnpuPP7+QpZ+vcjuVlKIByyIGFS4v78vOzqa0tJShQ4cyfPhwhg4dSr9+/QgEAmRlZZGfn09WVhYADQ0N1NXVUVdXR0NDAwcOHGDDhg1fPLZs2UI47PwRRF6vl9LSUsaOHcvYsWMZNWoUPXr0ICcnh9zcXHJzc/H7/dTW1hIOhzlw4AB79uxhx44drF27ltWrV7Ny5UoikZge9FcMvAtMwTyCOKnI+7doxsJpg5f4VekFcMGkMyeT7vHy4ScL3E4lZYSBJRHdlR39srOzmTp1KjNmzGDGjBmMGTMGVbWnAzcajbJu3Trefvtt3n77bRYtWmRbQVBUVMScOXO49NJLOffcc8nIsHawaVNTE4sXL+aNN97gtddeY9euXbbk2QErgLOBpNplSwoAUYOFkwZlDoA7Jpx2OuW7y6k8IAcpxULQgEURnfoY3vjn5ORwxRVX8M1vfpMpU6bg9camw7axsZEPP/yQV199lRdeeIGmTp7Q6fV6mTt3LrfccgtTpkzB43HuFmHx4sU88sgjvPjiizQ3O36+yBuYK6uSZsxNCgCxH+jZ1SfPTFPJlFdRzGVkZRFM8aOTYyUMfByOTeOvKArnn38+1157LZdeeqnlO2ar6urqePrpp3nkkUdYvXp1u18bCAS4/vrruf322xkwYEBsEmxVVVXFgw8+yEMPPURNTY2Tl7oXuMvJC8SSvHWLLcCQrj55eppKvryKRJLSgIUx6Pb3eDzMnTuXn/zkJ4wZM8bZi3XRsmXLeOqpp3jllVfYt28fYOY9YsQIrrvuOq677joKCgpczbGuro577rmHBx54gJaWFicuYQCXAa87ETzW5K1bfIy5NLBLJvkUeqnyMhLJRweWOjzhz+PxcM0113DXXXcxdOhQx65jt8bGRg4dOkTv3r1Ja2N7ajft2LGDW2+9lXfffdeJ8LXABGCnE8FjSZYBigorT5ZTzkSyWhV1tvGfOHEin376KY8//nhCNf5gdvcPGDAgLht/gIEDB/L222/z2GOPEQgE7A6fBzxOErSfCf8NCMssFQANUgCIJLQharDboXX+hYWFPPLIIyxatIjx48c7cg1hzqe4/vrrWb58OaNGjbI7/NmYe6okNCkAUly2qlo6tCyWs6KFiIV9unOb/MyePZtNmzZx00032baMT7Rv+PDhLFmyhNmzZ9sd+h4SfJMgeQWmoPMCGXPPDKQvGZPubc5UuN1KrHpDKgCRPBoNWBGx/zXt8/m4//77mTdvHkVFRbbHF+0LBAK89tpr3HLLLXaGzcQ8PTBhyR4uKWJWINCtT5r6WI7C0xVR7WuNmt43bOADhXoL45wa0M+jkCbzAEWC04HFER27V5P369eP+fPnc9VVV6Eo8ofiFlVVueiii6ipqWHZsmV2hR0BLME8NyDhSAGQ5GYFAt16+ZRX90QjD1dHtdFh4+jtnz0K1Fmc6JSnQJ6sBBAJbn3UYK/Ny/0mTJjAxx9/zPDhw+0NLLpEURRmzpxJRUUFK1eutCvsaOARu4LFkhQAyUuZkZPx5/KW8HM1mj5YM9pe8tlkWNvaKk1R6C0FgEhg1bo5699OM2bM4K233nJ9bbw4mqIozJo1i1WrVrFlyxY7QvYE1gAb7QgWS/KunYRmF2acvj8YfaM6ondosLFK0y0NA/gVuDBNlReTSEgG8EFYp87G9v+KK67gqaeewu/32xdU2KqxsZGJEyeyfv16O8KtAcZjjiQlDJkEmGTODWT+cktjZGlHG38Av8VxyRYDamUuoEhQ2zXD9sb/ueeek8Y/zgUCAV588UW79gkYA1xkR6BYkiGA5KGcHUh/p6wl/K32uvtPRLU4ERDAD3SXYQCRYEKGudufXbdtM2bM4OWXX8bnkyOyEkG3bt3o0aMH8+bNsyNcIfCUHYFiRd6xuy4HKAWGAsNaPxYDWa2PPCAA+DBP3NOBg62PvZizRjdhjhutBbq8Hn8upO3J9K+viEQHdzVGeVTDyhBohmIeDCQvKJFIPo0YlNu029+ECRP48MMPycnJsSVee4zW5bfHfjz280c6cgXC4f8+9qOT2sr5RLmeKDencjUMg5kzZ/LOO+9YDoW5KmCT9axiQ96vOy4Pc8/86Zi7QI3FviGUZmAl8AnwDrAYiHTkibPAX5Pp33wgEi22ksAhTafB4hvhFJ8ivQAiYVTqBp/YtOa/uLiY5cuX0717d1viHcswjKMeTlAU5aiHVU7mbHeuO3fuZMSIEYRCIauhfgf8p+WEYkSGANqXC3wD85f6f63/PQnohb3Fkw+z9+As4DrgB5hLS8JAGW1P0ld6ZPnXVUSig+xIosniH6mGQl+PFAAiMayIGracZeHz+XjjjTcoLS21HqzV4UZT13V0XXe04W/rukder6ON7InydsqxxYWVQiA/P5/GxkYWLVpkNa1i4I+YvQFxT96tj6cAFwA3ALOBdHfToQp4AvgrsO3IT0zL8r+7Oxw9146LGMCuiGbpVasA56epZMmrSsS5A7rBIpvu/u+//35++MMf2hIrlo19Zxy+025r++ITFQ1uOJxjV4qB+vp6SkpKqK6utprGOcAHVoPEgvQAfMkLfBV4Evgh5liOt91nxEYmcCbwH8CpmHMH9p4XyPyfsnDkBrsuogAtgNX3RAXoIcMAIs7Zdfc/e/ZsHnzwQUt3n7G6Y7bqyEb+cEFwOG9dj5/Vb4cLqM4OD/j9foLBIAsWLLCaQhB4w2qQWJB3arMIuh74CVDici4dkqGqz/X3qVeGdcPWZZxNusFBzdofshe4IE3FL68sEaeqdFgQsd5gFRYWsmnTpi7v7R8vd83JrLM9AocOHaK4uJjmZksbQpeRIG1Jqu8DcCqwCHMbx4T4hQH09qqz7G78ATJVxfILIgpsdugkNSHssNWm1+dvfvObLjX+hmGgaRqapknj77DO/qyLioq48sorrV52AObKsLiXqgVAD+AfwHLgDJdz6ZQMVTmgG0auE7EVIGBD9/0OzaBZ3tdEHGo2YL8Ny/4mTpzI9ddf36nnSMPvnsM/+44MVdx44412XPI8O4I4LRULgPOAz4FrSMAhkO4ej6NniWbbUADowBqb91UXwg5lmmF5erbH4+HPf/5zmxPiTkTXdWn440BHfg+TJ0+mpMRyh/BEqwFiIZUKAD/m8oy3MQ9vSDhZqlKtYjg6cTNNUUi3YV3tPt2gwqYNVoSwgwHssuE1ec011zB+/PiOXdMwiEajcTVJLtUd7g1orwiYM2eO1ctIARBHBgBLge+TgHf9h3XzePJicZ1cm2bxfx41OrabkRAxcFC3PvPf4/Fw1113dehrD99tivjU3pDAxRdfbDX8QKCb1SBOS4UCYAywEBjndiJWZKnKfgX7J/6dSKaq4LOhBmg2ZChAxI89NtyEz507l6FDh7b7NZ0ZbxbuamsJ46RJk0hLS7MaPu4nAiZ7ATALc5Z/H7cTsWpGToYjE//akteJ8c327NIM9spQgHCZDuy3OPtfURR+8pOftPs1HeleFvHlREVAZmYmEyZMsBravq0hHZLMBcA3gXmYB/IktAFpPgb50zIzPbH7dQVUhTSbDt1YGTGol/dD4aJDukHYYozzzz+fMWPGtPl56fJPXCcqAsaNs9xp3H5XURxI1gLgMuBx4mMnP8smBszdiIf4LXdJdUqeTXMBosCyiC7zAYRrDtjQG3/ttde2+bl42w1PdN6xv8Phw4dbDdnXagCnJWMBMAt4jiRp/Af5ffT0mRP/e/pj+y1lqQp+m3oBGgxYbuO560J0xgGLw1A5OTlceumlJ/ycNP7J48jf5cnmenRAD8sJOSwpGskjnAW8BMTsVjlTVeiT5qXQ4yHfq5Lv8ZDe2nD6VAXdMGgxDEK6+bE6qlMZ1TgY0TgU1Yi0M1aoAJMCX55FlK4o+FWVlhi+2RR6FPbZNJHvgG6wMgKn+pTEXYoRBzSgVodGw6AZCBrmhMugYRZYEcAwvjxP2of5WvIp4FfAj0KGAlkKZCuQrShkKgm8POYkQgaWh6CuuOIKMjIyjvt3Ge9PPrquoygKvXv3thoq7pebJ1MB0A94GfPwHEf18HkoTU+jOM1Lobf9ZfmqouBVFLJa+1p6+778nGZAeTjCtpYIO1oiNB9zlzIk3UfRMfGHpvtY29xiy/fREX5FIUdVqLdpIl+5bpAWhbHeZG1u7NdkmEvYqg2o1c35FJ35bRwuBMKGGev4Zxt4gXxVoVCBAhWKVCVp3hyqbWigv/nNbx73b7KPf/LSNI2ePS233zl25OKkZHkX9gMfA6c7dYE0RWF0RhojM9IoOEmj3xUGUNYSYUVzC3vDURTgm4XZx10rZBi8XdNo+/XbowN7Ihp2Tm8a4FEY75WegBMxMCetVehQoRs0uNDGqJhFQA8V+qhmD0GiWhs1LO3/n52dTXV1NV7vlyWRdPsnv+bmZnJzLS2+qgS625SOI5KlyP8jDjX+6arC+Ew/4zL8+B085lYBSvw+Svw+KiIaByLRExYa6YpCwKPSaPHUvs5QgUKPavmkwCOVaWZ39QSv9QOIkjRxwEIAACAASURBVEWDYS6b3K0bhFy+sdQxex0O6rAWg0IV+qkK/TwKvpM+O75Y7QGYOnWqNP4pyO/3Ww0R21nbXZAMBcBVwK1OBB6ZkcaUQAYZMT7fvqfP88XEvxMZnunn04ZgDDMyJwRmGwoNNq7p360ZNBkGE72pe3ywAZRrBjt0g+o4blOqdKjSDdZGDfp5FAZ6FPIS5HdWb/HnOmPGjC/++/ARvkJ0QNzf2yR6AVAIPGh30DyPygW5mfTyxeePp7sDQxAdUeBRCRoadm7ud/hs9kk+lewEaVDsoGHe7W/VjNZx+cSgYfbelGkG3VWFYR6Fojh+m2s+YjJkV02fPh34cpMfkRpCoZDVELG9S+uC+GzhOu532DzGMsLv5ezcLNs2wXGCV1HonubhYDi2b0Yq0N2jsj+qWz5R7UiNBnwY1hnrVSj2xO/P3Q4GsFMz2KS5381vlTlEYFCkwkiPSmEcFgL1Frv/s7OzGTt2LIDc+aeYpqYmqyEsVxBOS+QC4DzMI31toQBz0j2MCKQTjOPG/7Ch6WkcDMe+wPQrCoUelUM2z0GIAiuj5pjzWK9CWvz/CjrtoG6wJpp8uyIe0mGBrtNXVRjlja8Jg80Wf9alpaWoqioz/lNQRUWF1RCxna3dBYlaAHiAh7BpFYMH+GqGh/E+lcoEaPwBCjxeVHBlY51sVaHF5vkAh5XrBgcjBqM9Cv2TpDcgaJgnI+5P8jMR9ugG+8MGpV6FoZ74mNxpdXiltLRUxv1T1J49e6yGOGBHHk6Kh7/Rrrgamw5a8ADXZXoZ7zN/FInyFq0oMDTT8izVLiv0qKQ7VCy1tDaYLYnyy2jHbs3gvbCe9I3/YRqwIWrwYVinNg6+ZTt6AGTcPzVt27bNaoj9duThpEQsAHzAz+wIpGDe+Q8/alOaxLnrLPa7tyBLAXp4VcfmSgzzKgm9MiBswLKIwYqokZJnINS1zuvYrBmuFtVhi1e3YTtYkaDWrVtnNcQ+O/JwUiIWANcBA+0INCfd88Wd/2FKwvQBmHsC5HvcWREA5ounp0fF7k39chQYnMDd/zUGvB/RU/4YZANYHzVYHHGvN8fqdW3YDlYkqNWrV1sNsdWOPJyUaAWACtxlR6BxPpWz0o7/9j0J9p49wsVhAACPAj09HuwsQ8Ym8OZAuzSDj8M6wQR7HTnpgG7wQcSdIQGrRwBnZ2fbkodILPX19XYUABvtyMVJifY+ew423P0XqQpXpJ+4yVITqAcAoNDrcf2X6FOgl9djS09AP1WhW4w3XrKDAayOGqyMGrZumZwsggYsCMe+V8TCDsAABAIBexIRCWXhwoV2zP2QAsBmN1kNcHjcP72NNkY1Emu2r6LAEJd7AaC1CPB48Flou73AqC5WER9FdJZFDHZonT8sxyod86jj7VZbmySnYc6LsLIvf2dZ/WuWHoDU9MYbb1gNsQs4ZEMqjkqkZYBFwByrQU73qQxoZ3zZm4DjtiV+H5tjeEJgW7ytwwEHNJ1wF9ZMD/epZHSh/W8waN1G12Bv60cP5lyCXFUhW4F0BTIxJxb6AFUxX/xW+xp0zEYtVWb522Ft6wqPrhZ7nSEFgOgsXdeZP3++1TAL7cjFaYlUAFyDeepfl2UqcGEbXf+H+RNwva+/dTJgTRwsV/Iq0MurUhnVae5EEZCmKHgzM1vSe/XWQzu3HX/wejsqTtD4apiT8WqOuts8/uu+4u96J1gUWBIxqHSp8S8qKmLs2LGMGzeO4cOH06dPH/r27UvPnj3xeDzk5eWhKArNzc3U1dVRV1fH3v/P3nnH2VFWjf87c+uWbDa9k54QQugEQgmECEZUEDD+UCAgvIpi4wVUfFEEBBHpAmIBFAu8KKL0EiAkJBAg9ABJSCc9W+/urTPzPL8/ZjdvSNly55k7M3fn+/ksS3Z3zpx778yc85znlI0bWbVqFStXrmTp0qUsXryYxsbGkuu+oq06YIrLTkDoloV0l5deeonNmx1X8L2qQhe3CZID8EWnAo6NR6jq5HkTCdgWQDuTKhO80pLxWg3A3lcaFNVpsATNXTSO/SIaTZls4tVVqxhUW5sd07s2kvtkbZemaXmx+m5f+ZfS+FdWVjJz5kxOPPFETjrpJCZO7ForjMrKSiorKxkyZAj77rsvM2fO3PE7KSXLli1j/vz5PProo8ybN498vjTRpI8tSRR2KcNVh4ryy3Q6TTzu+6FuIQq59957VYiZp0KI2wQl26oGez+l6ML3pAZXVMe6FGLeVFGJCMxbYyMlPNHY4klnwI5oFZI6q+PZAdW6xoDIruWYMHLQwNSQiopkbv3eHQEDeDIvin7dxUYAlpiS9SXYy9Z1nZkzZ3L22Wdz2mmnuR6Sbm1t5dFHH+WPf/wjCxYsKEn72ylRjfEKyj4toKFthPF2KWkUziMAq1evZsSIEY51CwkGmzdvZvz48U6d4DUoKlV3m6BEAD6DA+MPcGQ39pcjQiIClonengzoh1yAnanWNRJahG17yQvQsacM7ooE1m7dVrMWGFBTkx07eIhVWLOyWu6yzbFFyJI7PUtLYPwrKys577zzuOSSSxg7dqyr59qZ6upqzjrrLM466yxWrFjBHXfcwT333KNiMtpeed+UVGowrIh7zsKOAG207GtB9SZYa6vv27mHKOS2225TEQFznEFYKoJSBXCyUwGH76Hmf2/EAroNMDruXWfAjohpMDSqU7OHB3yfiN5pD4HtqZaKxStWVC+TumWOHNNUOWLkjujulhKnPay1JCtcNP6JRIJLL72UdevWcdddd5XU+O/KhAkTuOOOO1i1ahUXX3wxyWTStXMtMWSX+wRIbGP/uiF5Ii943ZBsdMH4A2zcuNEFqSF+ZPv27fzhD39QIeo/KoSUgqA4AEc7OXhERGNQN1YXVVYwm7cmdI1+Ue86A3aEhj0/YEhU31EqGNc0enXjc8mYZuT9NWtqF61bH1sZTRr5fcY0bSvh8KZmadf6u8WZZ57JRx99xE033UT//v1dO093GTp0KLfeeisffPABp5ziuBBnj1jAq4bocERyTsJyS/JsQfCKIdngktHfmfXr17t8hhC/cM0116iI+GwgIPv/EAwHoBIY70TAru1+OyNhCbSApg973RmwM5KaxrBohFpdo19EKzrToqWQj721ZnVtXvFY4r1hxRO8TkS6YXCGDRvGk08+yYMPPsjo0aNdOIMaxowZw6OPPsqTTz7pSovcrLRzK3a99VIS3jAkzxQEH5jS8YCf7rB27drSnSzEMz788EPuueceFaIewJshrUURhByA/cFZp9kJRWQZRxCYgfCPPk2faISYDoaPL0ENO/TvlIyCDHw9HieSrJCRigqhxZMWekTIaMTKSWm25nK0tLbGWtLpxJp0LpIWUnm44ayzzuLOO++ktrZWtWjXOPnkk3nvvff41re+xcMPP6xU9jYhWWHBxIhGs4SPTMkmD3ssbNrk+3kuIQ6xLIsLL7wQ0zSdipLAn51rVDqC4AAc6OTgao1uhf/bSQpBqwIjVWo0YEpFkrfS7iVt+YXu9BnYG2/mDMgZGk2pCHtxNNNCklZshOLxOLfccgvf+c53lMotFf369eOf//wnv/3tb7n44osxDHXbZh+ZkjphzxDwmnQ67bUKIS5z1113sXjxYhWi5hKA9r87EwQLN8XJwWOielFh5mqFD7RSMyweC8QH6wRTglEC+yCAesXbDAMGDOCll14KrPHfmYsuuohnn32Wfv36KZMp8IfxB5S+rhD/sW3bNq6++mpV4m5TJahUBMFOONpsHFzkK4xKgV6CGmg30DXYr8LfuQBOUbH67wr1llCaaLbPPvuwYMECpk2bplCqt8yYMYNXXnmlLOvlDzroIK9VCHGR2267jVQqpUKUSQB6/+9KEByAgU4OdjJZLmk53hPyjJHJ8u5epmL/vzNyUtKq8DwTJkxg4cKF7Lvvvspk+oUJEyYwf/58Xycxdpd4PM5pp53mtRohLvLYY4+pEhUFFgFXEoytdSAYDsAARwc7cAB6O08K8YyoBvuWaRRAYBtnt2lQWO8/YsQI5s6dW5ar5HZGjx7N/Pnzy+Y1fu973wu3AMqYfD7P8uXLVYqMAVdjDwLaR6Vgtyh7B6Cz3v8dEZECPZi7AACMT8YD1tC4a0igRteIu9gDIC0keUVOxoABA5g7dy777BOIZ4IjRowYwVNPPRWoqoY9cfDBB/Ozn/3MazVCXKSpqckt0UcAbwGz3DqBKvzuAHwe6ONEQMKhkQhqUyCwcwEm+bwvQDFEsNsHD4vqjIxFGBjR6a1rVGiakgtaAo2KpkLGYjEefvjhLg/uKQf2339/HnnkEWIxf3am7IwjjzySJ598kqqqKq9VCXGRvn37unmN9sNuCXyFWydQgV8dgGHAw8ATONQx4XCR2NsoOBPgMeOScRIBm2vQHXSgStfoG9EZ3OYQ7BONMDiq0y+iU6trVLc5BzHN3hqJ0PFFlRZSWYXBTTfdxPTp09UICxAzZszg+uuv91qNbjFixAhuuukm5s2bx4ABjgKPIQEgFosxadIkN0+hA9cCfwJ8mZTlR8twNnAX9gRAx1zXK+bYCahLJMnp/myx2xXqTZOFqazXagSGjeaeBxd1l6985Ss89NBDCjTaM1LKHdP6dp7at7cJftpO0bD2/9c07VM/V63fqaeeyuOPP+6K/GKJRCKMGzeOCRMmMH78eMaPH89hhx3GlClTiESCe5+HdJ+bb76Zyy+/vBSnehE4DVBScqAKPzkANcDdwNdUCv1RdZSBDlfAhq6zNVGhSKPSI5EsbsmxzQhuUmOpyEnJZtN5+H/w4MEsXbpUaRJZu8Hf2fCrot0RUO0Q1NfXM3nyZLZu3apMZnfp1asXM2bM4JhjjmHq1KkceuihVFdXAyCEQCja7gkJHk1NTRx44IGl6vj4BnZeQEMpTtYV/OIATAAeA5RvlF5YGWV8Ea2Ad2VzsgJL8+uOSeeYUvJMUyslGGEfaLZZQknXv//85z+ceuqpjuUIIVwx+J3R7gjouvNr/sEHH+RrX1Pq13fKuHHjmD17NrNmzWLatGl73eu1LKvk722Iv3j22Wc57bTTlHaz7ID3scfbbyvFyTrDDw7AZ4H/BVxJG/5GZZSJChyAgq6zLZHEH29ZcTSaFgtSGa/V8C2mhE9M521/TjnlFB599NGij5dS7jD8fqDdEXASGZg1axbPPvusQq12Z8CAAZx99tl89atf5fDDD+/SMaEDEALw+OOPM2fOHBXTALvCe8AMfBAJ8NqanQPch4uNEy6tjjJEURLc9kSSfIBzAQA+zOT4OBfcygY3aRaSBodtf2OxGO+//35RWf9+M/y74iQqsHz5ciZPnoxlqZ+nOG3aNC666CJmz55NItG9qpfQAQhp55NPPuGyyy7j3//+dymuideAE4EWt0/UEV7GtL+DPTnJNeNfqeF4/39n+hfyymR5xX6VSQbGAtOoqqSoCP1feOGF3Tb+Ukosy/K9MWp3UEzT7Pa++cSJE5kzZ45SfWbNmsWiRYt45ZVXOPvss7tt/GHvCZMhPY8RI0bw0EMP8dKClzl6+vFun+4I4BHs5kGe4VUE4LvAHW6f5Ji4zpeSalfsTbEYrVFfVnR0GSElL7RkyChIdisXVIT/4/E4q1atYvjw4V36e7+v+Duju1sDa9euZeLEiRQKzkprTzzxRK699lqmTp3qSA6gYgRsSJnRkrfImIIF817gmisuZ9mHH7h5unuAb7h5go7wIp59DvB7XHY+KjU4qzLiuBHQriSEsB0ArzdPHKBpGkjYZqgPxwaVFinJOjTE55xzTpdXueWSfd6eoNiVbYHa2lrS6TSLFi0q6lwTJ07kT3/6E9deey3Dhg0rSsaulMNnEKIOKSFVEEhg5OgxfG3O14nGYix5/TVXtq+AQ4AM8Iobwjuj1GbsZOBRXB6WEAHOq4wySUHy355IReOkAtrlTADvpnOsz5dvHoApoYDElGBJidn2MwuJxL7JJfZ7Af93Ezhdhy9dupTJkyd3+Dft4f5yJBKJdBoNSKfTHHnkkSxdurTLcpPJJFdeeSWXXXaZ8s5tYQQgZGdypqQ5v/s1sWLZR/zw+xfx5uuvuXFaCzgJu1dASSmlAzAJeBXo7eZJqjT4akWUfV0y/u1srKhybDBKTaslWNiSJV9Gqx4LyApJQUryEgpS4sWrO/LII3n11Vc7/JtyWfV3hK7rnUYDtmzZwoknntglJ2DatGncd999rk1QDB2AkJ1pyJoYe8kFMk2TX119Jb+/83Y3tu22AocCG1UL7ohSbQHUYns3Q906QUKDY+M651RGGRJx36/JRaJYLg6jUc2KXIHXW7NYAd1vbkdiN+tpEZKGtqz9TJvxN3G+ii+Wn/zkJx2Wnvk9wU8VXdkSqK6u5vzzz0cIwfvvv08+v3ty7bBhw7j11lu54447XG3LW+4OWUjXKViStLH360HXdaafMJN995vMS8/PpaA2KbwaOAz4CyV8jJXKgv0DmO2G4KQGx8cjHB3XqSjBq7E0nZZYjNZIMDLpBfB6a5athWCvdLJS0iokGeHNCr8jYrEYW7ZsoW/fvrv9rpxD/p3RlS2BTCbDM888w7Jly0ilUvTv358jjjiCo446qiRteXuKYxbSOR2t/ndl1ccrOOfLX2L9urWq1fgRcKNqoXujFA7A+cC9qoVqwJFxnc8mIlS7+Crymk4uGiWv65h6xHfGpyMMKZmfypB2WNvuFYaElLA78/nZhE6fPp358+fv9vOebPzb6YoT4CWhAxACkDcFTfnu3atbt2zmrNNPUV0lkAcOx+4Y6Dpu9wEYBdyuWmh/XeOiqihnJN0x/hY69YkkG5NVbE9W0BKNUQiY8U8LwXPNrYE0/jkp2WoJNpgWKZ8bf7Dr0XclNP42oYEN8TsSaO0g9L83Bg0ewr+emsthRxypUp0E9oK5JD163D7JHdh7G8o4OKZzSVWU0S7s8xtt7X43V1SQ1SNI/y5cOqTRtHi+KU3QyvzTQrLRFGw2BRkFTXlKxUknnfSpf4fG/9P42Qnwc3QipDRkDIFZ5POmd20tD/z7cQ453HlPip04HPiWSoF7w82r/3TgX6qEacAXkhGOi7vjszTH4rRGY4HL7N+VFkvwYnPaazW6RVZKGi1J3qdGoiOSySQtLS1Eo3ZOSGj8944ftwN6QmVGyN6xJNRnDZw+ehobGjjj5BNZsewjNYpBE7AvdnWAa7gVAYgDN6kSFgXOrnDH+Bu6xuZkJS1lYPyzQvJSgIx/QUq2mIItpgik8QeYMmVKaPy7iJ8iAW6NVQ4JFqm86dj4A/Tp25e/P/IYw0fs41yYTS1wtSphe8MtB+DbwGgVgiLAuZVRDoypVzUTibI1Xhmocr69YUl4KZUJRJ6CBBoswSZTOO6+5zUHH3zwjv8PV5Kd44WD1N5y2bIsTNPENM1AzF4IcZe0ISgonI8+ZOgw/vzQv6ioqFQl8gLs/jmu4YYD0Au4QoUgDTirIuJKR79UNE5DPBHolr47s6glQyEABigrJRtNi2YhAx9xATjqqKMAf61u/Y7bTsCuBt+yrEDPXAhRT8GStBbUX4f77jeZG25TNuYmCvxKlbA94YYD8A1ASeeOzycjHODCyr8xnghsK989sTxXoFHBHHs3kUCdZYf7jTJ5DsdiMU466aTQuHSTdgPthsyeavCzpiDVzTK2noolJM0uvlen/7+vMucCZfN9vggc3OlfFYlq6xoDfqBC0MExneNd2PNvicVJB6SJT1doMi2WZfw9ptiQsMkUtAQos78rnHXWWQwePDgM/ReBKgO9q9HviUhph7Ozpuiwk12IPQm1KW8hXHYOr/rlr5k4aT8VojQURdT3JlwlXwUecCqkr65xSVWUpGLtspEo9fHuzwz3KxJ4pqmVgo8Na6uQ1FmiLML9OzNs2DDefvtt+vbt26NWmqppT6DsDkEfo6yatCE+Fc6ujkeociFyGnSkhKa8qXTfvyPeXvIGX/rsCSq2vASwP6CsxKAd1b02bwPGOBGgAedXRhmgq7X+pqZTl0gqlek1SzM56nw60rc90a/Rx85JsQwZMoSnnnqKUaNGhUZIAV0tDWw3/D11pb8nLCF3jK9tp2BJdE0jVoKZKEFBAs15q2TGH+ykwJZUijffcDxBUGv7esq5VrsLVsUoYBUOtxWmxnS+UqG+B/iWRCWmYqfCS9JC8HyTP0v+BLDdtIf0lBuzZ8/mlltuYdiwYWHJnyI66w8Qrvj3TlPeIr+Xjl8VUZ2aRKnmvfkXKaG5sPf3yU2y2Qwzph7Chk/WOxXVCgwHmp1r9X+o3Aw/G4fGP6nZiX+qaY3Gysr4A7zVmvNahT1iSdhiCQoeP6xra2s59NBDmTBhAuPGjWPMmDEMGDCAQYMG0bt3b+LxOFVVVRiGQWtrK6lUimw2y4YNG1i3bh3r1q1j/fr1ZDIZqqurmTx5MmeccQbjxo2zX2do/JUhhNjj4J/Q8HdMzhQdGrWsKbCkpHcigl4Gpc7FIKSkKWd1eciPaioqKvnhFVfyg2/9l1NR1cAc7O66ylB5VSzBnmdcNCcldE5S7LFKHTYmqpTK9Jpm0+KlVMZrNXbDlLDZsjA9uNeGDBnCCSecwAknnMBRRx3F2LFjlXSd29MeddjwRz27RgHCUH/HCCmpz3YtmS2iQZ+KGD1tR8ASksacSQmj/ntECMGs6dP4cKnj+T5vYo8MVoaqS2IY8IkTeQkNflYdU5741xBPkCmjrH+Aec0ZUj4zQF4Y/5EjR3LGGWdw+umnM3XqVFfazO7JAQhr/tWjaRqRSCRc9XeRxlz3ktl0TaM6rlMR7RnJgXlTkCoI17P9u8q8uc9xzuwvqRA1GfhQhSBQtwXweRw6E4fHdOXGXwBZvbz2wOpNq0cb/1gsxqmnnsr555/PzJkz0fXSPtDC9rHu0B5VCd/bzmktdD+ZTUhJKm+RtyS94jqRMt0SkNjvT8Zn5ZAzTjyJAw46mPfeedupqLNQWBao6ul5rFMBR7lU8y/L6EKXwJs+2/svlfGvrq7m+9//PsuWLePBBx/kxBNPLLnxh7Ddr5uExr9zcg5r/fOmoCFrkQvaqNAuYApJQ9b0nfFv54JvfUeFmNNVCGlHlXVcBxQ9BWF4ROPiKvVh+s3J8ujz347f9v4FsNl0N+EvHo8zZ84crrrqKgYNGuTaefbGzlsA4d5/iJcYbXvaqm63RESnOq4TDXiCtJRtq36fOzWmYXDkAZPYsnmTU1ETgRUKVFISARiGA+MPcKAb+1IaZWX8AVZkC16r8Cm2u2z8Z8+ezbJly7j77rs9Mf67Eq5QQ7zCFHY2u8pLMG8J6rMmzXnL80S5YpDYlQ71OdP3xh8gGovxtXO/rkLUF1UIATUOwBSnAia6MOwnHSmfXv8AppRsMkyv1dhBveVenf+YsWN5+umneeCBBxgxYoQr5yiGMPwf4gWWxNX2tTlTUJcxSOUtzAA07mo3/O06WwHQuZ3Tv3KmCjEnqhACahwARw2PqzUY4kJ9SnoPdcVBZmPBP8a/RUhSLtx0mqYx54Jv8OzLizn+hJnK5TshXP2HeIHZXspWAiOXNe2IQEPWJGv6J4O+HUtI0oatYypvESC7v4NRY8ZywMGHOBVzNPbcHcd47gDsE9FdmchrauVV7vJh1h8DfwpSUm+pXwnX9unD/Q89wi9vvp2KyirfTTYLV/8hpcbe8y/9CtcQdsVAXdYk1dZBzytfQEo7QtGUs/VpLQRrxb8nTjn9y05FVOOw5047KqykoxjtMJcW6qKM9v8zQvhi4I8EtltS+WCfKQcexFMvLeKEkz6742eGkL7K5g0jACGlJG8JGnOmp6twKSFrCJryFtsyBg05k7QhMIT6Z8DOmG33fmPOZHvGoDlvkXdh0eEVJ5+ipB/AUSqEqEi9H+Lk4EEBz0AtBVsL/lgN17vQ4nfW57/IHff8iYqKyt1+11qwiEU0Yh5fI6HxDyklu0738wuGJTHaqmA0QNcgGtGJaBDT7e+6rqEh0dDY2xpMAkJIxE7fDUtiCvur3O+2fUaOYp+Ro1i/bq0TMY73EcAHDkCtCw/3ggf14W6yOu999n9WSloURyG+fuG3ueqXv95jH3j4vwlefZPe9jIPHYCQUiAlpArBqNGX2MmJ1g5d/a+zn5h2zHRfOAAqLGWNk4N7u/Bct8po/9+U0Opx+EsCdYp1+O4lP+QXN9y8V+PfjiUkzXnL01VB6ACEuI0hJPVZIxDGP8Q504513DtvAlDhVIhTS6kDcScCEi6s7Mrpcd1keh8KbLKE0k5/P/jh5Vx+5dVd/vuCJWnxMCkwdABC3KK9dW1D1vuhNSGl47DDDncqIgKMcSrEqQOQdKpAzI3IrlY+d9IGj8v/ClLSrDD0P+eCb/DDK67s9nFZU9Diwb5oaPxD3MKw7Na1Tlr7hgSTd+//Iwry38c5FeD9mDyJ2qHEALJ8Egs3G4an529QmPX/hS+dzrU33lr08e1VAb3ipevxEDoAIaqxpCRdEGTDcH+PZOPbb/DCH+6mlwZNzh4vY53q4jQC4HgyjRvmLVomD20LPC3/y0pJVtF7OXnKAdx69x8cD/DJGILmfOmiImH9f4gqhJS0Fizq2xrt+Il8YwMil/VajbLHyma49YwvANDL+fb3UKcCnDoAAnCUop5zwVjHpff75irIeZz816hoU7Jf//7c+8A/9ljqVww5U9KUV9sXPSTELdoNf11buN+P1+2jv/gZd87+IpoflSsTNCm56yunUEinAbsLrkMGOhWgIl0+5ehgN643ueM/gSbt4eo/IyR5BQ8DTdO4/Xf3MnyEo3lRu5E3BQ25MHEqxL8YQtKcN31t+AEKqUYW/v1+Vr6+mKeuv8prdcqWx3/xU1a+vnjHv+Nl4gBsdnJwk0tGrhwKAVMeVgA0KvpcLvjWdzj+M8pmV3wKMyydCvEZlpRkTUFDW0/9JIo58AAAIABJREFUnCl9a/jbeeamG3b8/9O338z7jz7soTblyfuPPsxzd93+qZ8lnDsAtU4FqLCTjoYbb3XJAYiVwdKwRXjjAGSlVNLxb/zEffmfq36hQKO9I6XdLCjl4rS0kJCOsCRkTLt1bV3GHlRj+KB1d1cwMy08//s7P/WzP37zPDa8+ZpHGpUfG5Ys5o/fPG+3nzuqn7fxvA8AwCdODt7oko1LeGQ8VZLz6CGiYtKfpmn86rY7iCcSCjTqHHuSmeW75KqQ8kJiR56yprAH5mRM6jIGLXmLQgAXHf/66Y/2+PObvnAijWtXllib8qNx9cfc+IU9R0BjzpMAfeEAfOTk4PWWcGW3vtr0z/jcYsl5YMtMae//O+XMs8/liGlHK9Co6whpTzFryJqBfBjvShjRUM+OFrbSfn/b32KJ/W8hJZa09+/zptjRf6I5b2fvb0sbO8bRZk2BFeDPqPmTNSz6+1/3+DshBNccfVjoBDigad1qrpk+da+lxAouHcdBBBV9AD50cnCrhM2WZGhEbe2+jkCXMtBTAbOy9B5ASkHZW1VVNT/66c8VaFMcRtsM9XhEo1c8QjRgA6csCem2nvB9KqKeD0MqJ7KGNw2l/IfkD18/q8O/sEyTq486lCsXvEHfcRNKpFd50Lh6JVcfexjC3YWoY+EqIgDvORWwTGWf2Z2oEMGOAnixj9iq4Jzf+v7FDBg0SIE2zihYkvqsSXNAwrNm29yDuoxB1rQjYykPWyCXG5aUtBrh+wnw8UvP88n7nT+6hWVxzbGHsfHtN0qgVXmwZek7XH3MoZ0afwVPJMcXs6okwLVOBLzr0r5tb4+76DnBC3OVldLxFdWnb1+++d3vK9FHFbkdCVoGaUP4KrQudsoar8+au1U0tM9GD3GOn0vxSoks5PnDBed0+e+FENwwawZLn3jERa3Kg3cfeYhfzjwGYXX+JFWw+e3YwKmqllvo5OCNlnSlGkCXklhAO7lpHrgAKvoOfP2b36aqqlqBNuqxpD14pS5j0tS2h+tFnqWQkpwpaGpLIussa7zVsLACklXuVwqWJBs6UmjA/d8+n3xra7eP/cMFc3j6lz9X3rm9HNCAp3/5c+799gVdPibv/LTNTgWocgAWOBXwSsGdm7OP4ahRoWeU+nEvce4AVFZWcf6FF6lRyEUkdiOhVN5ie8bYkcWdM4UrjYWEtBPKWtrawG7P2NsSebNra4D2UsfQBSiO9uTQEFj+/DO89cSjRR//9O03c8cZJyPzYdvgdkQuwx2nzeLp22/u1nF55zd0g1MBqoYBPYXDsT5LDMGsRIQKxe5lXFjELIERCVproNL62TkpceqCnfrl2dT26aNEn1LSXsdtp9RYaEBE14jpGhFdQ9cgotn/3x6Z0duSS+3tBM3OKG/7tyXs0L3VllGuYvVuCHskck2idIOQyoVUIdjZ+qowW1P89twzHctZsXABP548hksffYZBkw9UoFlw2br0XW469bNFRVRyPnAAVFnFjcCbTgTkJSxwKTu3r6kg2FJiSh1mU1H6d87531CgiffsXOvdWrCbDLXnEGzP2Cv4rWmDren2f9ulYQ1Zk6acRUvB3l4oWFJp6D5rhhPkukvGEOTD98zuQ3/macqy0nMtLVx3wtE8dd2VUAY9V7qNZfL09Vdx3cyjizL+AApiKI668ILajrn/cSpgQUHQ6oKjHhOCioD1BSj1esWpN7rf/lM44KCD1SgTsldaChZmmA/QJXJmWPIH9mLiPz+/nFVvqO/u98xvbuGK/cf2qCqBrR+8yxUHjOfp225yJEdBw7X1TgWodADux2FZQl7Ckzl3bth+Rh49QGHAUkYABDhu/fulL39FjTIhHSIlNOascAhSJxhCkgqNPwDvPfYwL/z+Ltfkt9TXccOsGfz1W+dhpJpcO4/XFFJN/O3bX+e6E46mpW67I1kSaHF+D69zKkClA7ABmOdUyBJDsNqlp9uAfM4VuW5RqqyFrIIV5RdOO0OBJiFdQUi70VHoBOwZU0iacuG4aLBb0f7xG+eV5Fxv/PthLh0/nOduuhYZ0OTrPSEKOZ654WouGz+c1x/5pxKZrVJBET+scipAtY25x6kACfxv1lKRILEbMSkC1RugIloaFyDn8Ek5Yd9J7DNylBplQrqEJSQNWSMsD9wFuwtkOBgKIN/cwC9PPLbk533ixl/x36MGMv+3tyKymZKfXxVWNsOC393OJaMG8dQtNyqV3eT8+swDjvs0q7Yw/0JBWKJBSB7OuVP21MssUGkFwwmoKNFGQMHhG338THfG/YZ0jJDQmA9zAtopWHZkJDT+YKZbuObIQ4pOUHOKME3+dfXPuHjUQB676iekt20JRP8ADUhv28K//+cy/nvUQB7++RVdaurTXbY7z0v9CJ+0At4ZE7hNhaB3DMG8vDvZu30LBeIBaBBUqXg+wt5wuv8/fcZMRZqEdBdLSBpyJnnL/9ezm2RMQVPODMP+gMjnuHb64bQ01HmtCgDP330HP5kyjhtmHMnK+c8jC/6ryhKFPCteeIYbP3MUP5kyjnn3/s7V821z7rQ7bsEP7uSaVWPvTQx0KkgDzqqIcFDMnVB4YyxOOhpzRbYKPsrkWZFzdy/NlPCJWbyHq2kaS9dspHdtrUKtQoqhJhEp2baRX5CSHWWXISCNAr86YRqbVyz3WpUOmXLSLGZe+F1GHjqVSEWlJzpYmTTr317Ci7+/i3effapk522RMNd547uLgLudCnFrifk94DcqBEWAOZURJrv0YEtHozTG4pS+8r5z1uUN3km7m7iYlZItDh6evaNRPtzWiNTDBjV+oCKqUx3XdzQqKmcsCU05M9wCaUNkM/zqM0ezZeXHXqvSLQaMGs1x557PxONn0n/0WKIVVcq3fzXAzKSpX7uKj+Y9z/z776Nu3VrFZ+kaKy3Je84H4B0MvONUiFtPiTj2HsUYFcIiwJkVEQ52KRIg0GiMx8lGVDVGVEOdabIo5W7LzWYhaXAQPh6ha1z9k59w0g9/qlCrECdEdI2aeIR4ibaQvCBjCFqNMNO/nXxzA9ceczjN27Z6rYpjYokE+06fwcRjjmX45AOoHTqMito+xKuqiMbioEdA+79pKRrYoSBhYRkG+XQrmYZ6mrZsYvOyj/jwpRdZtmAeZsEflQkvGYIGZwGAFNAXBYUEbj4hvgT8W5UwDfh8MsJxcd01pQ1dpykWp6BHfNF3PSMEc5vSrp6jwRI0O1hB7RfV2Dei8dMXFzGwh7cF9RuVMZ3qWIRyCgZYEppzpiejsv1Keusmrj7mMHKplNeqhHRCq4TnnIf/H8W2r45xc8PwP8BjqoRJ4Imcxd+yloohCnskJgQD8jmGZdP0NbzvGRAvwZPbqQvZq03Fm075LCIXDgjxExlDUJ81y2J/XEh7FkJ9xgiN/06se20hVxyyX2j8A8J6Nc07nlEhBNzvNfM9oEWlwHcNwS1pk1XO91A6Rnq/bIqWwgFw+DZWtumYa23l9+fM9mEmRc/GapuEV5cxAlkpINtHOGdNMl2cntgT0KTkuZuu5eZTZinr7x/iLhJYr8Z5VeYAuJ251Yw9KOg0lUKzEt40BM0C9onqJFywOg3xBMIHsdNP8iaGixudzUI6igJMimjE2t6munVriWmSsUdNV6JbiDokkDMleUui75hs6F8sIckYglTBHqoU8n+IfI67vvxFXn3oAa9VCekGGyzJOuc++FvAr51rY1OK1O13gYnAFNWCNwrJYkNgoTFkJ0PkFAk0xRNqhDkkbUmaXGhE0U6TcLaq2j/6aUOy/JWF7LPvvgycOMmpaiEuICTkLUHWlEgpieq6r3IECpak1RCkChaGkOGKfxc2vb2E62YcydZVwcr0D4ElpkRBB4TbgUXOxdiU6tbvDSwG9nXrBAkNpsV0ZiQiVDl8ValYnJRP+gNsLpi83ure3vp6wyo6AhABTk3seRfpihcWMmj/g4rWK6R0RDRIRnUSEZ2YB5UDhiXJmYK8UDs+uZyQRoF//PgHLPr7X71WJaQItgjJK4bja1sC44DVzjWyKeXdPgF4DXC1Y0ylBl+tiDIpWvxL25ysxPLJssjtSoB1hkWxUamEBp+P79kBiESjXL34HWpGjCpat5DSE9E1YjokIhFiEQ3V/oDEHtZjCIlhSQqWDFv3doAGbHz7DW4/8zSyTeU7aa+ckcBLBUGj88t8AXCcYyk7UWordxLwBODq8loHzi2yeZDUNDYmvelMtSeElDze6F4/77VG8TMXKjT43F4cALCdgKteeYveI5W0gwjxAE2zk1EjOsTatgsibTkEINGwu0Fq2Al7dtDertG22lb0AjsZ0bQkppRh7X4XydZt40/fvoBlCxwPWQ3xkHWW5E01SevnAH9TIagdL5a5XwP+issVCBUaXFYdpXc3V/KpWIxUNO6SVsXxXFOarEuzC9YYxecXJDU4uQMHANqcgEVv0XtU6ASEhHQFkcvw2LVX8eIff+u1KiEOMbHr/hVMt20EhgFK94O9aBz+APBdcDe/JyvhhSKGCWV81g0QYFjcvVxNJx5gVz5AyzS56uhD2P7R+w7OFBJS/pjpVl68/ddcMnpwSYx/WsIyS7LQkDxbEDxbECwyJCst6VqvlZ7GclOqGm3/RxQbfyhNFcCeWAJsAU7GxShEnZAcl4h02cuROjRH/ZH9vzNRDdbn3an1TTnItNaAiV3ItZBCsODP9zJ8/AQG77tfkWcLCSlPCqlG5t/9G26ffQrLXp6PdHmPRABLTckSU7JN2I6Agf2VlrBVwFpLEtOgj+6PXKgg0ihRFfovYEfOlfbUAe8cAIA3gY+BU9zSwwSmRHVqungRt0Ti5CP+G2oT13TXpgK2SFl0EqDAdgC6+oh464n/hH0CQkIApMXGt5fw4CXf4e+XfI9lCxeU5LQWsNiQrO/E8RfAFmF/Hxg6Ad3GAhYaAkVP7b9hb5srx+t494PAduAh7OEGyklJe+OkK2Sj/jP+YJdpVUd0Wl3o5NaWvlX08QVp5wJ0lcduvJ5VS17nm/c/hJZIFn3ekJDgIWnZtIFFf72P5+683ZPhNO+akq3dKLVcbkniGowv48FSbvC+KWlVE8gxgeuVSNoDXjsAAM8DR2DPDVDePaarJl0ChubfWeqjEzHezyhoI7ELTl9xFuiuGf9g3gv8eL9R/Pe/nmDIQYc51CAkxL9olknDujW8/dgjPHvX7WQ97NnfIOyM9O6y1JT00TT6+/fx6Cs+sSSr1XWv/AuwXJWwXfGTW9cLuAu71EEZl1VHGdyFEFY2EqXeJ93/9kSrJXihWX0/gO2WoNVB85WpMY3hDkKEp17+Uz5z8Y+QPna+QkK6QvvM+YZ1a1j95uu88cg/WbHoZa/V2sFCQ7KtyHs9qcEJMb1b0b6eSKOEBQXhfE6vTR67i+46NeJ2x48f51eBu7G7Bzrm2l6xLl202xNJ8ro/twDArq9+oqG16P36vdFoCZoUjAN2Qr/hI/j+Px6lz9gJjuQEAQ1ACKQeOjx+QhMCs5AnEo2CrqPtNBK8/eqW0gLTwshlyaVSZFNN1K1bw/p332bla4tZ/cZrvpk5vyuNEuY5HEPbW4Pj4rovwsZ+JCdhniHIqsvhvAG4XJm0PeBHBwBgKHAbMNupoBtqYl3aBthUUYnw7dth80Emx8qcoVRmi5DUOcgtGK5rTFU0hGH6uedz+tXXo1dUKZHnN/IN9dz/3W8w7ogjOeEHP/JanZCdeOKaK3jurtu9VsM1FhuSTQraLA/SNabFNE/qx/1MQcICQ5BSZ/w3Ya/+3esCh38dgHZOBh7HwVb1Nb1iVHbyKk1NZ0uyothTlAw3tgFyUrLZwbz4ag1O6qQZUHfQdJ0zf3kj0+ZcAD7syVAMIpvhudtv5KlbbwRA13VuWbMF3UcdJ3syRkszl47raqpw8EhJeKGgbpTysDan3+/Go1QYwMsFQZPa6s2zgb8rlbgH/O7IPQU0OBGQ7UJNbSYaDENTresU0d24Q6IOb+P2GmJVSCF48PJLuWT0IF7/671gqo14lBIrk+bF23/NxaMG7jD+AEII5t5xs4eahezM49dd5bUKrvKBqXaq4kYhecMIJzWC/exbZCg3/s9QAuMP/o8AACwFJhd78Dcro0zopFnNtkQFhYDsyS7LFlieVVsN4GQiIMC0mMYQl2qFI9Eon7/0xxzz9W+S7NPPlXOoRANaNm/k6Zuv5+W//rnDv7151UZi1UpSXUKKJFu/nR/vN9prNVxju5C87HwK3R4ZqGscGdN6bE5ATsIr6o1/CpgCrFcqdS8Eweptc3RwF/a9jIAYf4B9Eupvt4TDyYfb3RlTANithB+74Tp+tO9I7jrtc6xbvNCXUQFRyPHRM49z3dEH8z8HTezU+AP85bsXBsIDL1c0De69QGnRka+QwHtqOtHtkW1CstAQPbJtcKot4U+x8Qe4lBIZf/BHH4DO2OTk4HWW5JgOfm9peqBCWZW6To0eISUUFZoAcQ0yDt4E28ly35Qtf+Vllp86C4DDT/sy08+9gOEHHULEo6RBM93KmtdeYe7ddxQ1se3dp59g89J3GLz/QS5oF9IZqxfNZ8WrC71WwzXWWJJmlx9uDcI2hEfGdGp7iDe7WUiWGFLp1mcb/wTuUS927wThI7scB52QemlwZa/YXl9oUzROa8zV6cTK2W5YvNKSUSYvIyVbHSQCgp0IWO3R1TRw9FiO/tpZTDjmeAaOn0C8V60LTp3ETLdSv3Y1H8x9hvn330fjpo2OpdYOHsI17ywDzb8lqGWJafDjSSM9bczjJhkJzxcE7kwQ2Z0IcGBUY1QZdwxsn6GwUl2Tn51ZAxwCNLkhfG8E4dP6LHZSRNH8oCrKiL1cmNsSSQo+rv/fExJ4oqFFWU8AAaxzMBYYYP+oxgQf3fzD99uf/Y6bwYgDDmLA6DHUDB5CRW0fovEE6BHQtN3rvC0TK5+nkM2QbWqkfu0aNi3/kBWvLOKDec8jTHcep7O+fwknX3GNK7JDdkcD/veSb7Po7660V/cFTpr+OGGYrnFwTMNfA9Wd0yLhDXdC/mA3VD0OeMMV6R3gnyf23hkIbHUi4Ji4zpeSezbym5OVWA73wL3g42yBDxUmA242BTkHU8hqNPiMwnLAnsYVLy5i0OQDvVajR7B60UvcdvoXvFbDNdZYkrdd3PvvjKQGB0SddQj1CxawwpQst4ofmtYJErvk7wF3xHdMEJ7Y23DYCvEtQ1DYy/0gAmj8AUYk1W5bVDi8WVPS7jYWUhy3fOlzyIL6WQ8hn8bMtHDnmad7rYZrNEt3E/+6Qk7C64ZkkSFpCfAzYZuQvFAQfOSe8Qd7e9sT4w/ejgPuDhOBoqfGGEC1rjFylxC10DRaosHa/wfIS8krqSwFhXPDNeyugE5xqxyw3DHzeT55920O//KZXqtStmhCcNsXP0vDxg1eq+IKBvCyIfCLG5mWdjQiB/TRNDqpxvYN9QLeMiUfWVLVON+98Vfg++6eomOC4gDo2DMCimaLBdPiOjv7ANlIlGzAus2tzxssTGWUGn+AqKbR0smM8M5okTA6Epwb3W9sX7Ma3TIZd8xxXqtSdmjAP374Pd577mmvVXGN1wzpyyhck4RVliQL1GgacZ8+H+oEvG1KPrAkafffxyeBr4GquUHFERQHYANwCVD0cj2Pnew2YadWeploJDAJgFLCktYcH+fc80lNcFTTK4GoBgPCKEDRfLx4EWMOPpj+Y8Z7rUpZ8eb//pXHbrjOazVc431Tst6DpL+uIrEdgdWW7aRENajWvG8nbGCXir9pSlaUxvADzANOA++DNV6//93hHzgcDhQBvl8VZVhbGKA+niQb8b8DYErJ/FSGVgdDe7pCXko2OSwHjAOfTejFe2ohAPzspcUMmLS/12qUBWtfXcAtXzrZazVc42NL8r7H+/7FkNTsqoHhukZfvXTGyAC2CskmC7YIWbJSyTZeAE4B1NVxOyBIDsBngLlOhQzQNS6uipLQ/D8CGCArJC80t+JO6enubDAtnHYOnRTRmBTuAzhC13WuevUdakeN8VqVQLNl6Tv8cmZHrcCCzXpLskSt8S9NV69diGswUNMYqEM/XaNaU6eECTQJqJeSOmG3R3Z3KbVXngFOxy778wVBekprwApgnFNB+0d15lRG2JaswNT8WwiRFZLnm1pLerE2C0mDw0hDFLsxUDJIV5cPicbj/OKNpVQNHuq1KoGkbsUyrj1uKkJ49Lh3mU/aOtIpNP8GcCLwQ+Dz6sR2nyjQp80RqNagSoMEGgkNEm3PlRj2tq6FPY63/Xta2qH8tIQWaXdD9EF85C/Af6F2dppjgvaIvgy4sdO/6gJHxnWOqu3l2zLAtBC82JQuuadqAZ8YluMbZp+IxmFhFMAx0XicKxe+Qe3IsV6rEijqln3AtTOPdq15k9esbav1V2zYrgR+gW1/7wQuVCu+x3I9cAW+8EM+TdCe0NXAKuzmQI6ZUhHnhJpK370JOSGZW+KV/87UWUJJSeBxMZ1+/g2wBAZd17l87oJwZkAXKfdGP6ssybvq9/wXA8fCp7bEf4C94ApTeoojA3wDD+v8O8PfG+C7U8CO+nxWhbBtpkWdaTE6ESPik0iAJSXzUhkMxWV+3SGqqekJUC8loyJaILpN+RkpJS//5T7GT51K3zAnYK9owFv/+Du/O+9rXqviChI72/8j9QlBjcAsoH6Xn78GzAdOxl58hXSdNdh2ynHempsEzQEAeAc4D6hRIazREnycMxgaj1Ll8VhgieTllqzr2f6dEdE0CtL5ZlUBe0thUFgWqITX/vm/RHTJuKOme62K/5CS//z0R/z7up97rYkrGMBiQ/KJ+lI/CXwF29jviXXYK9gDgdD77BoPAV8E1nqsR6cE0QEwgc3AGaoE5qTkg2yBApKhsahn0YD30wW2GP7Ys4xq0KrgYdMooY9u1/yGOGfFooWsef1VDjvty2gBKGEtBWamlVtOPoF3nnnCa1VcoVnCIkPQ4E5Q8JfA7zr5mxbgb0AzcDzBGCPvBS3At4GfAjmPdekSQX4qPw4o3+ir0nUOrUowpSJOrIRGq960WJjyRWnoDraagoyCrYi4BifEdCqDfLX5jOo+/bj4kccZuN8BXqviKRvfep1bv/xFCum016q4wipLstSUbraLi9K9bnSTgd8DR7ujTmB5Ctv4r/dake4Q5EfyCGApirYCdiWpa0xMxpmUjDM41v2VliEla/ImawsGmwsmGSmJaRp9IzrjkjH2TcaJtzkYpoSnG9WN91VFQUo2OmwM1E6tBtPjerh0UMznfnApJ//k50gfl7O6gbRMHvnJZcy//x6vVXGFnLT70W9xv7tfMTZAB76Jnd1eq1adwLEZuzrNt4l+HRFkBwDgHOz6Slep1DWGx6MMiUXpE9XprUeo0LUdEYK8lKSFoNkSbDcsNhkmmw2TjhJ1q3SdE2oqGJuI8UpLhu2Gpy2h94qqigCAobrGETHv23+WGwNGjuKiB/5Fv3ETvVbFdTRg49tvcNfXZtPSUOe1OsqR2O1yPzRlqQrGndyOA4CrsJ2Bnubb54FbsbdQWjzWpWjK4Vl8J/Adr5UoBg2YWpVkW8FXvSE+hSXt7oCqohNjIhoHhf0BXGHqaV/m/918B7GqXl6r4gq5xnruv+i/+OBFXydWF029gHdNQVNpC4BU3IyTgGux+9uX+81tYudDXIOd6R9oyuHDimMPVzjKa0WKQQMGR3WSPk6SSwlJvcLKhAkRjf1DJ8AVdF1n9jXXc9R530CLxb1WRwlWJs3c39zEU7cq6QHmO5olfGhKNnszzEfljXgA8DPsdrfltidVAB7EdnRWeqyLMsrlKTwYWAAEcoRaXNMYFvX3/bLJFOQV9iaYGNGYHDoBrqFHo8y+6rpAOwJWJs3cO27iqVvK0/CnJCwzJRsdjuF2iBs34Xjge9jl2kEPRzVgJz3eCWzyWBfllNMTeB/g5bbvgWNQVKfSx1EAQ8JG03mL4J0Z3bYd4N9XXR7M+Po3Oeniy6gePNR/vUh3QQNat2xi/r2/45nf3OK1OsqRwGYhWWVJtvsj69fN268GOAs4FzjCxfOoRmJHle8DHsFHw3tUU27P3vHYnauGeK1Id6nQNAb7PArQJCSNipsUDdE1Do9pPS6DyAtGH3wYp199LfscMtV3UQGRy7Jy4Xwe/vlP2LLyY6/VUU5KwgZLsl5IMv7ywkplAyYBXwW+BEwp0Tm7gwSWAA9jj55f66k2JaLcHACA0dg1mft6rUh3GRbVd5QG+pUtpiCruE1xjQbTYjpV/n7pZcWBn/sCn/nWdxlxyGHo8aQnOliZNGveeJVnbr+ZFYte9kQHt5BAk7Tnzm+wJCl/Gf2d8eKuG4vdKW8mcBzebRM0YK/052KP6l3nkR6eUa6P3L7Av4FA9UztpWv0j/g7CmBhbwWobkceAw6JaQwL2waXnEFjxnLsnPPZb8Zn6DtqDJGKCtSPopCYmTR1q1eydO7TLPjzfTRt2az6JJ5hYa/yG4Vkm4A6ISl4rVTX8PqGiwKHAocDh7V9TUD9AKI8sAx4C3vw0WLgA7rXBKns8PrDd5MEcDsBGmmpAUMDEAXISckWU7iynzw6ojElWp5bAjkJKSkxsbd8ajR/9uKOxuNMOu4E9ptxAkMnTaZmwCAq+/YjUd2LSDQKegQ0bcfnrwEIAVJgGQVyrS1k6upo2ryJTcs+ZOkLz7Fi0csI4Y9N752R2HPjM1ISQSOq2RYp1vZdw677EtL+bmL/bVZCtm3mfLOUtPpj5nwx+PFhE8WeO7AvMBJ7S3co9hTYqravPrsc04xdj9+CPdToE2Ajdme+Zdgh/R5t7PeEHz981ZwG3IMdFfA9SU1jiM9zAQCahaTBpaFFlRocHNXKYoiQBDYKyXJT0ryLhYgAwyMaEyMa1cF/qYEiK2GFZQ/XKQTUcisivPJ6MD3lwx+OXcpxsteRZO9aAAAgAElEQVSKdIWBEZ2qABi/ekuQcrF2eahuRwOCmhvQ1cYuUeDAqMbISEBfaMDYKCRvGSXrtOd3wouuB9PTPvwvArcA47xWpCMiwLBYxJfh4V3ZZgnSLjoBOnb3wIkRjURArtZUW2OXTd18Xw6LauwTOgGuskFI3jA8rbv3G+EF14PpiR9+AvgucCk+LhdMtpUF+v0DktiVATn1WWOfIoKdHzAuovl2qmCjhBVthr+YdyMKfCYeTk10i4yEuQVRThvBGaDSoYzwauvB9OQPPwHMAX6ITzsI9tbt6YF+R2A7ASo7Be4NDbt3wJgIDNC9byJkApssyWohaVCQEjFc15ga8/pVlSevG5IN3rTbdYOnsBcyqx3KCS+2Hkz44dtR5unYHavOYPfsUk/pH9HpFYB8AAFsLUEkYGcqNNtgDtM1+uilu5gtYLuQbBSw0bKz+lWhATPjOjX+/8gDRUrCCwV3KldKzCbgB9gNa8B58UF4pfVgwg//0ySAz7R9HQcciA+GWgTFCZDYToDqRkFdIa7BYF2jvwb9dI1eCt+u9qYudcJu37pdSFfDyEN1jSPDKIBSFhvdz8nwGRns8bO/BlI7/Tx0AEKKJvzwO6YvdmOK8cBE7AYVQ4BqoLbtu45de9oKNGKPiFyL3dhC2YTCIDkBG00Lw+NnbQzorUMvzXYGKjSowE4kjAGRnWrwLexZBwZQkJDBbtfaKu1yxxZZ+gLiGXGdPv7/uANBg4CXDP/1IOgiJnZP+qvZ8zCa0AEIKZrww3ePscBSQFmf1Vpdo4+PcwIkUGcJWoO90vIFfTQ4Pu7/JFC/I4F5hc5LMX1IAfg7cAOwvIO/Cx2AkKLxrzUJPquwb15lNAnJZtOfWcyWhM1maPxV0Shhrep+yz2QNZYMmvFvAX6DXap8Ph0b/5AQR4Ten7sksSdMTVYpNKrZWwIVPmkZ3NrWFdCPjkmQiWOXBSb98TEHjqyE5wsiKA1/3gLuxV71N3fjuDACEFI04YfvPgcCr2EnGCqlStfoq+tEPfoUDWmH/EuZ+d/TGKhrHBMmBHYbCSwyJNv8H5G6C9vwv13k8aEDEFI04YdfGi4DbnRDsA7U6Bo1Eb1knQNNCc1C0FJkw5uQ7nFA1G6AFNJ1PrYk75uBuDqdfrChAxBSNOGHXxo04F/Yg4lcO0G1rtFb13FrwZiXkmYhXW39G7I7OjA9ptM3zNjpEvUCXjYEAcn7Dx2AEM8IP/zSUQ28Cuzv9oliGlRqGpW6RtJhnkBB2gY/LaXnpX09maQGM2I6FeEd2yE5CS8aglxwrtXQAQjxjPDDLy1jgUXAoFKdMALENY24Zn+PaaCjoQOaZl8AQoKFRGCH9/PSHpFakDIoq6geQR8NpsdLt9UTNCxgvgslf8loBE2DeFQnHtGpSkSpjEeoikd5Y12DU/GhAxDiGeGHX3oOAl4Cenush98QhGWpnTJI15gW08I3ahcE8Koh2apoeyoe1Tn3iFFUJ6Id/t2tL65weqrQAQjxjPA5UnrewR5LnPZaER9hAecC04DHcP5QK1u2Csnr4TjbTyGB1xQaf4BjxvTv1PiHhASd0AHwhpeBk4AmrxXxARZwHvA3YDFwKnbp5J+ArHdq+ZdNbTPtw+0Ze+X/uiHZrND4D+md5IBhtcrkhYT4ldAB8I5XgJnAdq8V8ZAsMBvb+O/M+9hd0IYBlwAflVgv37NBSF411E4iDBom8Ioh2ajQ+MciOrMmDcYnPbZCQlwldAC85S3gCOyZAT2NeuBE4N8d/E0j9gS0/YCDsSehrXNftWCwVUgWBivjXRk5CS8XhPJGP9PHDaC2Mq5UZkiIXwkdAO9Zgz018AmvFSkh72BPS1zUzWN+DIzC3iL4MXYypWfEfDCYqUHYZW8NPWg/oL7tNTcqdnzGDajmgGFhbm5IzyEMdPkHDbgUuA67DXy58mfgItTt75dk/atp0DsZY2CvJEN7JxlaW8GA6gS3z/u4FKfvFB27Y+CYMu8YuKqtw59qf6dPZZyvHbYP8Wj3nDovqwAO7dOn95uNjUXnEemahpCyvC+YkA4J01z9gwRuAuZj74lP8FYd5dQD3wIe9lqRndE0SEQi6Lq9ok9GI1QlIlQnolTFo/SuiNGvKkHfyjhRHxtXAbxjSjYLODSqld0AoZyEN021mf7txCI6X5gypNvG32vyojDVyfFxXRO5cOJkjyZ0APzHG9gh7iuww9wxb9VRwj+Bi4FNXiuyKxfPKC8/a6uQPG9IDoho7ONjh6U7rLck75mSgguyNQ1OnjyE/lXKZ3W5Tlowx8nxMV03clYP2jsK2Y1gubw9hxzwM+zEt+c81sUJy4HPAl/Bh8a/XClIWGJK5hvqu+KVkkYJLxmCJS4Zf7CT/sb0r3JJuqto23P5M5wIiEW0jCplQoJJ6AD4mw+wDeiJ2BUDQWEj8E3suQdBdmBKwf1uCa4XMK9gG9DWADkCLW0OzEsF95MbDxnRp6jjNF1n0MB+irXpOmNqKu9qNcwKJzIq9egqVfqEBJNwCyAYPA8chu0M/AiY4a06e2UFcAu2Uct5rEtQ+C+gFrsBknIkdgj9E0syIqIxIaJR49OdgZSE5aZkg8/HTMdjUYYNG0Iy4c3u3ISamjmrWlq+7VROMhpZqEKfkOASOgDBQQLPtH0dgm04voptPLzEBJ4C/tj2PdxU7B4mcCbwJHCCWydpdwTWW5IBOoyOaAzVvZ8pILA7G662JHUBuHKSiQQjhg8mGvVmJNOE3lW/XNPSerklnbtICan5KiE3pPSEDkAweQu7lO5S7JXjacDngF6lVqQCxmZhfanPW2bksOdD/Bu7RbSrbBewXUjimmSorjFchwG6VrKaYIF9/o0CNlnu7e+rJh6Lemb89+tTc1ZdLn/Liub0QBXyeseimQ9aWrrThyOkDAkdgGCTBf637SsBHAdMb/ua2vYzV5nQt2+vdxscj0QNgQxwCvCPtu+uU5Cw1pKstSCGZICuMaDNGeilqWsSIrHD+9uFZLuAOiExFMkuFZqmMXxY6Y1/m+G/6cPG1GCVcmsT8WebjZ7cSDoEQgegnMhjJ9y1J93FgInYiXj7AyOwe+sPxd42SAI14Gy8fF4UZmMnK4Y4Jw98GbgPOLuUJzawQ/GbBIAkAtRo0FvXqNagQoMK7P4CMUBv+y6x9zCEtGXkJGSlJAu0SmgWkpS0Jz4FmYED+pJIlK4/1359as6uy+VvVG34wXbsKmLaz1XLDQkeoQNQvhjYMwY6nDPQvyLeWJctFJ1H0FIwzwGuKvb4kN0wgDnASuDneNSt08Iuw2v8VKMYP6fmuUc8HqNvbWlaBLcZ/ps+bEwNcuscgyoSy5Y1pt93S35IcPA6ByjEYyoj0Y1Ojt+czY85qE/N51XpEwLYlvZq7ChAWE3hMf361rruhu3Xp+bsgRWJLR82pv66LZt3zfjrmkZNLHGuW/JDgkXoAPRwYrq2xMnxQkrWpbP/OHhw9QBVOoXs4AHsQVFhvbZH6LpOTY17jYJKZfjbGVKReGNFKvW62+cJCQahA9DDSeh6R+N4u0Rjwahc31j4+MD+vcqrr64/eBs4FHjEa0V6Ir2qK9E19x6TpTL8AFXRSKFCj4bRupAdhA5AD+crTS2PV8eijnO06vOF3isaMx9NqKm6//gBA6pV6Bayg2bs5MBvAimPdelRVFY6arbnG3RNY0hVxTkrW1u3e61LiH8IHYAezlUg+sRjb6qQlbUsfUUqPee1hobmUdVV8/Yf2OcAFXJDADsv4I/AAdidIUNKQCkz/91keGXybyubW//htR4h/iJ0AEKoiEWvVykva1n62tb08R9ub3p3SEVyzX61vb6uUn4PZx12s6CvA1s91qXsiceCXyg1vDL5zPp09hyv9QjxH6EDEMKKppb/DKqIK+/mI6RkczY36sOmlvv6xmMtE2qr7zxg0KBAjl7zGRL4M3afh1shcH11VGAC97h9Ej0S7Efk0Mrkwg2Z3Oe81iPEnwT76g5RRm08/lM35TcUjOoVTa3f+biuLjW6V9WCwwbUHqxItKMO8sW2VNd1jd41nqc6NAOXYDd6eoCeMYdBAg9jv+ZvuH2y0jVIVouuaYyoqrxvUyZ3rNe6hPiX0AEIAWB5c+vdA5KJzW6fJ2tZ+pqW9LFv1TW/NaQiuXpyba/znIp0crAluucBaBr06dObcWP2YegQJW3ZVbACOAs7P+BhytcReBa7xfVsYLnHuviWZEQ3R/aqPPeTdOYCr3UJ8TehAxCyg9GVVWfEdb0k7d7atgdGf9DU8qfaeKx1VK/Ke8f17VtThChHDoApum4rI7rOiOFDGDywH5GIN9PgOuEDbOM4HrgBO0IQdPLAX4EDgVmAo74V5YymwaCK5JL+8cSoNan0X7zWJ8T/hA5AyA5eb2h4dVhVRckfHE0Fo2ptS+b8jc3NjaOqq16c0qfPlG4cnnFy7oLVNQcgEtEZNWo4VcEoC1sNXA6M9loRB6wGfgQMwW6N/J636vibfon45lGViZO2ZnOHb8hmHXX3DOk5hA5AyKdY05I+b2hV0pPwalv1wIwPmpreG1qZXHtA795dCWG2Ojlna77ziWiaBsOHDg5iRnij1wp0k3XAzcARwDjgRoL3GkpK/2Rs+9iaqnPr84Wha9L5uV7rExIsQgcgZDdGV1Qf3i8Rb/Lq/EJKNmVyI99rbr6nj109cEcH1QObnJyrJde5A9CntobKyuQef6drjpPEfLmXUCJMYDH2dsU07IjFZcDr9NTJQ12kXzK+ZUxN1Vl1OWPgqjDcH1IkgVvShLjPorq6lkmVlfuJuPywsWAUPSlQBY0Fo7qxYHy3IpK9aHSvqkW9k7Hvv7O96Z2d/uQTJ/JTuY4r6HRdo3+/Pnv9fUUiSroTGZ3QF+gp3dnqsPMUXgHmA4twGMHpafRPxrb3jcV/uKIlfX99ruC1OiEBJ3QAQvbIR5nM5v/f3p0HR3rXdx5/9y31KbVuaWY89+mZMR7fGOP14lQIJPHiggBmIWyK4E02QIoKtZv9g0oVqYWwWQJsCFc2dgKhYggVwAYTBhvM4eEYX3Pac2vG0uiWuqW+j/3jGc1oZqS+nqf1tNSfV1X/Ybee3/OzxtPPt7+/7+/72xUOb/K4XEdHk6ll6VVeyvzuAees4/m+1pbTbT7vXxybjv0jJgOAsdl0yfdDwUDJgr9gi9dsALAPeNLMAHX2lxjr8F2XXj3AUkHhFEYwM3HpNYqxQ+HYpdd4vSe7WnX4PCMRn/fDp2NzXx039/+byGUKAGRJR2KxSWBNf6Dlu8NzqfsbISd7affAxuFk6tGo1/O5PBybydT+gVguAAgE/KXf93lqvvclb6OxA4C69oeQ0jpbPGPtnpaPnIjHH5lI68Ev1lINgJSTG5pL/caOSPDhgNvdUJ9Ak5lsYCaTvcXMGFOJDKnc0mchtbT4Sl7f02a6seFDGNv2RC7r8HlGN4QD7x5PZbtPxOOP2D0fWZ0UAEhFjs7MfmFjINCzIeT/ls/lXDWNZopFuDC1dCsBj7t0jd6mXtMlEl7gK8DiVYY12Ay+bZHQn/X7W45aNaYsjw6fZ9So6s/2nInN/ZPd85HVTUsAUrFDMzNTwAN7eoLd8UTx0ZFk6v5ELr/iq9gHJxNsXuIEY6ezdIy8sceSGsnbgO9gLAfUtO1tF3jzkcAHYtn8e8+nM9vTM3EF9ytIR4tntM3j/cip+NyjSvXLctGHhFTtpZHZ0TPxuTfu7e0LbWkLfjrq88TtnpMZpydqL0QfiAYJtVpyZOwbMJrdvAeoqLBgH3i2tgU+3O9vOXLS5Uwen5n75FAitTOdL+jvtQUcZbZ4Fmo9SGKBjhbP6JZQ4L0TqWzPqfjco6YHFKmCPiikZs9euJA8MT37ocl0NryrPfzO/taWl13m98Uvu3gqx9BMbR2FHQ4Ht2/tt2oqazBO+TsD/E/gusMG9oFnSzjwwT6/79BhlzP1yvTc/27ih37pAo0yXM7S/6+6ymR/MiVqRyrhcDA9kcr2nIjPPWJqIJEaNeOHhtTBkanY14aSqe07o8Ed64P+77e6XeY+HZfZyyO1JzFeu32NhTMBYAD4GDAIPOKB2xc+9E/E5v5mOJG+sUkf+gsNmLm4pUx9R7mjgLM5c6UwxaK6HIq9mv0DRCx2aCJ+/Oxs4jdvWmHLA8cuxshWeC7AtQaiQatqAa7lA96ThQN66C/qbjMXt3hKBwBeT+mVmFnzjXhWxN8NWb30YSJ1sXB5YGd7+F39/pZTjbw8kM4VOHoxVvP1/+mOrRbOpjG4G/jP65L3mrm41Vs6APD5Std2TM+V7iFRAQUAYisFAFJ3R6diXx1KpDbviEZ3bgj69zfq8sAL56e5tq6rWGGh17b+KDdtuG7JfkVrdbtMP+Hq6M3AvWYG6AqUfsC3tJR+f2o2Zeb2AMNmBxAxQwGALJvDExPHzswm7l+wPFD7V+46mExkOD5y9ZTyVSwLPHjHNjxl1o1XkojXc9zuOSxhK/APZgfpiyx9tLMDBwF/6S6Qw1OmjzEw1cZaxKzV82klK8aC5YFIoy0PHDgzcdX2rlS68nXenrYA73jdznpMa9k5gLDH/VG757GI/4BxkFCn2YEG2pYOAFr9LbjKBHNDkwoAZGVTACC2arTlgelklufPXzkJOZGobnvg3TvWcOc2U8XpDWEg0Hro6HT8W3bPY4E7gMeA/UCv2cGiAS9B39J90MLB8i2ez43NmJ3GGbMDiJihAEAaQiMtDxw4M8FsOgfATGz2urqAch66Z6cVLYJt09HinQy0Bl5r9zyACPBHwAvAs8Bbsegz68a+yJLvOZ1OIpFQyetHZxLEkqZ3AbxkdgARMxQASENphOWBTL7AUy+PApDL5ZiZqS4W8bpdfOjNt7K1P1qP6dWNAxgItL7UGQyvf3l83M4K9duALwOvAn8L7LVycJfTwY7e8JLvt0VCOMs0CToxPGl2GnGUARCbKQCQhjW/PLC9vX3Xci8PnBqf5fCQkeIdHZskm81Vdb3P4+IDb9rHzrWml6rrzudyFgYCLYe3toUeeHUuudemh38YeBh4DvgF8AeA6aMWF7O5K4h/iS2ALpeLjmj57M2hc2Nmp3EIaIQTtqWJKQCQhndkcvLo/PLA1nDoU+1ez3T5q8z70YkxphIZ8oUCrw6PUihU93ntdRtBwG/fuhlngxQ5Xivice9fG2lrf3Uutftle9b8bwG+iPFt/++A19TzZi6ng7s2Lh2UdXa04S7TITCby3Pk/LjZqTxrdgARs1b8SW7SPC7EYrmJdOb7qXzhE7vaw6+4HdyYzBc66/U1qlAscm4ywY7eMMVCnkQyRSjoL3tC4EIOh4Nt/VG2D3Rw/NVJkpnqMgn1li4UNk4mk78PBIGXAdOl7RUIAb+P8eD/KLAP41jkutu3Lsq27sXX91tbW+jt6aJcrPbi2TF+8cqQ2al8HHjF7CAiZigAkBVpLJU+PJvL/99dHcHHWlzuzZlCYUOuULQ8o5XK5hmNp9neEyaXyxGLz+HxuPF5q3teRUOtvH7XOoI+D4PjMdMHyVgshNFU5wPAduACxjfyevk58IdAXx3vcZ2gz82bdvUtegiQy+Vi3Zq+slv/AL7x7MuMziTMTKUA/DFgupOQiBkKAGRFG01mxmcy2a/c2j/wyVZnIUSxuDOZL5g6Je5aM8kssXSWTZ1BCoUCsfgciWQKr8eDx7P0VrJruZwONva2ce+udbR63QxPzZLKNlQg4AL2AO8D3ggkMbICVk8yBPyGxWOW5HI6eGDvAG3+RQI3Bwz0ddPa2lJ2nKnZFF/76bGqd4Zc4yDwWVMjiFhAAYCsChdisdxkKvNkMl/4X7vawyd8LseeRC7fYe68tivGZtPE0zk2dQUByGZzzMTiJBJJXC5nVRkBt8vJ5r52/uOe9dzQFWE2lWE8VttxxHW0BngLxjf1ToxAwKqtma8AHwQqj55Mum9rN5u7rk/9O4C+3i4i4WBF4zxx8BQnh00f4vc54CdmBxExSwGArDpjqfShWDb32Z0dwcfS+eJ96Xyhy5JxZ9PMpXNs6AheXifOXloWqCUj4HA46G0LcOe2Afas7yaXL3Bxeu6qToQNIIhx6t4fAzswlgbMLg8kgZ3AbpPjVOQ1a9q4fUPH9W84oK+nk7a2pbcELpTK5Pj7H75ErsZTIxf4E8D0NgIRsxqzNFnEOl3AUSxoHTtvU2eQ37qxD/cia8n+1hai0QihCjrJLSaezPDM0fP8+MigFafN1cuvgM8AXwdqneS9wNNWTWgpt90Q5bWbrv+jdzqdDPR3EwyU7ve/0Hd+fZLv/Oqk2SkdxwikRGynDICsdgmMorYHrRpwKpHh3ESCGzr8+K7ZMmYmIwBG/4Ct/VHu272e/miQmUTailPnrDaAsTzwPoz1/Fp2D5wD3o6Fgdm17t7UyR2LfPP3+bysW9uLv4I1/3nxZIYv/eBFcgXT3/4/hdL/0iAUAEgzOAzcDGyzasC5TI5jF+N0BX2LFpZdrhGoMRBwOhwMREPcvWNNoy8PvB5j98AO4DRwsYrrfdShGDDU4uZ3dvcv2u0vEgmxZqAHj7u6P4+v//w4p0ZMt5/IYWx/tLPLoshlCgCkWTwFvBOj45wlcoUix0fiJDI51rT7F91eZqZYcF5bwMdrNvRwz861tHrdjEzPNeLugd0YBYPrgB9gPOxK+qM37N733NmxNxaL1i1F7uwN87t7BogGrv49OxwOero76e6K4qiyKdPJi1N87afHrJjeExi9D0QagmoApJncBfwI8Fg9cLjFw71bui7vEliK399KV0c7fn/l6edr5QtFnjt9kacOnePUxWVpilitnwP3Yyy/XOVj775zIBfLfDKZTj+QSWdav3dkmOMj5r8Qb+4Kcvv6DrpD1+8A9Xq9rOnvxuerPvjK5vJ87BvPMjxlSX+k3wK+Z8VAIlZQACDN5k8wCtjqYm27n3s2dy36IFrIbLHgvHNjMZ46dI5fnRy2ojrdSv8A/Jf5f/jLB299VyqT/fNEMrm9UChe/ty5MJ3k68+dr+kGbpeDbd0hbl7XTmdg8d93JBykt6er7OE+S/naT47y9OHBmq69xosYbY4bag1HmpsCAGlGjwLvrucNNnYGuPWGKP2R1pI/Z1Ug0IC7B4qbe9oe+M93bXxbMpV5SzqdWfIX8eiBs0wmKj9atyPgY89AhB29YXzuxTv3ORwOurs6iLbXvuLzwpkR/u7J5616Yj8E/LM1Q4lYQwGANCMP8G3gN+t9o/5IKzetaWNLd7DkgUB+fyudne0EqqhMX0wjLQ+si/p58KY1ZX/u4OAUz5wsvS3e7XSwtTvE7oFI2aDK5/UyUGPKf97Q5Cwf/+YBUlWeArmEkxhFko11EIQ0PQUA0qwCGIWBty3HzYI+N3sG2tjdH1nyKFqwLhCAxlgeeNvNaxloK/3ATmXzfOlnp8ktctpiR8DL7v4IO/rCtJQ5pQ+MKv/e7s6aU/5gZFM+/s0DjMVM9ftf6PeAx6waTMQqCgCkmXUCP8boSrcsXE4H23pC3LSmjZ7Q0g95KwMBO5cHKs0CLCwGdDsdbOkOsbs/UjZ4uMwBvd2dtFfY1W8piXSWv/72rzg/blXXY34J3IHW/qUBKQCQZtcFPInRJ2BZVbI8YFWNANi3PPB7+9aWTdtfmE7yw+Mj7B6IsLM3TIun8h3KDhz093URrrCf/1JSmRyfeeIgJy+a7vU/r4jR8fAZqwYUsZICABGIAI9j9LxfdpUsD1iZEYDlXR64IernLRVkAWrV091BtD1iaox4MsOnn/g1g2OWffMHeAR4r5UDilhJjYBEjH72/4KxTWvLct88ky9wfirBCxemmU5mCbW4Cfqu7lSXzeaYmTE6C3q8HrxVdha81nI2F5pJZrkh6ifUYnn7BYJBPz3dnaa+yYxMz/Gpx3/N0KQle/3njQK/i3HwkUhDUgAgYshiBAEtGA2Dlj07ViwaJw4eGpphcDKBx+UkGvBe1bnO6kBguc4emE3nFm3Na4bL6eSGtX04nYtvBazEkfPjfPqJg0zPWf7f/D6M9X+RhqUAQOSKIrAf48S2NwK17yMzKZ7OcWJslsNDMZLZPNGAF++CPe9WBwILzx7Yu74bgKGpOQqLVObXYiaZZV27n7CFWYCOjraqTvNbqFAo8vivT/GVHx8hk7M88/EY8FGrBxWxmmoARBa3F/gqsMvuicCl3QPdIW5au/juASuLBedZvXvghmiAt9w0YMHMjON8t2xch9NV/bf/VyfiPPL0Yc6NzVgyl2ucwigotbSYQKQelAEQWdwI8P+AVoxtXLYGy+WWBxYeQ2xFRgCuXh4YHI8xOmNuX/xMMsv6jgAhn/m5RcLBqqv+M7k83/rlSR55+hBT1qf8wagleRNwph6Di1hNAYDI0nLAv2McIHQPELV1NpfMLw8cGY6RKxSJ+r14Ln0Tvrw0YOL0wWs5HQ762oP85GhtPfsXsqoWoKOjveJOf0XglyeG+NyTz3N4cIw6nqj8B+iwH1lBFACIlHcO4xjXBHA7NtYGLHTV7oFElrZWD36v8e36ckbAokAg4vdxfiLGxek5U+NMW5IFcNDb3VFR8d/pkWm+8O8v8NShc6Qyde3E+1fAX9fzBiJWUwAgUpkc8FOMg4S6gN00SA3NwuWBRCbP2qj/cmMhKwOBnrZAQ2QBPB43nR3tJX9mcjbFPz9zlMd+dqxe6f6FvgE8jLr9yQqjAECkOnHg34B/xWggtBOofR+axUbiKYZnUmztCV3VXdCKQMDKLMCGjsB1vQ4q5fV6lmz5m8nl+e7B03x5/4sMWtfOt5TvA29FB/3ICqQAQKQ2Y8A3MXYKtGLsFjBf3WaBWCpLOltgQ+f1OwLMFgs2QhbA6/PSFg5d9e8WrvO/eHaUvEXbF8v4CfDbQN1TDCL1oABAxJwpjDbCXwRmgG2AtR1vajA6m3rh39EAAAeKSURBVGJzV/ByTcC1ai0WbIQsgMfjoS1yJQBYxnX+hX6I8fA394sQsZECABFrJDC+EX4WOAz0A+vsnJDT4WBDR+m+ALUsDViVBZhL59heQxbAgYNoe2S51/kX+ibwIGrzKyucAgARaxWAIxg9BL6D0Vp4BzYsD2TzBfauaavsZ6tYGrAyC7CxhixAJpfnwNnJ5VznX+jzGAf8ZJf7xiJWUwAgUj/DGAWDXwAmgK0YhYPLIpsvcPv6juquWbA04PG48XoWb91rWRYgk2N7T+VZgFdG43z7pSEODY4v1zr/vBzw58D/QNX+skooABCpvwTwM+BvMbID/cDaet+0UIQ7N1QXAMzL5nLMxGZpbwsvut/eqizAVKKyLMBwLMXjh4Z4/vw06Vx9jy9exBjGyX5fWe4bi9RTw2xfEmkC8ycOvhajX/wXafB15GRq6bX1N9+y2ZJGCAfOTiz53mw6x/7jI/zLwUEuxmwptt8P3AQ8bcfNRepJGQARe1zE2D3wJYyDY7YDoZJX1KDWDMA8n9eL39+66HuWZgE6r84C5PJFfnFuku8eGbbrwZ8C/gz4bxi9H0RWHWUAROw1CnwMY8fA72B842wYyXSm5PuWZQHOXMkCvDIa59FfnOXAmQlyeVuW238MvAb4G7TeL6uYMgAijaEIvAL8E0ZmoAUjK2Bq94DZDEChUKAjuvROAiuzAEGfm6deHrVrnR+MEyAfBj4MjNsxAZHlpAyASOM5CLwHm/sIAORyeXK5fMmfsSoLsP/4iF3p/jTwCYxdGl+1YwIidlAAINK4Ru2eAEAqnS75/rrOMHs3dC/TbCz3OMZ5Dv8doxZDpGkoABCRkpKp0gEAWJcFWEbPAfditPM9be9UROyhAEBESkqlShcCworKAowDHwJuwyj2E2laCgBEpKRSvQAWavAsQAb4DLAJ+DRQurBBpAkoABCRkvIVFAJCQ2cBHsc4j+GDaJ1f5DIFACJSVrlCwHkNlgV4Dng9WucXWZQCABEpq5JCQGiYLMAQ8H6Mdf5nbJ6LSMNSACAiZVVSCDjPxixAEmM//w6Mcxa0zi9SggIAESmr0kJAsC0L8DiwC+3nF6mYAgARKavSQsB5y5gFOAjcg7HOf2Z5bimyOpjqMy4idVfyOfqn921dtsNqUuk0Qbe/op+dzwK8cKZuzQyHgL8AvgzYcnCAyEqnDICIVKTSQsB5dcoCJDDW+bdjrPPr4S9SIwUAIlKRagoBwfJagCLwda6s88etGlikWSkAEJGKVFMIOO/+vRusuv39wNuAs1YNKNLsFACISEWqLQQE2NLXTn80aMXt11sxiIhcoQBARCpWaUfAhe7evsaKW7/fikFE5AoFACJSsWoLAQHu2j6A1+0ye+tbgZvNDiIiVygAEJGKVVsICOD3ebh5Y48Vt3+fFYOIiEEBgIhUrJZCQIDX7Vxrxe3fBYSsGEhEFACISBVqKQQEy4oBg8DbzQ4iIgYFACJSlVoKAQHu3mFJMeAfWjGIiCgAEJEqJRK1LQPctc2SYsBbUDGgiCUUAIhIVebmEjVdZ2ExoLIAIhZQACAiVUmlM2RzuZquvceaYsCHgLAVA4k0MwUAIlK1qalYTddt7mtnQMWAIg1BAYCIVG1qeoZ8vvrdAGDZlsD/asUgIs2sDqd1ioiFimYu/tP7tlo1j+u0t4Xo7emq+rpEOstH/vFHZGrYTniNW4CDZgcRaVbKAIhITaam48Rn56q+zu/zsG9TrxVTUDGgiAkKAESkZsPDY6Qz2aqve91OS3oCvBMVA4rUTAGAiNQsXygwODhEOl3dGQGbey0rBnyH2UFEmpUCABExJZfPM3hhmLlEsqrrVAwoYi8FACJiWi6X5/z5YS6OjFMoVFa3eKc1nQH3YhQDikiVFACIiCWKwNR0jJOnBxkfnyKfL5T8+VavW8WAIjZSACAilsrn84xNTHHi1DkGzw8zMTlNIpEkk8lSKFwdFLx+lyXLAO9AxYAiVXPbPQERWZ2KxSJziWTZ2oCuoI+x2dpOGLwkiLEj4PNmBhFpNsoAiIitbuyPWDGMigFFqqQAQERstaM3jNtluinpHuBWC6Yj0jQUAIiIrXxuJ9u6Q1YM9X4rBhFpFgoARMR2uwfarBjm7agYUKRiCgBExHZ94Ra6gj6zwwSAhyyYjkhTUAAgIg1htzXFgA9bMYhIM1AAICINYXtvGI/L9EfSHuA2C6YjIiJiq6JeVb/+vqbftEiTMb33RkTqqrLG+rJQEugHpu2eiEgj0xKAiKw2rRidAUWkBGUARBqbMgC1eQnjpEARWYIyACKyGu0B7rB7EiKNTAGAiKxWb7V7AiKNTAGAiKxWb7B7AiKNTAGAiKxW6+yegEgjUwAg0tjidk9gBdPnm0gJ+gsi0tjO2z2BFeyE3RMQaWQKAEQa2w/snsAK9ozdExAREanVjUAO+9vrrrRXFthcw+9bpGkoAyDS2A4Dn7d7EivQ54CTdk9CRETEDC+wH/u/Va+U1/cAd02/aRERkQbjBT6LlgNKvfLAJy79rkRERFaVXcD/AQ5hbBG0+6Fr92sKeB74K2C7id+rSNP5/y3/BmGfz6xyAAAAAElFTkSuQmCC";
 
 // FocusLogApp.tsx
-var { useState: useState5, useEffect: useEffect2, useRef: useRef3, useCallback } = React5;
+var { useState: useState5, useEffect: useEffect3, useRef: useRef3, useCallback } = React5;
 var BREAK_BG = "#edf3f8";
 var BREAK_STRIPE = "#9bb4c8";
 var BREAK_TEXT = "#5e7d96";
@@ -24461,15 +24469,13 @@ var MEAL_STRIPE = "#cf9a5a";
 var MEAL_TEXT = "#8a5a22";
 function useTimer(api) {
   const [, force] = useState5(0);
-  useEffect2(() => {
+  useEffect3(() => {
     if (!api.timer)
       return;
     return api.timer.subscribe(() => force((x) => x + 1));
   }, []);
   return api.timer ? api.timer.getState() : { secs: 0, total: 0, running: false, paused: false, lengthMin: 25, taskName: "", startedAt: null };
 }
-var LOAD_COLOR = { A: "#b4533a", B: "#c79a2e", C: "#5b8c5a" };
-var LOAD_LABEL = { A: "A \u2014 high load", B: "B \u2014 medium load", C: "C \u2014 low load" };
 var SectionIcon = ({ src }) => /* @__PURE__ */ React5.createElement("img", { src, alt: "", draggable: false, style: { width: 15, height: 15, verticalAlign: "-3px", marginRight: 2 } });
 var POWER_COLOR = { P: "#c96f86", Y: "#cda32f", G: "#6f9461" };
 var POWER_LABEL = { P: "Must Today", Y: "Aim Today", G: "Bonus If Done" };
@@ -24598,15 +24604,34 @@ function stripLeadingTag(title) {
 function Stat({ label, value, color, big }) {
   return /* @__PURE__ */ React5.createElement("div", { style: { padding: "8px 12px", display: "flex", flexDirection: "column", alignItems: "center" } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: big ? 34 : 20, color: color || C.ink } }, value), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 11, letterSpacing: 0.4 } }, label));
 }
-function TomatoPips({ vivid, grey }) {
-  const items = [];
-  for (let i = 0; i < vivid; i++)
-    items.push(/* @__PURE__ */ React5.createElement("span", { key: "v" + i, style: { fontSize: 13 } }, "\u{1F345}"));
-  for (let i = 0; i < grey; i++)
-    items.push(/* @__PURE__ */ React5.createElement("span", { key: "g" + i, style: { fontSize: 13, opacity: 0.28 } }, "\u{1F345}"));
-  if (!items.length)
+function TomatoPips({ vivid, grey, base, plus, overInfo, underInfo, onGrey }) {
+  const total = vivid + grey;
+  if (!total)
     return /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11, color: C.muted } }, "\u2014");
-  return /* @__PURE__ */ React5.createElement("span", { style: { letterSpacing: 1 } }, items);
+  const b = base != null && base > 0 ? base : total;
+  const p1 = plus && plus[0] || 0;
+  const p2 = plus && plus[1] || 0;
+  const items = [];
+  for (let i = 0; i < total; i++) {
+    const doneOne = i < vivid;
+    const round = i < b ? 0 : i < b + p1 ? 1 : i < b + p1 + p2 ? 2 : 0;
+    const bg = round === 1 ? "#FBEFC9" : round === 2 ? "#F8D8B4" : "transparent";
+    const label = round === 1 ? overInfo && overInfo[0] ? "round 1: " + overInfo[0] : "extra round 1 (+\u{1F345})" : round === 2 ? overInfo && overInfo[1] ? "round 2: " + overInfo[1] : "extra round 2 (+\u{1F345}): if it grows again, split the task" : !doneOne && onGrey ? underInfo ? "finished early: " + underInfo : "finished early? click to reflect on why it was lighter" : void 0;
+    items.push(
+      /* @__PURE__ */ React5.createElement(
+        "span",
+        {
+          key: i,
+          onClick: !doneOne ? onGrey : void 0,
+          role: !doneOne && onGrey ? "button" : void 0,
+          "aria-label": label,
+          style: { fontSize: 13, opacity: doneOne ? 1 : round === 0 ? 0.28 : 0.5, background: bg, borderRadius: 4, padding: round === 0 ? 0 : "0 1px", cursor: !doneOne && onGrey ? "pointer" : "default" }
+        },
+        "\u{1F345}"
+      )
+    );
+  }
+  return /* @__PURE__ */ React5.createElement("span", { style: { letterSpacing: 1, display: "inline-flex", gap: 1, alignItems: "center" } }, items);
 }
 var btn = (color, ghost) => ({
   padding: "7px 14px",
@@ -24861,11 +24886,23 @@ function RotateCcwIcon({ size = 16 }) {
 function LockIcon({ size = 13, open = false }) {
   return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("rect", { width: "18", height: "11", x: "3", y: "11", rx: "2", ry: "2" }), open ? /* @__PURE__ */ React5.createElement("path", { d: "M7 11V7a5 5 0 0 1 9.9-1" }) : /* @__PURE__ */ React5.createElement("path", { d: "M7 11V7a5 5 0 0 1 10 0v4" }));
 }
+function SunRoutineIcon({ size = 14 }) {
+  return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("circle", { cx: "12", cy: "12", r: "4" }), /* @__PURE__ */ React5.createElement("path", { d: "M12 2v2" }), /* @__PURE__ */ React5.createElement("path", { d: "M12 20v2" }), /* @__PURE__ */ React5.createElement("path", { d: "m4.93 4.93 1.41 1.41" }), /* @__PURE__ */ React5.createElement("path", { d: "m17.66 17.66 1.41 1.41" }), /* @__PURE__ */ React5.createElement("path", { d: "M2 12h2" }), /* @__PURE__ */ React5.createElement("path", { d: "M20 12h2" }), /* @__PURE__ */ React5.createElement("path", { d: "m6.34 17.66-1.41 1.41" }), /* @__PURE__ */ React5.createElement("path", { d: "m19.07 4.93-1.41 1.41" }));
+}
+function MoonRoutineIcon({ size = 14 }) {
+  return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" }));
+}
 function MinusIcon({ size = 16 }) {
   return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "M5 12h14" }));
 }
 function PlusIcon({ size = 16 }) {
   return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "M5 12h14" }), /* @__PURE__ */ React5.createElement("path", { d: "M12 5v14" }));
+}
+function ExploreIcon({ size = 13 }) {
+  return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "m21 21-4.34-4.34" }), /* @__PURE__ */ React5.createElement("circle", { cx: "11", cy: "11", r: "8" }));
+}
+function HammerIcon({ size = 13 }) {
+  return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9" }), /* @__PURE__ */ React5.createElement("path", { d: "m18 15 4-4" }), /* @__PURE__ */ React5.createElement("path", { d: "m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5" }));
 }
 function BookmarkIcon({ size = 13, filled = false }) {
   return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: filled ? "currentColor" : "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z" }));
@@ -24924,9 +24961,12 @@ function CopyIcon({ size = 13 }) {
 function WandSparklesIcon({ size = 14 }) {
   return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z" }), /* @__PURE__ */ React5.createElement("path", { d: "m14 7 3 3" }), /* @__PURE__ */ React5.createElement("path", { d: "M5 6v4" }), /* @__PURE__ */ React5.createElement("path", { d: "M19 14v4" }), /* @__PURE__ */ React5.createElement("path", { d: "M10 2v2" }), /* @__PURE__ */ React5.createElement("path", { d: "M7 8H3" }), /* @__PURE__ */ React5.createElement("path", { d: "M21 16h-4" }), /* @__PURE__ */ React5.createElement("path", { d: "M11 3H9" }));
 }
+function Undo2Icon({ size = 14 }) {
+  return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "M9 14 4 9l5-5" }), /* @__PURE__ */ React5.createElement("path", { d: "M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" }));
+}
 function AutoTextarea({ value, onChange, placeholder, style }) {
   const ref = useRef3(null);
-  useEffect2(() => {
+  useEffect3(() => {
     const el = ref.current;
     if (!el)
       return;
@@ -24959,8 +24999,8 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
       holdRef.current = null;
     }
   };
-  useEffect2(() => () => endHold(), []);
-  useEffect2(() => setTask(preset || ""), [preset, tasks]);
+  useEffect3(() => () => endHold(), []);
+  useEffect3(() => setTask(preset || ""), [preset, tasks]);
   const mm = String(Math.floor(secs / 60)).padStart(2, "0");
   const ss = String(secs % 60).padStart(2, "0");
   const meta = tasks.find((t) => t.task === task) || {};
@@ -24991,7 +25031,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   const logBtn = /* @__PURE__ */ React5.createElement("button", { onClick: submit, disabled: !canLog, "aria-label": canLog ? void 0 : "pick a task and an expected rating first", style: { ...btn(C.ink), width: "100%", padding: "10px", opacity: canLog ? 1 : 0.5, cursor: canLog ? "pointer" : "not-allowed" } }, "log pomodoro + write Act");
   const markDoneLabel = /* @__PURE__ */ React5.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13, color: C.ink, cursor: "pointer" } }, /* @__PURE__ */ React5.createElement("input", { type: "checkbox", checked: markDone, onChange: (e) => setMarkDone(e.target.checked), style: { width: 16, height: 16, accentColor: C.better, cursor: "pointer" } }), "also set this task's status to Done in Notion");
   const chooseNextControls = /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("label", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: chooseNext ? 8 : 14, fontSize: 12.5, color: C.ink, cursor: "pointer" } }, /* @__PURE__ */ React5.createElement("input", { type: "checkbox", checked: chooseNext, onChange: (e) => setChooseNext(e.target.checked), style: { width: 15, height: 15, accentColor: C.ink, cursor: "pointer" } }), "pick the next task now (the log reopens to it after the break)"), chooseNext && /* @__PURE__ */ React5.createElement("select", { value: nextTask, onChange: (e) => setNextTask(e.target.value), style: { ...inputStyle, marginBottom: 14, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 } }, /* @__PURE__ */ React5.createElement("option", { value: "" }, "\u2014 next pomodoro: decide later \u2014"), tasks.map((t) => /* @__PURE__ */ React5.createElement("option", { key: t.task, value: t.task }, t.task, t.king ? " \u{1F451}" : ""))));
-  return /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : C.ink } }, mm, ":", ss), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React5.createElement(InfoHover, { C, label: "how the Focus form works", width: 360 }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Focus"), /* @__PURE__ */ React5.createElement("div", null, "Pick a task, set your expected feeling, and run the timer; when it finishes you rate how it actually went and the pomodoro is logged."), /* @__PURE__ */ React5.createElement("ul", { style: { margin: "6px 0 0", paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Task"), `: today's tasks from the Plan; "Act +1" writes back to this task's Notion page.`), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Feeling"), ": the four weathers, rain to full sun; your before and after ratings are both saved."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Timer"), ": the round buttons set 5 to 30 minutes (hold to speed up); the length locks while a pomodoro runs; the circle arrow resets the timer and task."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Pause"), ": pausing asks for a reason, yellow for internal, blue for external; it is recorded in the Pause view."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Log manually"), ": adds a pomodoro without running the timer."))), /* @__PURE__ */ React5.createElement("button", { disabled: lenLocked || pomoMin <= 5, onMouseDown: () => beginHold(-1), onMouseUp: endHold, onMouseLeave: endHold, "aria-label": lenLocked ? "length is locked while a pomodoro is running" : "shorter \u2014 hold to speed up (min 5)", style: { width: 24, height: 24, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: lenLocked || pomoMin <= 5 ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" } }, /* @__PURE__ */ React5.createElement(MinusIcon, { size: 14 })), /* @__PURE__ */ React5.createElement("button", { onClick: running ? onPause : () => onStart(task), disabled: blockStart, "aria-label": blockStart ? "pick a task and an expected rating first" : void 0, style: { ...btn(C.ink), borderRadius: 999, height: 32, padding: "0 21px", minWidth: 84, opacity: blockStart ? 0.5 : 1, cursor: blockStart ? "not-allowed" : "pointer" } }, running ? "pause" : /* @__PURE__ */ React5.createElement(React5.Fragment, null, paused || pauseActive ? "resume" : "start", /* @__PURE__ */ React5.createElement("span", { style: { fontVariantNumeric: "tabular-nums", fontSize: 12.5, marginLeft: 5 } }, pomoMin, "m"))), /* @__PURE__ */ React5.createElement("button", { disabled: lenLocked || pomoMin >= 30, onMouseDown: () => beginHold(1), onMouseUp: endHold, onMouseLeave: endHold, "aria-label": lenLocked ? "length is locked while a pomodoro is running" : "longer \u2014 hold to speed up (max 30)", style: { width: 24, height: 24, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: lenLocked || pomoMin >= 30 ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" } }, /* @__PURE__ */ React5.createElement(PlusIcon, { size: 14 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
+  return /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : running && secs > 0 && (secs <= 60 || [900, 600, 300].some((mk) => pomoMin * 60 > mk && secs <= mk && secs >= mk - 2)) ? C.worse : C.ink } }, mm, ":", ss), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React5.createElement(InfoHover, { C, label: "how the Focus form works", width: 360 }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Focus"), /* @__PURE__ */ React5.createElement("div", null, "Pick a task, set your expected feeling, and run the timer; when it finishes you rate how it actually went and the pomodoro is logged."), /* @__PURE__ */ React5.createElement("ul", { style: { margin: "6px 0 0", paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Task"), ": today's tasks from the Plan; each pomodoro adds +1 to that task's Spend in Notion."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Feeling"), ": the four weathers, rain to full sun; your before and after ratings are both saved."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Timer"), ": the round buttons set 5 to 30 minutes (hold to speed up); the length locks while a pomodoro runs; the circle arrow resets the timer and task."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Pause"), ": pausing asks for a reason, yellow for internal, blue for external; it is recorded in the Pause view."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Log manually"), ": adds a pomodoro without running the timer."))), /* @__PURE__ */ React5.createElement("button", { disabled: lenLocked || pomoMin <= 5, onMouseDown: () => beginHold(-1), onMouseUp: endHold, onMouseLeave: endHold, "aria-label": lenLocked ? "length is locked while a pomodoro is running" : "shorter \u2014 hold to speed up (min 5)", style: { width: 24, height: 24, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: lenLocked || pomoMin <= 5 ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" } }, /* @__PURE__ */ React5.createElement(MinusIcon, { size: 14 })), /* @__PURE__ */ React5.createElement("button", { onClick: running ? onPause : () => onStart(task), disabled: blockStart, "aria-label": blockStart ? "pick a task and an expected rating first" : void 0, style: { ...btn(C.ink), borderRadius: 999, height: 32, padding: "0 21px", minWidth: 84, opacity: blockStart ? 0.5 : 1, cursor: blockStart ? "not-allowed" : "pointer" } }, running ? "pause" : /* @__PURE__ */ React5.createElement(React5.Fragment, null, paused || pauseActive ? "resume" : "start", /* @__PURE__ */ React5.createElement("span", { style: { fontVariantNumeric: "tabular-nums", fontSize: 12.5, marginLeft: 5 } }, pomoMin, "m"))), /* @__PURE__ */ React5.createElement("button", { disabled: lenLocked || pomoMin >= 30, onMouseDown: () => beginHold(1), onMouseUp: endHold, onMouseLeave: endHold, "aria-label": lenLocked ? "length is locked while a pomodoro is running" : "longer \u2014 hold to speed up (max 30)", style: { width: 24, height: 24, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: lenLocked || pomoMin >= 30 ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" } }, /* @__PURE__ */ React5.createElement(PlusIcon, { size: 14 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
     resetTimer();
     setTask("");
     onPickTask && onPickTask("");
@@ -25033,12 +25073,28 @@ function FocusLogApp({ api }) {
   const init = api.getInitial();
   const [sessions, setSessions] = useState5(init.sessions);
   const [tasks, setTasks] = useState5(init.tasks);
+  const [quickParents, setQuickParents] = useState5(init.quickParents || []);
+  const [qaName, setQaName] = useState5("");
+  const [qaParent, setQaParent] = useState5("");
+  const [qaGuess, setQaGuess] = useState5("1");
+  const [qaBusy, setQaBusy] = useState5(false);
+  const [claimOpen, setClaimOpen] = useState5(false);
+  const [clTask, setClTask] = useState5("");
+  const [clMins, setClMins] = useState5(25);
+  const [clSince, setClSince] = useState5("");
+  const [clBusy, setClBusy] = useState5(false);
+  const [clParent, setClParent] = useState5("");
+  const [clGuess, setClGuess] = useState5("1");
+  const [clCreating, setClCreating] = useState5(false);
+  const [clMealEdits, setClMealEdits] = useState5({});
+  const [reflectSeed, setReflectSeed] = useState5("");
+  const [reflectCount, setReflectCount] = useState5(null);
   const [pending, setPending] = useState5(init.pending);
   const [doneSess, setDoneSess] = useState5({});
   const [view, setView] = useState5("today");
   const [statusSub, setStatusSub] = useState5("month");
   const [activeDaily, setActiveDaily] = useState5(api.getActiveDaily ? api.getActiveDaily() : null);
-  useEffect2(() => {
+  useEffect3(() => {
     if (!api.onActiveDaily)
       return;
     return api.onActiveDaily((ts) => setActiveDaily(ts));
@@ -25048,7 +25104,7 @@ function FocusLogApp({ api }) {
   const [monthOff, setMonthOff] = useState5(0);
   const [introOpen, setIntroOpen] = useState5(false);
   const monthLabelRef = useRef3(null);
-  useEffect2(() => {
+  useEffect3(() => {
     const el = monthLabelRef.current;
     if (!el)
       return;
@@ -25161,24 +25217,19 @@ function FocusLogApp({ api }) {
   const [newMorning, setNewMorning] = useState5("");
   const [newNight, setNewNight] = useState5("");
   const [routineDrag, setRoutineDrag] = useState5(null);
+  const [unfoldedDone, setUnfoldedDone] = useState5({});
   const [routineOver, setRoutineOver] = useState5(null);
   const [timelineMode, setTimelineModeState] = useState5(false);
   const [plans, setPlans] = useState5(init.plans || {});
   const [tlDrag, setTlDrag] = useState5(null);
-  const [planUndo, setPlanUndo] = useState5(null);
-  useEffect2(() => {
-    if (!planUndo)
-      return;
-    const tm = window.setTimeout(() => setPlanUndo(null), 8e3);
-    return () => window.clearTimeout(tm);
-  }, [planUndo]);
+  const [planUndo, setPlanUndo] = useState5([]);
   const [editBlockId, setEditBlockId] = useState5(null);
   const [blockDraft, setBlockDraft] = useState5({ name: "", dur: 30 });
   const tlRef = useRef3(null);
   const [longEvery, setLongEveryState] = useState5(settings.longBreakEvery || 3);
   const nowRef = useRef3(null);
   const tlScrollRef = useRef3(null);
-  useEffect2(() => {
+  useEffect3(() => {
     var _a2;
     if (!timelineMode || !tlScrollRef.current)
       return;
@@ -25334,8 +25385,8 @@ function FocusLogApp({ api }) {
         setEditTagId(t.id);
         setEditTagName(t.name);
         setEditTagCat(cat);
-      }, className: "fl-rowact", "aria-label": "edit", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 14 })),
-      /* @__PURE__ */ React5.createElement("button", { onClick: () => removePauseTag(t.id), className: "fl-rowact fl-rowdel", "aria-label": "delete", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(TrashIcon, { size: 14 }))
+      }, className: "fl-rowact fl-collapse", "aria-label": "edit", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 14 })),
+      /* @__PURE__ */ React5.createElement("button", { onClick: () => removePauseTag(t.id), className: "fl-rowact fl-rowdel fl-collapse", "aria-label": "delete", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(TrashIcon, { size: 14 }))
     );
   };
   const [editPauseId, setEditPauseId] = useState5(null);
@@ -25381,7 +25432,7 @@ function FocusLogApp({ api }) {
   const sawRun = useRef3(false);
   if (timer.running)
     sawRun.current = true;
-  useEffect2(() => {
+  useEffect3(() => {
     if (sawRun.current && (timer.running || timer.paused) && timer.taskName)
       setPreset(timer.taskName);
   }, [timer.taskName, timer.running, timer.paused]);
@@ -25391,6 +25442,9 @@ function FocusLogApp({ api }) {
   const pauseTag = timer.pauseTag || "";
   const setPauseTag = (t) => api.timer.setPauseTag(t);
   const [reflections, setReflections] = useState5(init.reflections || []);
+  const [calibrations, setCalibrations] = useState5(init.calibrations || []);
+  const [calibDraft, setCalibDraft] = useState5(null);
+  const [areaOptions, setAreaOptions] = useState5(init.areaOptions || []);
   const reflectFeelings = init.feelings && Object.keys(init.feelings).length ? init.feelings : {};
   const onSaveReflection = (r) => {
     const entry = { id: "rf" + Date.now(), ts: (/* @__PURE__ */ new Date()).toISOString(), tag: pauseTag || "", thoughts: r.thoughts || [], body: r.body || [], mood: r.mood || [] };
@@ -25400,6 +25454,22 @@ function FocusLogApp({ api }) {
     api.notify && api.notify("Reflection saved", 1500);
   };
   const resetTimer = () => api.timer.reset();
+  const restartTimer = () => {
+    const live = running || timer.paused;
+    const tname = timer.task || preset;
+    resetTimer();
+    if (live && api.beginReflectCountdown)
+      api.beginReflectCountdown(tname || "");
+  };
+  useEffect3(() => {
+    if (api.onReflectCount)
+      api.onReflectCount((st) => setReflectCount(st));
+    if (api.onReflectGo)
+      api.onReflectGo((task) => {
+        setReflectSeed(task ? "restarted: " + task : "restarted a pomodoro");
+        setView("reflect");
+      });
+  }, []);
   const changePomo = (n) => api.timer.setLength(n);
   const stepPomo = (delta) => api.timer.step(delta);
   const onStart = (taskName) => api.timer.start(typeof taskName === "string" ? taskName : void 0);
@@ -25415,11 +25485,11 @@ function FocusLogApp({ api }) {
     feeling: (_a = timer.breakFeeling) != null ? _a : null
   };
   const isPicked = (a) => brk.active && brk.picked.includes(a.id);
-  useEffect2(() => {
+  useEffect3(() => {
     if (brk.active)
       setView("break");
   }, [brk.active]);
-  useEffect2(() => {
+  useEffect3(() => {
     if (!api.onBreaksChange)
       return;
     return api.onBreaksChange(() => {
@@ -25428,22 +25498,22 @@ function FocusLogApp({ api }) {
       setBreaks([...fresh.breaks || []]);
     });
   }, []);
-  useEffect2(() => {
+  useEffect3(() => {
     if (!api.onPausesChange)
       return;
     return api.onPausesChange(() => setPauses([...api.getPauses ? api.getPauses() : []]));
   }, []);
-  useEffect2(() => {
+  useEffect3(() => {
     if (!api.onRequestLogView)
       return;
     return api.onRequestLogView(() => setView("log"));
   }, []);
-  useEffect2(() => {
+  useEffect3(() => {
     if (!api.onRequestSkyView)
       return;
     return api.onRequestSkyView(() => setView("sky"));
   }, []);
-  useEffect2(() => {
+  useEffect3(() => {
     if (!api.onSessionsChange)
       return;
     return api.onSessionsChange(() => {
@@ -25456,7 +25526,7 @@ function FocusLogApp({ api }) {
         setPreset(tn);
     });
   }, []);
-  useEffect2(() => {
+  useEffect3(() => {
     if (finished)
       setView("log");
   }, [finished]);
@@ -25523,11 +25593,55 @@ ${s.task}`))
       setDoneSess({});
       setSync("ok");
       setPendingSyncRebuild(true);
+      if (api.getInitial)
+        setAreaOptions(api.getInitial().areaOptions || []);
+      if (api.getQuickParents)
+        setQuickParents(api.getQuickParents());
       setFlash(fresh.length + " tasks loaded from Notion, timeline rebuilt.");
     } catch (e) {
       setSync("error");
       setFlash("Sync failed: " + ((e == null ? void 0 : e.message) || e));
     }
+  };
+  const openOverCalib = (t) => {
+    const rounds = (t.guessPlus || []).length;
+    if (rounds >= 2) {
+      api.notify && api.notify("Two extra rounds already: time to split this task.", 6e3);
+      return;
+    }
+    setCalibDraft({ mode: "over", pageId: t.id, task: t.task, hierarchy: hierarchyText(t), category: t.category || null, guess: t.pomodoros || 0, spend: t.act || 0, round: rounds + 1, count: 1, reason: "", note: "" });
+  };
+  const openUnderCalib = (t, spendOverride) => {
+    setCalibDraft({ mode: "under", pageId: t.id, task: t.task, hierarchy: hierarchyText(t), category: t.category || null, guess: t.pomodoros || 0, spend: spendOverride != null ? spendOverride : t.act || 0, reason: "", note: "", spare: "" });
+  };
+  const saveCalibration = async () => {
+    const d = calibDraft;
+    if (!d || !d.reason)
+      return;
+    let round = d.round;
+    if (d.mode === "over" && d.pageId && api.addGuessRound) {
+      try {
+        round = await api.addGuessRound(d.pageId, d.count || 1);
+      } catch (e) {
+        api.notify && api.notify("Could not add the + \u{1F345}: " + ((e == null ? void 0 : e.message) || e), 6e3);
+        return;
+      }
+      const nt = tasks.map((t) => t.id === d.pageId ? { ...t, guessPlus: [...t.guessPlus || [], d.count || 1], pomodoros: (t.pomodoros || 0) + (d.count || 1) } : t);
+      setTasks(nt);
+      api.saveTasks && api.saveTasks(nt);
+    }
+    const entry = { id: Date.now(), ts: Date.now(), pageId: d.pageId || null, task: d.task, hierarchy: d.hierarchy || "", category: d.category || null, guess: d.guess, spend: d.spend, direction: d.mode, round: d.mode === "over" ? round : null, reason: d.reason, note: (d.note || "").trim(), spare: d.spare || null };
+    const arr = [...calibrations, entry];
+    setCalibrations(arr);
+    api.saveCalibrations && api.saveCalibrations(arr);
+    if (api.appendCalibration) {
+      try {
+        await api.appendCalibration(entry);
+      } catch (e) {
+      }
+    }
+    setCalibDraft(null);
+    api.notify && api.notify(d.mode === "over" ? "+ \u{1F345} added and calibration saved." : "Calibration saved.", 4e3);
   };
   const logPomodoro = async (s, markDone) => {
     persist([...sessions, s]);
@@ -25550,24 +25664,37 @@ ${s.task}`))
         api.notify(msg2, 9e3);
     }
     let msg = "Logged.";
+    let newSpend = null;
     if (s.pageId) {
       try {
         const act = await api.writeAct(s.pageId);
-        msg += " Act" + (act != null ? " = " + act : " +1") + " written.";
+        newSpend = act != null ? act : null;
+        msg += " Spend" + (act != null ? " = " + act : " +1") + " written.";
       } catch (e) {
         savePending([...pending, { sessionId: s.id, pageId: s.pageId, task: s.task }]);
-        msg += " Act write queued.";
+        msg += " Spend write queued.";
       }
     } else {
       msg += " No Notion page linked.";
     }
     if (markDone && s.pageId && api.setDone) {
       try {
+        const meta = tasks.find((t) => t.id === s.pageId);
         const name = await api.setDone(s.pageId);
         const nt = tasks.filter((t) => t.id !== s.pageId);
         setTasks(nt);
         api.saveTasks(nt);
         msg += " Status set to " + name + ".";
+        const spendNow = newSpend != null ? newSpend : (meta && meta.act || 0) + 1;
+        const target = meta && meta.pomodoros || 0;
+        if (meta && target > 0 && spendNow < target)
+          openUnderCalib(meta, spendNow);
+        else if (meta && target > 0 && spendNow === target) {
+          const onEntry = { id: Date.now(), ts: Date.now(), pageId: meta.id || null, task: meta.task, hierarchy: hierarchyText(meta), category: meta.category || null, guess: target, spend: spendNow, direction: "on", round: null, reason: "on target", note: "", spare: null };
+          const arr = [...calibrations, onEntry];
+          setCalibrations(arr);
+          api.saveCalibrations && api.saveCalibrations(arr);
+        }
       } catch (e) {
         msg += " Mark-done failed: " + ((e == null ? void 0 : e.message) || e);
       }
@@ -25586,16 +25713,27 @@ ${s.task}`))
     if (!pending.length)
       return;
     setFlash("Retrying " + pending.length + "\u2026");
-    const still = [];
+    const still = [], gone = [];
     for (const p of pending) {
       try {
         await api.writeAct(p.pageId);
       } catch (e) {
-        still.push(p);
+        const msg = String(e && e.message || e || "");
+        if (/Notion 404|object_not_found|Could not find|archived/i.test(msg))
+          gone.push(p);
+        else
+          still.push(p);
       }
     }
     savePending(still);
-    setFlash(still.length ? still.length + " still pending." : "All pending writes pushed.");
+    const bits = [];
+    if (gone.length)
+      bits.push("Dropped " + gone.length + " write" + (gone.length > 1 ? "s" : "") + " to a deleted Notion page (" + gone.map((x) => x.task || "unknown task").join(", ") + "); the pomodoro stays in your local log.");
+    if (still.length)
+      bits.push(still.length + " still pending.");
+    if (!bits.length)
+      bits.push("All pending writes pushed.");
+    setFlash(bits.join(" "));
   };
   const weekStart = new Date(logicalWeekStart(Date.now(), settings).getTime() + weekOff * 7 * DAY);
   const weekEnd = new Date(weekStart.getTime() + 7 * DAY);
@@ -25702,9 +25840,194 @@ ${s.task}`))
     setPreset(leafTask);
     setView("log");
   };
+  const quickAdd = async () => {
+    const name = qaName.trim();
+    if (!name || qaBusy || !api.createTask)
+      return;
+    setQaBusy(true);
+    try {
+      const g = Math.max(0, Math.min(4, Math.round(Number(qaGuess) || 0)));
+      const t = await api.createTask(name, qaParent || null, g);
+      setTasks((prev) => [t, ...prev]);
+      const bl = todayBlocks();
+      if (bl.length) {
+        const d = /* @__PURE__ */ new Date();
+        let m = d.getHours() * 60 + d.getMinutes();
+        const mid = (tlStart + tlEnd) / 2;
+        if (Math.abs(m + 1440 - mid) < Math.abs(m - mid))
+          m += 1440;
+        const start = avoidMeals(clampStart(snap5(m), 25), 25, bl);
+        setTodayBlocks(resolveOverlaps([...bl, { id: "qa" + Date.now(), kind: "task", pageId: t.id, name: t.task, power: t.power || "Y", status: t.status, category: t.category, start, dur: 25, created: Date.now(), placed: true }]));
+      }
+      setQaName("");
+      openLog(t.task);
+      api.notify && api.notify('"' + t.task + '" is in Notion and on today\u2019s plan at now.');
+    } catch (e) {
+      api.notify && api.notify("Could not create the task in Notion. Check the token and database in settings.");
+    }
+    setQaBusy(false);
+  };
+  const tomatoesFor = (mins) => {
+    const pomo = settings.pomodoroMinutes || 25;
+    const sb = settings.breakMinutes || 5;
+    const lb = settings.longBreakMinutes || 20;
+    let best = 1, bestD = Infinity;
+    for (let k = 1; k <= 40; k++) {
+      const t = k * pomo + (k - 1) * sb + lb;
+      const d0 = Math.abs(t - mins);
+      if (d0 < bestD) {
+        bestD = d0;
+        best = k;
+      }
+      if (t > mins + pomo + lb)
+        break;
+    }
+    return best;
+  };
+  const doClaim = async () => {
+    const name = clTask.trim();
+    if (!name || clBusy)
+      return;
+    setClBusy(true);
+    const meta = tasks.find((t) => t.task === name) || null;
+    const now = Date.now();
+    let mins = clMins;
+    if (clSince) {
+      const mm = clSince.match(/^(\d{1,2}):(\d{2})$/);
+      if (mm) {
+        const d = /* @__PURE__ */ new Date();
+        let diff = d.getHours() * 60 + d.getMinutes() - (Number(mm[1]) * 60 + Number(mm[2]));
+        if (diff < 0)
+          diff += 1440;
+        if (diff > 0)
+          mins = Math.min(diff, 8 * 60);
+      }
+    }
+    mins = Math.max(5, Math.round(mins));
+    const bl = todayBlocks();
+    const d1 = new Date(now);
+    let nowTl = d1.getHours() * 60 + d1.getMinutes();
+    const mid = (tlStart + tlEnd) / 2;
+    if (Math.abs(nowTl + 1440 - mid) < Math.abs(nowTl - mid))
+      nowTl += 1440;
+    let endTl = nowTl, sguard = 0, movedFlag = true;
+    const claimedBl = bl.filter((x) => x.claimed);
+    while (movedFlag && sguard++ < 20) {
+      movedFlag = false;
+      for (const cb of claimedBl)
+        if (cb.start < endTl && cb.start + cb.dur > endTl - mins) {
+          endTl = Math.min(endTl, cb.start);
+          movedFlag = true;
+        }
+    }
+    const startTl = endTl - mins;
+    const clash = bl.find((x) => (x.kind === "routine" && !x.night || x.kind === "meeting" || x.kind === "task" && x.locked) && x.start < endTl && x.start + x.dur > startTl);
+    if (clash) {
+      api.notify && api.notify("Nothing logged: that span overlaps \u201C" + (clash.name || clash.kind) + "\u201D. Adjust the time, or claim the chunks around it separately.", 8e3);
+      setClBusy(false);
+      return;
+    }
+    const parseTlClock = (s0, ref) => {
+      const m2 = (s0 || "").match(/^(\d{1,2}):(\d{2})$/);
+      if (!m2)
+        return null;
+      let v = Number(m2[1]) * 60 + Number(m2[2]);
+      if (Math.abs(v + 1440 - ref) < Math.abs(v - ref))
+        v += 1440;
+      return v;
+    };
+    const mealsCovered = bl.filter((x) => x.kind === "meal" && x.start < endTl && x.start + x.dur > startTl).map((x) => {
+      const ed = clMealEdits[x.id] || {};
+      const as0 = parseTlClock(ed.start, x.start);
+      return { ...x, aStart: as0 != null ? as0 : x.start, aLen: Math.max(5, Math.min(240, Math.round(Number(ed.len)) || x.dur)) };
+    }).sort((a, b) => a.aStart - b.aStart);
+    let segs = [{ s: startTl, e: endTl }];
+    for (const m3 of mealsCovered) {
+      const out0 = [];
+      for (const g of segs) {
+        const a = Math.max(g.s, m3.aStart), b2 = Math.min(g.e, m3.aStart + m3.aLen);
+        if (b2 <= a) {
+          out0.push(g);
+          continue;
+        }
+        if (a - g.s >= 3)
+          out0.push({ s: g.s, e: a });
+        if (g.e - b2 >= 3)
+          out0.push({ s: b2, e: g.e });
+      }
+      segs = out0;
+    }
+    if (!segs.length) {
+      api.notify && api.notify("Nothing logged: after the meal there is no worked time left in that span.", 8e3);
+      setClBusy(false);
+      return;
+    }
+    const workedMins = segs.reduce((s2, g) => s2 + (g.e - g.s), 0);
+    const n = tomatoesFor(workedMins);
+    const realTs = (tl) => now - (nowTl - tl) * 6e4;
+    const newSess = [{ id: now, ts: realTs(segs[segs.length - 1].e), minutes: workedMins, task: name, hierarchy: meta ? hierarchyText(meta) : "", note: "", category: meta && meta.category || null, pageId: meta && meta.id || null, claimed: true }];
+    persist([...sessions, ...newSess]);
+    const dsKey = meta && meta.id || name;
+    setDoneSess((m) => ({ ...m, [dsKey]: (m[dsKey] || 0) + n }));
+    let msg = "Claimed: " + n + " \u{1F345} on \u201C" + name + "\u201D" + (mealsCovered.length ? " around " + mealsCovered.map((x) => x.name).join(" and ") : "") + ". It counts.";
+    let newSpend = null;
+    if (meta && meta.id && api.writeActBy) {
+      try {
+        newSpend = await api.writeActBy(meta.id, n);
+        msg += " Spend = " + newSpend + ".";
+      } catch (e) {
+        const q = [...pending];
+        for (let i = 0; i < n; i++)
+          q.push({ sessionId: now, pageId: meta.id, task: name });
+        savePending(q);
+        msg += " Spend write queued.";
+      }
+      const finalAct = newSpend != null ? newSpend : (meta.act || 0) + n;
+      setTasks((prev) => prev.map((t) => t.id === meta.id ? { ...t, act: finalAct } : t));
+    }
+    if (bl.length) {
+      const mealIds = new Set(mealsCovered.map((x) => x.id));
+      const withMeals = bl.map((x) => {
+        if (!mealIds.has(x.id))
+          return x;
+        const mc = mealsCovered.find((y) => y.id === x.id);
+        return { ...x, start: mc.aStart, dur: mc.aLen };
+      });
+      const claimBlocks = segs.map((g, i) => ({ id: "cl" + now + "_" + i, kind: "task", pageId: meta && meta.id || void 0, name, power: meta && meta.power || "Y", status: meta ? meta.status : void 0, category: meta && meta.category || void 0, start: g.s, dur: g.e - g.s, created: now, placed: true, claimed: true }));
+      const nightHit = withMeals.filter((x) => x.kind === "routine" && x.night && x.start < endTl && x.start + x.dur > startTl);
+      let shifted = withMeals;
+      if (nightHit.length) {
+        const m0 = Math.min(...nightHit.map((x) => x.start));
+        const delta = endTl - m0;
+        shifted = withMeals.map((x) => x.kind === "routine" && x.night && x.start >= m0 ? { ...x, start: x.start + delta } : x);
+      }
+      setTodayBlocks(resolveOverlaps([...shifted, ...claimBlocks]));
+    }
+    if (api.appendDaily) {
+      try {
+        for (const g of segs)
+          await api.appendDaily({ ts: realTs(g.e), minutes: Math.round(g.e - g.s), task: name, hierarchy: meta ? hierarchyText(meta) : "", note: "#FocusLog/claimed", category: meta && meta.category || null });
+        msg += " Added to daily note.";
+      } catch (e) {
+        msg += " Daily note skipped: " + ((e == null ? void 0 : e.message) || e);
+      }
+    }
+    const starName = newestStarName(sessions.length + newSess.length);
+    if (starName && api.notifyClickable)
+      api.notifyClickable("You lit up " + starName + " \u2728 (claimed). Click to see your Sky.", () => setView("sky"));
+    setFlash(msg);
+    setClaimOpen(false);
+    setClBusy(false);
+    if (meta) {
+      const target = meta.pomodoros || 0;
+      const spendNow = newSpend != null ? newSpend : (meta.act || 0) + n;
+      if (target > 0 && spendNow > target)
+        openOverCalib({ ...meta, act: spendNow });
+    }
+  };
   const rootRef = useRef3(null);
   const [panelW, setPanelW] = useState5(0);
-  useEffect2(() => {
+  useEffect3(() => {
     const el = rootRef.current;
     if (!el || typeof ResizeObserver === "undefined")
       return;
@@ -25751,11 +26074,11 @@ ${s.task}`))
     /* @__PURE__ */ React5.createElement("button", { onClick: (e) => {
       e.stopPropagation();
       startEditAct(a);
-    }, className: "fl-rowact", "aria-label": "edit", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 14 })),
+    }, className: "fl-rowact fl-collapse", "aria-label": "edit", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 14 })),
     /* @__PURE__ */ React5.createElement("button", { onClick: (e) => {
       e.stopPropagation();
       removeActivity(a.id);
-    }, className: "fl-rowact fl-rowdel", "aria-label": "delete", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(TrashIcon, { size: 14 }))
+    }, className: "fl-rowact fl-rowdel fl-collapse", "aria-label": "delete", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(TrashIcon, { size: 14 }))
   );
   const renderTaskRow = (t) => {
     const i = orderedTasks.indexOf(t);
@@ -25772,6 +26095,11 @@ ${s.task}`))
     const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
     const isFrozen = frozenNames.includes(t.task);
     const personal = isPersonal(t);
+    const overInfo = [1, 2].map((r) => {
+      const e = [...calibrations].reverse().find((c) => c.pageId === t.id && c.direction === "over" && c.round === r);
+      return e ? e.reason + (e.note ? ": " + e.note : "") : null;
+    });
+    const underCal = [...calibrations].reverse().find((c) => c.pageId === t.id && c.direction === "under");
     return /* @__PURE__ */ React5.createElement(
       "div",
       {
@@ -25809,8 +26137,10 @@ ${s.task}`))
         },
         Array.from({ length: 6 }).map((_, k) => /* @__PURE__ */ React5.createElement("span", { key: k, style: { width: 3, height: 3, borderRadius: "50%", background: C.faint } }))
       ),
-      /* @__PURE__ */ React5.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 6, rowGap: 2 } }, /* @__PURE__ */ React5.createElement("span", { style: { color: LOAD_COLOR[t.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, flexShrink: 0 }, "aria-label": LOAD_LABEL[t.load] || LOAD_LABEL.B }, t.load || "B"), cat && /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11, fontFamily: "var(--fl-mono)", color: personal ? TAG_COFFEE.personal.text : TAG_COFFEE.project.text, background: personal ? TAG_COFFEE.personal.bg : TAG_COFFEE.project.bg, border: `1px solid ${personal ? TAG_COFFEE.personal.border : TAG_COFFEE.project.border}`, borderRadius: 999, height: 16, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: "0 7px", whiteSpace: "nowrap", flexShrink: 0 } }, cat), /* @__PURE__ */ React5.createElement("span", { style: { minWidth: 0, overflowWrap: "anywhere" } }, titleText), t.king ? /* @__PURE__ */ React5.createElement("img", { src: crown_default, alt: "king", draggable: false, style: { width: 13, height: 13, flexShrink: 0 } }) : null), hier && /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hier)),
-      /* @__PURE__ */ React5.createElement("button", { onClick: () => togglePersonal(t.task), className: "fl-rowact", "aria-label": personal ? "move to Project" : "move to Personal", style: ICON_BTN }, personal ? /* @__PURE__ */ React5.createElement(BriefcaseIcon, { size: 14 }) : /* @__PURE__ */ React5.createElement(UserIcon, { size: 14 })),
+      /* @__PURE__ */ React5.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 6, rowGap: 2 } }, t.status === "exploring" ? /* @__PURE__ */ React5.createElement("span", { style: { color: MODE_COLORS.relax.solid, display: "inline-flex", flexShrink: 0 }, "aria-label": "Exploring" }, /* @__PURE__ */ React5.createElement(ExploreIcon, { size: 13 })) : t.status === "executing" ? /* @__PURE__ */ React5.createElement("span", { style: { color: MODE_COLORS.work.solid, display: "inline-flex", flexShrink: 0 }, "aria-label": "Executing" }, /* @__PURE__ */ React5.createElement(HammerIcon, { size: 13 })) : null, cat && /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11, fontFamily: "var(--fl-mono)", color: personal ? TAG_COFFEE.personal.text : TAG_COFFEE.project.text, background: personal ? TAG_COFFEE.personal.bg : TAG_COFFEE.project.bg, border: `1px solid ${personal ? TAG_COFFEE.personal.border : TAG_COFFEE.project.border}`, borderRadius: 999, height: 16, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: "0 7px", whiteSpace: "nowrap", flexShrink: 0 } }, cat), /* @__PURE__ */ React5.createElement("span", { style: { minWidth: 0, overflowWrap: "anywhere" } }, titleText), t.king ? /* @__PURE__ */ React5.createElement("img", { src: crown_default, alt: "king", draggable: false, style: { width: 13, height: 13, flexShrink: 0 } }) : null), hier && /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hier)),
+      /* @__PURE__ */ React5.createElement("button", { onClick: () => togglePersonal(t.task), className: "fl-rowact fl-collapse", "aria-label": personal ? "move to Project" : "move to Personal", style: ICON_BTN }, personal ? /* @__PURE__ */ React5.createElement(BriefcaseIcon, { size: 14 }) : /* @__PURE__ */ React5.createElement(UserIcon, { size: 14 })),
+      t.id && /* @__PURE__ */ React5.createElement("button", { onClick: () => openOverCalib(t), className: "fl-rowact fl-collapse", "aria-label": "the task grew: add a + tomato round (max two, then split)", style: { ...ICON_BTN, fontSize: 12, whiteSpace: "nowrap" } }, "+\u{1F345}"),
+      /* @__PURE__ */ React5.createElement("button", { onClick: () => openLog(t.task), className: "fl-rowact fl-collapse", "aria-label": "run a pomodoro", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PlayIcon, { size: 14 })),
       /* @__PURE__ */ React5.createElement(
         "button",
         {
@@ -25821,8 +26151,7 @@ ${s.task}`))
         },
         /* @__PURE__ */ React5.createElement(BookmarkIcon, { size: 13, filled: isFrozen })
       ),
-      /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", flexShrink: 0 }, "aria-label": `${completed} of ${est} done for this task` }, /* @__PURE__ */ React5.createElement(TomatoPips, { vivid: done, grey: remaining })),
-      /* @__PURE__ */ React5.createElement("button", { onClick: () => openLog(t.task), className: "fl-rowact", "aria-label": "run a pomodoro", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PlayIcon, { size: 14 }))
+      /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", flexShrink: 0 }, "aria-label": `${completed} of ${est} done for this task` }, /* @__PURE__ */ React5.createElement(TomatoPips, { vivid: done, grey: remaining, base: t.guessBase, plus: t.guessPlus, overInfo, underInfo: underCal ? underCal.reason + (underCal.note ? ": " + underCal.note : "") : null, onGrey: t.id ? () => openUnderCalib(t) : void 0 }))
     );
   };
   const todayKey = String(logicalDay(Date.now(), settings).getTime());
@@ -25848,11 +26177,31 @@ ${s.task}`))
   };
   const routineSaver = (which) => dayMode === "relax" ? which === "morning" ? saveRelaxMorning : saveRelaxNight : which === "morning" ? saveMorning : saveNight;
   const routineList = (which) => which === "morning" ? activeMorning : activeNight;
+  const refreshRoutineBlocks = (which, list) => {
+    const tb = todayBlocks();
+    const isMine = (b) => b.kind === "routine" && (which === "night" ? !!b.night : !b.night);
+    const olds = tb.filter(isMine).sort((a, b) => a.start - b.start);
+    if (!olds.length)
+      return;
+    const groups = groupRoutine(list, settings.routineGroupMinutes || 25);
+    let t = olds[0].start;
+    const fresh = groups.map((g, gi) => {
+      const start = Math.max(olds[gi] ? olds[gi].start : t, t);
+      const blk = { id: "r" + Date.now() + "_" + gi, kind: "routine", name: routineGroupName(which, gi, groups.length), start, dur: g.dur, refIds: g.steps.map((x) => x.id), steps: g.steps.map((x) => x.name) };
+      if (which === "night")
+        blk.night = true;
+      t = start + g.dur;
+      return blk;
+    });
+    setTodayBlocks(autoBreaksOf([...tb.filter((b) => !isMine(b)), ...fresh]), true);
+  };
   const addRoutine = (which) => {
     const name = (which === "morning" ? newMorning : newNight).trim();
     if (!name)
       return;
-    routineSaver(which)([...routineList(which), { id: "r" + Date.now(), name }]);
+    const next = [...routineList(which), { id: "r" + Date.now(), name }];
+    routineSaver(which)(next);
+    refreshRoutineBlocks(which, next);
     if (which === "morning")
       setNewMorning("");
     else
@@ -25882,10 +26231,14 @@ ${s.task}`))
           return { ...b, dur: steps.reduce((s, x) => s + (x.dur || ROUTINE_MIN), 0) || b.dur, steps: steps.map((x) => x.name) };
         }
         return b;
-      })));
+      })), true);
     setEditRoutineId(null);
   };
-  const removeRoutine = (which, id) => routineSaver(which)(routineList(which).filter((x) => x.id !== id));
+  const removeRoutine = (which, id) => {
+    const next = routineList(which).filter((x) => x.id !== id);
+    routineSaver(which)(next);
+    refreshRoutineBlocks(which, next);
+  };
   const moveRoutine = (which, from, to) => {
     if (from === to)
       return;
@@ -25893,6 +26246,7 @@ ${s.task}`))
     const [m] = a.splice(from, 1);
     a.splice(to, 0, m);
     routineSaver(which)(a);
+    refreshRoutineBlocks(which, a);
   };
   const renderRoutineBlock = (which, hideHeader) => {
     const list = routineList(which);
@@ -25948,18 +26302,38 @@ ${s.task}`))
           }, "aria-label": "drag to reorder", style: { display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" } }, Array.from({ length: 6 }).map((_, k) => /* @__PURE__ */ React5.createElement("span", { key: k, style: { width: 3, height: 3, borderRadius: "50%", background: C.faint } }))),
           /* @__PURE__ */ React5.createElement("button", { onClick: () => toggleRoutineDone(it.id), "aria-label": done ? "mark not done" : "mark done", style: { width: 18, height: 18, flexShrink: 0, borderRadius: 5, border: `1.5px solid ${done ? relax ? C.better : MODE_COLORS.work.solid : C.faint}`, background: done ? relax ? C.better : MODE_COLORS.work.solid : "transparent", color: "#fff", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, done && /* @__PURE__ */ React5.createElement(CheckIcon, { size: 12 })),
           /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere", textDecoration: done ? "line-through" : "none", color: done ? C.muted : C.ink } }, it.name),
-          /* @__PURE__ */ React5.createElement("button", { onClick: () => openLog(it.name), className: "fl-rowact", "aria-label": "run a pomodoro", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PlayIcon, { size: 13 })),
+          /* @__PURE__ */ React5.createElement("button", { onClick: () => openLog(it.name), className: "fl-rowact fl-collapse", "aria-label": "run a pomodoro", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PlayIcon, { size: 13 })),
           /* @__PURE__ */ React5.createElement("button", { onClick: () => {
             setEditRoutineId(it.id);
             setEditRoutineName(it.name);
             setEditRoutineDur(it.dur || 15);
-          }, className: "fl-rowact", "aria-label": "edit", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 14 })),
-          /* @__PURE__ */ React5.createElement("button", { onClick: () => removeRoutine(which, it.id), className: "fl-rowact fl-rowdel", "aria-label": "delete", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(TrashIcon, { size: 14 }))
+          }, className: "fl-rowact fl-collapse", "aria-label": "edit", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 14 })),
+          /* @__PURE__ */ React5.createElement("button", { onClick: () => removeRoutine(which, it.id), className: "fl-rowact fl-rowdel fl-collapse", "aria-label": "delete", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(TrashIcon, { size: 14 }))
         );
       };
       return groups.map((g, gi) => {
         const gname = routineGroupName(which, gi, groups.length);
-        return /* @__PURE__ */ React5.createElement(React5.Fragment, { key: "g" + gi }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: gi ? 6 : 0, padding: "0 2px" } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => openLog(gname), "aria-label": `run "${gname}" as one pomodoro (${g.dur}m of steps)`, style: { ...ICON_BTN, color: relax ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid } }, /* @__PURE__ */ React5.createElement(PlayIcon, { size: 14 })), /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: C.muted, fontFamily: "var(--fl-display)" } }, gname), /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" } }, g.dur, "m")), g.steps.map((it) => {
+        const gKey = which + ":" + gi;
+        const gDone = g.steps.length > 0 && g.steps.every((it) => isRoutineDone(it.id));
+        const tick = relax ? C.better : MODE_COLORS.work.solid;
+        if (gDone && !unfoldedDone[gKey]) {
+          flat += g.steps.length;
+          return /* @__PURE__ */ React5.createElement(
+            "div",
+            {
+              key: "g" + gi,
+              onClick: () => setUnfoldedDone((m) => ({ ...m, [gKey]: true })),
+              role: "button",
+              "aria-label": `finished \u2014 click to show the ${g.steps.length} steps`,
+              style: { display: "flex", alignItems: "center", gap: 6, marginTop: gi ? 6 : 0, padding: "0 2px", cursor: "pointer" }
+            },
+            /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 10, color: C.muted, width: 14, textAlign: "center" } }, "\u25B8"),
+            /* @__PURE__ */ React5.createElement("span", { style: { color: tick, display: "inline-flex" } }, /* @__PURE__ */ React5.createElement(CheckIcon, { size: 13 })),
+            /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: C.muted, fontFamily: "var(--fl-display)", textDecoration: "line-through" } }, gname),
+            /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" } }, g.dur, "m")
+          );
+        }
+        return /* @__PURE__ */ React5.createElement(React5.Fragment, { key: "g" + gi }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: gi ? 6 : 0, padding: "0 2px" } }, gDone ? /* @__PURE__ */ React5.createElement("span", { onClick: () => setUnfoldedDone((m) => ({ ...m, [gKey]: false })), role: "button", "aria-label": "fold the finished group", style: { fontSize: 10, color: C.muted, width: 14, textAlign: "center", cursor: "pointer", flexShrink: 0 } }, "\u25BE") : /* @__PURE__ */ React5.createElement("span", { style: { width: 14, flexShrink: 0 } }), /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: C.muted, fontFamily: "var(--fl-display)", textDecoration: gDone ? "line-through" : "none" } }, gname), /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" } }, g.dur, "m"), /* @__PURE__ */ React5.createElement("button", { onClick: () => openLog(gname), "aria-label": `run "${gname}" as one pomodoro (${g.dur}m of steps)`, style: { ...ICON_BTN, color: relax ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid, marginLeft: "auto" } }, /* @__PURE__ */ React5.createElement(PlayIcon, { size: 14 }))), g.steps.map((it) => {
           flat++;
           return renderStepRow(it, flat);
         }));
@@ -26000,7 +26374,7 @@ ${s.task}`))
         items.push({ type: "gap", t0: prevEnd, t1: b.start, minutes: b.start - prevEnd, topY: y, height: gh });
         y += gh;
       }
-      const h = b.kind === "break" ? SHORT_BREAK_H : b.kind === "longbreak" ? LONG_BREAK_H : b.kind === "meal" || b.kind === "task" && !b.pageId ? Math.max(MIN_BLOCK_H, 25 * PX_PER_MIN) : Math.max(MIN_BLOCK_H, b.dur * PX_PER_MIN);
+      const h = b.kind === "break" ? SHORT_BREAK_H : b.kind === "longbreak" ? LONG_BREAK_H : b.kind === "meal" || b.claimed || b.kind === "task" && !b.pageId ? Math.max(MIN_BLOCK_H, 25 * PX_PER_MIN) : Math.max(MIN_BLOCK_H, b.dur * PX_PER_MIN);
       items.push({ type: "block", b, t0: b.start, t1: b.start + b.dur, topY: y, height: h });
       y += h;
       prevEnd = b.start + b.dur;
@@ -26049,10 +26423,13 @@ ${s.task}`))
     return -1;
   };
   const todayBlocks = () => plans[todayKey] || [];
-  const setTodayBlocks = (blocks) => {
+  const setTodayBlocks = (blocks, silent) => {
+    if (!silent) {
+      const prev = todayBlocks();
+      setPlanUndo((u) => [...u, prev].slice(-3));
+    }
     setPlans((p) => ({ ...p, [todayKey]: blocks }));
     api.savePlan && api.savePlan(todayKey, blocks);
-    setPlanUndo(null);
   };
   const planBlocks0 = todayBlocks();
   const plannedPomos = planBlocks0.length ? planBlocks0.filter((b) => b.kind === "task").length : [...workTasks, ...personalTasks].reduce((s, t) => s + (t.pomodoros || 0), 0);
@@ -26103,7 +26480,8 @@ ${s.task}`))
   const buildInitialPlan = () => {
     var _a2, _b2, _c2, _d;
     const pomo = settings.pomodoroMinutes || 25;
-    const survivors = todayBlocks().filter((b) => b.kind === "meal" || b.kind === "task" && b.locked && !b.pageId).map((b) => {
+    const sameDayCreated = (b) => !!b.created && new Date(b.created).toDateString() === (/* @__PURE__ */ new Date()).toDateString();
+    const survivors = todayBlocks().filter((b) => b.kind === "meal" || b.claimed && sameDayCreated(b) || b.kind === "task" && b.locked && !b.pageId && sameDayCreated(b)).map((b) => {
       const nb = { ...b };
       delete nb.placed;
       return nb;
@@ -26119,7 +26497,7 @@ ${s.task}`))
       });
     }
     [...workTasks, ...personalTasks].filter((task) => !survivors.some((s) => s.kind === "task" && !s.pageId && s.name === task.task)).forEach((task) => {
-      blocks.push({ id: "b" + Date.now() + "_" + seq++, kind: "task", name: task.task, start: t, dur: 25, pomoLen: pomo, pageId: task.id || null, category: task.category || null, load: task.load || null, power: task.power || null });
+      blocks.push({ id: "b" + Date.now() + "_" + seq++, kind: "task", name: task.task, start: t, dur: 25, pomoLen: pomo, pageId: task.id || null, category: task.category || null, status: task.status || null, power: task.power || null });
       t += 25;
     });
     const survDinner = survivors.find((b) => b.kind === "meal" && b.meal === "dinner");
@@ -26136,21 +26514,21 @@ ${s.task}`))
     }
     return autoBreaksOf(blocks, { insertBreaks: false });
   };
-  useEffect2(() => {
+  useEffect3(() => {
     if (!pendingSyncRebuild)
       return;
-    setTodayBlocks(buildInitialPlan());
+    setTodayBlocks(buildInitialPlan(), true);
     setPendingSyncRebuild(false);
   }, [tasks, pendingSyncRebuild]);
   const setTimelineMode = (on) => {
     const hasInput = [...workTasks, ...personalTasks].length || !settings.skipMorningRoutine && (activeMorning || []).length || !settings.skipNightRoutine && (activeNight || []).length;
     if (on && !plans[todayKey] && hasInput)
-      setTodayBlocks(buildInitialPlan());
+      setTodayBlocks(buildInitialPlan(), true);
     else if (on && plans[todayKey]) {
       const cur = plans[todayKey];
       const hasLunch = cur.some((b) => b.meal === "lunch"), hasDinner = cur.some((b) => b.meal === "dinner");
       if (!!settings.lunchEnabled !== hasLunch || !!settings.dinnerEnabled !== hasDinner)
-        setTodayBlocks(autoBreaksOf(cur));
+        setTodayBlocks(autoBreaksOf(cur), true);
     }
     setTimelineModeState(on);
   };
@@ -26180,7 +26558,7 @@ ${s.task}`))
     const pomo = settings.pomodoroMinutes || 25;
     const last = todayBlocks().reduce((m, b) => Math.max(m, b.start + b.dur), tlStart);
     const id = "b" + Date.now();
-    setTodayBlocks([...todayBlocks(), { id, kind: "task", name: "New task", start: clampStart(snap5(last + (settings.breakMinutes || 5)), pomo), dur: pomo, power: "Y", load: "B" }]);
+    setTodayBlocks([...todayBlocks(), { id, kind: "task", name: "New task", start: clampStart(snap5(last + (settings.breakMinutes || 5)), pomo), dur: pomo, power: "Y", load: "B", created: Date.now() }]);
     setEditBlockId(id);
     setBlockDraft({ name: "New task", dur: pomo, power: "Y", load: "B", category: "" });
   };
@@ -26363,9 +26741,8 @@ ${s.task}`))
   const autoBreaks = () => {
     const prev = todayBlocks();
     const pomo = settings.pomodoroMinutes || 25;
-    const sized = prev.map((b) => b.kind === "task" && b.pageId ? { ...b, dur: 25, pomoLen: pomo } : b);
+    const sized = prev.map((b) => b.kind === "task" && b.pageId && !b.claimed ? { ...b, dur: 25, pomoLen: pomo } : b);
     setTodayBlocks(autoBreaksOf(sized));
-    setPlanUndo(prev);
   };
   const saveBlockEdit = () => {
     var _a2, _b2;
@@ -26410,6 +26787,53 @@ ${s.task}`))
     }
     setEditBlockId(null);
   };
+  const tlAnchorish = (x) => x.kind === "meal" || x.kind === "meeting" || x.kind === "task" && (x.locked || x.placed);
+  const lgGlue = (blocks, cur, newStart) => {
+    const movedArr = blocks.map((x) => x.id === cur.id ? { ...x, start: newStart } : x);
+    const D = movedArr.find((x) => x.id === cur.id);
+    const anchors = movedArr.filter(tlAnchorish);
+    const prevEnd = movedArr.reduce((m, x) => x.id !== cur.id && x.start + x.dur <= D.start ? Math.max(m, x.start + x.dur) : m, -1);
+    if (prevEnd >= 0 && D.start > prevEnd) {
+      let s = prevEnd, guard = 0;
+      while (guard++ < 30) {
+        const hit = anchors.find((f) => s < f.start + f.dur && s + D.dur > f.start);
+        if (!hit)
+          break;
+        s = hit.start + hit.dur;
+      }
+      if (s < D.start)
+        D.start = s;
+    }
+    return { movedArr, D, anchors };
+  };
+  const seatPeers = (blocks, cur) => blocks.filter((x) => x.kind === "task" && !x.locked && !x.placed && x.dur === cur.dur).sort((a, b) => a.start - b.start);
+  const pocketOf = (blocks, cur, t0) => {
+    const solids = blocks.filter((x) => x.id !== cur.id && x.kind !== "break" && x.kind !== "longbreak");
+    let t = t0;
+    const inS = solids.find((s) => t > s.start && t < s.start + s.dur);
+    if (inS)
+      t = t < inS.start + inS.dur / 2 ? inS.start : inS.start + inS.dur;
+    const dayLo = Math.min(tlStart, tlLeadOf(blocks));
+    const loB = solids.reduce((m, s) => s.start + s.dur <= t ? Math.max(m, s.start + s.dur) : m, -Infinity);
+    const hiB = solids.reduce((m, s) => s.start >= t ? Math.min(m, s.start) : m, Infinity);
+    return { lo: Math.max(dayLo, loB), hi: Math.min(tlEnd, hiB), loSolid: loB > -Infinity, hiSolid: hiB < Infinity, t };
+  };
+  const lgLanding = (blocks, cur, rawT) => {
+    const peers = seatPeers(blocks, cur);
+    const others = peers.filter((x) => x.id !== cur.id);
+    const oldIdx = others.filter((x) => x.start < cur.start).length;
+    const newIdx = others.filter((x) => x.start + x.dur / 2 <= rawT).length;
+    if (newIdx !== oldIdx) {
+      const seats = peers.map((x) => x.start);
+      const order = others.slice();
+      order.splice(newIdx, 0, cur);
+      return { mode: "rotate", start: seats[newIdx], order, seats };
+    }
+    const pk = pocketOf(blocks, cur, rawT);
+    if (pk.hi - pk.lo < cur.dur)
+      return { mode: "none", start: cur.start };
+    return { mode: "nudge", start: Math.max(pk.lo, Math.min(pk.hi - cur.dur, pk.t)), pk };
+  };
   const onTlDrop = (b, clientY) => {
     const d = tlDrag;
     const blocks = todayBlocks();
@@ -26424,53 +26848,109 @@ ${s.task}`))
     }
     const tlTop = tlRef.current ? tlRef.current.getBoundingClientRect().top : d.tlTop;
     const target = snapDrop(yToMin(tlLayout(blocks).items, clientY - tlTop - d.grab));
-    const newStart = avoidMeals(clampStart(target, cur.dur), cur.dur, blocks, cur.id);
     if (d.button === 2) {
+      const newStart = avoidMeals(clampStart(target, cur.dur), cur.dur, blocks, cur.id);
       const moving = blocks.filter((x) => x.start >= cur.start && (x.id === cur.id || x.kind !== "meeting" && x.kind !== "meal" && !(x.kind === "task" && (x.locked || x.placed))));
       const minStart = Math.min(...moving.map((x) => x.start));
       const maxEnd = Math.max(...moving.map((x) => x.start + x.dur));
       const delta = Math.max(Math.min(tlStart, tlLeadOf(blocks)) - minStart, Math.min(newStart - cur.start, tlEnd - maxEnd));
       const ids = new Set(moving.map((x) => x.id));
-      const shifted = resolveOverlaps(blocks.map((x) => {
+      const movedMap = blocks.map((x) => {
         if (!ids.has(x.id))
           return x;
         const nb = { ...x, start: x.start + delta };
         if (x.id === cur.id && x.kind === "task" && !x.locked)
           nb.placed = true;
         return nb;
-      }));
+      });
+      let pre = movedMap;
+      const curMoved = movedMap.find((x) => x.id === cur.id);
+      if (delta < 0 && curMoved) {
+        const sb0 = settings.breakMinutes || 5;
+        pre = movedMap.map((x) => {
+          if (ids.has(x.id) || x.kind !== "break" && x.kind !== "longbreak")
+            return x;
+          if (x.start >= curMoved.start && x.start + x.dur <= cur.start)
+            return null;
+          if (x.start < curMoved.start && x.start + x.dur > curMoved.start) {
+            const nd = curMoved.start - x.start;
+            if (nd < 1)
+              return null;
+            return { ...x, dur: nd, kind: nd > sb0 ? "longbreak" : "break", name: x.name === "Break" || x.name === "Long break" ? nd > sb0 ? "Long break" : "Break" : x.name };
+          }
+          return x;
+        }).filter(Boolean);
+      }
+      const shifted = resolveOverlaps(pre);
       const outBlocks = shifted.slice();
       const curNew = shifted.find((x) => x.id === cur.id);
       if (curNew) {
-        const prevEnd = shifted.reduce((m, x) => x.id !== cur.id && x.start + x.dur <= curNew.start ? Math.max(m, x.start + x.dur) : m, -1);
-        const gap = prevEnd >= 0 ? curNew.start - prevEnd : 0;
-        if (gap > 0) {
-          const shortB = settings.breakMinutes || 5;
-          outBlocks.push({ id: "gb" + Date.now(), kind: gap > shortB ? "longbreak" : "break", name: gap > shortB ? "Long break" : "Break", start: prevEnd, dur: gap });
+        const shortB = settings.breakMinutes || 5;
+        const others = shifted.filter((x) => x.id !== cur.id);
+        const lowBound = Math.min(cur.start, curNew.start);
+        let pt = others.reduce((m, x) => x.start + x.dur <= lowBound ? Math.max(m, x.start + x.dur) : m, -1);
+        if (pt < 0)
+          pt = lowBound;
+        const mk = (s, e) => {
+          const g = e - s;
+          if (g <= 0)
+            return;
+          const prevBr = outBlocks.find((x) => (x.kind === "break" || x.kind === "longbreak") && Math.abs(x.start + x.dur - s) < 0.5);
+          if (prevBr) {
+            const total = e - prevBr.start;
+            const long = total > shortB;
+            outBlocks[outBlocks.indexOf(prevBr)] = { ...prevBr, dur: total, kind: long ? "longbreak" : "break", name: prevBr.name === "Break" || prevBr.name === "Long break" ? long ? "Long break" : "Break" : prevBr.name };
+            return;
+          }
+          outBlocks.push({ id: "gb" + Date.now() + "_" + Math.round(s), kind: g > shortB ? "longbreak" : "break", name: g > shortB ? "Long break" : "Break", start: s, dur: g });
+        };
+        const between = others.filter((x) => x.start + x.dur > pt && x.start < curNew.start).sort((a, b2) => a.start - b2.start);
+        for (const x of between) {
+          mk(pt, Math.min(x.start, curNew.start));
+          pt = Math.max(pt, x.start + x.dur);
+          if (pt >= curNew.start)
+            break;
         }
+        if (pt < curNew.start)
+          mk(pt, curNew.start);
       }
       setTodayBlocks(outBlocks);
-    } else {
-      const isAnchor = (x) => x.kind === "meal" || x.kind === "meeting" || x.kind === "task" && (x.locked || x.placed);
-      const movedArr = blocks.map((x) => x.id === cur.id ? { ...x, start: newStart } : x);
-      const D = movedArr.find((x) => x.id === cur.id);
-      const anchors = movedArr.filter(isAnchor);
-      const prevEnd = movedArr.reduce((m, x) => x.id !== cur.id && x.start + x.dur <= D.start ? Math.max(m, x.start + x.dur) : m, -1);
-      if (prevEnd >= 0 && D.start > prevEnd) {
-        let s = prevEnd, guard = 0;
-        while (guard++ < 30) {
-          const hit = anchors.find((f) => s < f.start + f.dur && s + D.dur > f.start);
-          if (!hit)
-            break;
-          s = hit.start + hit.dur;
-        }
-        if (s < D.start)
-          D.start = s;
+    } else if (cur.kind === "task" && !cur.locked && !cur.placed) {
+      const land = lgLanding(blocks, cur, target);
+      if (land.mode === "rotate") {
+        const seatAt = new Map(land.order.map((x, i) => [x.id, land.seats[i]]));
+        setTodayBlocks(blocks.map((x) => seatAt.has(x.id) ? { ...x, start: seatAt.get(x.id) } : x));
+      } else if (land.mode === "nudge" && land.start !== cur.start) {
+        const shortB = settings.breakMinutes || 5;
+        const npk = land.pk, opk = pocketOf(blocks, cur, cur.start);
+        const pks = npk.lo === opk.lo ? [npk] : [npk, opk];
+        const isBrk = (x) => x.kind === "break" || x.kind === "longbreak";
+        const inPk = (x, pk) => x.start >= pk.lo - 0.5 && x.start + x.dur <= pk.hi + 0.5;
+        const out = blocks.map((x) => x.id === cur.id ? { ...x, start: land.start } : x).filter((x) => !(isBrk(x) && pks.some((pk) => inPk(x, pk))));
+        const mk = (s, e) => {
+          const g = e - s;
+          if (g > 0.5)
+            out.push({ id: "gb" + Date.now() + "_" + Math.round(s), kind: g > shortB ? "longbreak" : "break", name: g > shortB ? "Long break" : "Break", start: s, dur: g });
+        };
+        pks.forEach((pk) => {
+          const inside = land.start >= pk.lo - 0.5 && land.start + cur.dur <= pk.hi + 0.5;
+          if (inside) {
+            if (pk.loSolid)
+              mk(pk.lo, land.start);
+            if (pk.hiSolid)
+              mk(land.start + cur.dur, pk.hi);
+          } else if (pk.loSolid && pk.hiSolid)
+            mk(pk.lo, pk.hi);
+        });
+        setTodayBlocks(out);
       }
+    } else {
+      const newStart = avoidMeals(clampStart(target, cur.dur), cur.dur, blocks, cur.id);
+      const { movedArr, D, anchors } = lgGlue(blocks, cur, newStart);
       const moved = movedArr.sort((a, c) => a.start - c.start);
       let cursor = D.start + D.dur;
       const resolved = moved.map((x) => {
-        if (x.id === cur.id || isAnchor(x))
+        if (x.id === cur.id || tlAnchorish(x))
           return x;
         if (x.start + x.dur <= D.start)
           return x;
@@ -26487,12 +26967,11 @@ ${s.task}`))
         return { ...x, start: s };
       });
       setTodayBlocks(resolved);
-      setPlanUndo(blocks);
     }
     setTlDrag(null);
   };
   const renderBlock = (b, topY, h) => {
-    var _a2, _b2;
+    var _a2, _b2, _c2;
     const isTask = b.kind === "task";
     if (editBlockId === b.id) {
       return /* @__PURE__ */ React5.createElement("div", { key: b.id, style: { position: "absolute", left: 108, right: 4, top: topY, minHeight: h, boxSizing: "border-box", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6, padding: "4px 6px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, zIndex: 5 } }, /* @__PURE__ */ React5.createElement("input", { value: blockDraft.name, autoFocus: true, onChange: (e) => setBlockDraft({ ...blockDraft, name: e.target.value }), onKeyDown: (e) => {
@@ -26500,12 +26979,7 @@ ${s.task}`))
           saveBlockEdit();
         if (e.key === "Escape")
           setEditBlockId(null);
-      }, style: { flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 5, padding: "3px 6px", fontFamily: "var(--fl-display)" } }), b.kind === "task" && !b.pageId && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", gap: 3, flexShrink: 0 } }, ["P", "Y", "G"].map((p) => /* @__PURE__ */ React5.createElement("button", { key: p, onClick: () => setBlockDraft({ ...blockDraft, power: p }), "aria-pressed": blockDraft.power === p, "aria-label": "ExecutionPower: " + POWER_LABEL[p], style: { width: 20, height: 20, borderRadius: 6, border: blockDraft.power === p ? `2px solid ${C.ink}` : `1px solid ${C.faint}`, background: POWER_COLOR[p], padding: 0, boxSizing: "border-box" } }))), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", gap: 3, flexShrink: 0 } }, ["A", "B", "C"].map((l) => /* @__PURE__ */ React5.createElement("button", { key: l, onClick: () => setBlockDraft({ ...blockDraft, load: l }), "aria-pressed": blockDraft.load === l, "aria-label": "CognitiveLoad: " + LOAD_LABEL[l], style: { width: 20, height: 20, borderRadius: 6, border: blockDraft.load === l ? `2px solid ${LOAD_COLOR[l]}` : `1px solid ${C.faint}`, background: "transparent", color: LOAD_COLOR[l], fontFamily: "var(--fl-mono)", fontWeight: 700, fontSize: 11, padding: 0, boxSizing: "border-box" } }, l))), /* @__PURE__ */ React5.createElement("input", { value: (_a2 = blockDraft.category) != null ? _a2 : "", onChange: (e) => setBlockDraft({ ...blockDraft, category: e.target.value }), onKeyDown: (e) => {
-        if (e.key === "Enter")
-          saveBlockEdit();
-        if (e.key === "Escape")
-          setEditBlockId(null);
-      }, placeholder: "Area tag", "aria-label": "Area tag, like a Notion Area", style: { width: 76, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 5, padding: "3px 6px", fontFamily: "var(--fl-display)", flexShrink: 0 } })), b.kind === "meal" && /* @__PURE__ */ React5.createElement("input", { value: (_b2 = blockDraft.start) != null ? _b2 : "", onChange: (e) => setBlockDraft({ ...blockDraft, start: e.target.value }), onKeyDown: (e) => {
+      }, style: { flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 5, padding: "3px 6px", fontFamily: "var(--fl-display)" } }), b.kind === "task" && !b.pageId && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", gap: 3, flexShrink: 0 } }, ["P", "Y", "G"].map((p) => /* @__PURE__ */ React5.createElement("button", { key: p, onClick: () => setBlockDraft({ ...blockDraft, power: p }), "aria-pressed": blockDraft.power === p, "aria-label": "ExecutionPower: " + POWER_LABEL[p], style: { width: 20, height: 20, borderRadius: 6, border: blockDraft.power === p ? `2px solid ${C.ink}` : `1px solid ${C.faint}`, background: POWER_COLOR[p], padding: 0, boxSizing: "border-box" } }))), /* @__PURE__ */ React5.createElement("select", { value: (_a2 = blockDraft.category) != null ? _a2 : "", onChange: (e) => setBlockDraft({ ...blockDraft, category: e.target.value }), "aria-label": "Area tag, mirroring your Notion Area options", style: { width: 96, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 5, padding: "3px 4px", fontFamily: "var(--fl-display)", flexShrink: 0 } }, /* @__PURE__ */ React5.createElement("option", { value: "" }, "no area"), Array.from(/* @__PURE__ */ new Set([...areaOptions || [], ...tasks.map((t) => t.category).filter(Boolean), ...((_b2 = blockDraft.category) != null ? _b2 : "") ? [blockDraft.category] : []])).map((a) => /* @__PURE__ */ React5.createElement("option", { key: a, value: a }, a)))), b.kind === "meal" && /* @__PURE__ */ React5.createElement("input", { value: (_c2 = blockDraft.start) != null ? _c2 : "", onChange: (e) => setBlockDraft({ ...blockDraft, start: e.target.value }), onKeyDown: (e) => {
         if (e.key === "Enter")
           saveBlockEdit();
         if (e.key === "Escape")
@@ -26563,12 +27037,14 @@ ${s.task}`))
           setTlDrag(null);
         },
         onContextMenu: (e) => e.preventDefault(),
-        style: { position: "absolute", left: 108, right: 4, top: blkTop, height: h, boxSizing: "border-box", opacity: tlDrag && tlDrag.id !== b.id ? 0.5 : 1, background: isTask ? "#fdfbf5" : b.kind === "break" ? BREAK_BG : b.kind === "longbreak" ? LBREAK_BG : b.kind === "meal" ? MEAL_BG : b.kind === "routine" ? ROUTINE_THEME[b.night ? "night" : "morning"][dayMode === "relax" ? "relax" : "work"] : "#fbf8f1", border: `1px solid ${C.line}`, borderLeft: `4px solid ${isTask ? POWER_COLOR[b.power] || POWER_COLOR.Y : b.kind === "routine" ? ROUTINE_THEME[b.night ? "night" : "morning"].bar : b.kind === "break" ? BREAK_STRIPE : b.kind === "longbreak" ? LBREAK_STRIPE : b.kind === "meal" ? MEAL_STRIPE : C.muted}`, borderRadius: 6, padding: "2px 8px", cursor: b.kind === "meeting" || b.kind === "break" || b.kind === "longbreak" ? "default" : dragging ? "grabbing" : "grab", display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: b.kind === "break" ? BREAK_TEXT : b.kind === "longbreak" ? LBREAK_TEXT : b.kind === "meal" ? MEAL_TEXT : C.ink, zIndex: dragging ? 20 : 1, boxShadow: dragging ? "0 4px 14px rgba(0,0,0,0.18)" : "none", touchAction: "none", userSelect: "none", overflow: "hidden" }
+        style: { position: "absolute", left: 108, right: 4, top: blkTop, height: h, boxSizing: "border-box", opacity: tlDrag && tlDrag.id !== b.id ? 0.5 : 1, background: isTask ? "#fdfbf5" : b.kind === "break" ? BREAK_BG : b.kind === "longbreak" ? LBREAK_BG : b.kind === "meal" ? MEAL_BG : b.kind === "routine" ? ROUTINE_THEME[b.night ? "night" : "morning"][dayMode === "relax" ? "relax" : "work"] : "#fbf8f1", border: `1px solid ${C.line}`, borderLeft: `4px ${b.claimed ? "dashed" : "solid"} ${isTask ? POWER_COLOR[b.power] || POWER_COLOR.Y : b.kind === "routine" ? ROUTINE_THEME[b.night ? "night" : "morning"].bar : b.kind === "break" ? BREAK_STRIPE : b.kind === "longbreak" ? LBREAK_STRIPE : b.kind === "meal" ? MEAL_STRIPE : C.muted}`, borderRadius: 6, padding: "2px 8px", cursor: b.kind === "meeting" || b.kind === "break" || b.kind === "longbreak" ? "default" : dragging ? "grabbing" : "grab", display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: b.kind === "break" ? BREAK_TEXT : b.kind === "longbreak" ? LBREAK_TEXT : b.kind === "meal" ? MEAL_TEXT : C.ink, zIndex: dragging ? 20 : 1, boxShadow: dragging ? "0 4px 14px rgba(0,0,0,0.18)" : "none", touchAction: "none", userSelect: "none", overflow: "hidden" }
       },
+      b.claimed && /* @__PURE__ */ React5.createElement("span", { "aria-label": "claimed: logged after the fact, off the timer", style: { fontSize: 10, flexShrink: 0, lineHeight: 1 } }, "\u270B"),
       b.kind === "meeting" && /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, display: "inline-flex", flexShrink: 0 } }, /* @__PURE__ */ React5.createElement(LockIcon, { size: 12 })),
       (b.kind === "break" || b.kind === "longbreak") && /* @__PURE__ */ React5.createElement("img", { src: b.kind === "longbreak" ? break_long_default : break_short_default, alt: "", draggable: false, style: { width: 14, height: 14, flexShrink: 0 } }),
       b.kind === "meal" && /* @__PURE__ */ React5.createElement("span", { style: { color: MEAL_TEXT, display: "inline-flex", flexShrink: 0 } }, /* @__PURE__ */ React5.createElement(UtensilsIcon, { size: 13 })),
-      isTask && /* @__PURE__ */ React5.createElement("span", { style: { color: LOAD_COLOR[b.load] || LOAD_COLOR.B, fontFamily: "var(--fl-mono)", fontWeight: 700, fontSize: 12.5, flexShrink: 0 }, "aria-label": LOAD_LABEL[b.load] || LOAD_LABEL.B }, b.load || "B"),
+      b.kind === "routine" && /* @__PURE__ */ React5.createElement("span", { style: { color: ROUTINE_THEME[b.night ? "night" : "morning"].bar, display: "inline-flex", flexShrink: 0 }, "aria-label": b.night ? "night routine" : "morning routine" }, b.night ? /* @__PURE__ */ React5.createElement(MoonRoutineIcon, { size: 13 }) : /* @__PURE__ */ React5.createElement(SunRoutineIcon, { size: 13 })),
+      isTask && (b.status === "exploring" || b.status === "executing") && /* @__PURE__ */ React5.createElement("span", { style: { color: b.status === "exploring" ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid, display: "inline-flex", flexShrink: 0 }, "aria-label": b.status === "exploring" ? "Status: Exploring \u2014 still finding the shape" : "Status: Executing \u2014 the path is known" }, b.status === "exploring" ? /* @__PURE__ */ React5.createElement(ExploreIcon, { size: 12 }) : /* @__PURE__ */ React5.createElement(HammerIcon, { size: 12 })),
       isTask && b.category && settings.showAreaTimeline !== false && /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 10, fontFamily: "var(--fl-mono)", color: personalBlk ? TAG_COFFEE.personal.text : TAG_COFFEE.project.text, background: personalBlk ? TAG_COFFEE.personal.bg : TAG_COFFEE.project.bg, border: `1px solid ${personalBlk ? TAG_COFFEE.personal.border : TAG_COFFEE.project.border}`, borderRadius: 999, height: 16, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: "0 7px", whiteSpace: "nowrap", flexShrink: 0 } }, b.category),
       isTask && /* @__PURE__ */ React5.createElement("button", { onClick: () => toggleLock(b.id), className: b.locked ? "" : "fl-rowact fl-collapse", "aria-label": b.locked ? "commitment: fixed at this time, and auto-fix adds a long break after it and restarts the pomodoro count. Click to release." : "make this a commitment: fix it at this time, with a long break after it and a fresh pomodoro count", style: { ...ICON_BTN, color: b.locked ? POWER_COLOR[b.power] || POWER_COLOR.Y : C.muted } }, /* @__PURE__ */ React5.createElement(LockIcon, { size: 12, open: !b.locked })),
       isTask && b.placed && /* @__PURE__ */ React5.createElement("button", { onClick: () => setTodayBlocks(todayBlocks().map((x) => {
@@ -26578,7 +27054,12 @@ ${s.task}`))
         delete nb.placed;
         return nb;
       })), "aria-label": "placed (by right-drag): auto-fix keeps it exactly here, position only, the break rhythm is unchanged. Click to release it back into the flow.", style: { ...ICON_BTN, color: POWER_COLOR[b.power] || POWER_COLOR.Y } }, /* @__PURE__ */ React5.createElement(PinIcon, { size: 12 })),
-      /* @__PURE__ */ React5.createElement("span", { "aria-label": Array.isArray(b.steps) && b.steps.length ? b.steps.join(" \xB7 ") : void 0, style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, isTask ? stripLeadingTag(b.name) : b.name, Array.isArray(b.steps) && b.steps.length ? /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 11 } }, " \xB7 ", b.steps.join(" \xB7 ")) : null),
+      /* @__PURE__ */ React5.createElement("span", { "aria-label": Array.isArray(b.steps) && b.steps.length ? b.steps.join(" \xB7 ") : void 0, style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: b.kind === "routine" && Array.isArray(b.refIds) && b.refIds.length > 0 && b.refIds.every((id) => isRoutineDone(id)) ? "line-through" : "none" } }, isTask ? stripLeadingTag(b.name) : b.name, Array.isArray(b.steps) && b.steps.length ? /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 11 } }, " \xB7 ", b.steps.join(" \xB7 ")) : null),
+      isTask && b.pageId && /* @__PURE__ */ React5.createElement("button", { onClick: () => {
+        const t = tasks.find((x) => x.id === b.pageId);
+        if (t)
+          openOverCalib(t);
+      }, className: "fl-rowact fl-collapse", "aria-label": "the task grew: add a + tomato round (max two, then split)", style: { ...ICON_BTN, fontSize: 11, whiteSpace: "nowrap" } }, "+\u{1F345}"),
       (isTask || b.kind === "routine") && /* @__PURE__ */ React5.createElement("button", { onClick: () => openLog(b.name), className: "fl-rowact fl-collapse", "aria-label": "run a pomodoro", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PlayIcon, { size: 12 })),
       isTask && !b.pageId && /* @__PURE__ */ React5.createElement("button", { onClick: () => {
         setEditBlockId(b.id);
@@ -26637,10 +27118,23 @@ ${s.task}`))
         },
         n
       );
-    })), /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 12, color: C.muted, whiteSpace: "nowrap" } }, "pomodoros")), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" } }, /* @__PURE__ */ React5.createElement("button", { onClick: autoBreaks, "aria-label": "auto-fix: pack the day in your order around commitments, pins and meals, glue your breaks, and add only the missing rests", style: { ...btn(ACCENT), width: 30, height: 30, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(WandSparklesIcon, { size: 14 })), planUndo && /* @__PURE__ */ React5.createElement("button", { onClick: () => {
-      setTodayBlocks(planUndo);
-      setPlanUndo(null);
-    }, "aria-label": "undo the last auto-fix or drag", style: { ...btn(C.worse, true), padding: "5px 10px", fontSize: 12 } }, "undo"), settings.addBlockEnabled === true && /* @__PURE__ */ React5.createElement("button", { onClick: addBlock, "aria-label": "add a manual block: name, power colour, load letter, Area tag and length; lock it if it's a commitment", style: { ...btn(ACCENT), width: 30, height: 30, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(ListPlusIcon, { size: 14 })))), blocks.length === 0 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: "0 0 8px" } }, "No blocks yet \u2014 sync some tasks and re-open the timeline, or add a block."), /* @__PURE__ */ React5.createElement("div", { ref: tlScrollRef, style: { maxHeight: "62vh", overflowY: "auto", overflowX: "hidden" } }, /* @__PURE__ */ React5.createElement("div", { ref: tlRef, onContextMenu: (e) => e.preventDefault(), style: { position: "relative", height: totalH } }, /* @__PURE__ */ React5.createElement("div", { style: { position: "absolute", left: 100, top: 0, bottom: 0, width: 2, background: C.line } }), (() => {
+    })), /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 12, color: C.muted, whiteSpace: "nowrap" } }, "pomodoros")), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" } }, /* @__PURE__ */ React5.createElement("button", { onClick: autoBreaks, "aria-label": "auto-fix: pack the day in your order around commitments, pins and meals, glue your breaks, and add only the missing rests", style: { ...btn(ACCENT), width: 30, height: 30, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(WandSparklesIcon, { size: 14 })), /* @__PURE__ */ React5.createElement(
+      "button",
+      {
+        onClick: () => {
+          if (!planUndo.length)
+            return;
+          const snap = planUndo[planUndo.length - 1];
+          const rest = planUndo.slice(0, -1);
+          setTodayBlocks(snap, true);
+          setPlanUndo(rest);
+        },
+        disabled: planUndo.length === 0,
+        "aria-label": planUndo.length ? `undo your last plan edit (${planUndo.length} step${planUndo.length > 1 ? "s" : ""} stored)` : "nothing to undo yet: every plan edit stores a step, up to three",
+        style: { ...btn(ACCENT, true), width: 30, height: 30, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: planUndo.length ? 1 : 0.35, cursor: planUndo.length ? "pointer" : "default" }
+      },
+      /* @__PURE__ */ React5.createElement(Undo2Icon, { size: 14 })
+    ), settings.addBlockEnabled === true && /* @__PURE__ */ React5.createElement("button", { onClick: addBlock, "aria-label": "add a manual block: name, power colour, load letter, Area tag and length; lock it if it's a commitment", style: { ...btn(ACCENT), width: 30, height: 30, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(ListPlusIcon, { size: 14 })))), blocks.length === 0 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: "0 0 8px" } }, "No blocks yet \u2014 sync some tasks and re-open the timeline, or add a block."), /* @__PURE__ */ React5.createElement("div", { ref: tlScrollRef, style: { maxHeight: "62vh", overflowY: "auto", overflowX: "hidden" } }, /* @__PURE__ */ React5.createElement("div", { ref: tlRef, onContextMenu: (e) => e.preventDefault(), style: { position: "relative", height: totalH } }, /* @__PURE__ */ React5.createElement("div", { style: { position: "absolute", left: 100, top: 0, bottom: 0, width: 2, background: C.line } }), (() => {
       if (!items.length)
         return null;
       const ticks = [];
@@ -26662,6 +27156,17 @@ ${s.task}`))
       const gy = Math.max(0, tlDrag.y - tlDrag.grab);
       const gm = snapDrop(yToMin(items, gy));
       return /* @__PURE__ */ React5.createElement("span", { style: { position: "absolute", left: 42, top: gy - 7, width: 54, textAlign: "right", fontSize: 12.5, fontWeight: 700, color: C.ink, background: C.paper, borderRadius: 4, zIndex: 30, pointerEvents: "none" } }, fmtClock(gm));
+    })(), tlDrag && tlDrag.button !== 2 && (() => {
+      const cur = blocks.find((x) => x.id === tlDrag.id);
+      if (!cur || !items.length)
+        return null;
+      const gy = Math.max(0, tlDrag.y - tlDrag.grab);
+      const rawT = snapDrop(yToMin(items, gy));
+      const landing = cur.kind === "task" && !cur.locked && !cur.placed ? lgLanding(blocks, cur, rawT).start : lgGlue(blocks, cur, avoidMeals(clampStart(rawT, cur.dur), cur.dur, blocks, cur.id)).D.start;
+      let by = minToY(items, landing);
+      if (by < 0)
+        by = landing <= items[0].t0 ? items[0].topY : items[items.length - 1].topY + items[items.length - 1].height;
+      return /* @__PURE__ */ React5.createElement("div", { style: { position: "absolute", left: 100, right: 0, top: by - 1.5, height: 3, background: ACCENT, borderRadius: 999, zIndex: 25, pointerEvents: "none" } });
     })(), items.map((it, i) => it.type !== "block" ? null : /* @__PURE__ */ React5.createElement(React5.Fragment, { key: it.b.id }, /* @__PURE__ */ React5.createElement("span", { style: { position: "absolute", left: 46, top: it.topY + 3, width: 50, textAlign: "right", fontSize: 12, color: C.muted, fontFamily: "var(--fl-mono)" } }, fmtClock(it.b.start)), renderBlock(it.b, it.topY, it.height))), nowY >= 0 && /* @__PURE__ */ React5.createElement("div", { ref: nowRef, style: { position: "absolute", left: 0, right: 0, top: nowY, height: 0, zIndex: 6, pointerEvents: "none" } }, /* @__PURE__ */ React5.createElement("div", { style: { position: "absolute", left: 98, right: 0, top: 0, borderTop: `2px solid ${C.worse}` } }), /* @__PURE__ */ React5.createElement("span", { style: { position: "absolute", left: 0, top: -8, width: 36, textAlign: "right", fontSize: 12.5, color: C.worse, fontFamily: "var(--fl-mono)", fontWeight: 700 } }, fmtClock(nowMin))))));
   };
   const phaseRankNow = (() => {
@@ -26715,7 +27220,66 @@ ${s.task}`))
   return /* @__PURE__ */ React5.createElement("div", { ref: rootRef, style: { background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums" } }, /* @__PURE__ */ React5.createElement("style", null, `
         @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&display=swap');
         :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:'Baloo 2',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
-      `), /* @__PURE__ */ React5.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React5.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React5.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React5.createElement("span", null, "Square = ExecutionPower:"), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done")), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React5.createElement("span", null, "Letter = CognitiveLoad:"), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React5.createElement("b", { style: { color: LOAD_COLOR.A, fontFamily: "var(--fl-mono)" } }, "A"), " high"), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React5.createElement("b", { style: { color: LOAD_COLOR.B, fontFamily: "var(--fl-mono)" } }, "B"), " medium"), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React5.createElement("b", { style: { color: LOAD_COLOR.C, fontFamily: "var(--fl-mono)" } }, "C"), " low"), /* @__PURE__ */ React5.createElement("span", { style: { marginLeft: 4 } }, /* @__PURE__ */ React5.createElement("img", { src: crown_default, alt: "King", draggable: false, style: { width: 15, height: 15, verticalAlign: "-3px" } }), " = King ", "\xB7", " day starts at ", fmtHM(settings.dayStart)))), flash && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React5.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React5.createElement("div", { style: { marginBottom: 20, overflowX: "auto" } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "inline-flex", gap: 2, background: C.line, borderRadius: 12, padding: 4 } }, [["log", "Focus"], ["break", "Break"], ["pause", "Pause"], ["reflect", "Reflect"], ["today", "Plan"], ["status", "Status"], ["sky", "Sky"]].map(([t, lab]) => /* @__PURE__ */ React5.createElement("button", { key: t, onClick: () => setView(t), style: seg(view === t) }, lab)))), view === "sky" && /* @__PURE__ */ React5.createElement(SkyView, { sessions, reflections, C }), view === "reflect" && /* @__PURE__ */ React5.createElement(ReflectPanel, { feelings: reflectFeelings, C, onSave: onSaveReflection }), view === "today" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { className: "fl-plan-bar", style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "inline-flex", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 999, padding: 4 } }, ["work", "relax"].map((m) => {
+      `), /* @__PURE__ */ React5.createElement("div", { style: { maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" } }, /* @__PURE__ */ React5.createElement("h1", { style: { fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" } }, "Focus Log"), /* @__PURE__ */ React5.createElement("div", { style: { color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React5.createElement("span", null, "Square = ExecutionPower:"), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P } }), "Must Today"), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y } }), "Aim Today (default)"), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G } }), "Bonus If Done")), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" } }, /* @__PURE__ */ React5.createElement("span", null, "Icon = Status:"), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React5.createElement("span", { style: { color: MODE_COLORS.relax.solid, display: "inline-flex" } }, /* @__PURE__ */ React5.createElement(ExploreIcon, { size: 12 })), " Exploring"), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React5.createElement("span", { style: { color: MODE_COLORS.work.solid, display: "inline-flex" } }, /* @__PURE__ */ React5.createElement(HammerIcon, { size: 12 })), " Executing"), /* @__PURE__ */ React5.createElement("span", { style: { marginLeft: 4 } }, /* @__PURE__ */ React5.createElement("img", { src: crown_default, alt: "King", draggable: false, style: { width: 15, height: 15, verticalAlign: "-3px" } }), " = King ", "\xB7", " day starts at ", fmtHM(settings.dayStart)))), flash && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 } }, flash, pending.length > 0 && /* @__PURE__ */ React5.createElement("button", { onClick: retryPending, style: { ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" } }, "retry ", pending.length)), /* @__PURE__ */ React5.createElement("div", { style: { marginBottom: 20, overflowX: "auto" } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "inline-flex", gap: 2, background: C.line, borderRadius: 12, padding: 4 } }, [["log", "Focus"], ["break", "Break"], ["pause", "Pause"], ["reflect", "Reflect"], ["calibrate", "Calibrate"], ["today", "Plan"], ["status", "Stats"], ["sky", "Sky"]].map(([t, lab]) => /* @__PURE__ */ React5.createElement("button", { key: t, onClick: () => setView(t), style: seg(view === t) }, lab)))), calibDraft && (() => {
+    const d = calibDraft;
+    const over = d.mode === "over";
+    const REASONS = over ? ["hidden scope", "interrupted", "low energy", "perfectionism", "learning curve", "waiting on someone"] : ["overestimated it", "knew more than I thought", "smaller scope", "good flow", "cut scope on purpose"];
+    const chipStyle = (on) => ({ padding: "3px 11px", borderRadius: 999, border: on ? `1px solid ${over ? "#D9A521" : "#3E78B2"}` : `1px solid ${over ? "#D9A521" : "#3E78B2"}`, background: on ? over ? "#D9A521" : "#3E78B2" : over ? "#FBEFC9" : "#DCEAF6", color: on ? "#fdfbf6" : "#2b2723", fontSize: 12, cursor: "pointer", boxShadow: "none", fontFamily: "var(--fl-display)" });
+    return /* @__PURE__ */ React5.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }, onClick: () => setCalibDraft(null) }, /* @__PURE__ */ React5.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: C.card, borderRadius: 12, border: `1px solid ${C.line}`, padding: 16, width: "min(440px, 92vw)", boxShadow: "0 8px 30px rgba(0,0,0,0.2)" } }, /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.ink, overflowWrap: "anywhere" } }, over ? "The task grew: " : "Finished early: ", stripLeadingTag(d.task)), /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12, color: C.muted, fontFamily: "var(--fl-mono)", margin: "4px 0 10px" } }, "guess " + d.guess + " \xB7 spend " + d.spend + (over ? " \xB7 adding round " + d.round + " of 2" : " \xB7 " + Math.max(1, d.guess - d.spend) + " \u{1F345} back")), over && d.round === 2 && /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 11.5, color: "#c96f22", margin: "0 0 8px" } }, "Second extra round: if it still doesn't fit, consider splitting the task."), over && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12, color: C.muted, margin: "0 0 6px" } }, "how much bigger?"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } }, [1, 2, 3, 4].map((n) => /* @__PURE__ */ React5.createElement(
+      "button",
+      {
+        key: n,
+        onClick: () => setCalibDraft({ ...d, count: n }),
+        "aria-label": n === 4 ? "add one box (4 pomodoros)" : "add " + n + " pomodoro" + (n > 1 ? "s" : ""),
+        style: { padding: "3px 11px", borderRadius: 999, border: `1px solid ${(d.count || 1) === n ? "#c96f22" : C.faint}`, background: (d.count || 1) === n ? "#F8D8B4" : "#fffefc", color: "#2b2723", fontSize: 12, cursor: "pointer", boxShadow: "none", fontFamily: "var(--fl-display)" }
+      },
+      n === 4 ? "\u{1F4E6}" : "\u{1F345}".repeat(n)
+    )))), /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12, color: C.muted, margin: "0 0 6px" } }, over ? "what showed up?" : "what made it lighter?"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 } }, REASONS.map((r) => /* @__PURE__ */ React5.createElement("button", { key: r, onClick: () => setCalibDraft({ ...d, reason: r }), style: chipStyle(d.reason === r) }, r))), !over && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12, color: C.muted, margin: "0 0 6px" } }, "the spare tomato goes to\u2026"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 } }, ["a bonus task", "a longer break", "bank it"].map((r) => /* @__PURE__ */ React5.createElement("button", { key: r, onClick: () => setCalibDraft({ ...d, spare: r }), style: { padding: "3px 11px", borderRadius: 999, border: `1px solid ${MODE_COLORS.relax.border}`, background: d.spare === r ? MODE_COLORS.relax.solid : MODE_COLORS.relax.fill, color: d.spare === r ? "#fdfbf6" : "#2b2723", fontSize: 12, cursor: "pointer", boxShadow: "none", fontFamily: "var(--fl-display)" } }, r)))), /* @__PURE__ */ React5.createElement("input", { value: d.note || "", onChange: (e) => setCalibDraft({ ...d, note: e.target.value }), onKeyDown: (e) => {
+      if (e.key === "Enter" && d.reason)
+        saveCalibration();
+      if (e.key === "Escape")
+        setCalibDraft(null);
+    }, placeholder: "optional: one line about it (doubles as the lesson)", style: { width: "100%", boxSizing: "border-box", border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "6px 10px", marginBottom: 12, fontFamily: "var(--fl-display)" } }), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setCalibDraft(null), style: { ...btn(C.muted, true), borderRadius: 999, padding: "5px 14px", fontSize: 12.5 } }, "cancel"), /* @__PURE__ */ React5.createElement("button", { onClick: saveCalibration, disabled: !d.reason, style: { ...btn(C.ink), borderRadius: 999, padding: "5px 16px", fontSize: 12.5, opacity: d.reason ? 1 : 0.5, cursor: d.reason ? "pointer" : "default" } }, over ? "add + " + ((d.count || 1) === 4 ? "\u{1F4E6}" : "\u{1F345}".repeat(d.count || 1)) : "save"))));
+  })(), view === "sky" && /* @__PURE__ */ React5.createElement(SkyView, { sessions, reflections, C }), view === "reflect" && /* @__PURE__ */ React5.createElement(ReflectPanel, { feelings: reflectFeelings, C, onSave: onSaveReflection, seed: reflectSeed, onSeedUsed: () => setReflectSeed("") }), view === "calibrate" && (() => {
+    const STATUS_META = { split: { label: "Split", color: C.muted }, solved: { label: "Solved", color: MODE_COLORS.relax.solid }, executing: { label: "Executing", color: MODE_COLORS.work.solid }, exploring: { label: "Exploring", color: MODE_COLORS.relax.solid } };
+    const calibList = (tasks || []).filter((t) => t.guessPlus && t.guessPlus.length || t.status === "split" || t.status === "solved" || t.act > 0 && t.guessBase && t.act < t.guessBase);
+    const perTask = {};
+    calibrations.forEach((e) => {
+      perTask[e.pageId || e.task] = e;
+    });
+    const finals = Object.values(perTask);
+    const hits = finals.filter((e) => Math.abs((e.spend || 0) - (e.guess || 0)) <= 1).length;
+    const pct = finals.length ? Math.round(hits / finals.length * 100) : null;
+    const recent5 = finals.slice(-5);
+    const improving = finals.length >= 8 && recent5.filter((e) => Math.abs((e.spend || 0) - (e.guess || 0)) <= 1).length / recent5.length > hits / finals.length;
+    const countReasons = (dir) => {
+      const c = {};
+      calibrations.filter((e) => e.direction === dir).forEach((e) => {
+        c[e.reason] = (c[e.reason] || 0) + 1;
+      });
+      return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    };
+    const grew = countReasons("over");
+    const shrank = countReasons("under");
+    const areaAgg2 = {};
+    finals.forEach((e) => {
+      if (e.category && e.guess > 0)
+        (areaAgg2[e.category] = areaAgg2[e.category] || []).push((e.spend || 0) / e.guess);
+    });
+    const multipliers = Object.entries(areaAgg2).map(([a, xs]) => [a, xs.reduce((s, x) => s + x, 0) / xs.length]).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    const statCard = (title, body) => /* @__PURE__ */ React5.createElement("div", { style: { background: "#fffefc", border: `1px solid ${C.line}`, borderRadius: 8, padding: "10px 14px", minWidth: 170, flex: 1 } }, /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, title), /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12.5, color: C.ink } }, body));
+    return /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 8 } }, /* @__PURE__ */ React5.createElement(InfoHover, { C, label: "what Calibrate is", width: 360 }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Calibrate"), /* @__PURE__ */ React5.createElement("div", null, "Compare what you guessed against what a task really took, so your estimates get sharper over time."), /* @__PURE__ */ React5.createElement("ul", { style: { margin: "6px 0 0", paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Guess"), ": the tomatoes you planned (\u{1F4E6} counts as 4)."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Rounds"), ': how many "+" re-guesses you added (at most two, then the task must split).'), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Spend"), ": the pomodoros Notion actually recorded."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Status"), ": the final Split or Solved."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Reflection"), `: why the task grew or shrank, one chip plus an optional line, captured when you add a "+ \u{1F345}" (hover a task's tomatoes) or finish early (click a grey tomato, or mark done under the guess).`)))), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 14 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "How your guesses land"), pct == null ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "No calibrations yet. Add a ", "+\u{1F345}", " when a task grows, or click a grey tomato when one finishes early, and your calibration score builds from there.") : /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 15, color: C.ink, marginBottom: grew.length || shrank.length || multipliers.length ? 12 : 0 } }, /* @__PURE__ */ React5.createElement("span", { style: { color: MODE_COLORS.relax.solid, fontSize: 22, fontWeight: 700 } }, pct, "%"), " of your calibrated tasks landed within one ", "\u{1F345}", improving && /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted } }, " (and improving)"), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 12 } }, " \xB7 " + finals.length + " task" + (finals.length === 1 ? "" : "s"))), (grew.length > 0 || shrank.length > 0 || multipliers.length > 0) && /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap" } }, grew.length > 0 && statCard("when tasks grew", grew.map(([r, n]) => r + " \xD7" + n).join(" \xB7 ")), shrank.length > 0 && statCard("when tasks shrank", shrank.map(([r, n]) => r + " \xD7" + n).join(" \xB7 ")), multipliers.length > 0 && statCard("area multipliers", multipliers.map(([a, v]) => a + " \xD7" + v.toFixed(1)).join(" \xB7 ")))), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Today's tasks"), calibList.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "Nothing to calibrate yet. Tasks that overran their guess, finished early, or ended Split or Solved will appear here.") : /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, calibList.map((t) => {
+      const rounds = (t.guessPlus || []).length;
+      const meta = t.status ? STATUS_META[t.status] : null;
+      const over = t.act > (t.pomodoros || 0);
+      const under = t.act > 0 && t.guessBase && t.act < t.guessBase;
+      return /* @__PURE__ */ React5.createElement("div", { key: t.id || t.task, style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 11px", borderRadius: 8, background: "#fdfbf5", border: `1px solid ${C.line}` } }, /* @__PURE__ */ React5.createElement("div", { style: { flex: 1, minWidth: 140 } }, /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.ink, overflowWrap: "anywhere" } }, stripLeadingTag(t.task)), hierarchyText(t) && /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 11, color: C.muted } }, hierarchyText(t))), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, flexShrink: 0 } }, /* @__PURE__ */ React5.createElement("span", { "aria-label": "guessed pomodoros" }, "guess ", t.pomodoros || 0), rounds > 0 && /* @__PURE__ */ React5.createElement("span", { "aria-label": "extra + rounds", style: { color: rounds >= 2 ? "#c96f22" : "#b8941f" } }, "+", rounds), /* @__PURE__ */ React5.createElement("span", { "aria-label": "actual pomodoros", style: { color: over ? "#c96f22" : under ? C.muted : C.ink } }, "spend ", t.act || 0), meta && /* @__PURE__ */ React5.createElement("span", { style: { color: meta.color, fontFamily: "var(--fl-display)", fontWeight: 600 } }, meta.label)));
+    }))), calibrations.length > 0 && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 14 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Recent calibrations"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, calibrations.slice(-20).reverse().map((e) => /* @__PURE__ */ React5.createElement("div", { key: e.id, className: "fl-act-row", style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "7px 11px", borderRadius: 8, background: "#fdfbf5", border: `1px solid ${C.line}`, fontSize: 12.5, color: C.ink } }, /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 140, fontWeight: 600, overflowWrap: "anywhere" } }, stripLeadingTag(e.task)), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, flexShrink: 0 } }, "guess ", e.guess, " ", "\u2192", " spend ", e.spend), /* @__PURE__ */ React5.createElement("span", { style: { background: e.direction === "over" ? "#FBEFC9" : "#DCEAF6", border: `1px solid ${e.direction === "over" ? "#D9A521" : "#3E78B2"}`, color: "#2b2723", borderRadius: 999, padding: "1px 9px", fontSize: 11, flexShrink: 0 } }, e.reason), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
+      const arr = calibrations.filter((x) => x.id !== e.id);
+      setCalibrations(arr);
+      api.saveCalibrations && api.saveCalibrations(arr);
+    }, className: "fl-rowact fl-rowdel fl-collapse", "aria-label": "delete this calibration entry (the Notion Guess rounds and the daily-note line are not touched)", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(TrashIcon, { size: 13 })), e.note && /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 11, flexBasis: "100%" } }, e.note))))));
+  })(), view === "today" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { className: "fl-plan-bar", style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "inline-flex", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 999, padding: 4 } }, ["work", "relax"].map((m) => {
     const on = dayMode === m;
     const col = m === "work" ? MODE_COLORS.work.solid : MODE_COLORS.relax.solid;
     return /* @__PURE__ */ React5.createElement(
@@ -26742,11 +27306,53 @@ ${s.task}`))
       onMouseLeave: () => setIntroOpen(false)
     },
     /* @__PURE__ */ React5.createElement("span", { "aria-label": introOpen ? void 0 : "how the Timeline works", style: { display: "inline-flex", color: C.muted } }, /* @__PURE__ */ React5.createElement(InfoIcon, { size: 16 })),
-    introOpen && /* @__PURE__ */ React5.createElement("div", { style: { position: "absolute", right: 0, top: 22, width: 400, maxWidth: "84vw", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 16px", zIndex: 60, boxShadow: "0 6px 24px rgba(0,0,0,0.16)", fontSize: 12.5, fontWeight: 400, color: C.ink, lineHeight: 1.5, textAlign: "left" } }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "How the Timeline works"), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "Moving blocks"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Left-drag a task: pure reordering \u2014 it glues to the end of the block above your drop, whatever it lands on moves to after it, and no break is ever created."), /* @__PURE__ */ React5.createElement("li", null, "Right-drag: move a block plus everything after it; the grabbed task is pinned, and the gap opened in front becomes a break you own.")), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "Breaks are yours"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Auto-fix never deletes or resizes them; each one glues to the task before it."), /* @__PURE__ */ React5.createElement("li", null, "Longer than the short-break setting = a long break, and the pomodoro count restarts."), /* @__PURE__ */ React5.createElement("li", null, "Two long breaks back to back merge into one.")), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "Auto-fix"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Keeps your task order; compacts only genuinely empty gaps."), /* @__PURE__ */ React5.createElement("li", null, "Adds missing short breaks, plus a long one every N pomodoros; never against a meal."), /* @__PURE__ */ React5.createElement("li", null, "Deletes any long break sitting against lunch or dinner (the meal is the rest); later blocks move up."), /* @__PURE__ */ React5.createElement("li", null, "Task blocks always stay 25 minutes; the current Focus length is only recorded on them."), /* @__PURE__ */ React5.createElement("li", null, "After dinner: tasks stay in the evening, each with a break after it.")), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "Anchors and meals"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Lock = commitment: fixed time, a long break after it, rhythm restarts."), /* @__PURE__ */ React5.createElement("li", null, "Pin = placed: fixed position; a short break separates the task that packs in behind it."), /* @__PURE__ */ React5.createElement("li", null, "Meals reset the rhythm; use their pencil to re-time today's lunch or dinner.")), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "Sync and the ruler"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Sync deletes all breaks and rebuilds tasks fresh (unlocked, unpinned); your commitments and meals keep their time and length."), /* @__PURE__ */ React5.createElement("li", null, "The left ruler shows real clock times; the red line is now.")))
-  ), !timelineMode && /* @__PURE__ */ React5.createElement(InfoHover, { C, label: "how the Tasks view works", width: 400 }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "How the Tasks view works"), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "What's here"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Today's tasks from Notion, plus any local tasks added with the Timeline's add-block button (those survive sync, so the plugin also works without Notion)."), /* @__PURE__ */ React5.createElement("li", null, "Grouped into Project and Personal by your Personal Areas and names settings, with the morning and night routines around them.")), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "Reading a row"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "The coloured letter is cognitive load: A high, B medium, C low. The chip beside it is the Notion Area."), /* @__PURE__ */ React5.createElement("li", null, "A crown marks the King task; bookmarked tasks sort first, then the King, then the rest (new tasks arrive ranked Must, then Aim, then Bonus)."), /* @__PURE__ */ React5.createElement("li", null, "The tomatoes count today's pomodoros on that task: bright are done, grey still planned.")), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "On hover"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Drag the dots to reorder; the person/briefcase moves a task between Personal and Work."), /* @__PURE__ */ React5.createElement("li", null, "The bookmark pins a task to the top by name, so it survives the daily re-created Notion tasks."), /* @__PURE__ */ React5.createElement("li", null, "The play button runs a pomodoro on that task."))), /* @__PURE__ */ React5.createElement("div", { style: { display: "inline-flex", gap: 2, background: C.line, borderRadius: 10, padding: 3, flexShrink: 0 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setTimelineMode(false), "aria-pressed": !timelineMode, style: segH(!timelineMode) }, "Tasks"), /* @__PURE__ */ React5.createElement("button", { onClick: () => setTimelineMode(true), "aria-pressed": timelineMode, style: segH(timelineMode) }, "Timeline")))), /* @__PURE__ */ React5.createElement("div", { style: { margin: "0 0 12px" } }, /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink, fontSize: 16, fontWeight: 700, display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 6 } }, tasks.length, " tasks ", "\xB7", " ", countToday, " / ", plannedPomos, " ", "\u{1F345}", timelineMode && planEndMin > 0 && /* @__PURE__ */ React5.createElement("span", { style: { fontWeight: 600 } }, " \xB7 ends " + fmtClock(planEndMin), planOverflow > 0 && /* @__PURE__ */ React5.createElement("span", { style: { color: C.worse } }, " (overflows by " + planOverflow + "m)")))), fallingEnjoyment && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 200 } }, "Enjoyment is dipping over your last few pomodoros \\u2014 consider an extra break."), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
+    introOpen && /* @__PURE__ */ React5.createElement("div", { style: { position: "absolute", right: 0, top: 22, width: 400, maxWidth: "84vw", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 16px", zIndex: 60, boxShadow: "0 6px 24px rgba(0,0,0,0.16)", fontSize: 12.5, fontWeight: 400, color: C.ink, lineHeight: 1.5, textAlign: "left" } }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "How the Timeline works"), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "Moving blocks"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Left-drag a task: reordering by seats. Tasks of the same length trade start times (the chocolate bar shows the seat you'll take), and nothing else in the day moves: breaks, meals, routines and pinned blocks stay put. A drag that crosses no task just nudges that one block inside its free pocket, and the break padding around it stretches or shrinks to fit."), /* @__PURE__ */ React5.createElement("li", null, "Right-drag: move a block plus everything after it; the grabbed task is pinned, and the gap opened in front becomes a break you own.")), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "Breaks are yours"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Auto-fix never deletes or resizes them; each one glues to the task before it."), /* @__PURE__ */ React5.createElement("li", null, "Longer than the short-break setting = a long break, and the pomodoro count restarts."), /* @__PURE__ */ React5.createElement("li", null, "Two long breaks back to back merge into one.")), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "Auto-fix"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Keeps your task order; compacts only genuinely empty gaps."), /* @__PURE__ */ React5.createElement("li", null, "Adds missing short breaks, plus a long one every N pomodoros; never against a meal."), /* @__PURE__ */ React5.createElement("li", null, "Deletes any long break sitting against lunch or dinner (the meal is the rest); later blocks move up."), /* @__PURE__ */ React5.createElement("li", null, "Task blocks always stay 25 minutes; the current Focus length is only recorded on them."), /* @__PURE__ */ React5.createElement("li", null, "After dinner: tasks stay in the evening, each with a break after it.")), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "Anchors and meals"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Lock = commitment: fixed time, a long break after it, rhythm restarts."), /* @__PURE__ */ React5.createElement("li", null, "Pin = placed: fixed position; a short break separates the task that packs in behind it."), /* @__PURE__ */ React5.createElement("li", null, "Meals reset the rhythm; use their pencil to re-time today's lunch or dinner.")), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "Sync and the ruler"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Sync deletes all breaks and rebuilds tasks fresh (unlocked, unpinned); your commitments and meals keep their time and length."), /* @__PURE__ */ React5.createElement("li", null, "The left ruler shows real clock times; the red line is now.")))
+  ), !timelineMode && /* @__PURE__ */ React5.createElement(InfoHover, { C, label: "how the Tasks view works", width: 400 }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "How the Tasks view works"), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "What's here"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Today's tasks from Notion, plus any local tasks added with the Timeline's add-block button (those survive sync, so the plugin also works without Notion)."), /* @__PURE__ */ React5.createElement("li", null, "The capture box creates a task straight in Notion using your template presets: \u23F3 Common task, or \u{1F43E} a sub-task under a BIG TASK (the mountain-marked pages scheduled Today or This week, refreshed at each sync). The little number is your initial Guess: 1 to 3 become \u{1F345}s, 4 becomes one \u{1F4E6} box, empty means no guess. It also drops the task on today's plan at now and opens the pomodoro form. Push only: your timeline is never rebuilt by it."), /* @__PURE__ */ React5.createElement("li", null, "Grouped into Project and Personal by your Personal Areas and names settings, with the morning and night routines around them.")), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "Reading a row"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "The little icon is the Notion Status: a green search while Exploring, an orange hammer while Executing. The chip beside it is the Notion Area."), /* @__PURE__ */ React5.createElement("li", null, "A crown marks the King task; bookmarked tasks sort first, then the King, then the rest (new tasks arrive ranked Must, then Aim, then Bonus)."), /* @__PURE__ */ React5.createElement("li", null, "The tomatoes count today's pomodoros on that task: bright are done, grey still planned.")), /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, margin: "8px 0 2px" } }, "On hover"), /* @__PURE__ */ React5.createElement("ul", { style: { margin: 0, paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, "Drag the dots to reorder; the person/briefcase moves a task between Personal and Work."), /* @__PURE__ */ React5.createElement("li", null, "The bookmark pins a task to the top by name, so it survives the daily re-created Notion tasks."), /* @__PURE__ */ React5.createElement("li", null, "The play button runs a pomodoro on that task."))), /* @__PURE__ */ React5.createElement("div", { style: { display: "inline-flex", gap: 2, background: C.line, borderRadius: 10, padding: 3, flexShrink: 0 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setTimelineMode(false), "aria-pressed": !timelineMode, style: segH(!timelineMode) }, "Tasks"), /* @__PURE__ */ React5.createElement("button", { onClick: () => setTimelineMode(true), "aria-pressed": timelineMode, style: segH(timelineMode) }, "Timeline")))), /* @__PURE__ */ React5.createElement("div", { style: { margin: "0 0 12px" } }, /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink, fontSize: 16, fontWeight: 700, display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 6 } }, tasks.length, " tasks ", "\xB7", " ", countToday, " / ", plannedPomos, " ", "\u{1F345}", timelineMode && planEndMin > 0 && /* @__PURE__ */ React5.createElement("span", { style: { fontWeight: 600 } }, " \xB7 ends " + fmtClock(planEndMin), planOverflow > 0 && /* @__PURE__ */ React5.createElement("span", { style: { color: C.worse } }, " (overflows by " + planOverflow + "m)")))), fallingEnjoyment && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderLeft: `4px solid ${C.worse}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: C.ink, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 200 } }, "Enjoyment is dipping over your last few pomodoros, consider an extra break."), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
     startBreak();
     setView("break");
-  }, style: { ...btn(ACCENT, true), padding: "3px 10px" } }, "take a break")), tasks.length === 0 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), timelineMode ? /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, renderTimeline()) : renderTodaySections()), view === "status" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ React5.createElement(InfoHover, { C, label: "about this view", width: 340 }, statusSub === "week" && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Week"), /* @__PURE__ */ React5.createElement("div", null, "One week at a time: your pomodoros grouped by Area."), /* @__PURE__ */ React5.createElement("ul", { style: { margin: "6px 0 0", paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Charts"), ": one per Notion Area, with a row for each task worked on that week."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Marks"), ": ", "\u25CB", " is expected, ", "\u25CF", " is actual; green means better than expected, red worse."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Arrows"), ": step between weeks; the right arrow stops at the current week."))), statusSub === "month" && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Month"), /* @__PURE__ */ React5.createElement("div", null, "The month as a calendar: a square for every pomodoro."), /* @__PURE__ */ React5.createElement("ul", { style: { margin: "6px 0 0", paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Squares"), ": one per pomodoro, red on work days and green on relax days; the lightness is the time of day (light morning, medium afternoon, darkest evening)."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Yellow squares"), ': overnight pomodoros, done between your day start and "morning begins"; they stack on the day they lead into.'), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Changing month"), ": use the arrows or scroll on the month name; TODAY jumps back to now and opens today's daily note."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Days"), ": darker brown date numbers already have a daily note; click any day to open its note. The outline follows the daily note you have open, or today."))), statusSub === "totals" && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Total"), /* @__PURE__ */ React5.createElement("div", null, "The long view: everything you have logged, all projects combined."), /* @__PURE__ */ React5.createElement("ul", { style: { margin: "6px 0 0", paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Pomodoro totals"), ": counts and hours for this week, this month and this year."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Six-month heatmap"), ": pomodoros per day over the last six months; darker means more."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Expected vs actual"), ": how often sessions turned out more enjoyable than you expected, with the biggest surprises (dreaded, then enjoyed)."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Best time of day"), ": average enjoyment for morning, afternoon and evening."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "All sessions"), ": the full editable log; edits and deletes only change the local log, not Notion.")))), /* @__PURE__ */ React5.createElement("div", { style: { display: "inline-flex", gap: 2, background: C.line, borderRadius: 10, padding: 3, flexShrink: 0 } }, [["week", "Week"], ["month", "Month"], ["totals", "Total"]].map(([k, lab]) => /* @__PURE__ */ React5.createElement("button", { key: k, onClick: () => setStatusSub(k), style: segH(statusSub === k) }, lab)))), /* @__PURE__ */ React5.createElement("div", { style: { minWidth: 0 } }, statusSub === "week" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setWeekOff((w) => w - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, fmtDate(weekStart), " ", "\u2013", " ", fmtDate(new Date(+weekEnd - DAY))), /* @__PURE__ */ React5.createElement("button", { onClick: () => setWeekOff((w) => Math.min(0, w + 1)), style: btn(C.muted, true) }, "\u2192")), weekAreas.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, textAlign: "center", padding: "40px 0" } }, weekSessions.length ? "No pomodoros with an Area this week." : "No pomodoros this week.") : weekAreas.map((a) => /* @__PURE__ */ React5.createElement(GroupChart, { key: a, group: a, sessions: weekSessions.filter((x) => x.category === a), settings, override: modeOverride })), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted } }, /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink } }, "\u25CB"), " expected"), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink } }, "\u25CF"), " actual"), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.better } }, "\u2014"), " better than expected"), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.worse } }, "\u2014"), " worse than expected"))), statusSub === "month" && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginBottom: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, paddingLeft: 4 } }, /* @__PURE__ */ React5.createElement("span", { ref: monthLabelRef, "aria-label": "scroll to change the month", style: { fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums", fontSize: 16, fontWeight: "var(--h3-weight, 600)", color: C.ink, letterSpacing: "-0.01em", lineHeight: 1, cursor: "ns-resize", userSelect: "none" } }, /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-block", minWidth: "2.3em" } }, MON3[monthRef.getMonth()]), /* @__PURE__ */ React5.createElement("span", { style: { color: ACCENT, marginLeft: "0.1em" } }, monthRef.getFullYear())), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setMonthOff((m) => m - 1), "aria-label": "previous month", style: { background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" } }, /* @__PURE__ */ React5.createElement(ChevronLeftIcon, { size: 20 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
+  }, style: { ...btn(ACCENT, true), padding: "3px 10px" } }, "take a break")), tasks.length === 0 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No tasks yet. Set your Notion token in settings, then press sync."), !timelineMode && !!api.createTask && !!settings.notionToken && /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", margin: "0 0 12px" } }, /* @__PURE__ */ React5.createElement(
+    "input",
+    {
+      value: qaName,
+      onChange: (e) => setQaName(e.target.value),
+      onKeyDown: (e) => {
+        if (e.key === "Enter")
+          quickAdd();
+      },
+      placeholder: "capture a task: Enter = into Notion + do now",
+      style: { flex: 1, minWidth: 0, border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 999, padding: "6px 12px", fontFamily: "var(--fl-display)" }
+    }
+  ), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 2, border: `1px solid ${C.line}`, background: C.paper, borderRadius: 999, padding: "0 6px 0 9px", height: 30, boxSizing: "border-box", flexShrink: 0 } }, /* @__PURE__ */ React5.createElement("span", { "aria-hidden": "true", style: { fontSize: 12, lineHeight: 1 } }, "\u{1F345}"), /* @__PURE__ */ React5.createElement(
+    "input",
+    {
+      type: "number",
+      min: 1,
+      max: 4,
+      value: qaGuess,
+      onChange: (e) => setQaGuess(e.target.value),
+      "aria-label": "initial Guess in pomodoros: 1 to 3 write tomatoes, 4 writes one box; empty = no guess",
+      style: { width: 28, border: "none", boxShadow: "none", background: "transparent", color: C.ink, fontSize: 12.5, textAlign: "center", fontFamily: "var(--fl-mono)", padding: 0 }
+    }
+  )), /* @__PURE__ */ React5.createElement(
+    "select",
+    {
+      value: qaParent,
+      onChange: (e) => setQaParent(e.target.value),
+      "aria-label": "where it goes in Notion: a common task, or a sub-task under a BIG TASK",
+      style: { maxWidth: 150, border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 999, padding: "6px 8px", fontFamily: "var(--fl-display)", flexShrink: 0 }
+    },
+    /* @__PURE__ */ React5.createElement("option", { value: "" }, "\u23F3 Common task"),
+    quickParents.map((p) => /* @__PURE__ */ React5.createElement("option", { key: p.id, value: p.id }, "\u{1F43E} " + p.name))
+  ), /* @__PURE__ */ React5.createElement(
+    "button",
+    {
+      onClick: quickAdd,
+      disabled: qaBusy || !qaName.trim(),
+      "aria-label": "create it in Notion with your template presets, drop it on today's plan at now, and open the pomodoro form",
+      style: { ...btn(ACCENT), width: 30, height: 30, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: qaBusy || !qaName.trim() ? 0.5 : 1, flexShrink: 0 }
+    },
+    /* @__PURE__ */ React5.createElement(ListPlusIcon, { size: 14 })
+  )), timelineMode ? /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, renderTimeline()) : renderTodaySections()), view === "status" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ React5.createElement(InfoHover, { C, label: "about this view", width: 340 }, statusSub === "week" && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Week"), /* @__PURE__ */ React5.createElement("div", null, "One week at a time: your pomodoros grouped by Area."), /* @__PURE__ */ React5.createElement("ul", { style: { margin: "6px 0 0", paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Charts"), ": one per Notion Area, with a row for each task worked on that week."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Marks"), ": ", "\u25CB", " is expected, ", "\u25CF", " is actual; green means better than expected, red worse."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Arrows"), ": step between weeks; the right arrow stops at the current week."))), statusSub === "month" && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Month"), /* @__PURE__ */ React5.createElement("div", null, "The month as a calendar: a square for every pomodoro."), /* @__PURE__ */ React5.createElement("ul", { style: { margin: "6px 0 0", paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Squares"), ": one per pomodoro, red on work days and green on relax days; the lightness is the time of day (light morning, medium afternoon, darkest evening)."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Yellow squares"), ': overnight pomodoros, done between your day start and "morning begins"; they stack on the day they lead into.'), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Changing month"), ": use the arrows or scroll on the month name; TODAY jumps back to now and opens today's daily note."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Days"), ": darker brown date numbers already have a daily note; click any day to open its note. The outline follows the daily note you have open, or today."))), statusSub === "totals" && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Total"), /* @__PURE__ */ React5.createElement("div", null, "The long view: everything you have logged, all projects combined."), /* @__PURE__ */ React5.createElement("ul", { style: { margin: "6px 0 0", paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Pomodoro totals"), ": counts and hours for this week, this month and this year."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Six-month heatmap"), ": pomodoros per day over the last six months; darker means more."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Expected vs actual"), ": how often sessions turned out more enjoyable than you expected, with the biggest surprises (dreaded, then enjoyed)."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Best time of day"), ": average enjoyment for morning, afternoon and evening."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "All sessions"), ": the full editable log; edits and deletes only change the local log, not Notion.")))), /* @__PURE__ */ React5.createElement("div", { style: { display: "inline-flex", gap: 2, background: C.line, borderRadius: 10, padding: 3, flexShrink: 0 } }, [["week", "Week"], ["month", "Month"], ["totals", "Total"]].map(([k, lab]) => /* @__PURE__ */ React5.createElement("button", { key: k, onClick: () => setStatusSub(k), style: segH(statusSub === k) }, lab)))), /* @__PURE__ */ React5.createElement("div", { style: { minWidth: 0 } }, statusSub === "week" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setWeekOff((w) => w - 1), style: btn(C.muted, true) }, "\u2190"), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13 } }, fmtDate(weekStart), " ", "\u2013", " ", fmtDate(new Date(+weekEnd - DAY))), /* @__PURE__ */ React5.createElement("button", { onClick: () => setWeekOff((w) => Math.min(0, w + 1)), style: btn(C.muted, true) }, "\u2192")), weekAreas.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, textAlign: "center", padding: "40px 0" } }, weekSessions.length ? "No pomodoros with an Area this week." : "No pomodoros this week.") : weekAreas.map((a) => /* @__PURE__ */ React5.createElement(GroupChart, { key: a, group: a, sessions: weekSessions.filter((x) => x.category === a), settings, override: modeOverride })), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted } }, /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink } }, "\u25CB"), " expected"), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.ink } }, "\u25CF"), " actual"), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.better } }, "\u2014"), " better than expected"), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: C.worse } }, "\u2014"), " worse than expected"))), statusSub === "month" && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginBottom: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, paddingLeft: 4 } }, /* @__PURE__ */ React5.createElement("span", { ref: monthLabelRef, "aria-label": "scroll to change the month", style: { fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums", fontSize: 16, fontWeight: "var(--h3-weight, 600)", color: C.ink, letterSpacing: "-0.01em", lineHeight: 1, cursor: "ns-resize", userSelect: "none" } }, /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-block", minWidth: "2.3em" } }, MON3[monthRef.getMonth()]), /* @__PURE__ */ React5.createElement("span", { style: { color: ACCENT, marginLeft: "0.1em" } }, monthRef.getFullYear())), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setMonthOff((m) => m - 1), "aria-label": "previous month", style: { background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" } }, /* @__PURE__ */ React5.createElement(ChevronLeftIcon, { size: 20 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
     setMonthOff(0);
     api.openDailyNote && api.openDailyNote(+logicalDay(Date.now(), settings));
   }, "aria-label": "jump to the current month and open today's daily note \u2014 'today' follows your day-start setting, so after an evening rollover it is already tomorrow's date", style: { background: "transparent", border: "none", boxShadow: "none", color: ACCENT, cursor: "pointer", padding: "5px 8px", borderRadius: 7, fontFamily: "var(--fl-display)", fontWeight: 700, fontSize: 13, letterSpacing: "0.02em" } }, "TODAY"), /* @__PURE__ */ React5.createElement("button", { onClick: () => setMonthOff((m) => m + 1), "aria-label": "next month", style: { background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" } }, /* @__PURE__ */ React5.createElement(ChevronRightIcon, { size: 20 })))), /* @__PURE__ */ React5.createElement(
@@ -26776,13 +27382,112 @@ ${s.task}`))
     const pct = b.avg != null ? b.avg / 5 * 100 : 0;
     const isBest = bestBand && b.band === bestBand.band;
     return /* @__PURE__ */ React5.createElement("div", { key: b.band, style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 70, fontSize: 12, color: C.muted, textTransform: "capitalize" } }, b.name), /* @__PURE__ */ React5.createElement("div", { style: { flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` } }, /* @__PURE__ */ React5.createElement("div", { style: { width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral } })), /* @__PURE__ */ React5.createElement("span", { style: { width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted } }, b.avg != null ? b.avg.toFixed(1) : "\u2014", " \xB7 ", b.count, "\u{1F345}"));
-  })))), /* @__PURE__ */ React5.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React5.createElement("h3", { onClick: () => toggleFold("sessions"), style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 } }, foldedHistory.has("sessions") ? "\u25B8" : "\u25BE", " All sessions"), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), foldedHistory.has("sessions") ? null : sessions.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React5.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React5.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), !foldedHistory.has("sessions") && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion."))))), view === "log" && /* @__PURE__ */ React5.createElement(LogForm, { tasks: orderedTasks, preset, onAdd: logPomodoro, settings, secs, running, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask: (v) => {
+  })))), /* @__PURE__ */ React5.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React5.createElement("h3", { onClick: () => toggleFold("sessions"), style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 } }, foldedHistory.has("sessions") ? "\u25B8" : "\u25BE", " All sessions"), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, sessions.length, " logged")), foldedHistory.has("sessions") ? null : sessions.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No sessions yet. Log a pomodoro to see it here.") : /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => editingId === s.id ? /* @__PURE__ */ React5.createElement(SessionEditRow, { key: s.id, draft: editDraft, setDraft: setEditDraft, settings, onSave: saveEdit, onCancel: cancelEdit }) : /* @__PURE__ */ React5.createElement(SessionRow, { key: s.id, s, settings, onEdit: startEdit, onDelete: deleteSession }))), !foldedHistory.has("sessions") && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 11, marginTop: 10 } }, "Edits and deletes only change the local log; they do not undo the Act write-back on Notion."))))), reflectCount && /* @__PURE__ */ React5.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 95, display: "flex", alignItems: "center", justifyContent: "center" }, onClick: () => api.cancelReflectCountdown ? api.cancelReflectCountdown() : setReflectCount(null) }, /* @__PURE__ */ React5.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: "min(340px, 92vw)", background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: 18, textAlign: "center", boxShadow: "0 10px 30px rgba(0,0,0,0.25)" } }, /* @__PURE__ */ React5.createElement("div", { style: { fontFamily: "var(--fl-display)", fontSize: 15, fontWeight: 700, color: C.ink } }, "Off to Reflect in"), /* @__PURE__ */ React5.createElement("div", { style: { fontFamily: "var(--fl-mono)", fontSize: 44, fontWeight: 700, color: ACCENT, lineHeight: 1.2, margin: "6px 0 2px", fontVariantNumeric: "tabular-nums" } }, reflectCount.left), /* @__PURE__ */ React5.createElement("button", { onClick: () => api.cancelReflectCountdown ? api.cancelReflectCountdown() : setReflectCount(null), style: { ...btn(C.muted, true), padding: "6px 16px", fontSize: 12.5, borderRadius: 999, marginTop: 10, maxWidth: "100%", overflowWrap: "anywhere" } }, reflectCount.task ? "cancel, continue on \u201C" + stripLeadingTag(reflectCount.task) + "\u201D" : "cancel"))), claimOpen && /* @__PURE__ */ React5.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center" }, onClick: () => setClaimOpen(false) }, /* @__PURE__ */ React5.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: "min(560px, 92vw)", background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: 18, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" } }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, fontSize: 15.5, color: C.ink, marginBottom: 2, fontFamily: "var(--fl-display)" } }, "Claim finished work"), /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12.5, color: C.muted, marginBottom: 10 } }, "Work done off the timer still counts. Rough is fine; when unsure, claim the smaller number."), /* @__PURE__ */ React5.createElement(
+    "input",
+    {
+      list: "fl-claim-tasks",
+      value: clTask,
+      onChange: (e) => setClTask(e.target.value),
+      placeholder: "which task? pick or type freely",
+      style: { width: "100%", boxSizing: "border-box", border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "7px 10px", fontFamily: "var(--fl-display)", marginBottom: 10 }
+    }
+  ), /* @__PURE__ */ React5.createElement("datalist", { id: "fl-claim-tasks" }, tasks.map((t) => /* @__PURE__ */ React5.createElement("option", { key: t.id || t.task, value: t.task }))), clTask.trim() !== "" && !tasks.some((t) => t.task === clTask.trim()) && !!api.createTask && !!settings.notionToken && /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginBottom: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 12, color: C.muted, flexShrink: 0 } }, "not in your list yet:"), /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 2, border: `1px solid ${C.line}`, background: C.paper, borderRadius: 999, padding: "0 6px 0 9px", height: 28, boxSizing: "border-box", flexShrink: 0 } }, /* @__PURE__ */ React5.createElement("span", { "aria-hidden": "true", style: { fontSize: 11, lineHeight: 1 } }, "\u{1F345}"), /* @__PURE__ */ React5.createElement("input", { type: "number", min: 1, max: 4, value: clGuess, onChange: (e) => setClGuess(e.target.value), "aria-label": "initial Guess in pomodoros", style: { width: 26, border: "none", boxShadow: "none", background: "transparent", color: C.ink, fontSize: 12, textAlign: "center", fontFamily: "var(--fl-mono)", padding: 0 } })), /* @__PURE__ */ React5.createElement("select", { value: clParent, onChange: (e) => setClParent(e.target.value), "aria-label": "where it goes in Notion: a common task, or a sub-task under a BIG TASK", style: { maxWidth: 150, border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 999, padding: "5px 8px", fontFamily: "var(--fl-display)", flexShrink: 0 } }, /* @__PURE__ */ React5.createElement("option", { value: "" }, "\u23F3 Common task"), quickParents.map((p) => /* @__PURE__ */ React5.createElement("option", { key: p.id, value: p.id }, "\u{1F43E} " + p.name))), /* @__PURE__ */ React5.createElement(
+    "button",
+    {
+      onClick: async () => {
+        if (clCreating)
+          return;
+        setClCreating(true);
+        try {
+          const g = Math.max(0, Math.min(4, Math.round(Number(clGuess) || 0)));
+          const t = await api.createTask(clTask.trim(), clParent || null, g);
+          setTasks((prev) => [t, ...prev]);
+          api.notify && api.notify('"' + t.task + '" is in Notion.');
+        } catch (e) {
+          api.notify && api.notify("Could not create the task in Notion.");
+        }
+        setClCreating(false);
+      },
+      disabled: clCreating,
+      style: { ...btn(ACCENT, true), padding: "4px 10px", fontSize: 12, borderRadius: 999, opacity: clCreating ? 0.6 : 1 }
+    },
+    "add to Notion"
+  )), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12 } }, [25, 50, 75].map((m) => {
+    const on = clMins === m && !clSince;
+    return /* @__PURE__ */ React5.createElement("button", { key: m, onClick: () => {
+      setClMins(m);
+      setClSince("");
+    }, "aria-pressed": on, style: { ...btn(on ? ACCENT : C.muted, !on), padding: "4px 10px", fontSize: 12, borderRadius: 999 } }, "~" + m + "m");
+  }), /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 12, color: C.muted, marginLeft: 4 } }, "or since"), /* @__PURE__ */ React5.createElement(
+    "input",
+    {
+      type: "time",
+      value: clSince,
+      onChange: (e) => setClSince(e.target.value),
+      "aria-label": "when you started; the length is measured from here to now",
+      style: { border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 8, padding: "3px 6px", fontFamily: "var(--fl-mono)" }
+    }
+  )), (() => {
+    const bl0 = todayBlocks();
+    if (!bl0.length)
+      return null;
+    const d2 = /* @__PURE__ */ new Date();
+    let nt = d2.getHours() * 60 + d2.getMinutes();
+    const mid0 = (tlStart + tlEnd) / 2;
+    if (Math.abs(nt + 1440 - mid0) < Math.abs(nt - mid0))
+      nt += 1440;
+    let mm0 = clMins;
+    if (clSince) {
+      const m2 = clSince.match(/^(\d{1,2}):(\d{2})$/);
+      if (m2) {
+        let diff = d2.getHours() * 60 + d2.getMinutes() - (Number(m2[1]) * 60 + Number(m2[2]));
+        if (diff < 0)
+          diff += 1440;
+        if (diff > 0)
+          mm0 = Math.min(diff, 8 * 60);
+      }
+    }
+    const st0 = nt - Math.max(5, Math.round(mm0));
+    const covered = bl0.filter((x) => x.kind === "meal" && x.start < nt && x.start + x.dur > st0);
+    if (!covered.length)
+      return null;
+    return /* @__PURE__ */ React5.createElement("div", { style: { border: `1px solid ${C.line}`, background: C.paper, borderRadius: 8, padding: "8px 10px", marginBottom: 12 } }, /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12, color: C.muted, marginBottom: 6 } }, "That span crosses a meal. When did it actually happen? The claim splits around it, and only the worked minutes count."), covered.map((m4) => {
+      var _a2, _b2;
+      return /* @__PURE__ */ React5.createElement("div", { key: m4.id, style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 4 } }, /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 12.5, color: C.ink, minWidth: 60 } }, m4.name), /* @__PURE__ */ React5.createElement(
+        "input",
+        {
+          type: "time",
+          value: (_a2 = clMealEdits[m4.id] && clMealEdits[m4.id].start) != null ? _a2 : fmtClock(m4.start % 1440),
+          onChange: (e) => setClMealEdits((p) => ({ ...p, [m4.id]: { ...p[m4.id] || {}, start: e.target.value } })),
+          "aria-label": m4.name + " actual start time",
+          style: { border: `1px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 12, borderRadius: 8, padding: "3px 6px", fontFamily: "var(--fl-mono)" }
+        }
+      ), /* @__PURE__ */ React5.createElement(
+        "input",
+        {
+          type: "number",
+          min: 5,
+          max: 240,
+          value: (_b2 = clMealEdits[m4.id] && clMealEdits[m4.id].len) != null ? _b2 : m4.dur,
+          onChange: (e) => setClMealEdits((p) => ({ ...p, [m4.id]: { ...p[m4.id] || {}, len: e.target.value } })),
+          "aria-label": m4.name + " actual length in minutes",
+          style: { width: 52, border: `1px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 12, borderRadius: 8, padding: "3px 6px", textAlign: "center", fontFamily: "var(--fl-mono)" }
+        }
+      ), /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11.5, color: C.muted } }, "min"));
+    }));
+  })(), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setClaimOpen(false), style: { ...btn(C.muted, true), padding: "5px 12px", fontSize: 12.5 } }, "cancel"), /* @__PURE__ */ React5.createElement("button", { onClick: doClaim, disabled: clBusy || !clTask.trim(), style: { ...btn(ACCENT), padding: "5px 14px", fontSize: 12.5, opacity: clBusy || !clTask.trim() ? 0.6 : 1 } }, "claim it")))), view === "log" && /* @__PURE__ */ React5.createElement(LogForm, { tasks: orderedTasks, preset, onAdd: logPomodoro, settings, secs, running, resetTimer: restartTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask: (v) => {
     setPreset(v);
     api.timer && api.timer.setTask(v);
-  }, onPause, pauseActive, paused: timer.paused, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, expected: timer.expected, onSetExpected: setExpectedRating, autoLogDefault: settings.autoLogOnRate !== false, onAutoLogChange: (v) => api.patchSettings && api.patchSettings({ autoLogOnRate: v }) }), view === "break" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 16 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "Start a break"), /* @__PURE__ */ React5.createElement("button", { onClick: () => startBreak(settings.breakMinutes), style: { ...btn(C.ink, true), borderRadius: 999, padding: "6px 16px" } }, "short \xB7 ", settings.breakMinutes, "m"), /* @__PURE__ */ React5.createElement("button", { onClick: () => startBreak(settings.longBreakMinutes), style: { ...btn(C.ink, true), borderRadius: 999, padding: "6px 16px" } }, "long \xB7 ", settings.longBreakMinutes, "m")), brk.active && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink } }, String(Math.floor(brk.secs / 60)).padStart(2, "0"), ":", String(brk.secs % 60).padStart(2, "0")), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "flex-end" } }, !brk.finished && /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 4, marginRight: 4 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => api.timer.stepBreak(-1), style: { width: 29, height: 29, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, fontSize: 16, fontFamily: "var(--fl-display)", boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" } }, /* @__PURE__ */ React5.createElement(MinusIcon, { size: 18 })), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, minWidth: 34, textAlign: "center" } }, Math.round(brk.secs / 60), "m"), /* @__PURE__ */ React5.createElement("button", { onClick: () => api.timer.stepBreak(1), style: { width: 29, height: 29, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, fontSize: 16, fontFamily: "var(--fl-display)", boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" } }, /* @__PURE__ */ React5.createElement(PlusIcon, { size: 18 }))), !brk.finished && /* @__PURE__ */ React5.createElement("button", { onClick: () => api.timer.toggleBreakRun(), "aria-label": brk.running ? "pause" : "start", style: { ...btn(C.ink), borderRadius: 999, height: 32, padding: "0 14px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, brk.running ? /* @__PURE__ */ React5.createElement(PauseIcon, { size: 16 }) : /* @__PURE__ */ React5.createElement(PlayIcon, { size: 16 })), /* @__PURE__ */ React5.createElement("button", { onClick: endBreak, "aria-label": brk.finished ? "go back to my task" : "end break", style: { ...btn(C.muted, true), borderRadius: 999, height: 32, padding: "0 14px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, brk.finished ? /* @__PURE__ */ React5.createElement(ArrowRightIcon, { size: 16 }) : /* @__PURE__ */ React5.createElement(CheckIcon, { size: 16 })))), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, margin: "0 0 8px" } }, "Pick up to 3 \u2014 tap an activity (", brk.picked.length, "/3):"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, activities.length === 0 ? /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "No activities yet \u2014 end the break to add some.") : activities.map((a, i) => renderActRow(a, i))), /* @__PURE__ */ React5.createElement("div", { style: { marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` } }, /* @__PURE__ */ React5.createElement(Scale, { label: "how do you feel after this break?", value: brk.feeling, onChange: (v) => api.timer.setBreakFeeling(v), seasons: true }))), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20, display: brk.active ? "none" : void 0 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Break activities"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 } }, activities.length === 0 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "None yet. Add an activity and an area below."), activities.map((a, i) => renderActRow(a, i))), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" } }, /* @__PURE__ */ React5.createElement("input", { value: newAct.area, onChange: (e) => setNewAct({ ...newAct, area: e.target.value }), placeholder: "area / tag", style: { flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", boxSizing: "border-box" } }), /* @__PURE__ */ React5.createElement(AutoTextarea, { value: newAct.name, onChange: (e) => setNewAct({ ...newAct, name: e.target.value }), placeholder: "activity name", style: { flex: 2, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" } }), /* @__PURE__ */ React5.createElement("button", { onClick: addActivity, "aria-label": "add", style: { ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(ListPlusIcon, { size: 16 })))), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Break stats"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 } }, /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, "Favourites"), favs.length === 0 ? /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "\u2014") : favs.map((a) => /* @__PURE__ */ React5.createElement("div", { key: a.id, style: { fontSize: 13 } }, a.name, " ", /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 11 } }, a.count, "\xD7")))), /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, "Least chosen"), disliked.length === 0 ? /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "\u2014") : disliked.map((a) => /* @__PURE__ */ React5.createElement("div", { key: a.id, style: { fontSize: 13, color: C.muted } }, a.name, " ", /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 11 } }, a.count || 0, "\xD7"))))), /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 } }, "By area"), /* @__PURE__ */ React5.createElement(PieChart, { data: pieData })), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Break insights"), ratedBreaks.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "Rate a few breaks to see what restores you best.") : /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" } }, "Most restorative activities"), actScore.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No rated breaks had activities yet.") : /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 18 } }, actScore.slice(0, 3).map((x, i) => /* @__PURE__ */ React5.createElement("div", { key: x.id, style: { display: "flex", alignItems: "baseline", gap: 8, fontSize: 13 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 16, color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 12 } }, i + 1, "."), /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, color: C.ink, overflowWrap: "anywhere" } }, x.name, x.n < 3 && /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 10, color: C.muted } }, " (low sample)")), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted } }, x.avg.toFixed(1), " / 5")))), /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" } }, "Best time for breaks"), bestBreakBand ? /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, breakBandStats.map((b) => {
+  }, onPause, pauseActive, paused: timer.paused, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, expected: timer.expected, onSetExpected: setExpectedRating, autoLogDefault: settings.autoLogOnRate !== false, onAutoLogChange: (v) => api.patchSettings && api.patchSettings({ autoLogOnRate: v }) }), view === "log" && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React5.createElement("div", { style: { minWidth: 200, flex: 1 } }, /* @__PURE__ */ React5.createElement("div", { style: { fontFamily: "var(--fl-display)", fontSize: 15, fontWeight: 700, color: C.ink } }, "It still counts"), /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12, color: C.muted, marginTop: 2 } }, "Focus that happened off the timer still moved your goal. Claim it and let it count.")), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
+    setClaimOpen(true);
+    setClTask(preset || "");
+    setClMins(25);
+    setClSince("");
+    setClMealEdits({});
+  }, "aria-label": "log work you already did off the timer: Spend, timeline, star and daily note, all marked as claimed", style: { ...btn(C.muted, true), padding: "5px 14px", fontSize: 12.5, borderRadius: 999, flexShrink: 0 } }, "\u270B claim finished work")), view === "break" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 16 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "Start a break"), /* @__PURE__ */ React5.createElement("button", { onClick: () => startBreak(settings.breakMinutes), style: { ...btn(C.ink, true), borderRadius: 999, padding: "6px 16px" } }, "short \xB7 ", settings.breakMinutes, "m"), /* @__PURE__ */ React5.createElement("button", { onClick: () => startBreak(settings.longBreakMinutes), style: { ...btn(C.ink, true), borderRadius: 999, padding: "6px 16px" } }, "long \xB7 ", settings.longBreakMinutes, "m")), brk.active && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 30, color: brk.finished ? C.better : C.ink } }, String(Math.floor(brk.secs / 60)).padStart(2, "0"), ":", String(brk.secs % 60).padStart(2, "0")), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "flex-end" } }, !brk.finished && /* @__PURE__ */ React5.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 4, marginRight: 4 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => api.timer.stepBreak(-1), style: { width: 29, height: 29, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, fontSize: 16, fontFamily: "var(--fl-display)", boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" } }, /* @__PURE__ */ React5.createElement(MinusIcon, { size: 18 })), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, minWidth: 34, textAlign: "center" } }, Math.round(brk.secs / 60), "m"), /* @__PURE__ */ React5.createElement("button", { onClick: () => api.timer.stepBreak(1), style: { width: 29, height: 29, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, fontSize: 16, fontFamily: "var(--fl-display)", boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" } }, /* @__PURE__ */ React5.createElement(PlusIcon, { size: 18 }))), !brk.finished && /* @__PURE__ */ React5.createElement("button", { onClick: () => api.timer.toggleBreakRun(), "aria-label": brk.running ? "pause" : "start", style: { ...btn(C.ink), borderRadius: 999, height: 32, padding: "0 14px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, brk.running ? /* @__PURE__ */ React5.createElement(PauseIcon, { size: 16 }) : /* @__PURE__ */ React5.createElement(PlayIcon, { size: 16 })), /* @__PURE__ */ React5.createElement("button", { onClick: endBreak, "aria-label": brk.finished ? "go back to my task" : "end break", style: { ...btn(C.muted, true), borderRadius: 999, height: 32, padding: "0 14px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, brk.finished ? /* @__PURE__ */ React5.createElement(ArrowRightIcon, { size: 16 }) : /* @__PURE__ */ React5.createElement(CheckIcon, { size: 16 })))), /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, margin: "0 0 8px" } }, "Pick up to 3 \u2014 tap an activity (", brk.picked.length, "/3):"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, activities.length === 0 ? /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "No activities yet \u2014 end the break to add some.") : activities.map((a, i) => renderActRow(a, i))), /* @__PURE__ */ React5.createElement("div", { style: { marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` } }, /* @__PURE__ */ React5.createElement(Scale, { label: "how do you feel after this break?", value: brk.feeling, onChange: (v) => api.timer.setBreakFeeling(v), seasons: true }))), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20, display: brk.active ? "none" : void 0 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Break activities"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 } }, activities.length === 0 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "None yet. Add an activity and an area below."), activities.map((a, i) => renderActRow(a, i))), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" } }, /* @__PURE__ */ React5.createElement("input", { value: newAct.area, onChange: (e) => setNewAct({ ...newAct, area: e.target.value }), placeholder: "area / tag", style: { flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", boxSizing: "border-box" } }), /* @__PURE__ */ React5.createElement(AutoTextarea, { value: newAct.name, onChange: (e) => setNewAct({ ...newAct, name: e.target.value }), placeholder: "activity name", style: { flex: 2, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" } }), /* @__PURE__ */ React5.createElement("button", { onClick: addActivity, "aria-label": "add", style: { ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(ListPlusIcon, { size: 16 })))), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Break stats"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 } }, /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, "Favourites"), favs.length === 0 ? /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "\u2014") : favs.map((a) => /* @__PURE__ */ React5.createElement("div", { key: a.id, style: { fontSize: 13 } }, a.name, " ", /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 11 } }, a.count, "\xD7")))), /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 } }, "Least chosen"), disliked.length === 0 ? /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 13 } }, "\u2014") : disliked.map((a) => /* @__PURE__ */ React5.createElement("div", { key: a.id, style: { fontSize: 13, color: C.muted } }, a.name, " ", /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 11 } }, a.count || 0, "\xD7"))))), /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 } }, "By area"), /* @__PURE__ */ React5.createElement(PieChart, { data: pieData })), /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" } }, "Break insights"), ratedBreaks.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "Rate a few breaks to see what restores you best.") : /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" } }, "Most restorative activities"), actScore.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No rated breaks had activities yet.") : /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 18 } }, actScore.slice(0, 3).map((x, i) => /* @__PURE__ */ React5.createElement("div", { key: x.id, style: { display: "flex", alignItems: "baseline", gap: 8, fontSize: 13 } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 16, color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 12 } }, i + 1, "."), /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, color: C.ink, overflowWrap: "anywhere" } }, x.name, x.n < 3 && /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 10, color: C.muted } }, " (low sample)")), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted } }, x.avg.toFixed(1), " / 5")))), /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" } }, "Best time for breaks"), bestBreakBand ? /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, breakBandStats.map((b) => {
     const isBest = bestBreakBand && b.band === bestBreakBand.band;
     return /* @__PURE__ */ React5.createElement("div", { key: b.band, style: { display: "flex", alignItems: "baseline", gap: 8, fontSize: 13 } }, /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, textTransform: "capitalize", color: isBest ? C.ink : C.muted, fontWeight: isBest ? 700 : 400 } }, b.name, isBest ? " \u2014 best" : ""), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted } }, b.avg != null ? b.avg.toFixed(1) + " / 5" : "\u2014"));
-  })) : /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "Not enough rated breaks yet."))), /* @__PURE__ */ React5.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React5.createElement("h3", { onClick: () => toggleFold("breaks"), style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 } }, foldedHistory.has("breaks") ? "\u25B8" : "\u25BE", " All breaks"), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, breaks.length, " logged")), foldedHistory.has("breaks") ? null : breaks.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No breaks logged yet.") : /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...breaks].sort((a, b) => b.start - a.start).map((b) => editBreakId === b.id ? /* @__PURE__ */ React5.createElement("div", { key: b.id, style: { display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 } }, /* @__PURE__ */ React5.createElement("label", { style: { fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 } }, "start", /* @__PURE__ */ React5.createElement("input", { type: "datetime-local", value: breakDraft.start, onChange: (e) => setBreakDraft({ ...breakDraft, start: e.target.value }), style: { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } })), /* @__PURE__ */ React5.createElement("label", { style: { fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 } }, "end", /* @__PURE__ */ React5.createElement("input", { type: "datetime-local", value: breakDraft.end, onChange: (e) => setBreakDraft({ ...breakDraft, end: e.target.value }), style: { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } })), /* @__PURE__ */ React5.createElement("div", { style: { flexBasis: "100%", display: "flex", alignItems: "flex-end", gap: 8 } }, /* @__PURE__ */ React5.createElement(Scale, { label: "feeling", value: breakDraft.feeling, onChange: (v) => setBreakDraft({ ...breakDraft, feeling: v }), seasons: true }), /* @__PURE__ */ React5.createElement("button", { onClick: () => setBreakDraft({ ...breakDraft, feeling: null }), style: { ...btn(C.muted, true), padding: "2px 8px", fontSize: 11, marginBottom: 12 } }, "clear")), /* @__PURE__ */ React5.createElement("button", { onClick: saveEditBreak, "aria-label": "save", style: { ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(SaveIcon, { size: 15 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => setEditBreakId(null), "aria-label": "cancel", style: { ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(CircleXIcon, { size: 15 }))) : /* @__PURE__ */ React5.createElement("div", { key: b.id, className: "fl-act-row", style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" } }, fmtDate(b.start), " ", fmtTime(b.start), "\u2013", fmtTime(b.end)), /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 120, overflowWrap: "anywhere" } }, b.activities && b.activities.length ? b.activities.join(", ") : "\u2014"), /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" } }, b.areas && b.areas.length ? b.areas.join(" \xB7 ") : ""), b.feeling != null && (BREAK_SEASONS[b.feeling - 1] ? /* @__PURE__ */ React5.createElement("img", { src: BREAK_SEASONS[b.feeling - 1].img, alt: BREAK_SEASONS[b.feeling - 1].name, "aria-label": BREAK_SEASONS[b.feeling - 1].name, draggable: false, style: { width: 16, height: 16, flexShrink: 0 } }) : /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11, fontFamily: "var(--fl-mono)", color: C.ink, whiteSpace: "nowrap" } }, b.feeling, "/5")), /* @__PURE__ */ React5.createElement("button", { onClick: () => startEditBreak(b), className: "fl-rowact", "aria-label": "edit", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 14 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => deleteBreak(b.id), className: "fl-rowact fl-rowdel", "aria-label": "delete", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(TrashIcon, { size: 14 }))))))), view === "pause" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, margin: "0 0 10px" } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "Pause tags"), /* @__PURE__ */ React5.createElement(InfoHover, { C, label: "about pause tags", width: 330 }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Pause tags"), /* @__PURE__ */ React5.createElement("div", null, "Reasons you can tag a pause with, grouped by whether the interruption was ", /* @__PURE__ */ React5.createElement("b", { style: { color: PAUSE_CAT.internal.border } }, "internal"), " (your own impulse) or ", /* @__PURE__ */ React5.createElement("b", { style: { color: PAUSE_CAT.external.border } }, "external"), " (from outside). Picked from the log view when you pause."))), pauseTags.length === 0 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: "0 0 12px" } }, "None yet. Add one below."), ["internal", "external"].map((cat) => {
+  })) : /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: 0 } }, "Not enough rated breaks yet."))), /* @__PURE__ */ React5.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React5.createElement("h3", { onClick: () => toggleFold("breaks"), style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 } }, foldedHistory.has("breaks") ? "\u25B8" : "\u25BE", " All breaks"), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, breaks.length, " logged")), foldedHistory.has("breaks") ? null : breaks.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No breaks logged yet.") : /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...breaks].sort((a, b) => b.start - a.start).map((b) => editBreakId === b.id ? /* @__PURE__ */ React5.createElement("div", { key: b.id, style: { display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 } }, /* @__PURE__ */ React5.createElement("label", { style: { fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 } }, "start", /* @__PURE__ */ React5.createElement("input", { type: "datetime-local", value: breakDraft.start, onChange: (e) => setBreakDraft({ ...breakDraft, start: e.target.value }), style: { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } })), /* @__PURE__ */ React5.createElement("label", { style: { fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 } }, "end", /* @__PURE__ */ React5.createElement("input", { type: "datetime-local", value: breakDraft.end, onChange: (e) => setBreakDraft({ ...breakDraft, end: e.target.value }), style: { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } })), /* @__PURE__ */ React5.createElement("div", { style: { flexBasis: "100%", display: "flex", alignItems: "flex-end", gap: 8 } }, /* @__PURE__ */ React5.createElement(Scale, { label: "feeling", value: breakDraft.feeling, onChange: (v) => setBreakDraft({ ...breakDraft, feeling: v }), seasons: true }), /* @__PURE__ */ React5.createElement("button", { onClick: () => setBreakDraft({ ...breakDraft, feeling: null }), style: { ...btn(C.muted, true), padding: "2px 8px", fontSize: 11, marginBottom: 12 } }, "clear")), /* @__PURE__ */ React5.createElement("button", { onClick: saveEditBreak, "aria-label": "save", style: { ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(SaveIcon, { size: 15 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => setEditBreakId(null), "aria-label": "cancel", style: { ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(CircleXIcon, { size: 15 }))) : /* @__PURE__ */ React5.createElement("div", { key: b.id, className: "fl-act-row", style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" } }, fmtDate(b.start), " ", fmtTime(b.start), "\u2013", fmtTime(b.end)), /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 120, overflowWrap: "anywhere" } }, b.activities && b.activities.length ? b.activities.join(", ") : "\u2014"), /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" } }, b.areas && b.areas.length ? b.areas.join(" \xB7 ") : ""), b.feeling != null && (BREAK_SEASONS[b.feeling - 1] ? /* @__PURE__ */ React5.createElement("img", { src: BREAK_SEASONS[b.feeling - 1].img, alt: BREAK_SEASONS[b.feeling - 1].name, "aria-label": BREAK_SEASONS[b.feeling - 1].name, draggable: false, style: { width: 16, height: 16, flexShrink: 0 } }) : /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11, fontFamily: "var(--fl-mono)", color: C.ink, whiteSpace: "nowrap" } }, b.feeling, "/5")), /* @__PURE__ */ React5.createElement("button", { onClick: () => startEditBreak(b), className: "fl-rowact fl-collapse", "aria-label": "edit", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 14 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => deleteBreak(b.id), className: "fl-rowact fl-rowdel fl-collapse", "aria-label": "delete", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(TrashIcon, { size: 14 }))))))), view === "pause" && /* @__PURE__ */ React5.createElement("div", null, /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, margin: "0 0 10px" } }, /* @__PURE__ */ React5.createElement("h3", { style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 } }, "Pause tags"), /* @__PURE__ */ React5.createElement(InfoHover, { C, label: "about pause tags", width: 330 }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Pause tags"), /* @__PURE__ */ React5.createElement("div", null, "Reasons you can tag a pause with, grouped by whether the interruption was ", /* @__PURE__ */ React5.createElement("b", { style: { color: PAUSE_CAT.internal.border } }, "internal"), " (your own impulse) or ", /* @__PURE__ */ React5.createElement("b", { style: { color: PAUSE_CAT.external.border } }, "external"), " (from outside). Picked from the log view when you pause."))), pauseTags.length === 0 && /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13, margin: "0 0 12px" } }, "None yet. Add one below."), ["internal", "external"].map((cat) => {
     const rows = pauseTags.map((t, i) => ({ t, i })).filter((x) => catOf(x.t.category) === cat);
     return /* @__PURE__ */ React5.createElement("div", { key: cat, style: { marginBottom: 12 } }, /* @__PURE__ */ React5.createElement("p", { style: { fontSize: 11, color: catBorder(cat), textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700, margin: "0 0 6px", display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--fl-display)" } }, /* @__PURE__ */ React5.createElement("span", { style: { width: 10, height: 10, borderRadius: 3, background: catBorder(cat), display: "inline-block" } }), cat, " interrupt"), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, rows.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 12, margin: 0 } }, "None.") : rows.map((x) => renderTagRow(x.t, x.i))));
   }), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 } }, /* @__PURE__ */ React5.createElement("select", { value: newPauseCat, onChange: (e) => setNewPauseCat(e.target.value), style: { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)" } }, /* @__PURE__ */ React5.createElement("option", { value: "internal" }, "internal"), /* @__PURE__ */ React5.createElement("option", { value: "external" }, "external")), /* @__PURE__ */ React5.createElement("input", { value: newPauseTag, onChange: (e) => setNewPauseTag(e.target.value), onKeyDown: (e) => {
@@ -26792,7 +27497,7 @@ ${s.task}`))
     const s = bandSplit[bi];
     const total = s.internal + s.external;
     return /* @__PURE__ */ React5.createElement("div", { key: band }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", fontSize: 11, marginBottom: 3, fontFamily: "var(--fl-mono)" } }, /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, textTransform: "capitalize" } }, band), /* @__PURE__ */ React5.createElement("span", null, /* @__PURE__ */ React5.createElement("span", { style: { color: PAUSE_CAT.internal.border } }, "internal ", s.internal), /* @__PURE__ */ React5.createElement("span", { style: { color: C.faint } }, " \xB7 "), /* @__PURE__ */ React5.createElement("span", { style: { color: PAUSE_CAT.external.border } }, "external ", s.external))), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: C.line } }, total > 0 && /* @__PURE__ */ React5.createElement("div", { "aria-label": `internal ${s.internal}/${total}`, style: { width: `${s.internal / total * 100}%`, background: PAUSE_CAT.internal.border } }), total > 0 && /* @__PURE__ */ React5.createElement("div", { "aria-label": `external ${s.external}/${total}`, style: { width: `${s.external / total * 100}%`, background: PAUSE_CAT.external.border } })));
-  }))), /* @__PURE__ */ React5.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React5.createElement("h3", { onClick: () => toggleFold("pauses"), style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 } }, foldedHistory.has("pauses") ? "\u25B8" : "\u25BE", " All pauses"), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, pauses.length, " logged")), foldedHistory.has("pauses") ? null : pauses.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No pauses logged yet.") : /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...pauses].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((p) => editPauseId === p.id ? /* @__PURE__ */ React5.createElement("div", { key: p.id, style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 } }, /* @__PURE__ */ React5.createElement("input", { type: "datetime-local", value: pauseDraft.ts, onChange: (e) => setPauseDraft({ ...pauseDraft, ts: e.target.value }), style: { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } }), /* @__PURE__ */ React5.createElement("select", { value: pauseDraft.tag, onChange: (e) => setPauseDraft({ ...pauseDraft, tag: e.target.value }), style: { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } }, pauseTags.map((t) => /* @__PURE__ */ React5.createElement("option", { key: t.id, value: t.name }, t.name))), /* @__PURE__ */ React5.createElement("button", { onClick: saveEditPause, "aria-label": "save", style: { ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(SaveIcon, { size: 15 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => setEditPauseId(null), "aria-label": "cancel", style: { ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(CircleXIcon, { size: 15 }))) : /* @__PURE__ */ React5.createElement("div", { key: p.id, className: "fl-act-row", style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" } }, fmtDate(p.ts), " ", fmtTime(p.ts)), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, minWidth: 34 } }, p.mins != null ? p.mins + "m" : "\u2014"), /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, p.tag), /* @__PURE__ */ React5.createElement("button", { onClick: () => startEditPause(p), className: "fl-rowact", "aria-label": "edit", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 14 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => deletePause(p.id), className: "fl-rowact fl-rowdel", "aria-label": "delete", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(TrashIcon, { size: 14 })))))))));
+  }))), /* @__PURE__ */ React5.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React5.createElement("h3", { onClick: () => toggleFold("pauses"), style: { fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 } }, foldedHistory.has("pauses") ? "\u25B8" : "\u25BE", " All pauses"), /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" } }, pauses.length, " logged")), foldedHistory.has("pauses") ? null : pauses.length === 0 ? /* @__PURE__ */ React5.createElement("p", { style: { color: C.muted, fontSize: 13 } }, "No pauses logged yet.") : /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, [...pauses].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((p) => editPauseId === p.id ? /* @__PURE__ */ React5.createElement("div", { key: p.id, style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 } }, /* @__PURE__ */ React5.createElement("input", { type: "datetime-local", value: pauseDraft.ts, onChange: (e) => setPauseDraft({ ...pauseDraft, ts: e.target.value }), style: { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } }), /* @__PURE__ */ React5.createElement("select", { value: pauseDraft.tag, onChange: (e) => setPauseDraft({ ...pauseDraft, tag: e.target.value }), style: { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" } }, pauseTags.map((t) => /* @__PURE__ */ React5.createElement("option", { key: t.id, value: t.name }, t.name))), /* @__PURE__ */ React5.createElement("button", { onClick: saveEditPause, "aria-label": "save", style: { ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(SaveIcon, { size: 15 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => setEditPauseId(null), "aria-label": "cancel", style: { ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement(CircleXIcon, { size: 15 }))) : /* @__PURE__ */ React5.createElement("div", { key: p.id, className: "fl-act-row", style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 } }, /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" } }, fmtDate(p.ts), " ", fmtTime(p.ts)), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 12, minWidth: 34 } }, p.mins != null ? p.mins + "m" : "\u2014"), /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, p.tag), /* @__PURE__ */ React5.createElement("button", { onClick: () => startEditPause(p), className: "fl-rowact fl-collapse", "aria-label": "edit", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 14 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => deletePause(p.id), className: "fl-rowact fl-rowdel fl-collapse", "aria-label": "delete", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(TrashIcon, { size: 14 })))))))));
 }
 
 // main.tsx
@@ -26867,6 +27572,7 @@ var DEFAULT_SETTINGS = {
   dailyNoteWrite: true,
   dailyNoteTrueDate: true,
   dailyHeading: "\u{1F33B} Today",
+  calibrationHeading: "Calibration",
   dailyCreateHeading: true,
   dailyTemplate: '- [ ] <mark class="hltr-yellow">{date}</mark> {start} - {end} \u{1F345} {tag}\n    - {task}{hierarchy}\n    - {note}',
   createDailyIfMissing: true,
@@ -26966,19 +27672,33 @@ function optValue(name) {
   const mts = (name.match(/\u{1F3D4}/gu) || []).length;
   return boxes * 4 + toms + mts;
 }
-function fieldValue(page, field) {
+function guessOf(page) {
   var _a, _b;
-  const ms = ((_b = (_a = page == null ? void 0 : page.properties) == null ? void 0 : _a[field]) == null ? void 0 : _b.multi_select) || [];
-  return ms.reduce((a, o) => a + optValue(o.name), 0);
+  const ms = ((_b = (_a = page == null ? void 0 : page.properties) == null ? void 0 : _a["Guess"]) == null ? void 0 : _b.multi_select) || [];
+  let base = 0;
+  const plus = [];
+  for (const o of ms) {
+    const name = o.name || "";
+    if (name.trim().startsWith("+"))
+      plus.push(optValue(name));
+    else
+      base += optValue(name);
+  }
+  return { base, plus: plus.slice(0, 2) };
 }
-function estTotalOf(page) {
-  return fieldValue(page, "1 Est_T") + fieldValue(page, "2 Est_T") + fieldValue(page, "3 Est_T");
-}
-function mapLoad(name) {
+function mapStatus(name) {
   if (!name)
-    return "B";
-  const c = name[0];
-  return c === "A" || c === "B" || c === "C" ? c : "B";
+    return null;
+  const n = name.toLowerCase();
+  if (n.includes("explor"))
+    return "exploring";
+  if (n.includes("execut"))
+    return "executing";
+  if (n.includes("split"))
+    return "split";
+  if (n.includes("solv"))
+    return "solved";
+  return null;
 }
 function mapPower(name) {
   if (!name)
@@ -27081,6 +27801,11 @@ var TimerEngine = class {
     this.iv = null;
     this.fired = {};
     this.subs = /* @__PURE__ */ new Set();
+    // Emit only when the DISPLAYED second flips: polls can arrive at several Hz from two windows
+    // whose intervals drift against the wall-clock second, and per-poll emits made the digits
+    // advance in uneven bursts (a second lingering ~1.5s, then a quick catch-up).
+    this.lastPollSecs = -1;
+    this.lastPollBreak = -1;
     this.lengthMin = Math.max(5, Math.min(30, Math.round(lengthMin) || 25));
     this.total = this.lengthMin * 60;
     this.frozenSecs = this.total;
@@ -27317,7 +28042,7 @@ var TimerEngine = class {
     this.plugin.setBackgroundThrottle(false);
     if (this.iv != null)
       return;
-    this.iv = window.setInterval(() => this.poll(), 500);
+    this.iv = window.setInterval(() => this.poll(), 200);
   }
   stopTick() {
     if (this.running || this.breakRunning)
@@ -27341,11 +28066,15 @@ var TimerEngine = class {
       const s = this.secsNow();
       if (this.total > 900 && s <= 900 && !this.fired[900]) {
         this.fired[900] = true;
-        this.plugin.timerNotify("15 minutes left. Still on this task?");
+        this.plugin.timerNotify("15 minutes left. Are you still on the task?");
+      }
+      if (this.total > 600 && s <= 600 && !this.fired[600]) {
+        this.fired[600] = true;
+        this.plugin.timerNotify("10 minutes left. Are you still on the task?");
       }
       if (this.total > 300 && s <= 300 && !this.fired[300]) {
         this.fired[300] = true;
-        this.plugin.timerNotify("5 minutes left. Stay with it.");
+        this.plugin.timerNotify("5 minutes left. Are you still on the task?");
       }
       if (s <= 0 && !this.fired[0]) {
         this.fired[0] = true;
@@ -27357,7 +28086,10 @@ var TimerEngine = class {
         this.plugin.timerDone();
         return;
       }
-      changed = true;
+      if (s !== this.lastPollSecs) {
+        this.lastPollSecs = s;
+        changed = true;
+      }
     }
     if (this.breakRunning) {
       if (this.breakSecsNow() <= 0) {
@@ -27369,7 +28101,11 @@ var TimerEngine = class {
         this.plugin.breakDone();
         return;
       }
-      changed = true;
+      const bs = this.breakSecsNow();
+      if (bs !== this.lastPollBreak) {
+        this.lastPollBreak = bs;
+        changed = true;
+      }
     }
     if (changed)
       this.emit();
@@ -27401,6 +28137,15 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     // position. This replaces the old patchwork (one focus size, one break size, plus
     // ad-hoc +Npx grows for pause/celebration) that fought each other when phases switched.
     this.floatSizePhase = "";
+    // ---------- restart → Reflect countdown ----------
+    // Owned by the core so BOTH surfaces mirror ONE state: the float shows the countdown on its
+    // own face (where the eyes are), the panel shows its overlay, cancel anywhere cancels both.
+    // Deadline-based (not tick-decrement) so the main window's background throttling can't
+    // stretch the five seconds — the float's unthrottled 500ms poll drives expiry when hidden.
+    this.reflectCountdown = null;
+    this.rcTimer = null;
+    this.reflectCountCb = null;
+    this.reflectGoCb = null;
   }
   async onload() {
     const loaded = await this.loadData() || {};
@@ -27414,6 +28159,9 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       pauses: loaded.pauses || [],
       breaks: loaded.breaks || [],
       reflections: loaded.reflections || [],
+      calibrations: loaded.calibrations || [],
+      areaOptions: loaded.areaOptions || [],
+      quickParents: loaded.quickParents || [],
       feelings: loaded.feelings || JSON.parse(JSON.stringify(DEFAULT_FEELINGS)),
       morningRoutine: loaded.morningRoutine || DEFAULT_MORNING.map((a) => ({ ...a })),
       nightRoutine: loaded.nightRoutine || DEFAULT_NIGHT.map((a) => ({ ...a })),
@@ -27460,6 +28208,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     this.addRibbonIcon("timer", "Toggle floating timer", () => this.toggleFloating());
     this.addCommand({ id: "open-focus-log", name: "Open Focus Log", callback: () => this.activateView() });
     this.addCommand({ id: "toggle-floating-timer", name: "Toggle floating timer", callback: () => this.toggleFloating() });
+    this.registerObsidianProtocolHandler("focuslog", () => this.activateView());
     this.addSettingTab(new FocusLogSettingTab(this.app, this));
   }
   onunload() {
@@ -27630,7 +28379,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       } catch (e) {
         this.data.pending = [...this.data.pending || [], { sessionId: s.id, pageId: s.pageId, task: s.task }];
         await this.persist();
-        msg += " Act write queued.";
+        msg += " Spend write queued.";
       }
     }
     if (markDone && s.pageId) {
@@ -28042,11 +28791,12 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
   }
   // Mirrors the "Today Tasks" view: Today / King / This week, plus Daily dated today.
   async queryToday() {
+    var _a, _b, _c;
     const filter = {
       or: [
-        { property: "Status", select: { equals: "\u{1F33B} Today" } },
-        { property: "Status", select: { equals: "1\uFE0F\u20E3 King" } },
-        { property: "Status", select: { equals: "\u{1F331} Daily" } }
+        { property: "Schedule", select: { equals: "\u{1F33B} Today" } },
+        { property: "Schedule", select: { equals: "1\uFE0F\u20E3 King" } },
+        { property: "Schedule", select: { equals: "\u{1F331} Daily" } }
       ]
     };
     const pages = [];
@@ -28059,6 +28809,37 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       pages.push(...json.results || []);
       cursor = json.has_more ? json.next_cursor : void 0;
     } while (cursor);
+    try {
+      const db = await this.notionFetch(`/databases/${this.data.settings.databaseId}`);
+      const prop = (_a = db == null ? void 0 : db.properties) == null ? void 0 : _a[this.data.settings.categoryProperty || "Area"];
+      const opts = (((_b = prop == null ? void 0 : prop.select) == null ? void 0 : _b.options) || ((_c = prop == null ? void 0 : prop.multi_select) == null ? void 0 : _c.options) || []).map((o) => o.name).filter(Boolean);
+      if (opts.length) {
+        this.data.areaOptions = opts;
+        await this.persist();
+      }
+    } catch (e) {
+    }
+    try {
+      const bt = [];
+      let bc = void 0;
+      do {
+        const body = { filter: { and: [
+          { property: "Guess", multi_select: { contains: "\u{1F3D4}\uFE0F" } },
+          { or: [
+            { property: "Schedule", select: { equals: "\u{1F33B} Today" } },
+            { property: "Schedule", select: { equals: "\u{1F3AF} This week" } }
+          ] }
+        ] }, page_size: 100 };
+        if (bc)
+          body.start_cursor = bc;
+        const j = await this.notionFetch(`/databases/${this.data.settings.databaseId}/query`, "POST", body);
+        bt.push(...j.results || []);
+        bc = j.has_more ? j.next_cursor : void 0;
+      } while (bc);
+      this.data.quickParents = bt.map((p) => ({ id: p.id, name: plainTitle(p) })).filter((x) => x.name);
+      await this.persist();
+    } catch (e) {
+    }
     const cache = {};
     const tasks = [];
     for (const p of pages) {
@@ -28066,14 +28847,17 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
       if (!task)
         continue;
       const h = await this.resolveHierarchy(p, cache);
+      const g = guessOf(p);
       tasks.push({
         task,
-        load: mapLoad(selectName(p, "CognitiveLoad")),
+        status: mapStatus(selectName(p, "Status")),
         power: mapPower(selectName(p, "ExecutionPower")),
-        king: (selectName(p, "Status") || "").includes("King"),
+        king: (selectName(p, "Schedule") || "").includes("King"),
         category: categoryName(p, this.data.settings.categoryProperty) || null,
-        pomodoros: estTotalOf(p),
-        act: numberProp(p, "Act"),
+        pomodoros: g.base + g.plus.reduce((a, b) => a + b, 0),
+        guessBase: g.base,
+        guessPlus: g.plus,
+        act: numberProp(p, "Spend"),
         url: p.url,
         id: p.id,
         parent: h.parent,
@@ -28088,8 +28872,8 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     });
     const POWER_RANK = { P: 0, Y: 1, G: 2 };
     const fresh = tasks.filter((t) => prevIndex[t.id] === void 0).sort((a, b) => {
-      var _a, _b;
-      return ((_a = POWER_RANK[a.power]) != null ? _a : 1) - ((_b = POWER_RANK[b.power]) != null ? _b : 1);
+      var _a2, _b2;
+      return ((_a2 = POWER_RANK[a.power]) != null ? _a2 : 1) - ((_b2 = POWER_RANK[b.power]) != null ? _b2 : 1);
     });
     const known = tasks.filter((t) => prevIndex[t.id] !== void 0).sort((a, b) => prevIndex[a.id] - prevIndex[b.id]);
     const locals = (this.data.tasks || []).filter((t) => t.local);
@@ -28128,12 +28912,64 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     }
     return { parent: immediate, ancestor: top };
   }
-  // Read current Act, then PATCH only that one property (+1).
+  // Read current Spend, then PATCH only that one property (+1).
   async incrementAct(pageId) {
     const page = await this.notionFetch(`/pages/${pageId}`);
-    const next = numberProp(page, "Act") + 1;
-    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Act: { number: next } } });
+    const next = numberProp(page, "Spend") + 1;
+    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Spend: { number: next } } });
     return next;
+  }
+  // Claimed work: add n pomodoros to Spend in one read + one PATCH.
+  async incrementActBy(pageId, n) {
+    const page = await this.notionFetch(`/pages/${pageId}`);
+    const next = numberProp(page, "Spend") + Math.max(1, Math.round(n || 1));
+    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Spend: { number: next } } });
+    return next;
+  }
+  // Quick-add from the panel. The public API cannot apply Notion page templates, so this
+  // replicates the user's two templates exactly: no parent = "Common task" (Area Task, ⏳ icon);
+  // a parentId = "This is sub tasks under BIG TASK" (Area Pro, 🐾 icon, Parent item relation).
+  // Both get Schedule 🌻 Today, Status Exploring, ExecutionPower 🌤️ Aim Today, empty Guess —
+  // the same values the real templates preset. One-way push: nothing is pulled back.
+  async createTask(name, parentId, guess) {
+    const sub = !!parentId;
+    const props = {
+      Task: { title: [{ text: { content: name } }] },
+      Schedule: { select: { name: "\u{1F33B} Today" } },
+      Status: { select: { name: "Exploring" } },
+      ExecutionPower: { select: { name: "\u{1F324}\uFE0F Aim Today" } }
+    };
+    const g = Math.max(0, Math.min(4, Math.round(guess || 0)));
+    if (g)
+      props.Guess = { multi_select: [{ name: g === 4 ? "\u{1F4E6}" : "\u{1F345}".repeat(g) }] };
+    props[this.data.settings.categoryProperty || "Area"] = { select: { name: sub ? "Pro" : "Task" } };
+    if (sub)
+      props["Parent item"] = { relation: [{ id: parentId }] };
+    const page = await this.notionFetch(`/pages`, "POST", {
+      parent: { database_id: this.data.settings.databaseId },
+      icon: { type: "emoji", emoji: sub ? "\u{1F43E}" : "\u23F3" },
+      properties: props
+    });
+    const parentName = sub ? ((this.data.quickParents || []).find((x) => x.id === parentId) || {}).name || null : null;
+    const t = {
+      task: name,
+      status: "exploring",
+      power: "Y",
+      king: false,
+      category: sub ? "Pro" : "Task",
+      pomodoros: g,
+      guessBase: g,
+      guessPlus: [],
+      act: 0,
+      url: page.url,
+      id: page.id,
+      parent: parentName,
+      ancestor: parentName,
+      group: parentName || name
+    };
+    this.data.tasks = [t, ...this.data.tasks || []];
+    await this.persist();
+    return t;
   }
   // Resolve the Status option that means "done": an explicit setting wins, otherwise
   // auto-detect from the database schema (first option whose name reads as done/complete).
@@ -28145,7 +28981,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     if (this.doneStatusCache)
       return this.doneStatusCache;
     const db = await this.notionFetch(`/databases/${this.data.settings.databaseId}`);
-    const status = (_a = db == null ? void 0 : db.properties) == null ? void 0 : _a["Status"];
+    const status = (_a = db == null ? void 0 : db.properties) == null ? void 0 : _a["Schedule"];
     const opts = ((_b = status == null ? void 0 : status.select) == null ? void 0 : _b.options) || ((_c = status == null ? void 0 : status.status) == null ? void 0 : _c.options) || [];
     const match = opts.find((o) => /done|complete|finish/i.test(o.name || ""));
     if (!match)
@@ -28153,10 +28989,10 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     this.doneStatusCache = match.name;
     return match.name;
   }
-  // Set a task page's Status select to the resolved done value.
+  // Set a task page's Schedule select to the resolved done value (Done moved to Schedule).
   async setTaskDone(pageId) {
     const name = await this.resolveDoneStatus();
-    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Status: { select: { name } } } });
+    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Schedule: { select: { name } } } });
     return name;
   }
   // Build the initial content for a newly created daily note: a template (Focus Log's, else the
@@ -28362,6 +29198,102 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
     const block = (s.pauseTemplate || "").replace(/\{date\}/g, m.format("YYYY-MM-DD")).replace(/\{pomodoro-start\}/g, hm(p.pomodoroStart || p.pauseStart)).replace(/\{pomodoro-resume\}/g, hm(p.pauseEnd)).replace(/\{pause-start\}/g, hm(p.pauseStart)).replace(/\{pause-end\}/g, hm(p.pauseEnd)).replace(/\{pause-tag\}/g, p.tag || "");
     await this.app.vault.process(file, (data) => insertUnderHeading(data, s.dailyHeading, block, s.dailyCreateHeading));
   }
+  // Add one "+ 🍅" re-estimate round to a task's Guess multi-select. The caller enforces the
+  // two-round cap in the UI; this re-checks against Notion's current value to be safe.
+  async addGuessRound(pageId, count = 1) {
+    var _a, _b;
+    const page = await this.notionFetch(`/pages/${pageId}`);
+    const ms = (((_b = (_a = page == null ? void 0 : page.properties) == null ? void 0 : _a["Guess"]) == null ? void 0 : _b.multi_select) || []).map((o) => o.name);
+    const rounds = ms.filter((n) => (n || "").trim().startsWith("+")).length;
+    if (rounds >= 2)
+      throw new Error("Two extra rounds already: split the task.");
+    const optName = count >= 4 ? "+ \u{1F4E6}" : "+ " + "\u{1F345}".repeat(Math.max(1, Math.min(3, count)));
+    const next = [...ms, optName];
+    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Guess: { multi_select: next.map((name) => ({ name })) } } });
+    return rounds + 1;
+  }
+  // Write a calibration entry to the daily note under its own "Calibration" heading:
+  // time, task, parents, guess vs spend, the reason chip and the optional note.
+  async appendCalibrationToDailyNote(e) {
+    var _a, _b, _c;
+    const s = this.data.settings;
+    if (!s.dailyNoteWrite)
+      return;
+    const moment = window.moment;
+    if (!moment)
+      throw new Error("moment unavailable");
+    const fileDate = s.dailyNoteTrueDate ? new Date(e.ts) : new Date(e.ts - dayShiftHours(s.dayStart) * 36e5);
+    const m = moment(new Date(fileDate.getFullYear(), fileDate.getMonth(), fileDate.getDate()));
+    const dn = (_b = (_a = this.app.internalPlugins) == null ? void 0 : _a.getPluginById) == null ? void 0 : _b.call(_a, "daily-notes");
+    const opts = ((_c = dn == null ? void 0 : dn.instance) == null ? void 0 : _c.options) || {};
+    const format = opts.format || "YYYY-MM-DD";
+    const folder = (opts.folder || "").trim();
+    const path = (0, import_obsidian.normalizePath)((folder ? folder + "/" : "") + m.format(format) + ".md");
+    let file = this.app.vault.getAbstractFileByPath(path);
+    if (!file) {
+      if (folder && !this.app.vault.getAbstractFileByPath(folder))
+        await this.app.vault.createFolder(folder).catch(() => {
+        });
+      file = await this.app.vault.create(path, "# " + s.dailyHeading + "\n");
+    }
+    const pad = (n) => String(n).padStart(2, "0");
+    const d = new Date(e.ts);
+    const line = `- ${pad(d.getHours())}:${pad(d.getMinutes())} **${e.task}**${e.hierarchy ? " (" + e.hierarchy + ")" : ""} \xB7 guess ${e.guess} \u2192 spend ${e.spend} \xB7 ${e.reason}${e.note ? ": " + e.note : ""}`;
+    await this.app.vault.process(file, (data) => insertUnderHeading(data, this.data.settings.calibrationHeading || "Calibration", line, true));
+  }
+  beginReflectCountdown(task) {
+    this.clearRc();
+    this.reflectCountdown = { deadline: Date.now() + 5e3, task: task || "", lastLeft: 5 };
+    this.emitRc();
+    this.rcTimer = window.setInterval(() => this.pollReflectCountdown(), 250);
+  }
+  cancelReflectCountdown() {
+    this.clearRc();
+    this.emitRc();
+  }
+  clearRc() {
+    if (this.rcTimer != null) {
+      window.clearInterval(this.rcTimer);
+      this.rcTimer = null;
+    }
+    this.reflectCountdown = null;
+  }
+  emitRc() {
+    const rc = this.reflectCountdown;
+    if (this.reflectCountCb)
+      try {
+        this.reflectCountCb(rc ? { left: rc.lastLeft, task: rc.task } : null);
+      } catch (e) {
+      }
+  }
+  pollReflectCountdown() {
+    const rc = this.reflectCountdown;
+    if (!rc)
+      return;
+    const left = Math.ceil((rc.deadline - Date.now()) / 1e3);
+    if (left <= 0) {
+      const task = rc.task;
+      this.clearRc();
+      this.emitRc();
+      try {
+        window.focus();
+        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE);
+        if (leaves.length)
+          this.app.workspace.revealLeaf(leaves[0]);
+      } catch (e) {
+      }
+      if (this.reflectGoCb)
+        try {
+          this.reflectGoCb(task);
+        } catch (e) {
+        }
+      return;
+    }
+    if (left !== rc.lastLeft) {
+      rc.lastLeft = left;
+      this.emitRc();
+    }
+  }
   // ---------- bridge handed to the React app ----------
   makeApi() {
     const self = this;
@@ -28377,6 +29309,9 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         pauses: self.data.pauses || [],
         breaks: self.data.breaks || [],
         reflections: self.data.reflections || [],
+        calibrations: self.data.calibrations || [],
+        areaOptions: self.data.areaOptions || [],
+        quickParents: self.data.quickParents || [],
         feelings: self.data.feelings || {},
         morningRoutine: self.data.morningRoutine || [],
         nightRoutine: self.data.nightRoutine || [],
@@ -28410,6 +29345,12 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         self.data.reflections = arr;
         await self.persist();
       },
+      saveCalibrations: async (arr) => {
+        self.data.calibrations = arr;
+        await self.persist();
+      },
+      addGuessRound: (pageId, count) => self.addGuessRound(pageId, count),
+      appendCalibration: (e) => self.appendCalibrationToDailyNote(e),
       saveFeelings: async (obj) => {
         self.data.feelings = obj;
         await self.persist();
@@ -28456,7 +29397,18 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         await self.persist();
       },
       sync: () => self.queryToday(),
+      createTask: (name, parentId, guess) => self.createTask(name, parentId, guess),
+      beginReflectCountdown: (task) => self.beginReflectCountdown(task),
+      cancelReflectCountdown: () => self.cancelReflectCountdown(),
+      onReflectCount: (cb) => {
+        self.reflectCountCb = cb;
+      },
+      onReflectGo: (cb) => {
+        self.reflectGoCb = cb;
+      },
+      getQuickParents: () => self.data.quickParents || [],
       writeAct: (pageId) => self.incrementAct(pageId),
+      writeActBy: (pageId, n) => self.incrementActBy(pageId, n),
       setDone: (pageId) => self.setTaskDone(pageId),
       appendDaily: (p) => self.appendToDailyNote(p),
       openDailyNote: (ts) => self.openDailyNoteForDate(ts),
@@ -28624,7 +29576,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
             this.plugin.timer.poll();
             this.render();
             this.maybeSaveBounds();
-          }, 500);
+          }, 200);
         }
       }
     } catch (e) {
@@ -28689,7 +29641,19 @@ var FloatTimerView = class extends import_obsidian.ItemView {
       }
       this.plugin.timer.start();
     };
-    this.els.reset.onclick = () => this.plugin.timer.reset();
+    this.els.reset.onclick = () => {
+      const st = this.plugin.timer.getState();
+      const live = st.running || st.paused;
+      const tname = st.taskName || "";
+      this.plugin.timer.reset();
+      if (live)
+        this.plugin.beginReflectCountdown(tname);
+    };
+    this.els.rcWrap = wrap.createDiv({ cls: "flt-rc" });
+    this.els.rcWrap.createDiv({ cls: "flt-rc-title", text: "Off to Reflect in" });
+    this.els.rcNum = this.els.rcWrap.createDiv({ cls: "flt-rc-num" });
+    this.els.rcCancel = this.els.rcWrap.createEl("button", { cls: "flt-btn flt-rc-cancel", text: "cancel, keep this task" });
+    this.els.rcCancel.onclick = () => this.plugin.cancelReflectCountdown();
     this.unsub = this.plugin.timer.subscribe(() => this.render());
     this.render();
     this.tickWin = this.fwin;
@@ -28698,7 +29662,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
       this.plugin.timer.poll();
       this.render();
       this.maybeSaveBounds();
-    }, 500);
+    }, 200);
     this.plugin.notifyFloatChange();
   }
   // The closed loop has three screens: setup (pick task + rate, idle), focus (the
@@ -28714,6 +29678,15 @@ var FloatTimerView = class extends import_obsidian.ItemView {
   }
   render() {
     var _a;
+    this.plugin.pollReflectCountdown();
+    const rc = this.plugin.reflectCountdown;
+    if (this.els.rcWrap) {
+      this.els.rcWrap.toggleClass("is-on", !!rc);
+      if (rc && this.els.rcNum)
+        this.els.rcNum.setText(String(Math.max(1, rc.lastLeft)));
+    }
+    if (rc)
+      return;
     const s = this.plugin.timer.getState();
     if (s.running)
       this.sawRun = true;
@@ -28730,6 +29703,9 @@ var FloatTimerView = class extends import_obsidian.ItemView {
       const ss = String(s.secs % 60).padStart(2, "0");
       this.els.time.setText(mm + ":" + ss);
       this.els.time.toggleClass("is-done", s.secs === 0);
+      const totalS = (s.lengthMin || 25) * 60;
+      const alertRed = s.running && s.secs > 0 && (s.secs <= 60 || [900, 600, 300].some((mk) => totalS > mk && s.secs <= mk && s.secs >= mk - 2));
+      this.els.time.toggleClass("is-alert", alertRed);
       this.els.task.setText(s.taskName || "Focus");
       const wantIcon = s.running ? "pause" : "play";
       if (this.lastIcon !== wantIcon) {
@@ -29133,7 +30109,7 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.persist();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Done status value").setDesc("Optional. The exact Status option to set when you tick \u201Cmark done\u201D while logging. Leave blank to auto-detect an option whose name contains \u201CDone\u201D.").addText(
+    new import_obsidian.Setting(containerEl).setName("Done status value").setDesc("Optional. The exact Schedule option to set when you tick \u201Cmark done\u201D while logging. Leave blank to auto-detect an option whose name contains \u201CDone\u201D (e.g. \u{1F389}Done).").addText(
       (t) => t.setPlaceholder("auto-detect").setValue(this.plugin.data.settings.doneStatus).onChange(async (v) => {
         this.plugin.data.settings.doneStatus = v.trim();
         await this.plugin.persist();
@@ -29353,7 +30329,7 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.persist();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Add block button").setDesc("Show the 'add block' button on the Timeline toolbar. A manual block gets a name, an ExecutionPower colour, a CognitiveLoad letter, an Area-style tag, and its own length. Off by default.").addToggle(
+    new import_obsidian.Setting(containerEl).setName("Add block button").setDesc("Show the 'add block' button on the Timeline toolbar. A manual block gets a name, an ExecutionPower colour, an Area-style tag, and its own length. Off by default.").addToggle(
       (t) => t.setValue(this.plugin.data.settings.addBlockEnabled === true).onChange(async (v) => {
         this.plugin.data.settings.addBlockEnabled = v;
         await this.plugin.persist();
@@ -29485,6 +30461,12 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
     new import_obsidian.Setting(containerEl).setName("Tag namespace").setDesc("Parent segment for the {tag}. With \u201CNotion\u201D, an Area of En writes \u201C#Notion/En\u201D. Leave blank for a flat tag like \u201C#En\u201D.").addText(
       (t) => t.setPlaceholder("Notion").setValue(this.plugin.data.settings.tagNamespace).onChange(async (v) => {
         this.plugin.data.settings.tagNamespace = v.trim();
+        await this.plugin.persist();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Calibration heading").setDesc("First-level heading (#) the calibration lines append under; created at the end of the note when missing. The leading # is added automatically.").addText(
+      (t) => t.setValue(this.plugin.data.settings.calibrationHeading || "Calibration").onChange(async (v) => {
+        this.plugin.data.settings.calibrationHeading = v.trim();
         await this.plugin.persist();
       })
     );
