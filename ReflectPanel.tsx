@@ -24,9 +24,12 @@ const THOUGHT_COLORS = [
 
 // The optional pause reflection: name a few thoughts, mark where you feel it on the rabbit body map,
 // and place how it feels on the valence/arousal circumplex. Calls onSave({ thoughts, body, mood }) and resets.
-export function ReflectPanel({ feelings, C, onSave }: { feelings: any; C: any; onSave: (r: any) => void }) {
+export function ReflectPanel({ feelings, C, onSave, seed, onSeedUsed }: { feelings: any; C: any; onSave: (r: any) => void; seed?: string; onSeedUsed?: () => void }) {
   const [thoughts, setThoughts] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
+  // A seed arrives from the restart bridge: pre-fill the thought input (editable, not yet
+  // added), then hand the seed back so revisiting the view later starts blank again.
+  React.useEffect(() => { if (seed) { setDraft(seed); onSeedUsed && onSeedUsed(); } }, [seed]);
   const [body, setBody] = useState<any[]>([]);
   const [moods, setMoods] = useState<{ q: string; name: string }[]>([]);
   const [saved, setSaved] = useState(false);
