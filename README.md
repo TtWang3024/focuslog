@@ -4,12 +4,13 @@ An Obsidian pomodoro companion that treats your day as something to *feel*, not 
 
 ## The fun parts
 
-- **A sky of stars.** Every pomodoro you log lights a real star in a night sky with true constellations; your reflections light a second, silver sky. Drag to roam, scroll to zoom.
+- **A sky of stars.** Every pomodoro you log lights a real star in a night sky with true constellations; every urge you surf lights a second, silver sky. Drag to roam, scroll to zoom.
 - **Feelings as weather.** Rate each session before and after with rain-to-sun weather icons, then watch the calibration stats: starting is usually less bad than feared, and the "biggest surprises" list proves it.
 - **Breaks with seasons.** Rate how a break felt with four season trees, pick restoring activities, and learn which ones actually leave you restored.
 - **A drag-first Timeline.** Left-drag reorders by seats: same-length tasks trade start times while everything else stays put, with a chocolate bar showing exactly where you'll land; right-drag pins a block in place and carves out a break you own; auto-fix packs the day around meals and commitments without touching your breaks.
 - **Days with moods.** Work and relax days re-tint the morning and night routines (straw or blush dawns, sea-glass or misty-purple nights); Project and Personal tasks wear coffee-coloured tags.
 - **A living calendar.** Month squares are coloured by day type and time of day (overnight work glows gold), date numbers show at a glance which days have a daily note, the outline follows the note you have open, and right-clicking a day reveals, deletes, or flips it between work and relax.
+- **Urge surfing.** When the itch to switch hits mid-pomodoro, tap the wave: rate how strong it is on a vertical scale that doubles as the chart's axis, breathe with the circle, mark where you feel it on the rabbit and name the feeling around it. Then decide after the wave — park the thought, switch on purpose, or return to the task.
 - **A floating timer.** A tiny always-on-top window with the same clock, pause reasons, and a star celebration when you finish.
 
 Everything can be written into your daily notes: pomodoro blocks, pause reasons, and a per-day counter.
@@ -30,7 +31,8 @@ Everything can be written into your daily notes: pomodoro blocks, pause reasons,
 - [Study icons created by Mihimihi - Flaticon](https://www.flaticon.com/free-icons/study)
 - [Table lamp icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/table-lamp)
 - [Notebook icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/notebook)
-- The Reflect view's icons (sun, moon, cactus, lily, and the body map) come from [Hold](https://github.com/TtWang3024/pause), the Chrome extension this view grew out of.
+- [UIcons by Flaticon](https://www.flaticon.com/uicons): the play, pause, plus, minus, seedling, sea-wave, shuffle, walking, stomach, water and angle-fold control icons.
+- The urge surf's icons (sun, moon, cactus, lily, and the rabbit body map) come from [Hold](https://github.com/TtWang3024/pause), the Chrome extension that view grew out of.
 
 ## Build
 
