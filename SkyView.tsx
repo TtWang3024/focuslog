@@ -1,6 +1,6 @@
 import * as React from "react";
 import { createSkyMap } from "./skymap";
-import { InfoHover, SUBBAR, SUBBAR_TRACK } from "./icons";
+import { InfoHover, SUBBAR, SUBTAB_ROW, subTab, TomatoIcon, WaterIcon } from "./icons";
 import skyStars from "./sky-data/sky-stars.json";
 import skyLines from "./sky-data/sky-constellations.json";
 import skyLabels from "./sky-data/sky-labels.json";
@@ -118,20 +118,19 @@ export function SkyView({ sessions, urges, C }: { sessions: any[]; urges: any[];
     };
   }, [entries, mode]);
 
-  const seg = (on: boolean): any => ({ padding: "4px 12px", borderRadius: 8, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 12.5, fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: "var(--fl-display)", boxShadow: "none" });
   const empty = mode === "wave" ? "Surf your first urge to light a star." : "Log your first pomodoro to light a star.";
 
   return (
     <div>
       {/* control left, info right - the shape every view shares, so the info button never moves */}
       <div style={SUBBAR}>
-        <div style={{ ...SUBBAR_TRACK, background: C.line }}>
-          <button type="button" style={seg(mode === "pomodoro")} onClick={() => setMode("pomodoro")}>Pomodoros</button>
-          <button type="button" style={seg(mode === "wave")} onClick={() => setMode("wave")}>Waves</button>
+        <div style={SUBTAB_ROW}>
+          <button type="button" style={subTab(mode === "pomodoro")} onClick={() => setMode("pomodoro")}><TomatoIcon size={13} on={mode === "pomodoro"} />Pomo</button>
+          <button type="button" style={subTab(mode === "wave")} onClick={() => setMode("wave")}><WaterIcon size={13} on={mode === "wave"} />Waves</button>
         </div>
         <InfoHover C={C} label="about your Sky" width={330}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Your Sky</div>
-          <div><b>Pomodoros</b> lights an amber star for every pomodoro you log; <b>Waves</b> is a second, silver sky with one star per urge you surf — however the wave ended, noticing it is the whole achievement. Recent stars shine brighter. Work you claim after the fact lights a quieter copper star: same sky, different instrument.</div>
+          <div><b>Pomo</b> lights an amber star for every pomodoro you log; <b>Waves</b> is a second, silver sky with one star per urge you surf — however the wave ended, noticing it is the whole achievement. Recent stars shine brighter. Work you claim after the fact lights a quieter copper star: same sky, different instrument.</div>
           <div style={{ marginTop: 6 }}>Drag to roam and scroll to zoom. Hover a star for its story, or near a constellation for its name.</div>
         </InfoHover>
       </div>

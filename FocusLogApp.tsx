@@ -4,7 +4,7 @@ import { SkyView } from "./SkyView";
 import { newestStarName } from "./skymap";
 import { MoodGrid } from "./MoodGrid";
 import { BodyMap } from "./BodyMap";
-import { InfoHover, SUBBAR, SUBBAR_TRACK } from "./icons";
+import { InfoHover, SUBBAR, subTab, SUBTAB_ROW, TomatoIcon, WaterIcon } from "./icons";
 import breakShortIcon from "./assets/break-short.png";
 import breakLongIcon from "./assets/break-long.png";
 import roosterImg from "./assets/rooster.png";
@@ -511,11 +511,10 @@ const ADD_BTN: any = { padding: "7px 14px", borderRadius: 8, fontSize: 13, curso
 // The merged Calibrate view: five panels across the top, and two of them (Total, Log) open a
 // second control down their left side. One table per level so the control and the switch that
 // renders the panel can never drift apart.
-const FOCUS_SUB: [string, string][] = [["log", "Pomo"], ["break", "Break"], ["pause", "Pause"]];
+const FOCUS_SUB: [string, string, any][] = [["log", "Pomo", TomatoIcon], ["break", "Break", MugIcon], ["pause", "Pause", PlayPauseIcon]];
 const isFocusView = (v: string) => FOCUS_SUB.some(([k]) => k === v);
-const CALIB_TABS: [string, string][] = [["today", "Today"], ["accuracy", "Pomo Accuracy"], ["total", "Sum"], ["log", "Log"]];
-const TOTAL_TABS: [string, string][] = [["calib", "Calibrate"], ["break", "Break"], ["pomo", "Pomo"], ["pause", "Pause"]];
-const LOG_TABS: [string, string][] = [["calib", "Tasks"], ["break", "Break"], ["pomo", "Pomo"], ["pause", "Pause"]];
+const CALIB_TABS: [string, string][] = [["today", "Today"], ["accuracy", "Pomo Accuracy"], ["total", "Sum"]];
+const HIST_TABS: [string, string][] = [["calib", "Calibration"], ["break", "Break"], ["pomo", "Pomo"], ["pause", "Pause"]];
 // Small uppercase heading for the today-view groups (Work / Personal) and routine blocks.
 const SECTION_HEAD: any = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: "#8a8175", margin: "2px 0 4px 2px", fontFamily: "var(--fl-display)" };
 function polarPt(cx: number, cy: number, r: number, deg: number) {
@@ -821,15 +820,24 @@ function SeaWaveIcon({ size = 14 }: any) {
     </svg>
   );
 }
-// The surf's tab glyphs, each in two weights: the regular outline for a resting pill, the
-// heavier cut for the open one, so the active tab reads as filled-in rather than recoloured.
-function WaterIcon({ size = 14, on = false }: any) {
+// The Focus sub-tabs' glyphs, in the same two weights as the surf tabs: the regular
+// outline resting, the heavier cut when that panel is the open one.
+function MugIcon({ size = 14, on = false }: any) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
-      <path d={on ? "M21,17a4.875,4.875,0,0,1-2.8-.9.333.333,0,0,0-.406,0,4.91,4.91,0,0,1-5.594,0,.333.333,0,0,0-.406,0,4.91,4.91,0,0,1-5.594,0,.333.333,0,0,0-.406,0,4.759,4.759,0,0,1-5.051.3A1.5,1.5,0,1,1,2.254,13.8a1.707,1.707,0,0,0,1.805-.149,3.354,3.354,0,0,1,3.882,0,1.854,1.854,0,0,0,2.118,0,3.354,3.354,0,0,1,3.882,0,1.854,1.854,0,0,0,2.118,0,3.354,3.354,0,0,1,3.882,0,1.706,1.706,0,0,0,1.8.149,1.5,1.5,0,1,1,1.508,2.594A4.485,4.485,0,0,1,21,17Zm2.254,5.394A1.5,1.5,0,0,0,21.746,19.8a1.7,1.7,0,0,1-1.8-.149,3.352,3.352,0,0,0-3.882,0,1.854,1.854,0,0,1-2.118,0,3.352,3.352,0,0,0-3.882,0,1.854,1.854,0,0,1-2.118,0,3.352,3.352,0,0,0-3.882,0,1.7,1.7,0,0,1-1.805.149A1.5,1.5,0,0,0,.746,22.394,4.759,4.759,0,0,0,5.8,22.1a.333.333,0,0,1,.406,0,4.91,4.91,0,0,0,5.594,0,.333.333,0,0,1,.406,0,4.91,4.91,0,0,0,5.594,0,.333.333,0,0,1,.406,0A4.875,4.875,0,0,0,21,23,4.485,4.485,0,0,0,23.254,22.394Zm0-18A1.5,1.5,0,0,0,21.746,1.8a1.706,1.706,0,0,1-1.8-.149,3.352,3.352,0,0,0-3.882,0,1.854,1.854,0,0,1-2.118,0,3.352,3.352,0,0,0-3.882,0,1.854,1.854,0,0,1-2.118,0,3.352,3.352,0,0,0-3.882,0A1.707,1.707,0,0,1,2.254,1.8,1.5,1.5,0,1,0,.746,4.394,4.759,4.759,0,0,0,5.8,4.1a.333.333,0,0,1,.406,0,4.91,4.91,0,0,0,5.594,0,.333.333,0,0,1,.406,0,4.91,4.91,0,0,0,5.594,0,.333.333,0,0,1,.406,0A4.875,4.875,0,0,0,21,5,4.485,4.485,0,0,0,23.254,4.394Zm0,6A1.5,1.5,0,0,0,21.746,7.8a1.708,1.708,0,0,1-1.8-.149,3.352,3.352,0,0,0-3.882,0,1.854,1.854,0,0,1-2.118,0,3.352,3.352,0,0,0-3.882,0,1.854,1.854,0,0,1-2.118,0,3.352,3.352,0,0,0-3.882,0A1.709,1.709,0,0,1,2.254,7.8,1.5,1.5,0,0,0,.746,10.394,4.757,4.757,0,0,0,5.8,10.1a.333.333,0,0,1,.406,0,4.91,4.91,0,0,0,5.594,0,.333.333,0,0,1,.406,0,4.91,4.91,0,0,0,5.594,0,.333.333,0,0,1,.406,0A4.875,4.875,0,0,0,21,11,4.485,4.485,0,0,0,23.254,10.394Z" : "M21,23a4.375,4.375,0,0,1-3-1.225,4.336,4.336,0,0,1-6,0,4.336,4.336,0,0,1-6,0,4.186,4.186,0,0,1-5.668.2,1,1,0,1,1,1.335-1.489,2.2,2.2,0,0,0,3.388-.817,1.006,1.006,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.008,1.008,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.006,1.006,0,0,1,1.89,0,2.2,2.2,0,0,0,3.387.817,1,1,0,0,1,1.336,1.487A3.981,3.981,0,0,1,21,23Zm0-6a4.375,4.375,0,0,1-3-1.225,4.336,4.336,0,0,1-6,0,4.336,4.336,0,0,1-6,0,4.186,4.186,0,0,1-5.668.2,1,1,0,1,1,1.335-1.489,2.2,2.2,0,0,0,3.388-.817,1.006,1.006,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.007,1.007,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.007,1.007,0,0,1,1.89,0,2.2,2.2,0,0,0,3.387.817,1,1,0,0,1,1.336,1.487A3.981,3.981,0,0,1,21,17Zm0-6a4.375,4.375,0,0,1-3-1.225,4.336,4.336,0,0,1-6,0,4.336,4.336,0,0,1-6,0,4.186,4.186,0,0,1-5.668.2A1,1,0,1,1,1.667,8.489a2.2,2.2,0,0,0,3.388-.817,1.006,1.006,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.008,1.008,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.006,1.006,0,0,1,1.89,0,2.2,2.2,0,0,0,3.387.817,1,1,0,0,1,1.336,1.487A3.981,3.981,0,0,1,21,11Zm0-6a4.375,4.375,0,0,1-3-1.225,4.336,4.336,0,0,1-6,0,4.336,4.336,0,0,1-6,0,4.186,4.186,0,0,1-5.668.2A1,1,0,1,1,1.667,2.489a2.2,2.2,0,0,0,3.388-.817,1.006,1.006,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.008,1.008,0,0,1,1.875-.041h0l.015.042a2.278,2.278,0,0,0,4.11,0,1.008,1.008,0,0,1,1.89,0,2.2,2.2,0,0,0,3.387.817,1,1,0,1,1,1.336,1.487A3.981,3.981,0,0,1,21,5Z"} />
+      <path d={on ? "M13.025,3V1a1,1,0,0,1,2,0V3A1,1,0,0,1,13.025,3Zm-3,1a1,1,0,0,0,1-1V1a1,1,0,0,0-2,0V3A1,1,0,0,0,10.025,4Zm-4,0a1,1,0,0,0,1-1V1a1,1,0,0,0-2,0V3A1,1,0,0,0,6.025,4ZM24,13.143A3.983,3.983,0,0,1,20,17H17.525a6.875,6.875,0,0,1-5.742,3H8.216a6.877,6.877,0,0,1-5.808-3.088C.992,14.653-2.453,6.371,3,6L17,6a3.1,3.1,0,0,1,2.882,4C22.353,10,24,11.205,24,13.143Zm-2,0c.088-.927-1.25-1.224-2.458-1.143a16.82,16.82,0,0,1-.954,3H20A1.984,1.984,0,0,0,22,13.143ZM19,22H1a1,1,0,0,0,0,2H19A1,1,0,0,0,19,22Z" : "M20,10h-.115A3.1,3.1,0,0,0,17,6L3,6c-5.451.372-2,8.651-.589,10.912A6.877,6.877,0,0,0,8.216,20h3.567a6.875,6.875,0,0,0,5.742-3H20C24.814,16.907,25.759,9.822,20,10Zm-8.217,8H8.216a4.881,4.881,0,0,1-4.131-2.179C3.541,15.3.494,8,3,8L17,8a.973.973,0,0,1,.729.325,1.028,1.028,0,0,1,.261.8C17.427,13.384,16.368,17.811,11.783,18ZM20,15H18.588a16.82,16.82,0,0,0,.954-3c1.209-.081,2.546.216,2.458,1.143A1.984,1.984,0,0,1,20,15ZM9.025,3V1a1,1,0,0,1,2,0V3A1,1,0,0,1,9.025,3Zm4,0V1a1,1,0,0,1,2,0V3A1,1,0,0,1,13.025,3Zm-8,0V1a1,1,0,0,1,2,0V3A1,1,0,0,1,5.025,3ZM20,23a1,1,0,0,1-1,1H1a1,1,0,0,1,0-2H19A1,1,0,0,1,20,23Z"} />
     </svg>
   );
 }
+function PlayPauseIcon({ size = 14, on = false }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d={on ? "M22,21c-.553,0-1-.448-1-1V4c0-.552,.447-1,1-1s1,.448,1,1V20c0,.552-.447,1-1,1Zm-4,0c-.553,0-1-.448-1-1V4c0-.552,.447-1,1-1s1,.448,1,1V20c0,.552-.447,1-1,1Zm-13.673-.271c-.509,0-1.023-.122-1.509-.367-1.139-.578-1.818-1.683-1.818-2.958V6.597c0-1.275,.679-2.381,1.817-2.958,1.119-.567,2.452-.457,3.46,.285l7.368,5.402c.86,.631,1.354,1.606,1.354,2.674s-.494,2.043-1.355,2.674l-7.368,5.403c-.588,.432-1.265,.651-1.949,.651Z" : "M22,21c-.553,0-1-.448-1-1V4c0-.552,.447-1,1-1s1,.448,1,1V20c0,.552-.447,1-1,1Zm-4,0c-.553,0-1-.448-1-1V4c0-.552,.447-1,1-1s1,.448,1,1V20c0,.552-.447,1-1,1Zm-13.673-.271c-.509,0-1.023-.122-1.509-.367-1.139-.578-1.818-1.683-1.818-2.958V6.597c0-1.275,.679-2.381,1.817-2.958,1.119-.567,2.452-.457,3.46,.285l7.368,5.402c.86,.631,1.354,1.606,1.354,2.674s-.494,2.043-1.355,2.674l-7.368,5.403c-.588,.432-1.265,.651-1.949,.651Zm-.003-15.455c-.205,0-.408,.05-.603,.149-.458,.232-.721,.66-.721,1.174v10.807c0,.514,.263,.941,.721,1.174,.459,.232,.959,.19,1.372-.112l7.369-5.404c.347-.254,.538-.631,.538-1.061s-.191-.807-.538-1.061L5.094,5.536c-.233-.172-.5-.262-.77-.262Z"} />
+    </svg>
+  );
+}
+// The surf's tab glyphs, each in two weights: the regular outline for a resting pill, the
+// heavier cut for the open one, so the active tab reads as filled-in rather than recoloured.
 function WalkingIcon({ size = 14, on = false }: any) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
@@ -841,6 +849,29 @@ function StomachIcon({ size = 14, on = false }: any) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
       <path d={on ? "m15,3h-5c-1.398,0-2.701-.967-3.031-2.249-.138-.535-.687-.854-1.218-.72-.535.138-.857.684-.72,1.218.478,1.855,2.07,3.276,3.969,3.652v9.099c0,2.176-3.612,3.186-3.743,3.331-1.897.711-3.257,2.527-3.257,4.669v1c0,.553.447,1,1,1s1-.447,1-1v-1c0-1.305.842-2.406,2.008-2.818.167.104.342.21.504.312,2.012,1.275,3.911,2.479,8.487,2.505h.04c1.835,0,3.568-.72,4.886-2.029,1.338-1.331,2.075-3.096,2.075-4.97v-5c0-3.859-3.141-7-7-7Zm4.915,9.702c-.222.506-.811.733-1.319.511-.319-.142-.672-.213-1.05-.213-.596,0-.979.179-1.464.406-.566.265-1.271.594-2.311.594-.74,0-1.474-.161-2.181-.479-.504-.226-.729-.817-.503-1.321.227-.503.819-.729,1.321-.503.448.201.906.303,1.362.303.596,0,.979-.179,1.463-.405.566-.266,1.271-.595,2.312-.595.657,0,1.283.129,1.858.383.505.224.733.814.511,1.319Z" : "m15,3h-5c-1.398,0-2.701-.967-3.031-2.249-.138-.535-.687-.854-1.218-.72-.535.138-.857.684-.72,1.218.478,1.855,2.07,3.276,3.969,3.652v9.099c0,2.176-3.59,3.173-3.717,3.304-1.914.702-3.283,2.542-3.283,4.696v1c0,.553.447,1,1,1s1-.447,1-1v-1c0-1.304.836-2.415,2-2.828.174.108.344.216.511.322,2.012,1.275,3.911,2.479,8.487,2.505h.04c1.835,0,3.568-.72,4.886-2.029,1.338-1.331,2.075-3.096,2.075-4.97v-5c0-3.859-3.141-7-7-7Zm0,2c2.757,0,5,2.243,5,5v1.314c-.539-.181-1.205-.314-2-.314-1.185,0-1.971.301-2.664.566-.608.232-1.134.434-1.949.434-1.049,0-1.906-.335-2.387-.575v-6.425h4Zm3.515,13.552c-.939.934-2.173,1.447-3.477,1.447h-.027c-3.58-.021-5.167-.789-6.832-1.818,1.318-.731,2.821-2.035,2.821-4.181v-.41c.646.225,1.46.41,2.387.41,1.185,0,1.971-.301,2.664-.566.608-.232,1.134-.434,1.949-.434.986,0,1.65.291,2,.5v1.5c0,1.338-.527,2.599-1.485,3.552Z"} />
+    </svg>
+  );
+}
+function TimePastIcon({ size = 16 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="M13.001,7.245c-.539-.121-1.074,.215-1.197,.753-.31,1.365-.411,2.751-.3,4.119,.017,.209,.099,.407,.235,.567,.667,.784,1.427,1.495,2.261,2.111,.179,.133,.387,.196,.594,.196,.307,0,.609-.141,.805-.405,.328-.444,.234-1.07-.209-1.398-.624-.461-1.199-.983-1.714-1.555-.055-1.061,.038-2.132,.279-3.191,.123-.539-.215-1.075-.753-1.197Z" />
+      <path d="M22.122,6.806c-.637-1.882-2.151-3.383-4.05-4.015-3.472-1.155-6.995-1.154-10.468,0-1.898,.631-3.412,2.132-4.05,4.015-.231,.682-.417,1.37-.557,2.058-.033-.064-.067-.131-.102-.203-.246-.494-.845-.697-1.341-.45-.494,.246-.695,.846-.449,1.341,.595,1.196,.928,1.607,1.982,2.443,.18,.143,.4,.217,.622,.217,.147,0,.296-.033,.434-.099,1.221-.588,1.642-.916,2.503-1.948,.354-.424,.297-1.055-.127-1.408-.424-.354-1.054-.297-1.408,.127-.033,.04-.066,.078-.097,.115,.116-.518,.261-1.036,.435-1.551,.438-1.292,1.479-2.324,2.786-2.759,3.054-1.015,6.151-1.015,9.206,0,1.307,.435,2.349,1.466,2.786,2.759,1.023,3.021,1.023,6.084,0,9.105-.438,1.293-1.479,2.324-2.787,2.758-3.054,1.018-6.151,1.018-9.206,0-1.306-.434-2.348-1.465-2.786-2.759-.099-.291-.188-.581-.268-.872-.146-.533-.697-.847-1.229-.699-.533,.146-.846,.696-.7,1.229,.09,.328,.19,.657,.302,.984,.638,1.885,2.152,3.386,4.049,4.016,1.737,.577,3.485,.866,5.234,.866s3.498-.289,5.233-.866c1.899-.631,3.413-2.132,4.05-4.016,1.167-3.446,1.167-6.941,0-10.388Z" />
+    </svg>
+  );
+}
+function SettingsIcon({ size = 16 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="M12,8a4,4,0,1,0,4,4A4,4,0,0,0,12,8Zm0,6a2,2,0,1,1,2-2A2,2,0,0,1,12,14Z" />
+      <path d="M21.294,13.9l-.444-.256a9.1,9.1,0,0,0,0-3.29l.444-.256a3,3,0,1,0-3-5.2l-.445.257A8.977,8.977,0,0,0,15,3.513V3A3,3,0,0,0,9,3v.513A8.977,8.977,0,0,0,6.152,5.159L5.705,4.9a3,3,0,0,0-3,5.2l.444.256a9.1,9.1,0,0,0,0,3.29l-.444.256a3,3,0,1,0,3,5.2l.445-.257A8.977,8.977,0,0,0,9,20.487V21a3,3,0,0,0,6,0v-.513a8.977,8.977,0,0,0,2.848-1.646l.447.258a3,3,0,0,0,3-5.2Zm-2.548-3.776a7.048,7.048,0,0,1,0,3.75,1,1,0,0,0,.464,1.133l1.084.626a1,1,0,0,1-1,1.733l-1.086-.628a1,1,0,0,0-1.215.165,6.984,6.984,0,0,1-3.243,1.875,1,1,0,0,0-.751.969V21a1,1,0,0,1-2,0V19.748a1,1,0,0,0-.751-.969A6.984,6.984,0,0,1,7.006,16.9a1,1,0,0,0-1.215-.165l-1.084.627a1,1,0,1,1-1-1.732l1.084-.626a1,1,0,0,0,.464-1.133,7.048,7.048,0,0,1,0-3.75A1,1,0,0,0,4.79,8.992L3.706,8.366a1,1,0,0,1,1-1.733l1.086.628A1,1,0,0,0,7.006,7.1a6.984,6.984,0,0,1,3.243-1.875A1,1,0,0,0,11,4.252V3a1,1,0,0,1,2,0V4.252a1,1,0,0,0,.751.969A6.984,6.984,0,0,1,16.994,7.1a1,1,0,0,0,1.215.165l1.084-.627a1,1,0,1,1,1,1.732l-1.084.626A1,1,0,0,0,18.746,10.125Z" />
+    </svg>
+  );
+}
+function CheckSolidIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 507.506 507.506" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="M163.865,436.934c-14.406,0.006-28.222-5.72-38.4-15.915L9.369,304.966c-12.492-12.496-12.492-32.752,0-45.248l0,0c12.496-12.492,32.752-12.492,45.248,0l109.248,109.248L452.889,79.942c12.496-12.492,32.752-12.492,45.248,0l0,0c12.492,12.496,12.492,32.752,0,45.248L202.265,421.019C192.087,431.214,178.271,436.94,163.865,436.934z" />
     </svg>
   );
 }
@@ -984,7 +1015,9 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   const canLog = true as boolean;
   const blockStart = !running && !paused && !pauseActive && !rated;
   const logBtn = <button onClick={submit} disabled={!canLog} aria-label={canLog ? undefined : "set an expected rating first"} style={{ ...btn(C.ink), width: "100%", padding: "10px", opacity: canLog ? 1 : 0.5, cursor: canLog ? "pointer" : "not-allowed" }}>log pomodoro + write Act</button>;
-  const markDoneLabel = (
+  // Only offered when the chosen task really maps to a Notion page: a free pomodoro (or a
+  // local-only task) has nothing to set Done, so the line would be a dead checkbox.
+  const markDoneLabel = !meta.id ? null : (
     <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13, color: C.ink, cursor: "pointer" }}>
       <input type="checkbox" checked={markDone} onChange={(e) => setMarkDone(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.better, cursor: "pointer" }} />
       also set this task's status to Done in Notion
@@ -1169,10 +1202,7 @@ export default function FocusLogApp({ api }: any) {
   const [view, setView] = useState("log");
   // Status view bundles the old week/month/totals; its right-side vertical control picks the sub-view.
   const [calibSub, setCalibSub] = useState("today");
-  // Total and Log remember their own last panel, so stepping away to Calendar and back returns
-  // you to what you were reading instead of resetting to the first entry.
-  const [totalSub, setTotalSub] = useState("calib");
-  const [logSub, setLogSub] = useState("calib");
+  const [historySub, setHistorySub] = useState("calib");
   // The daily note focused in the workspace (ms timestamp), null when none: drives the calendar outline.
   const [activeDaily, setActiveDaily] = useState<number | null>(api.getActiveDaily ? api.getActiveDaily() : null);
   useEffect(() => { if (!api.onActiveDaily) return; return api.onActiveDaily((ts: number | null) => setActiveDaily(ts)); }, []);
@@ -2335,9 +2365,10 @@ export default function FocusLogApp({ api }: any) {
             return (
               <React.Fragment key={"g" + gi}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: gi ? 8 : 0, padding: "0 2px" }}>
-                  {gDone && <span style={{ color: tick, display: "inline-flex", flexShrink: 0 }}><CheckIcon size={13} /></span>}
                   <span style={{ fontSize: 12, fontWeight: 600, color: C.muted, fontFamily: "var(--fl-display)", textDecoration: gDone ? "line-through" : "none" }}>{gname}</span>
-                  <button onClick={() => openLog(gname)} aria-label={`run "${gname}" as one pomodoro`} style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 999, border: "none", boxShadow: "none", background: relax ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}><PlayIcon size={10} /></button>
+                  {gDone
+                    ? <span aria-label={`"${gname}" is finished`} style={{ width: 20, height: 20, minWidth: 20, borderRadius: 999, background: "rgb(144, 213, 144)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><CheckSolidIcon size={10} /></span>
+                    : <button onClick={() => openLog(gname)} aria-label={`run "${gname}" as one pomodoro`} style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 999, border: "none", boxShadow: "none", background: relax ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}><PlayIcon size={10} /></button>}
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "2px 0 0 14px" }}>
                   {g.steps.map((it: any) => { flat++; return renderPill(it, flat); })}
@@ -3266,7 +3297,6 @@ export default function FocusLogApp({ api }: any) {
 
   const seg = (on: boolean): any => ({ padding: "6px 14px", borderRadius: 9, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", textTransform: "capitalize", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.14)" : "none", fontFamily: "var(--fl-display)", whiteSpace: "nowrap" });
   // Horizontal sub-view toggle, same look as the Sky view's Pomodoros/Waves control.
-  const segH = (on: boolean): any => ({ padding: "4px 12px", borderRadius: 8, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 12.5, fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: "var(--fl-display)", boxShadow: "none" });
 
   return (
     <div ref={rootRef} style={{ background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums" }}>
@@ -3275,7 +3305,13 @@ export default function FocusLogApp({ api }: any) {
         :root{ --fl-display:'Baloo 2',Georgia,'Iowan Old Style',serif; --fl-mono:'Baloo 2',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
       `}</style>
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" }}>
-        <h1 style={{ fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" }}>Focus Log</h1>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: "0 0 6px" }}>
+          <h1 style={{ fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: 0 }}>Focus Log</h1>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+            <button onClick={() => setView("history")} aria-label="history: every calibration, break, pomodoro and pause ever logged" style={{ ...ICON_BTN, padding: 2, color: view === "history" ? C.ink : C.muted, borderBottom: `2px solid ${view === "history" ? "#C57B5A" : "transparent"}`, borderRadius: 0 }}><TimePastIcon size={16} /></button>
+            <button onClick={() => api.openSettings && api.openSettings()} aria-label="open the Focus Log settings" style={{ ...ICON_BTN, padding: 2 }}><SettingsIcon size={16} /></button>
+          </div>
+        </div>
         {flash && (
           <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 }}>
             {flash}
@@ -3283,7 +3319,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        <div style={{ marginBottom: 12, overflowX: "auto" }}>
+        <div style={{ marginBottom: 8, overflowX: "auto" }}>
           <div style={{ display: "inline-flex", gap: 2, background: C.line, borderRadius: 12, padding: 4 }}>
             {/* Focus stays lit for any of its three faces; clicking it returns to the pomodoro. */}
             {([["log", "Focus"], ["calendar", "Calendar"], ["calibrate", "Calibrate"], ["today", "Plan"], ["sky", "Sky"]] as [string, string][]).map(([t, lab]) => (<button key={t} onClick={() => setView(t)} style={seg(t === "log" ? isFocusView(view) : view === t)}>{lab}</button>))}
@@ -3291,8 +3327,8 @@ export default function FocusLogApp({ api }: any) {
         </div>
         {isFocusView(view) && (
           <div style={SUBBAR}>
-            <div style={{ ...SUBBAR_TRACK, background: C.line }}>
-              {FOCUS_SUB.map(([k, lab]) => (<button key={k} onClick={() => setView(k)} style={segH(view === k)}>{lab}</button>))}
+            <div style={SUBTAB_ROW}>
+              {FOCUS_SUB.map(([k, lab, Icon]) => (<button key={k} onClick={() => setView(k)} style={subTab(view === k)}><Icon size={13} on={view === k} />{lab}</button>))}
             </div>
             <InfoHover C={C} label="about this view" width={360}>
               {view === "log" && (<>
@@ -3431,6 +3467,7 @@ export default function FocusLogApp({ api }: any) {
           const areaAgg: any = {};
           finals.forEach((e: any) => { if (e.category && e.guess > 0) (areaAgg[e.category] = areaAgg[e.category] || []).push((e.spend || 0) / e.guess); });
           const multipliers = Object.entries(areaAgg).map(([a, xs]: any) => [a, xs.reduce((s: number, x: number) => s + x, 0) / xs.length] as [string, number]).sort((a, b) => b[1] - a[1]).slice(0, 4);
+          const avgMiss = finals.length ? finals.reduce((s: number, e: any) => s + Math.abs((e.spend || 0) - (e.guess || 0)), 0) / finals.length : null;
           const statCard = (title: string, body: any) => (
             <div style={{ background: "#fffefc", border: `1px solid ${C.line}`, borderRadius: 8, padding: "10px 14px", minWidth: 170, flex: 1 }}>
               <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>{title}</div>
@@ -3450,7 +3487,7 @@ export default function FocusLogApp({ api }: any) {
                     <span style={{ color: MODE_COLORS.relax.solid, fontSize: 22, fontWeight: 700 }}>{pct}%</span>
                     {" of your calibrated tasks landed within one "}{"\u{1F345}"}
                     {improving && <span style={{ color: C.muted }}> (and improving)</span>}
-                    <span style={{ color: C.muted, fontSize: 12 }}>{" · " + finals.length + " task" + (finals.length === 1 ? "" : "s")}</span>
+                    <span style={{ color: C.muted, fontSize: 12 }}>{" · " + finals.length + " task" + (finals.length === 1 ? "" : "s")}{avgMiss != null ? " · avg miss " + avgMiss.toFixed(1) + " \u{1F345}" : ""}</span>
                   </div>
                 )}
                 {(grew.length > 0 || shrank.length > 0 || multipliers.length > 0) && (
@@ -3462,24 +3499,6 @@ export default function FocusLogApp({ api }: any) {
                 )}
               </div>
           );
-          const secCalibHistory = () => (calibrations.length === 0
-            ? <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}><p style={{ color: C.muted, fontSize: 13, margin: 0 }}>No calibrations yet. Add a {"+\u{1F345}"} when a task grows, or click a grey tomato when one finishes early.</p></div>
-            : (
-                <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
-                  <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Recent calibrations</h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {calibrations.slice(-20).reverse().map((e: any) => (
-                      <div key={e.id} className="fl-act-row" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "7px 11px", borderRadius: 8, background: "#fdfbf5", border: `1px solid ${C.line}`, fontSize: 12.5, color: C.ink }}>
-                        <span style={{ flex: 1, minWidth: 140, fontWeight: 600, overflowWrap: "anywhere" }}>{stripLeadingTag(e.task)}</span>
-                        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, flexShrink: 0 }}>guess {e.guess} {"→"} spend {e.spend}</span>
-                        <span style={{ background: e.direction === "over" ? "#FBEFC9" : "#DCEAF6", border: `1px solid ${e.direction === "over" ? "#D9A521" : "#3E78B2"}`, color: "#2b2723", borderRadius: 999, padding: "1px 9px", fontSize: 11, flexShrink: 0 }}>{e.reason}</span>
-                        <button onClick={() => { const arr = calibrations.filter((x: any) => x.id !== e.id); setCalibrations(arr); api.saveCalibrations && api.saveCalibrations(arr); }} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete this calibration entry (the Notion Guess rounds and the daily-note line are not touched)" style={ICON_BTN}><TrashIcon size={13} /></button>
-                        {e.note && <span style={{ color: C.muted, fontSize: 11, flexBasis: "100%" }}>{e.note}</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-          ));
           const secPomodoroStats = () => (<div>
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
                 <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Pomodoro totals</h3>
@@ -3493,9 +3512,8 @@ export default function FocusLogApp({ api }: any) {
                   <Stat label="hours, month" value={hrsOf(sumMin(inMonth))} color={C.muted} />
                   <Stat label="hours, year" value={hrsOf(sumMin(inYear))} color={C.muted} />
                 </div>
-              </div>
-              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
-                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 12px" }}>Six-month heatmap</h3>
+                {/* the density strip lives under the same title: one card = the long count of doing */}
+                <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "14px 0 8px" }}>Six-month heatmap</p>
                 <ContribHeatmap sessions={sessions} settings={settings} />
               </div>
           </div>);
@@ -3529,30 +3547,6 @@ export default function FocusLogApp({ api }: any) {
                 )}
               </div>
           );
-          const secAllSessions = () => (
-              <div>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-                  <h3 onClick={() => toggleFold("sessions")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><AngleIcon size={15} down={!foldedHistory.has("sessions")} /> All sessions</h3>
-                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{sessions.length} logged{(() => { const n = urges.filter((u: any) => !u.outcome || u.outcome === "surfed").length; return n ? " · \u{1F30A} " + n + " surfed" : ""; })()}</span>
-                </div>
-                {foldedHistory.has("sessions") ? null : sessions.length === 0 ? (
-                  <p style={{ color: C.muted, fontSize: 13 }}>No sessions yet. Log a pomodoro to see it here.</p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {[...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => (
-                      editingId === s.id ? (
-                        <SessionEditRow key={s.id} draft={editDraft} setDraft={setEditDraft} settings={settings} onSave={saveEdit} onCancel={cancelEdit} />
-                      ) : (
-                        <SessionRow key={s.id} s={s} settings={settings} onEdit={startEdit} onDelete={deleteSession} />
-                      )
-                    ))}
-                  </div>
-                )}
-                {!foldedHistory.has("sessions") && <p style={{ color: C.muted, fontSize: 11, marginTop: 10 }}>
-                  Edits and deletes only change the local log; they do not undo the Act write-back on Notion.
-                </p>}
-              </div>
-          );
           const secBreakStats = () => (
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
                 <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Break stats</h3>
@@ -3572,43 +3566,6 @@ export default function FocusLogApp({ api }: any) {
                 </div>
                 <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>By area</p>
                 <PieChart data={pieData} />
-              </div>
-          );
-          const secAllBreaks = () => (
-              <div>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-                  <h3 onClick={() => toggleFold("breaks")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><AngleIcon size={15} down={!foldedHistory.has("breaks")} /> All breaks</h3>
-                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{breaks.length} logged</span>
-                </div>
-                {foldedHistory.has("breaks") ? null : breaks.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No breaks logged yet.</p> : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {[...breaks].sort((a, b) => b.start - a.start).map((b) => (
-                      editBreakId === b.id ? (
-                        <div key={b.id} style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
-                          <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>start<input type="datetime-local" value={breakDraft.start} onChange={(e) => setBreakDraft({ ...breakDraft, start: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
-                          <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>end<input type="datetime-local" value={breakDraft.end} onChange={(e) => setBreakDraft({ ...breakDraft, end: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
-                          <div style={{ flexBasis: "100%", display: "flex", alignItems: "flex-end", gap: 8 }}>
-                            <Scale label="feeling" value={breakDraft.feeling} onChange={(v: number) => setBreakDraft({ ...breakDraft, feeling: v })} seasons />
-                            <button onClick={() => setBreakDraft({ ...breakDraft, feeling: null })} style={{ ...btn(C.muted, true), padding: "2px 8px", fontSize: 11, marginBottom: 12 }}>clear</button>
-                          </div>
-                          <button onClick={saveEditBreak} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
-                          <button onClick={() => setEditBreakId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
-                        </div>
-                      ) : (
-                        <div key={b.id} className="fl-act-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
-                          <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(b.start)} {fmtTime(b.start)}{"–"}{fmtTime(b.end)}</span>
-                          <span style={{ flex: 1, minWidth: 120, overflowWrap: "anywhere" }}>{(b.activities && b.activities.length) ? b.activities.join(", ") : "—"}</span>
-                          <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>{(b.areas && b.areas.length) ? b.areas.join(" · ") : ""}</span>
-                          {b.feeling != null && (BREAK_SEASONS[b.feeling - 1]
-                            ? <img src={BREAK_SEASONS[b.feeling - 1].img} alt={BREAK_SEASONS[b.feeling - 1].name} aria-label={BREAK_SEASONS[b.feeling - 1].name} draggable={false} style={{ width: 16, height: 16, flexShrink: 0 }} />
-                            : <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.ink, whiteSpace: "nowrap" }}>{b.feeling}/5</span>)}
-                          <button onClick={() => startEditBreak(b)} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-                          <button onClick={() => deleteBreak(b.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
-                        </div>
-                      )
-                    ))}
-                  </div>
-                )}
               </div>
           );
           const secPauseStats = () => (
@@ -3655,44 +3612,6 @@ export default function FocusLogApp({ api }: any) {
                 )}
               </div>
           );
-          const secAllPauses = () => (
-              <div>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-                  <h3 onClick={() => toggleFold("pauses")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><AngleIcon size={15} down={!foldedHistory.has("pauses")} /> All pauses</h3>
-                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{pauses.length} logged</span>
-                </div>
-                {foldedHistory.has("pauses") ? null : pauses.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No pauses logged yet.</p> : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {[...pauses].sort((a, b) => (+new Date(b.ts)) - (+new Date(a.ts))).map((p) => (
-                      editPauseId === p.id ? (
-                        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
-                          <input type="datetime-local" value={pauseDraft.ts} onChange={(e) => setPauseDraft({ ...pauseDraft, ts: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
-                          <select value={pauseDraft.tag} onChange={(e) => setPauseDraft({ ...pauseDraft, tag: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }}>
-                            {pauseTags.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
-                          </select>
-                          <button onClick={saveEditPause} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
-                          <button onClick={() => setEditPauseId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
-                        </div>
-                      ) : (
-                        <div key={p.id} className="fl-act-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
-                          <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(p.ts)} {fmtTime(p.ts)}</span>
-                          <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, minWidth: 34 }}>{p.mins != null ? p.mins + "m" : "—"}</span>
-                          {/* the reason wears its category: yellow came from you, blue came at you.
-                              A tag deleted since the pause was logged falls back to internal, as the stats do. */}
-                          <span style={{ flex: 1, minWidth: 0 }}>
-                            <span style={{ display: "inline-block", padding: "1px 10px", borderRadius: 999, background: catColor(pauseCatOf(p.tag)), border: `1px solid ${catBorder(pauseCatOf(p.tag))}`, color: C.ink, fontSize: 12, maxWidth: "100%", overflowWrap: "anywhere", lineHeight: 1.45 }}>{p.tag}</span>
-                          </span>
-                          <button onClick={() => startEditPause(p)} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-                          <button onClick={() => deletePause(p.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
-                        </div>
-                      )
-                    ))}
-                  </div>
-                )}
-              </div>
-          );
-          // The one panel with no former home: Pomo Accuracy took the whole "how your guesses
-          // land" card and Log took the entry list, so Total shows the shape of the misses.
           const secBestTime = () => (
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
                 <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Best time of day</h3>
@@ -3720,26 +3639,6 @@ export default function FocusLogApp({ api }: any) {
                 )}
               </div>
           );
-          const secCalibSummary = () => {
-            const overN = calibrations.filter((e: any) => e.direction === "over").length;
-            const underN = calibrations.filter((e: any) => e.direction === "under").length;
-            const miss = finals.length ? finals.reduce((s: number, e: any) => s + Math.abs((e.spend || 0) - (e.guess || 0)), 0) / finals.length : null;
-            return (
-              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
-                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Calibration stats</h3>
-                {calibrations.length === 0 ? (
-                  <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>Nothing calibrated yet. The shape of your misses shows up here once a few tasks have grown or shrunk.</p>
-                ) : (
-                  <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around" }}>
-                    <Stat label="calibrations" value={calibrations.length} big />
-                    <Stat label="grew" value={overN} color={"#c96f22"} />
-                    <Stat label="shrank" value={underN} color={C.muted} />
-                    <Stat label={"avg miss " + "\u{1F345}"} value={miss == null ? "—" : miss.toFixed(1)} color={C.muted} />
-                  </div>
-                )}
-              </div>
-            );
-          };
           const secCatchUp = () => {
             // The catch-up day runs morning to morning: during the overnight stretch the day
             // you just finished stays on screen, so it can still be tidied before bed. A
@@ -3799,14 +3698,11 @@ export default function FocusLogApp({ api }: any) {
               </div>
             );
           };
-          const rail: [string, string][] = calibSub === "total" ? TOTAL_TABS : LOG_TABS;
-          const railSub = calibSub === "total" ? totalSub : logSub;
-          const setRailSub = calibSub === "total" ? setTotalSub : setLogSub;
           return (
             <div>
               <div style={SUBBAR}>
-                <div style={{ ...SUBBAR_TRACK, background: C.line }}>
-                  {CALIB_TABS.map(([k, lab]) => (<button key={k} onClick={() => setCalibSub(k)} style={segH(calibSub === k)}>{lab}</button>))}
+                <div style={SUBTAB_ROW}>
+                  {CALIB_TABS.map(([k, lab]) => (<button key={k} onClick={() => setCalibSub(k)} style={subTab(calibSub === k)}>{lab}</button>))}
                 </div>
                 <InfoHover C={C} label="about this view" width={360}>
                   {calibSub === "today" && (<>
@@ -3822,47 +3718,167 @@ export default function FocusLogApp({ api }: any) {
                     <div style={{ fontWeight: 700, marginBottom: 4 }}>Pomo Accuracy</div>
                     <div>Two kinds of guess, side by side: how long a task would take, and how it would feel.</div>
                     <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-                      <li><b>How your guesses land</b>: the share of calibrated tasks that finished within one {"\u{1F345}"}, plus why they grew or shrank.</li>
+                      <li><b>How your guesses land</b>: the share of calibrated tasks that finished within one {"\u{1F345}"}, the average miss, and why tasks grew or shrank.</li>
                       <li><b>Expected vs actual</b>: how often sessions turned out more enjoyable than you expected, with the biggest surprises.</li>
                     </ul>
                   </>)}
                   {calibSub === "total" && (<>
                     <div style={{ fontWeight: 700, marginBottom: 4 }}>Sum</div>
-                    <div>The long view: everything you have logged, gathered in one place.</div>
-                    <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-                      <li><b>break</b> and <b>pause</b> stats: how you rest, and when and why you stop.</li>
-                      <li><b>calibration stats</b>: how many guesses you have corrected, and the average miss.</li>
-                      <li><b>pomodoro stats</b>: counts and hours, a six-month heatmap, and your best time of day.</li>
-                    </ul>
-                  </>)}
-                  {calibSub === "log" && (<>
-                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Log</div>
-                    <div>The full record, one list per kind. Edits and deletes only change the local log; they never undo what was written to Notion.</div>
+                    <div>The long view, four cards in one scroll: pomodoro totals with the six-month heatmap, your best time of day, how you rest, and when and why you stop.</div>
                   </>)}
                 </InfoHover>
               </div>
               {calibSub === "today" && secCatchUp()}
               {calibSub === "accuracy" && (<>{secGuessLand()}<div style={{ marginTop: 14 }}>{secExpectedVsActual()}</div></>)}
-              {(calibSub === "total" || calibSub === "log") && (
-                <div style={{ display: "flex", flexDirection: narrowPanel ? "column" : "row", gap: 14, alignItems: "flex-start" }}>
-                  {/* the rail turns into a scrolling strip on a narrow sidebar, so the panel keeps its width */}
-                  <div style={{ display: "flex", flexDirection: narrowPanel ? "row" : "column", gap: 2, background: C.line, borderRadius: 10, padding: 3, flex: narrowPanel ? "0 0 auto" : "0 0 83px", maxWidth: "100%", overflowX: narrowPanel ? "auto" : "visible", boxSizing: "border-box" }}>
-                    {rail.map(([k, lab]) => (
-                      <button key={k} onClick={() => setRailSub(k)} style={{ ...segH(railSub === k), padding: "4px 9px", textAlign: "left", whiteSpace: "nowrap" }}>{lab}</button>
-                    ))}
-                  </div>
-                  <div style={{ flex: "1 1 auto", minWidth: 0, width: "100%" }}>
-                    {calibSub === "total" && railSub === "break" && secBreakStats()}
-                    {calibSub === "total" && railSub === "pause" && secPauseStats()}
-                    {calibSub === "total" && railSub === "calib" && (<>{secCalibSummary()}{secBestTime()}</>)}
-                    {calibSub === "total" && railSub === "pomo" && secPomodoroStats()}
-                    {calibSub === "log" && railSub === "calib" && secCalibHistory()}
-                    {calibSub === "log" && railSub === "pomo" && secAllSessions()}
-                    {calibSub === "log" && railSub === "pause" && secAllPauses()}
-                    {calibSub === "log" && railSub === "break" && secAllBreaks()}
-                  </div>
+              {calibSub === "total" && (
+                <div>
+                  {secPomodoroStats()}
+                  <div style={{ marginTop: 20 }}>{secBestTime()}</div>
+                  <div style={{ marginTop: 20 }}>{secBreakStats()}</div>
+                  <div style={{ marginTop: 20 }}>{secPauseStats()}</div>
                 </div>
               )}
+            </div>
+          );
+        })()}
+
+
+        {/* The full record lives behind the corner history icon: one list per kind, two
+            levels of title only. Edits and deletes only change the local log. */}
+        {view === "history" && (() => {
+          const secCalibHistory = () => (calibrations.length === 0
+            ? <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}><p style={{ color: C.muted, fontSize: 13, margin: 0 }}>No calibrations yet. Add a {"+\u{1F345}"} when a task grows, or click a grey tomato when one finishes early.</p></div>
+            : (
+                <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: foldedHistory.has("calibrations") ? 0 : 10 }}>
+                    <h3 onClick={() => toggleFold("calibrations")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><AngleIcon size={15} down={!foldedHistory.has("calibrations")} /> All calibrations</h3>
+                    <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{calibrations.length} logged</span>
+                  </div>
+                  {foldedHistory.has("calibrations") ? null : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {calibrations.slice().reverse().map((e: any) => (
+                      <div key={e.id} className="fl-act-row" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "7px 11px", borderRadius: 8, background: "#fdfbf5", border: `1px solid ${C.line}`, fontSize: 12.5, color: C.ink }}>
+                        <span style={{ flex: 1, minWidth: 140, fontWeight: 600, overflowWrap: "anywhere" }}>{stripLeadingTag(e.task)}</span>
+                        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, flexShrink: 0 }}>guess {e.guess} {"→"} spend {e.spend}</span>
+                        <span style={{ background: e.direction === "over" ? "#FBEFC9" : "#DCEAF6", border: `1px solid ${e.direction === "over" ? "#D9A521" : "#3E78B2"}`, color: "#2b2723", borderRadius: 999, padding: "1px 9px", fontSize: 11, flexShrink: 0 }}>{e.reason}</span>
+                        <button onClick={() => { const arr = calibrations.filter((x: any) => x.id !== e.id); setCalibrations(arr); api.saveCalibrations && api.saveCalibrations(arr); }} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete this calibration entry (the Notion Guess rounds and the daily-note line are not touched)" style={ICON_BTN}><TrashIcon size={13} /></button>
+                        {e.note && <span style={{ color: C.muted, fontSize: 11, flexBasis: "100%" }}>{e.note}</span>}
+                      </div>
+                    ))}
+                  </div>}
+                </div>
+          ));
+          const secAllSessions = () => (
+              <div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+                  <h3 onClick={() => toggleFold("sessions")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><AngleIcon size={15} down={!foldedHistory.has("sessions")} /> All sessions</h3>
+                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{sessions.length} logged{(() => { const n = urges.filter((u: any) => !u.outcome || u.outcome === "surfed").length; return n ? " · \u{1F30A} " + n + " surfed" : ""; })()}</span>
+                </div>
+                {foldedHistory.has("sessions") ? null : sessions.length === 0 ? (
+                  <p style={{ color: C.muted, fontSize: 13 }}>No sessions yet. Log a pomodoro to see it here.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {[...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => (
+                      editingId === s.id ? (
+                        <SessionEditRow key={s.id} draft={editDraft} setDraft={setEditDraft} settings={settings} onSave={saveEdit} onCancel={cancelEdit} />
+                      ) : (
+                        <SessionRow key={s.id} s={s} settings={settings} onEdit={startEdit} onDelete={deleteSession} />
+                      )
+                    ))}
+                  </div>
+                )}
+                {!foldedHistory.has("sessions") && <p style={{ color: C.muted, fontSize: 11, marginTop: 10 }}>
+                  Edits and deletes only change the local log; they do not undo the Act write-back on Notion.
+                </p>}
+              </div>
+          );
+          const secAllBreaks = () => (
+              <div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+                  <h3 onClick={() => toggleFold("breaks")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><AngleIcon size={15} down={!foldedHistory.has("breaks")} /> All breaks</h3>
+                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{breaks.length} logged</span>
+                </div>
+                {foldedHistory.has("breaks") ? null : breaks.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No breaks logged yet.</p> : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {[...breaks].sort((a, b) => b.start - a.start).map((b) => (
+                      editBreakId === b.id ? (
+                        <div key={b.id} style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
+                          <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>start<input type="datetime-local" value={breakDraft.start} onChange={(e) => setBreakDraft({ ...breakDraft, start: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
+                          <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>end<input type="datetime-local" value={breakDraft.end} onChange={(e) => setBreakDraft({ ...breakDraft, end: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
+                          <div style={{ flexBasis: "100%", display: "flex", alignItems: "flex-end", gap: 8 }}>
+                            <Scale label="feeling" value={breakDraft.feeling} onChange={(v: number) => setBreakDraft({ ...breakDraft, feeling: v })} seasons />
+                            <button onClick={() => setBreakDraft({ ...breakDraft, feeling: null })} style={{ ...btn(C.muted, true), padding: "2px 8px", fontSize: 11, marginBottom: 12 }}>clear</button>
+                          </div>
+                          <button onClick={saveEditBreak} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
+                          <button onClick={() => setEditBreakId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
+                        </div>
+                      ) : (
+                        <div key={b.id} className="fl-act-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                          <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(b.start)} {fmtTime(b.start)}{"–"}{fmtTime(b.end)}</span>
+                          <span style={{ flex: 1, minWidth: 120, overflowWrap: "anywhere" }}>{(b.activities && b.activities.length) ? b.activities.join(", ") : "—"}</span>
+                          <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>{(b.areas && b.areas.length) ? b.areas.join(" · ") : ""}</span>
+                          {b.feeling != null && (BREAK_SEASONS[b.feeling - 1]
+                            ? <img src={BREAK_SEASONS[b.feeling - 1].img} alt={BREAK_SEASONS[b.feeling - 1].name} aria-label={BREAK_SEASONS[b.feeling - 1].name} draggable={false} style={{ width: 16, height: 16, flexShrink: 0 }} />
+                            : <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.ink, whiteSpace: "nowrap" }}>{b.feeling}/5</span>)}
+                          <button onClick={() => startEditBreak(b)} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                          <button onClick={() => deleteBreak(b.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
+          );
+          const secAllPauses = () => (
+              <div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+                  <h3 onClick={() => toggleFold("pauses")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><AngleIcon size={15} down={!foldedHistory.has("pauses")} /> All pauses</h3>
+                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{pauses.length} logged</span>
+                </div>
+                {foldedHistory.has("pauses") ? null : pauses.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No pauses logged yet.</p> : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {[...pauses].sort((a, b) => (+new Date(b.ts)) - (+new Date(a.ts))).map((p) => (
+                      editPauseId === p.id ? (
+                        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
+                          <input type="datetime-local" value={pauseDraft.ts} onChange={(e) => setPauseDraft({ ...pauseDraft, ts: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
+                          <select value={pauseDraft.tag} onChange={(e) => setPauseDraft({ ...pauseDraft, tag: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }}>
+                            {pauseTags.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+                          </select>
+                          <button onClick={saveEditPause} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
+                          <button onClick={() => setEditPauseId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
+                        </div>
+                      ) : (
+                        <div key={p.id} className="fl-act-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                          <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(p.ts)} {fmtTime(p.ts)}</span>
+                          <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, minWidth: 34 }}>{p.mins != null ? p.mins + "m" : "—"}</span>
+                          {/* the reason wears its category: yellow came from you, blue came at you.
+                              A tag deleted since the pause was logged falls back to internal, as the stats do. */}
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ display: "inline-block", padding: "1px 10px", borderRadius: 999, background: catColor(pauseCatOf(p.tag)), border: `1px solid ${catBorder(pauseCatOf(p.tag))}`, color: C.ink, fontSize: 12, maxWidth: "100%", overflowWrap: "anywhere", lineHeight: 1.45 }}>{p.tag}</span>
+                          </span>
+                          <button onClick={() => startEditPause(p)} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                          <button onClick={() => deletePause(p.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
+          );
+          return (
+            <div>
+              <div style={SUBBAR}>
+                <div style={SUBTAB_ROW}>
+                  {HIST_TABS.map(([k, lab]) => (<button key={k} onClick={() => setHistorySub(k)} style={subTab(historySub === k)}>{lab}</button>))}
+                </div>
+                <InfoHover C={C} label="about this view" width={360}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>History</div>
+                  <div>The full record, one list per kind: calibrations, breaks, pomodoros, pauses. Edits and deletes only change the local log; they never undo what was written to Notion.</div>
+                </InfoHover>
+              </div>
+              {historySub === "calib" && secCalibHistory()}
+              {historySub === "break" && secAllBreaks()}
+              {historySub === "pomo" && secAllSessions()}
+              {historySub === "pause" && secAllPauses()}
             </div>
           );
         })()}
