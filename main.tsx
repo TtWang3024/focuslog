@@ -53,8 +53,8 @@ function getElectronRemote(): any {
 
 // Pause-category colours for the floating window's reason chips (internal=yellow, external=blue).
 const FLOAT_CAT: any = {
-  internal: { fill: "#FBEFC9", border: "#D9A521" },
-  external: { fill: "#DCEAF6", border: "#3E78B2" },
+  internal: { fill: "#FDE4C8", border: "#F07B16" },
+  external: { fill: "#D6E8FD", border: "#2779E0" },
 };
 // First-time size (px) for each float phase; once you move/resize a phase, that phase
 // remembers its own bounds (settings.floatPhaseBounds) and the default is ignored.
@@ -1639,6 +1639,53 @@ export default class FocusLogPlugin extends Plugin {
     if (counterStatus === "ambiguous") new Notice("Focus Log: the counter prefix matches more than one line — counter not updated.");
   }
 
+  // The catch-up can rename a logged pomodoro after the fact; the daily note follows. The
+  // old block is rebuilt exactly as appendToDailyNote wrote it and swapped for the new one.
+  // If the note was edited by hand meanwhile the block won't match, nothing is touched, and
+  // the caller is told so it can say the line was left alone.
+  async renameInDailyNote(p: { ts: number; minutes: number; oldTask: string; newTask: string; hierarchy: string; note: string; category?: string | null }): Promise<boolean> {
+    const s = this.data.settings;
+    if (!s.dailyNoteWrite) return false;
+    try {
+      const moment = (window as any).moment;
+      if (!moment) return false;
+      const trueDate = new Date(p.ts);
+      const fileDate = s.dailyNoteTrueDate ? trueDate : new Date(p.ts - dayShiftHours(s.dayStart) * 3600000);
+      const fileM = moment(new Date(fileDate.getFullYear(), fileDate.getMonth(), fileDate.getDate()));
+      const dn: any = (this.app as any).internalPlugins?.getPluginById?.("daily-notes");
+      const opts = dn?.instance?.options || {};
+      const format = (s.dailyTitleFormat || opts.format || "YYYY-MM-DD").trim();
+      const folder = (s.dailyNoteFolder || opts.folder || "").trim();
+      const path = normalizePath((folder ? folder + "/" : "") + fileM.format(format) + ".md");
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof TFile)) return false;
+      const dateM = moment(new Date(trueDate.getFullYear(), trueDate.getMonth(), trueDate.getDate()));
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const startT = new Date(p.ts - (p.minutes || 25) * 60000);
+      const endT = new Date(p.ts);
+      const hier = p.hierarchy ? " (" + p.hierarchy + ")" : "";
+      const slug = (s.writeCategoryTag !== false && p.category) ? tagSlug(p.category) : "";
+      const ns = (s.tagNamespace || "").trim();
+      const tag = slug ? "#" + (ns ? ns + "/" : "") + slug : "";
+      const mk = (task: string) => (s.dailyTemplate || "")
+        .replace(/\{date\}/g, dateM.format("YYYY-MM-DD"))
+        .replace(/\{start\}/g, pad(startT.getHours()) + ":" + pad(startT.getMinutes()))
+        .replace(/\{end\}/g, pad(endT.getHours()) + ":" + pad(endT.getMinutes()))
+        .replace(/\{task\}/g, task || "")
+        .replace(/\{hierarchy\}/g, hier)
+        .replace(/\{tag\}/g, tag)
+        .replace(/\{note\}/g, p.note || "");
+      const oldBlock = mk(p.oldTask);
+      const newBlock = mk(p.newTask);
+      let done = false;
+      await this.app.vault.process(file, (data: string) => {
+        if (data.includes(oldBlock)) { done = true; return data.replace(oldBlock, newBlock); }
+        return data;
+      });
+      return done;
+    } catch (e) { return false; }
+  }
+
   // Open the daily note FILE for a calendar date (clicked in the Status month view). Resolves the
   // path with the same folder/format logic as appendToDailyNote, creates it if missing (only when
   // "Create new daily note if missing" is on), and opens it in the MAIN editor area rather than the
@@ -1943,6 +1990,7 @@ export default class FocusLogPlugin extends Plugin {
       saveDoneToday: async (arr: any[]) => { self.data.doneToday = arr; await self.persist(); },
       saveUrges: async (arr: any[]) => { self.data.urgesSurfed = arr; await self.persist(); },
       appendDaily: (p: any) => self.appendToDailyNote(p),
+      renameDaily: (p: any) => self.renameInDailyNote(p),
       openDailyNote: (ts: number) => self.openDailyNoteForDate(ts),
       hasDailyNote: (ts: number) => self.dailyNoteExists(ts),
       openDayMenu: (ts: number, ev: MouseEvent, extra?: any) => self.openDayMenu(ts, ev, extra),

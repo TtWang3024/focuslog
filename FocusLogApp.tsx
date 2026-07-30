@@ -557,8 +557,8 @@ function PieChart({ data, empty }: any) {
 // something outside interrupted you (blue). Fills are soft; borders are the strong
 // hue used for the left bar, the pill, and the pie slices.
 const PAUSE_CAT: any = {
-  internal: { fill: "#FBEFC9", border: "#D9A521" },
-  external: { fill: "#DCEAF6", border: "#3E78B2" },
+  internal: { fill: "#FDE4C8", border: "#F07B16" },
+  external: { fill: "#D6E8FD", border: "#2779E0" },
 };
 const catOf = (cat: any): string => (cat === "external" ? "external" : "internal");
 const catColor = (cat: any) => PAUSE_CAT[catOf(cat)].fill;
@@ -1208,6 +1208,7 @@ export default function FocusLogApp({ api }: any) {
   useEffect(() => { if (!api.onActiveDaily) return; return api.onActiveDaily((ts: number | null) => setActiveDaily(ts)); }, []);
   const [preset, setPreset] = useState("");
   const [monthOff, setMonthOff] = useState(0);
+  const [todayFlash, setTodayFlash] = useState(false);   // brief pill behind TODAY confirming the click
   const [introOpen, setIntroOpen] = useState(false);   // the Timeline's formatted how-it-works hover card
   // Scroll the wheel over the "Mon Year" label to spin through months (down = next, up = previous).
   // React's onWheel is passive, so a native non-passive listener is needed to preventDefault the page
@@ -3338,7 +3339,7 @@ export default function FocusLogApp({ api }: any) {
                   <li><b>Task</b>: today's tasks from the Plan; each pomodoro adds +1 to that task's Spend in Notion.</li>
                   <li><b>Feeling</b>: the four weathers, rain to full sun; your before and after ratings are both saved.</li>
                   <li><b>Timer</b>: the round buttons set 5 to 30 minutes (hold to speed up); the length locks while a pomodoro runs; the circle arrow resets the timer and task.</li>
-                  <li><b>Pause</b>: pausing asks for a reason, yellow for internal, blue for external; it is recorded under Pause.</li>
+                  <li><b>Pause</b>: pausing asks for a reason, orange for internal, blue for external; it is recorded under Pause.</li>
                   <li><b>{"\u{1F30A}"} Surf an urge</b>: mid-run, tap the wave: rate it, breathe, find it on the rabbit, name the feeling. Decide after the wave. The floating window keeps a quick 90-second version.</li>
                 </ul>
               </>)}
@@ -3433,7 +3434,7 @@ export default function FocusLogApp({ api }: any) {
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <button onClick={() => setMonthOff((m) => m - 1)} aria-label="previous month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" }}><ChevronLeftIcon size={20} /></button>
-                    <button onClick={() => { setMonthOff(0); api.openDailyNote && api.openDailyNote(+logicalDay(Date.now(), settings)); }} aria-label="jump to the current month and open today's daily note — 'today' follows your day-start setting, so after an evening rollover it is already tomorrow's date" style={{ background: "transparent", border: "none", boxShadow: "none", color: ACCENT, cursor: "pointer", padding: "5px 8px", borderRadius: 7, fontFamily: "var(--fl-display)", fontWeight: 700, fontSize: 13, letterSpacing: "0.02em" }}>TODAY</button>
+                    <button onClick={() => { setMonthOff(0); setTodayFlash(true); window.setTimeout(() => setTodayFlash(false), 450); api.openDailyNote && api.openDailyNote(+logicalDay(Date.now(), settings)); }} aria-label="jump to the current month and open today's daily note — 'today' follows your day-start setting, so after an evening rollover it is already tomorrow's date" style={{ background: todayFlash ? "#E4D3B8" : "transparent", transition: "background 0.35s ease", border: "none", boxShadow: "none", color: ACCENT, cursor: "pointer", padding: "5px 8px", borderRadius: 7, fontFamily: "var(--fl-display)", fontWeight: 700, fontSize: 13, letterSpacing: "0.02em" }}>TODAY</button>
                     <button onClick={() => setMonthOff((m) => m + 1)} aria-label="next month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" }}><ChevronRightIcon size={20} /></button>
                   </div>
                 </div>
@@ -3501,7 +3502,17 @@ export default function FocusLogApp({ api }: any) {
           );
           const secPomodoroStats = () => (<div>
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
-                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Pomodoro totals</h3>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+                  <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>Pomodoro totals</h3>
+                  <InfoHover C={C} label="about pomodoro totals" width={330}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Pomodoro totals</div>
+                    <div>Counts and hours for this calendar week, month and year.</div>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                      <li><b>Heatmap</b>: one square per day over six months, the newest week at the left; darker means more (the steps come from the heat-thresholds setting).</li>
+                      <li>Yellow-stacked overnight pomodoros count toward the day they lead into, same as everywhere else.</li>
+                    </ul>
+                  </InfoHover>
+                </div>
                 <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around" }}>
                   <Stat label="this week" value={countWeek} big />
                   <Stat label="this month" value={countMonth} big />
@@ -3549,7 +3560,18 @@ export default function FocusLogApp({ api }: any) {
           );
           const secBreakStats = () => (
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
-                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Break stats</h3>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+                  <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>Break stats</h3>
+                  <InfoHover C={C} label="about break stats" width={330}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Break stats</div>
+                    <div>How you actually rest.</div>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                      <li><b>Favourites</b>: the activities you tick most, with their counts.</li>
+                      <li><b>This week / month</b>: breaks logged in each window.</li>
+                      <li><b>Pie</b>: your break time split by the activities' Areas.</li>
+                    </ul>
+                  </InfoHover>
+                </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 }}>
                   <div>
                     <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Favourites</p>
@@ -3614,7 +3636,17 @@ export default function FocusLogApp({ api }: any) {
           );
           const secBestTime = () => (
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
-                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Best time of day</h3>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+                  <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>Best time of day</h3>
+                  <InfoHover C={C} label="about best time of day" width={330}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Best time of day</div>
+                    <div>The average after-rating (1{"\u2013"}5) of your pomodoros in each band; the green bar is your best.</div>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                      <li>Bands follow the My-day settings: morning until \u201CMorning ends\u201D, afternoon until \u201CAfternoon ends\u201D, evening after.</li>
+                      <li>The {"\u{1F345}"} count beside each bar is the sample size {"\u2014"} small samples wobble.</li>
+                    </ul>
+                  </InfoHover>
+                </div>
                 {!bestBand ? (
                   <p style={{ color: C.muted, fontSize: 13 }}>Not enough data yet.</p>
                 ) : (
@@ -3653,11 +3685,17 @@ export default function FocusLogApp({ api }: any) {
             daySess.forEach((s: any) => { groupsCu[isOvernight(s.ts, settings) ? 0 : bandOf(s.ts, settings)].push(s); });
             const missing = daySess.filter(unnamed).length;
             const saveName = (id: any) => {
+              const cur = sessions.find((x: any) => x.id === id);
               const v = (cuEdit && cuEdit.id === id ? cuEdit.v : "").trim();
               setCuEdit(null);
-              if (!v) return;
+              if (!cur || !v || v === (cur.task || "")) return;
               const next = sessions.map((s: any) => (s.id === id ? { ...s, task: v } : s));
               setSessions(next); api.saveSessions && api.saveSessions(next);
+              // the daily note follows: the old block is swapped for the new one when it still
+              // matches what the logger wrote (a hand-edited line is left alone).
+              if (api.renameDaily) api.renameDaily({ ts: +new Date(cur.ts), minutes: cur.minutes || 25, oldTask: cur.task || "", newTask: v, hierarchy: cur.hierarchy || "", note: cur.note || "", category: cur.category || null })
+                .then((ok: boolean) => { api.notify && api.notify(ok ? "Renamed \u2014 daily note updated." : "Renamed. The daily-note line looked different, so it was left as is."); })
+                .catch(() => {});
             };
             return (
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
@@ -3677,16 +3715,17 @@ export default function FocusLogApp({ api }: any) {
                           {list.map((s: any) => (
                             <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 11px", borderRadius: 8, background: "#fdfbf5", border: `1px solid ${C.line}`, fontSize: 13, color: C.ink }}>
                               {isOvernight(s.ts, settings) && <span title="an overnight head start — done after the day started, before morning began" style={{ color: OVERNIGHT_COLOR, display: "inline-flex", flexShrink: 0 }}><StarIcon size={13} /></span>}
-                              {!unnamed(s) ? (
-                                <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{stripLeadingTag(s.task)}</span>
-                              ) : cuEdit && cuEdit.id === s.id ? (
+                              {cuEdit && cuEdit.id === s.id ? null : !unnamed(s) ? (
+                                <span role="button" title="click to rename; the daily note follows" onClick={() => setCuEdit({ id: s.id, v: s.task })} style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", cursor: "pointer" }}>{stripLeadingTag(s.task)}</span>
+                              ) : null}
+                              {cuEdit && cuEdit.id === s.id ? (
                                 <input autoFocus list="fl-catchup-tasks" value={cuEdit.v} onChange={(e) => setCuEdit({ id: s.id, v: e.target.value })}
                                   onKeyDown={(e) => { if (e.key === "Enter") saveName(s.id); if (e.key === "Escape") setCuEdit(null); }}
                                   onBlur={() => saveName(s.id)} placeholder="what was this one for?"
                                   style={{ flex: 1, minWidth: 120, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 6, padding: "4px 8px", fontFamily: "var(--fl-display)" }} />
-                              ) : (
+                              ) : unnamed(s) ? (
                                 <button onClick={() => setCuEdit({ id: s.id, v: "" })} style={{ flex: 1, textAlign: "left", border: `1.5px dashed ${C.faint}`, background: "transparent", color: C.muted, boxShadow: "none", borderRadius: 999, padding: "3px 11px", fontSize: 12.5, fontFamily: "var(--fl-display)", cursor: "pointer" }}>name this pomodoro…</button>
-                              )}
+                              ) : null}
                             </div>
                           ))}
                         </div>
@@ -3709,7 +3748,8 @@ export default function FocusLogApp({ api }: any) {
                     <div style={{ fontWeight: 700, marginBottom: 4 }}>Today</div>
                     <div>Every pomodoro of the day, grouped morning / afternoon / evening, oldest first — a quick catch-up for the ones that ran unnamed.</div>
                     <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-                      <li><b>name this pomodoro{"\u2026"}</b>: an unnamed run (it logged as plain "Focus"); click, pick a task or type one, and Enter or a click away saves. Open until tomorrow morning.</li>
+                      <li><b>name this pomodoro{"\u2026"}</b>: an unnamed run; click, pick a task or type one, and Enter or a click away saves. Named ones can be renamed the same way {"\u2014"} click the name. Open until tomorrow morning.</li>
+                      <li>A rename also rewrites that pomodoro's line in the daily note, as long as the line still matches what was written.</li>
                       <li><b style={{ color: "#D9A521" }}>{"\u2B50"} star</b>: an overnight head start, done after the day began but before morning — it counts toward the day it leads into, like the Calendar's yellow squares.</li>
                       <li>Naming only changes the local log; nothing is written back to Notion.</li>
                     </ul>
