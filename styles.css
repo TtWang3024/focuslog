@@ -62,7 +62,6 @@
 .workspace-leaf-content[data-type="focuslog-view"] .fl-collapse { display: none !important; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-act-row:hover .fl-collapse { display: inline-flex !important; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-rowdel:hover { color: #C06A57 !important; }
-.workspace-leaf-content[data-type="focuslog-view"] .fl-thought:hover .fl-rowact,
 .workspace-leaf-content[data-type="focuslog-view"] .fl-btag:hover .fl-rowact { opacity: 0.65; }
 /* Spinning refresh icon while a Notion sync is in flight. */
 @keyframes fl-spin { to { transform: rotate(360deg); } }
@@ -97,7 +96,24 @@ body.focuslog-float-window .focuslog-float .flt-celebrate .flt-rate,
 body.focuslog-float-window .focuslog-float .flt-celebrate .flt-open-form,
 body.focuslog-float-window .focuslog-float .flt-celebrate .flt-cclose { -webkit-app-region: no-drag; }
 
-/* Restart→Reflect countdown: covers the whole float so everything beneath is unclickable. */
+/* Guided urge surf: the breathing circle pulses at a slow natural pace (4s in, 4s out). */
+.fl-breath { width: 46px; height: 46px; flex-shrink: 0; border-radius: 50%; background: #DCEAF6; border: 1.5px solid #3E78B2; animation: fl-breathe 8s ease-in-out infinite; }
+@keyframes fl-breathe { 0%, 100% { transform: scale(0.72); } 50% { transform: scale(1); } }
+
+/* Urge-surfing wave button: solid sea-wave glyph, always sea blue; filled chip while riding.
+   Shape and glyph size are inherited from .flt-icon, so it is the reset button's twin. */
+.focuslog-float .flt-btn.flt-urge { color: #3E78B2; }
+.focuslog-float .flt-btn.flt-urge.is-on { background: #DCEAF6; border-color: #3E78B2; color: #3E78B2; font-variant-numeric: tabular-nums; }
+
+/* The surf's Wave / Body / Emotions panes share one 320px slot, so the three decisions below
+   never move when you switch. The sizing is scoped here rather than baked into BodyMap and
+   MoodGrid themselves: the rabbit is sized by HEIGHT (making the
+   match exact, ~155px wide), and the mood cells are pinned to 160px × 2 rows = 320px. */
+.fl-surf-pane .fl-bodymap-fig { flex: 0 0 auto; width: auto; height: 320px; }
+.fl-surf-pane .fl-bodymap-fig img { width: auto; height: 100%; }
+.fl-surf-pane .fl-cx-cell { min-height: 0; height: 160px; box-sizing: border-box; padding: 16px; }
+
+/* Restart→urge-surf countdown: covers the whole float so everything beneath is unclickable. */
 .flt-rc { position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: var(--background-primary); }
 .flt-rc.is-on { display: flex; }
 .flt-rc-title { font-size: 12px; color: var(--text-muted); }
@@ -173,13 +189,13 @@ body.focuslog-float-window .notice { display: none !important; }
 .focuslog-float .flt-btn:disabled { opacity: 0.4; cursor: default; }
 .focuslog-float .flt-btn svg { width: 18px; height: 18px; display: block; }
 .focuslog-float .flt-btn.flt-step { padding: 4px; line-height: 0; }
-.focuslog-float .flt-btn.flt-step svg { width: 22px; height: 22px; }
+.focuslog-float .flt-btn.flt-step svg { width: 12px; height: 12px; }
 .focuslog-float .flt-btn.flt-icon { padding: 5.5px 11px; border-color: #cfc7b8; color: #8a8175; }
 .focuslog-float .flt-btn.flt-icon:hover { background: #f3eee3; }
 .focuslog-float .flt-btn.flt-brk-toggle { background: #2b2723; color: #fdfbf6; border-color: #2b2723; }
 .focuslog-float .flt-btn.flt-brk-toggle:hover { background: #423b34; }
-.focuslog-float .flt-btn.flt-primary { background: #2b2723; color: #fdfbf6; border-color: #2b2723; padding: 5.5px 18px; }
-.focuslog-float .flt-btn.flt-primary:hover { background: #423b34; }
+.focuslog-float .flt-btn.flt-primary { background: #C57B5A; color: #fdfbf6; border-color: #C57B5A; padding: 5.5px 18px; }
+.focuslog-float .flt-btn.flt-primary:hover { background: #B56C4C; }
 
 .focuslog-float .flt-flash {
   /* Bottom of the window — the top is where the macOS traffic lights sit. */
@@ -353,8 +369,7 @@ body.focuslog-float-window .notice { display: none !important; }
 @keyframes fl-pop { from { transform: scale(0.2) rotate(-20deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
 @keyframes fl-fall { 0% { transform: translateY(0) rotate(0); opacity: 1; } 100% { transform: translateY(240px) rotate(460deg); opacity: 0; } }
 
-/* ---------- Pause reflection: mood circumplex (ported from Hold to Pause) ---------- */
-.fl-reflect button { text-decoration: none; }
+/* ---------- Urge surf, Emotions tab: mood circumplex (ported from Hold to Pause) ---------- */
 .fl-cx { position: relative; --cx-line: #3a3a3a; }
 .fl-cx-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: 1fr 1fr; gap: 0; border-radius: 14px; overflow: hidden; }
 /* double-headed dark-grey axis arrows, overlaid through the centre */
@@ -377,16 +392,7 @@ body.focuslog-float-window .notice { display: none !important; }
 .fl-cx-chip { font-family: var(--fl-display); font-size: 13px; padding: 5px 11px; border-radius: 16px; background: #fff; border: 1.5px solid; cursor: default; font-weight: 600; line-height: 1.2; max-width: 100%; box-sizing: border-box; text-align: center; overflow-wrap: anywhere; }
 .fl-cx-chip.on { color: #fff !important; }
 
-/* Thought pills: text dead-centre; the bin fades in on hover in a reserved right slot, balanced by a left spacer. */
-.fl-thought {
-  display: inline-grid; grid-template-columns: 14px 1fr 14px; align-items: center; gap: 3px;
-  padding: 1px 8px; border-radius: 999px; background: #fff; border: 2.25px solid;
-  font-family: var(--fl-display); font-size: 12.5px; font-weight: 600; color: #2b2723; line-height: 1.2;
-}
-.fl-thought .fl-thought-text { grid-column: 2; text-align: center; white-space: nowrap; }
-.fl-thought .fl-rowact { grid-column: 3; justify-self: center; padding: 0; color: #8a8175; display: inline-flex; align-items: center; cursor: default; }
-
-/* ---------- Pause reflection: body map (ported from Hold to Pause) ---------- */
+/* ---------- Urge surf, Body tab: body map (ported from Hold to Pause) ---------- */
 .fl-bodymap { display: flex; gap: 14px; align-items: flex-start; }
 .fl-bodymap-fig { position: relative; flex: 0 0 170px; width: 170px; touch-action: none; }
 .fl-bodymap-fig img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; -webkit-user-drag: none; }

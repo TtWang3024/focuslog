@@ -4,9 +4,13 @@ import { createRoot, Root } from "react-dom/client";
 import FocusLogApp, { MACARON, MODE_COLORS, darken, fmtHM, parseHM, BREAK_SEASONS } from "./FocusLogApp";
 import { newestStarName } from "./skymap";
 
-// Lucide minus/plus for the float's stepper buttons (sized by the .flt-btn svg rule).
-const FLT_MINUS = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>`;
-const FLT_PLUS = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`;
+// Solid glyphs for the float's controls (sized by the .flt-btn svg rule): minus/plus steppers,
+// play/pause for the primary and break toggles, and a bold rotate-left for reset.
+const FLT_MINUS = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 512 512" fill="currentColor"><path d="M480,288H32c-17.673,0-32-14.327-32-32s14.327-32,32-32h448c17.673,0,32,14.327,32,32S497.673,288,480,288z"/></svg>`;
+const FLT_PLUS = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 512 512" fill="currentColor"><path d="M480,224H288V32c0-17.673-14.327-32-32-32s-32,14.327-32,32v192H32c-17.673,0-32,14.327-32,32s14.327,32,32,32h192v192c0,17.673,14.327,32,32,32s32-14.327,32-32V288h192c17.673,0,32-14.327,32-32S497.673,224,480,224z"/></svg>`;
+const FLT_PLAY = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.492,7.969,10.954.975A5,5,0,0,0,3,5.005V19a4.994,4.994,0,0,0,7.954,4.03l9.538-6.994a5,5,0,0,0,0-8.062Z"/></svg>`;
+const FLT_PAUSE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6.5,0A3.5,3.5,0,0,0,3,3.5v17a3.5,3.5,0,0,0,7,0V3.5A3.5,3.5,0,0,0,6.5,0Z"/><path d="M17.5,0A3.5,3.5,0,0,0,14,3.5v17a3.5,3.5,0,0,0,7,0V3.5A3.5,3.5,0,0,0,17.5,0Z"/></svg>`;
+const FLT_ROTATE_LEFT = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M1.611,12c.759,0,1.375,.57,1.485,1.32,.641,4.339,4.389,7.68,8.903,7.68,5.476,0,9.827-4.917,8.867-10.569-.453-2.665-2.148-5.023-4.523-6.313-3.506-1.903-7.48-1.253-10.18,1.045l1.13,1.13c.63,.63,.184,1.707-.707,1.707H2c-.552,0-1-.448-1-1V2.414c0-.891,1.077-1.337,1.707-.707l1.332,1.332C7.6-.115,12.921-1.068,17.637,1.408c3.32,1.743,5.664,5.027,6.223,8.735,1.122,7.437-4.633,13.857-11.86,13.857-6.021,0-11.021-4.457-11.872-10.246-.135-.92,.553-1.754,1.483-1.754Z"/></svg>`;
 import starImg from "./assets/star.png";
 import rateRain from "./assets/rate-rain.png";
 import rateClouds from "./assets/rate-clouds.png";
@@ -14,6 +18,8 @@ import ratePartly from "./assets/rate-partly-sunny.png";
 import rateSun from "./assets/rate-sun.png";
 
 export const VIEW_TYPE = "focuslog-view";
+// Solid sea-wave glyph for the float's urge button (inline SVG; no icon font is bundled).
+const SEA_WAVE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="m6.5 9c-3.006 0-6.5 1.747-6.5 4 0 1.103.897 2 2 2 .415 0 .8-.127 1.12-.344.273.78 1.008 1.344 1.88 1.344.798 0 1.483-.473 1.804-1.15.782.779 1.196 1.829 1.196 3.15 0 2.198-1.794 3.987-4 3.987-.875 0-1.68-.276-2.392-.821-.438-.334-1.065-.254-1.402.187-.336.438-.252 1.066.186 1.401 1.054.806 2.301 1.233 3.606 1.233l11 .013c.334 0 .646-.167.832-.445.048-.071 1.168-1.784 1.168-4.555 0-5.607-4.612-10-10.5-10zm16.621 13.391-.136.78c-.083.479-.499.829-.985.829h-4.132c.451-.897 1.132-2.632 1.132-5 0-4.159-2.101-7.756-5.357-9.901-.564-1.793-1.752-2.992-3.182-3.71-.182.917-.991 1.611-1.961 1.611-1.009 0-1.837-.753-1.972-1.725-.367.439-.912.725-1.528.725-1.103 0-2-.897-2-2 .006-.459.178-.929.469-1.272.965-1.37 3.401-2.728 7.09-2.728 7.565 0 13.492 5.603 13.492 12.755.148 3.468-.4 6.603-.931 9.635z"/></svg>`;
 export const VIEW_TYPE_FLOAT = "focuslog-float";
 const NOTION_VERSION = "2022-06-28";
 // The enjoyment scale is 1-4 weather buttons, shared verbatim with the React panel's
@@ -78,7 +84,9 @@ export interface FocusLogSettings {
   dinnerEnabled: boolean;
   dinnerStart: number;
   dinnerMinutes: number;
-  nightRoutineGap: number;
+  nightRoutineGap: number;       // retired from the UI (was "starts N min after dinner"); still read once to seed nightRoutineStarts
+  morningRoutineEnds: number;    // the Plan list's morning phase ends here, and counted pomodoro room begins
+  nightRoutineStarts: number;    // the night phase begins here, and counted pomodoro room stops
   routineGroupMinutes: number;
   addBlockEnabled: boolean;
   showAreaTimeline: boolean;
@@ -115,6 +123,7 @@ export interface FocusLogSettings {
   morningBegins: number;
   dayEnds: number;
   longBreakMinutes: number;
+  urgeSurfMinutes: number;
   longBreakEvery: number;
   timeFmtV2: boolean;
   workDays: boolean[];
@@ -139,6 +148,8 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   dinnerStart: 1110,
   dinnerMinutes: 45,
   nightRoutineGap: 60,
+  morningRoutineEnds: 540,
+  nightRoutineStarts: 1215,
   routineGroupMinutes: 25,
   addBlockEnabled: false,
   showAreaTimeline: true,
@@ -176,6 +187,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   morningBegins: 480,
   dayEnds: 1380,
   longBreakMinutes: 20,
+  urgeSurfMinutes: 5,
   longBreakEvery: 3,
   timeFmtV2: true,
   workDays: [true, true, true, true, true, true, true],
@@ -220,7 +232,7 @@ const DEFAULT_RELAX_NIGHT = [
   { id: "rn-read", name: "Read for fun" },
 ];
 
-// Default valence/arousal feeling vocabulary for the pause reflection (ported from Hold to Pause).
+// Default valence/arousal feeling vocabulary for the urge surf's Emotions tab (ported from Hold to Pause).
 const DEFAULT_FEELINGS: any = {
   tl: ["vexation", "distress", "panic", "rage", "anger", "tension", "frustration", "worry"],
   tr: ["excitement", "joy", "delight", "amazement", "surprise"],
@@ -237,7 +249,7 @@ interface PluginData {
   pauseTags: any[];
   pauses: any[];
   breaks: any[];
-  reflections: any[];
+  reflections: any[];        // retired with the Reflect view; kept so persist() never drops old saves
   calibrations: any[];
   areaOptions: string[];
   quickParents: { id: string; name: string }[];
@@ -249,6 +261,10 @@ interface PluginData {
   routineDone: { [dayKey: string]: string[] };
   modeOverride: { [dayKey: string]: string };
   plans: { [dayKey: string]: any[] };
+  doneToday: any[];
+  urgesSurfed: any[];
+  timerRun: any;             // the live pomodoro mirrored to disk, so a quit loses nothing
+  floatWasOpen: boolean;     // the float was up at quit, so the next launch reopens it properly
 }
 
 // ---------- Notion property parsing ----------
@@ -389,6 +405,8 @@ interface TimerState {
   pauseTag: string;          // the reason chosen for the current pause
   expected: number;          // the "before" enjoyment rating (1-5), carried so a quick-log has it
   // ----- break phase (shared with the panel + the floating window's closed loop) -----
+  adopted: boolean;          // this run was re-adopted from disk after an app quit
+  finishedAt: number | null; // wall-clock ms when the pomodoro hit 00:00 (null unless finished)
   breakActive: boolean;      // a break is in progress (running, paused, or finished-awaiting-dismiss)
   breakRunning: boolean;     // the break countdown is ticking
   breakFinished: boolean;    // the break hit 0 (kept up so its activities/feeling can still be set)
@@ -424,6 +442,7 @@ class TimerEngine {
   private iv: number | null = null;
   private fired: Record<number, boolean> = {};
   private subs = new Set<() => void>();
+  private adoptedRun = false;   // the current run came back from disk after an app quit
 
   constructor(private plugin: FocusLogPlugin, lengthMin: number) {
     this.lengthMin = Math.max(5, Math.min(30, Math.round(lengthMin) || 25));
@@ -445,19 +464,96 @@ class TimerEngine {
     return Math.max(0, this.breakFrozen);
   }
 
+  private finishedAtMs(): number | null {
+    return (this.startedAt != null && !this.running && !this.paused && this.frozenSecs === 0 && this.endTs > 0) ? this.endTs : null;
+  }
+  // What a quit must not lose: everything needed to rebuild this run from the wall clock.
+  private runSnapshot(): any {
+    if (this.startedAt == null && !this.running && !this.paused && !this.breakActive) return null;
+    return { running: this.running, paused: this.paused, endTs: this.endTs, frozenSecs: this.frozenSecs,
+      total: this.total, lengthMin: this.lengthMin, task: this.taskName, expected: this.expected,
+      startedAt: this.startedAt, pauseStart: this.pauseStart, pauseTag: this.pauseTag,
+      brk: this.breakActive ? { active: true, running: this.breakRunning, finished: this.breakFinished,
+        endTs: this.breakEndTs, frozen: this.breakRunning ? this.breakSecsNow() : this.breakFrozen,
+        total: this.breakTotal, start: this.breakStart, picked: this.breakPicked.slice(), feeling: this.breakFeeling } : null };
+  }
+  private pushSnap() { this.plugin.saveTimerRun(this.runSnapshot()); }
+  // Re-adopt a run persisted before the last quit. The engine is wall-clock based, so the
+  // remaining time falls straight out of endTs; a deadline that passed while Obsidian was
+  // closed lands on the finished screen, to be rated late and logged at its real end time.
+  adopt(run: any): "running" | "paused" | "finished" | "break-running" | "break-paused" | "break-finished" | null {
+    if (!run) return null;
+    let kind: "running" | "paused" | "finished" | null = null;
+    if (run.startedAt != null) {
+      this.lengthMin = Math.max(5, Math.min(30, Math.round(run.lengthMin) || this.lengthMin));
+      this.total = run.total || this.lengthMin * 60;
+      this.taskName = run.task || "";
+      this.expected = run.expected || 0;
+      this.startedAt = run.startedAt;
+      this.pauseStart = run.pauseStart ?? null;
+      this.pauseTag = run.pauseTag || "";
+      this.adoptedRun = true;
+      if (run.running && Date.now() < run.endTs) {
+        this.endTs = run.endTs;
+        this.running = true; this.paused = false;
+        // milestones crossed before the quit must not re-fire as stale notices
+        const s = this.secsNow();
+        [900, 600, 300].forEach((m) => { if (s <= m) this.fired[m] = true; });
+        this.ensureTick();
+        kind = "running";
+      } else if (run.paused && (run.frozenSecs || 0) > 0) {
+        this.frozenSecs = run.frozenSecs;
+        this.paused = true; this.running = false;
+        kind = "paused";
+      } else {
+        // It ended while we were away, or was already sitting finished at quit: freeze at
+        // 00:00 with the deadline kept, so the rate step logs the real end time.
+        this.endTs = run.endTs || Date.now();
+        this.frozenSecs = 0; this.running = false; this.paused = false;
+        this.fired[0] = true;   // that finish already happened; no late celebration
+        kind = "finished";
+      }
+    }
+    let bk: "break-running" | "break-paused" | "break-finished" | null = null;
+    const b = run.brk;
+    if (b && b.active) {
+      this.breakTotal = b.total || 0;
+      this.breakStart = b.start || Date.now();
+      this.breakPicked = Array.isArray(b.picked) ? b.picked.slice(0, 3) : [];
+      this.breakFeeling = b.feeling ?? null;
+      this.breakActive = true;
+      this.adoptedRun = true;
+      if (b.running && Date.now() < b.endTs) {
+        this.breakEndTs = b.endTs; this.breakRunning = true; this.breakFinished = false;
+        this.ensureTick();
+        bk = "break-running";
+      } else if (b.running || b.finished) {
+        // it ran out while we were away, or was already on the finished face at quit
+        this.breakEndTs = b.endTs || 0;
+        this.breakFrozen = 0; this.breakRunning = false; this.breakFinished = true;
+        bk = "break-finished";
+      } else {
+        this.breakFrozen = Math.max(0, b.frozen || 0); this.breakRunning = false; this.breakFinished = false;
+        bk = "break-paused";
+      }
+    }
+    if (kind || bk) this.emit();
+    return kind || bk;
+  }
   getState(): TimerState {
     return {
       secs: this.secsNow(), total: this.total, running: this.running, paused: this.paused, lengthMin: this.lengthMin, taskName: this.taskName, startedAt: this.startedAt, pauseStart: this.pauseStart, pauseTag: this.pauseTag, expected: this.expected,
+      adopted: this.adoptedRun, finishedAt: this.finishedAtMs(),
       breakActive: this.breakActive, breakRunning: this.breakRunning, breakFinished: this.breakFinished, breakSecs: this.breakSecsNow(), breakTotal: this.breakTotal, breakStart: this.breakStart, breakPicked: this.breakPicked.slice(), breakFeeling: this.breakFeeling,
     };
   }
-  setPauseTag(tag: string) { this.pauseTag = tag || ""; this.emit(); }
+  setPauseTag(tag: string) { this.pauseTag = tag || ""; this.emit(); this.pushSnap(); }
   // The panel's "before" rating; kept on the engine so a quick-log from the float window
   // (which never shows a before-section) still records the expectation the user set.
-  setExpected(n: number) { this.expected = (n >= 1 && n <= 4) ? Math.round(n) : 0; this.emit(); }
+  setExpected(n: number) { this.expected = (n >= 1 && n <= 4) ? Math.round(n) : 0; this.emit(); this.pushSnap(); }
   // Pre-select the task for the next pomodoro (e.g. chosen on the float celebration)
   // without starting the timer; both windows show it as the upcoming task.
-  setTask(name: string) { this.taskName = (name || "").trim(); this.emit(); }
+  setTask(name: string) { this.taskName = (name || "").trim(); this.emit(); this.pushSnap(); }
   // Write the pending pause (its event + daily-note block) if one is open, then clear
   // it. Called when resuming, and when logging a pomodoro mid-pause.
   commitPendingPause() {
@@ -504,6 +600,7 @@ class TimerEngine {
     this.paused = false;
     this.ensureTick();
     this.emit();
+    this.pushSnap();
     if (fresh) this.plugin.onTimerStarted();
   }
   pause() {
@@ -515,6 +612,7 @@ class TimerEngine {
     this.pauseTag = "";
     this.stopTick();
     this.emit();
+    this.pushSnap();
   }
   resume() { this.start(); }
   reset() {
@@ -528,6 +626,8 @@ class TimerEngine {
     this.frozenSecs = this.total;
     this.endTs = 0;
     this.startedAt = null;
+    this.adoptedRun = false;
+    this.pushSnap();   // startedAt is null now, so this clears the on-disk run
     this.taskName = "";
     this.expected = 0;
     this.pauseStart = null;
@@ -565,12 +665,14 @@ class TimerEngine {
       this.breakRunning = false;
     }
     this.emit();
+    this.pushSnap();
   }
   toggleBreakRun() {
     if (!this.breakActive || this.breakFinished) return;
     if (this.breakRunning) { this.breakFrozen = this.breakSecsNow(); this.breakRunning = false; this.stopTick(); }
     else { this.breakEndTs = Date.now() + Math.max(1, this.breakFrozen) * 1000; this.breakRunning = true; this.ensureTick(); }
     this.emit();
+    this.pushSnap();
   }
   stepBreak(deltaMin: number) {
     if (!this.breakActive) return;
@@ -579,17 +681,22 @@ class TimerEngine {
     this.breakFinished = false;
     if (this.breakRunning) this.breakEndTs = Date.now() + next * 1000;
     this.emit();
+    this.pushSnap();
   }
   toggleBreakPick(id: string) {
     if (this.breakPicked.includes(id)) this.breakPicked = this.breakPicked.filter((x) => x !== id);
     else if (this.breakPicked.length < 3) this.breakPicked = [...this.breakPicked, id];
     this.emit();
+    this.pushSnap();
   }
-  setBreakFeeling(n: number) { this.breakFeeling = Math.max(1, Math.min(4, Math.round(n) || 2)); this.emit(); }   // 1-4 = the four seasons (Spring..Winter)
+  setBreakFeeling(n: number) { this.breakFeeling = Math.max(1, Math.min(4, Math.round(n) || 2)); this.emit(); this.pushSnap(); }   // 1-4 = the four seasons (Spring..Winter)
   // Commit the break (activities + feeling → the breaks log via the plugin) and clear
   // the phase. Called when the user ends/skips the break, closing the loop back to setup.
   endBreak() {
-    if (this.breakActive && this.breakStart) this.plugin.commitBreak(this.breakStart, Date.now(), this.breakPicked.slice(), this.breakFeeling);
+    // A break that already hit 00:00 ended AT its deadline, not when this button was finally
+    // pressed — without the clamp, a finished break dismissed the next morning records hours.
+    const endedAt = (this.breakFinished && this.breakEndTs > 0) ? Math.min(Date.now(), this.breakEndTs) : Date.now();
+    if (this.breakActive && this.breakStart) this.plugin.commitBreak(this.breakStart, endedAt, this.breakPicked.slice(), this.breakFeeling);
     this.breakActive = false;
     this.breakRunning = false;
     this.breakFinished = false;
@@ -600,6 +707,7 @@ class TimerEngine {
     this.breakEndTs = 0;
     this.stopTick();
     this.emit();
+    this.pushSnap();
   }
 
   // Emit only when the DISPLAYED second flips: polls can arrive at several Hz from two windows
@@ -643,6 +751,7 @@ class TimerEngine {
         this.stopTick();
         this.emit();
         this.plugin.timerDone();
+        this.pushSnap();   // the finished screen survives a quit before it is rated
         return;
       }
       if (s !== this.lastPollSecs) { this.lastPollSecs = s; changed = true; }
@@ -652,6 +761,7 @@ class TimerEngine {
         this.breakFrozen = 0;
         this.breakRunning = false;
         this.breakFinished = true;
+        this.pushSnap();
         this.stopTick();
         this.emit();
         this.plugin.breakDone();
@@ -694,6 +804,10 @@ export default class FocusLogPlugin extends Plugin {
       calibrations: loaded.calibrations || [],
       areaOptions: loaded.areaOptions || [],
       quickParents: loaded.quickParents || [],
+      doneToday: loaded.doneToday || [],
+      urgesSurfed: loaded.urgesSurfed || [],
+      timerRun: loaded.timerRun ?? null,
+      floatWasOpen: !!loaded.floatWasOpen,
       feelings: loaded.feelings || JSON.parse(JSON.stringify(DEFAULT_FEELINGS)),
       morningRoutine: loaded.morningRoutine || DEFAULT_MORNING.map((a) => ({ ...a })),
       nightRoutine: loaded.nightRoutine || DEFAULT_NIGHT.map((a) => ({ ...a })),
@@ -718,6 +832,16 @@ export default class FocusLogPlugin extends Plugin {
     // Migrate the day/time-band settings from whole hours to minutes-from-midnight (one
     // time). Old configs stored e.g. dayStart: 4; the code now expects 240. Persist the
     // flag right away so a reload before any later save can't double-convert.
+    // The routine boundaries used to be derived (morning: Morning-begins + the routine's summed
+    // minutes; night: dinner end + the old gap). Seed the new explicit settings from those same
+    // formulas, so the Plan phases and the pomodoro counter keep today's behaviour until edited.
+    if (loaded.settings && (loaded.settings as any).morningRoutineEnds == null) {
+      const s = this.data.settings;
+      const morningSum = (this.data.morningRoutine || []).reduce((a: number, it: any) => a + (it.dur || 25), 0);
+      s.morningRoutineEnds = (s.morningBegins ?? 480) + (morningSum || 60);
+      s.nightRoutineStarts = s.dinnerEnabled ? (s.dinnerStart ?? 1110) + (s.dinnerMinutes ?? 45) + (s.nightRoutineGap ?? 60) : 1215;
+      await this.persist();
+    }
     if (loaded.settings && !loaded.settings.timeFmtV2) {
       for (const k of ["dayStart", "morningBegins", "dayEnds", "morningEnd", "afternoonEnd"] as const) {
         const v = (this.data.settings as any)[k];
@@ -730,6 +854,15 @@ export default class FocusLogPlugin extends Plugin {
     }
 
     this.timer = new TimerEngine(this, this.data.settings.pomodoroMinutes);
+    // Pick back up whatever was running when Obsidian last quit: a still-live run resumes on
+    // the wall clock; one whose time passed while away opens on the finished screen instead.
+    {
+      const kind = this.timer.adopt(this.data.timerRun);
+      if (kind === "running") this.timerNotify("Picked your pomodoro back up \u2014 " + Math.max(1, Math.ceil(this.timer.getState().secs / 60)) + " min left.");
+      else if (kind === "finished") this.timerNotify("A pomodoro finished while you were away. Rate it when you're ready \u2014 it still counts.");
+      else if (kind === "break-running") this.timerNotify("Picked your break back up \u2014 " + Math.max(1, Math.ceil(this.timer.getState().breakSecs / 60)) + " min left.");
+      else if (kind === "break-finished") this.timerNotify("Your break ended while you were away.");
+    }
     // When the main window is revealed again, recompute at once so any alert or
     // finish that came due while it was hidden (and its timers throttled) fires.
     this.registerDomEvent(document, "visibilitychange", () => { if (!document.hidden) this.timer.poll(); });
@@ -738,7 +871,16 @@ export default class FocusLogPlugin extends Plugin {
     this.registerEvent(this.app.workspace.on("window-open", () => this.onFloatWindowOpen()));
     // The Month calendar's chocolate outline follows the daily note you focus (today when none is).
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.updateActiveDaily()));
-    this.app.workspace.onLayoutReady(() => this.updateActiveDaily());
+    this.app.workspace.onLayoutReady(() => {
+      this.updateActiveDaily();
+      // A float popout restored from the last session's layout comes back as a plain centered
+      // window — never through our hide → size → reveal path — and its leaf is exactly where
+      // "open daily note on startup" likes to land. Close every remnant, then reopen the float
+      // properly if it was up at quit.
+      this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT).forEach((l) => l.detach());
+      this.closeFloatRemnants();
+      if (this.data.floatWasOpen) this.openFloating();
+    });
 
     this.registerView(VIEW_TYPE, (leaf) => new FocusLogView(leaf, this));
     this.registerView(VIEW_TYPE_FLOAT, (leaf) => new FloatTimerView(leaf, this));
@@ -751,7 +893,9 @@ export default class FocusLogPlugin extends Plugin {
     this.addSettingTab(new FocusLogSettingTab(this.app, this));
   }
 
+  unloading = false;   // distinguishes app-quit/plugin-reload teardown from the user closing the float
   onunload() {
+    this.unloading = true;
     this.timer?.dispose();
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_FLOAT);
   }
@@ -954,7 +1098,10 @@ export default class FocusLogPlugin extends Plugin {
     const live = leaves.find((l) => { const w = (l.view as any)?.containerEl?.win; return w && !w.closed; });
     if (live) {
       this.app.workspace.revealLeaf(live);
-      this.pinFloatWindow(false);
+      // true = also size and place: for a same-session reveal this re-applies the current
+      // bounds (a no-op); for a leaf restored by Obsidian it is the missing sizing pass.
+      this.pinFloatWindow(true);
+      this.data.floatWasOpen = true; void this.persist();
       return;
     }
     leaves.forEach((l) => l.detach());
@@ -978,6 +1125,7 @@ export default class FocusLogPlugin extends Plugin {
       this.pinFloatWindow(true);
       try { if (this.floatWin && this.floatWin.setOpacity) this.floatWin.setOpacity(1); } catch {}
     }, 90);
+    this.data.floatWasOpen = true; void this.persist();
   }
 
   // Fires from workspace "window-open". If this popout is the one we just asked for,
@@ -999,8 +1147,29 @@ export default class FocusLogPlugin extends Plugin {
     } catch {}
   }
 
+  // A restored float popout whose leaf was hijacked (e.g. by the startup daily note) is no
+  // longer our view type, so it must be recognised by its window instead: a tiny popout the
+  // exact size of a remembered float phase. Ordinary popouts are nowhere near these sizes.
+  private closeFloatRemnants() {
+    const sizes: any[] = Object.values(FLOAT_PHASE_DEFAULTS);
+    const pb = this.data.settings.floatPhaseBounds || {};
+    Object.keys(pb).forEach((k) => { if (pb[k]) sizes.push(pb[k]); });
+    if (this.data.settings.floatBounds) sizes.push(this.data.settings.floatBounds);
+    const doomed: any[] = [];
+    this.app.workspace.iterateAllLeaves((l: any) => {
+      try {
+        const w = l.view?.containerEl?.win;
+        if (!w || w === window || w.closed) return;
+        if (l.getViewState && l.getViewState().type === VIEW_TYPE_FLOAT) return;   // handled by the detach above
+        if (sizes.some((b: any) => Math.abs((b.w || 0) - w.outerWidth) <= 26 && Math.abs((b.h || 0) - w.outerHeight) <= 26)) doomed.push(l);
+      } catch {}
+    });
+    doomed.forEach((l) => { try { l.detach(); } catch {} });
+  }
+
   closeFloating() {
     this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT).forEach((l) => l.detach());
+    this.data.floatWasOpen = false; void this.persist();
   }
   toggleFloating() {
     const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT);
@@ -1111,6 +1280,12 @@ export default class FocusLogPlugin extends Plugin {
     // log view) — no extra modal. Fall back to the modal only if there's no float.
     if (this.isFloatingOpen()) this.floatView()?.celebrate();
     else new CelebrateModal(this.app).open();
+  }
+
+  // The engine mirrors its live run here on every state change; null clears it.
+  saveTimerRun(snap: any) {
+    this.data.timerRun = snap ?? null;
+    void this.persist();
   }
 
   async persist() {
@@ -1245,9 +1420,9 @@ export default class FocusLogPlugin extends Plugin {
         group: h.ancestor || task,
       });
     }
-    // Preserve the user's manual ranking across syncs: tasks whose id we have not seen
-    // go to the top, ranked by urgency Must → Aim → Bonus as their default order;
-    // already-ranked ids keep their saved position.
+    // Preserve the user's manual ranking across syncs: already-ranked ids keep their saved
+    // position, and tasks whose id we have not seen join at the END of the list (ranked
+    // Must → Aim → Bonus among themselves), so a sync never reshuffles what you arranged.
     const prevIndex: Record<string, number> = {};
     (this.data.tasks || []).forEach((t: any, i: number) => { if (t && t.id != null) prevIndex[t.id] = i; });
     const POWER_RANK: Record<string, number> = { P: 0, Y: 1, G: 2 };
@@ -1260,7 +1435,7 @@ export default class FocusLogPlugin extends Plugin {
     // LOCAL tasks (created with the Timeline's add-block button) live alongside Notion tasks and
     // survive every sync, so the plugin also works without a Notion database at all.
     const locals = (this.data.tasks || []).filter((t: any) => t.local);
-    const ordered = [...fresh, ...known, ...locals];
+    const ordered = [...known, ...fresh, ...locals];
     this.data.tasks = ordered;
     await this.persist();
     return ordered;
@@ -1362,10 +1537,19 @@ export default class FocusLogPlugin extends Plugin {
   }
 
   // Set a task page's Schedule select to the resolved done value (Done moved to Schedule).
-  async setTaskDone(pageId: string): Promise<string> {
+  // Also reads and returns the PREVIOUS Schedule, so the panel's "Done today" pile can put
+  // the exact value back when the user un-finishes the task.
+  async setTaskDone(pageId: string): Promise<{ name: string; prev: string | null }> {
     const name = await this.resolveDoneStatus();
+    let prev: string | null = null;
+    try { const page = await this.notionFetch(`/pages/${pageId}`); prev = selectName(page, "Schedule"); } catch (e) {}
     await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Schedule: { select: { name } } } });
-    return name;
+    return { name, prev };
+  }
+
+  // Un-finish: put the task's Schedule back (its pre-done value, else 🌻 Today).
+  async restoreTask(pageId: string, schedule?: string | null): Promise<void> {
+    await this.notionFetch(`/pages/${pageId}`, "PATCH", { properties: { Schedule: { select: { name: schedule || "\u{1F33B} Today" } } } });
   }
 
   // Build the initial content for a newly created daily note: a template (Focus Log's, else the
@@ -1604,32 +1788,32 @@ export default class FocusLogPlugin extends Plugin {
     await this.app.vault.process(file, (data: string) => insertUnderHeading(data, this.data.settings.calibrationHeading || "Calibration", line, true));
   }
 
-  // ---------- restart → Reflect countdown ----------
+  // ---------- restart → urge-surf countdown ----------
   // Owned by the core so BOTH surfaces mirror ONE state: the float shows the countdown on its
   // own face (where the eyes are), the panel shows its overlay, cancel anywhere cancels both.
   // Deadline-based (not tick-decrement) so the main window's background throttling can't
   // stretch the five seconds — the float's unthrottled 500ms poll drives expiry when hidden.
-  reflectCountdown: { deadline: number; task: string; lastLeft: number } | null = null;
+  surfCountdown: { deadline: number; task: string; lastLeft: number } | null = null;
   private rcTimer: number | null = null;
-  reflectCountCb: ((st: { left: number; task: string } | null) => void) | null = null;
-  reflectGoCb: ((task: string) => void) | null = null;
-  beginReflectCountdown(task: string) {
+  surfCountCb: ((st: { left: number; task: string } | null) => void) | null = null;
+  surfGoCb: ((task: string) => void) | null = null;
+  beginSurfCountdown(task: string) {
     this.clearRc();
-    this.reflectCountdown = { deadline: Date.now() + 5000, task: task || "", lastLeft: 5 };
+    this.surfCountdown = { deadline: Date.now() + 5000, task: task || "", lastLeft: 5 };
     this.emitRc();
-    this.rcTimer = window.setInterval(() => this.pollReflectCountdown(), 250);
+    this.rcTimer = window.setInterval(() => this.pollSurfCountdown(), 250);
   }
-  cancelReflectCountdown() { this.clearRc(); this.emitRc(); }
+  cancelSurfCountdown() { this.clearRc(); this.emitRc(); }
   private clearRc() {
     if (this.rcTimer != null) { window.clearInterval(this.rcTimer); this.rcTimer = null; }
-    this.reflectCountdown = null;
+    this.surfCountdown = null;
   }
   private emitRc() {
-    const rc = this.reflectCountdown;
-    if (this.reflectCountCb) try { this.reflectCountCb(rc ? { left: rc.lastLeft, task: rc.task } : null); } catch (e) {}
+    const rc = this.surfCountdown;
+    if (this.surfCountCb) try { this.surfCountCb(rc ? { left: rc.lastLeft, task: rc.task } : null); } catch (e) {}
   }
-  pollReflectCountdown() {
-    const rc = this.reflectCountdown;
+  pollSurfCountdown() {
+    const rc = this.surfCountdown;
     if (!rc) return;
     const left = Math.ceil((rc.deadline - Date.now()) / 1000);
     if (left <= 0) {
@@ -1637,16 +1821,61 @@ export default class FocusLogPlugin extends Plugin {
       this.clearRc();
       this.emitRc();
       // Best-effort: bring the main window forward and reveal the panel, then hand the panel
-      // the task so it opens Reflect seeded. If the panel view is closed, nothing to reveal.
+      // the task so the surf opens over it. If the panel view is closed, nothing to reveal.
       try {
         window.focus();
         const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE);
         if (leaves.length) this.app.workspace.revealLeaf(leaves[0]);
       } catch (e) {}
-      if (this.reflectGoCb) try { this.reflectGoCb(task); } catch (e) {}
+      if (this.surfGoCb) try { this.surfGoCb(task); } catch (e) {}
       return;
     }
     if (left !== rc.lastLeft) { rc.lastLeft = left; this.emitRc(); }
+  }
+
+  // ---------- urge surfing ----------
+  // A 90-second wave, core-owned like the restart countdown: press the wave button when the
+  // itch to switch hits; the pomodoro keeps running. Outlast the wave and a surfed urge is
+  // recorded (humble count in Stats). Pausing or resetting mid-wave cancels it silently: the
+  // pause + tag flow already records that story, and no judgment is attached either way.
+  urgeWave: { deadline: number; task: string; lastLeft: number } | null = null;
+  private uwTimer: number | null = null;
+  urgeWaveCb: ((st: { left: number } | null) => void) | null = null;
+  urgeSurfedCb: ((arr: any[]) => void) | null = null;
+  beginUrgeWave() {
+    if (this.urgeWave) { this.cancelUrgeWave(); return; }   // second press = changed my mind
+    const st = this.timer.getState();
+    if (!st.running) return;
+    this.urgeWave = { deadline: Date.now() + 90000, task: st.taskName || "", lastLeft: 90 };
+    this.emitUw();
+    this.uwTimer = window.setInterval(() => this.pollUrgeWave(), 250);
+  }
+  cancelUrgeWave() { this.clearUw(); this.emitUw(); }
+  private clearUw() {
+    if (this.uwTimer != null) { window.clearInterval(this.uwTimer); this.uwTimer = null; }
+    this.urgeWave = null;
+  }
+  private emitUw() {
+    const w = this.urgeWave;
+    if (this.urgeWaveCb) try { this.urgeWaveCb(w ? { left: w.lastLeft } : null); } catch (e) {}
+  }
+  pollUrgeWave() {
+    const w = this.urgeWave;
+    if (!w) return;
+    const st = this.timer.getState();
+    if (!st.running) { this.cancelUrgeWave(); return; }
+    const left = Math.ceil((w.deadline - Date.now()) / 1000);
+    if (left <= 0) {
+      const task = w.task;
+      this.clearUw();
+      this.emitUw();
+      this.data.urgesSurfed = [...(this.data.urgesSurfed || []), { ts: Date.now(), task }];
+      this.persist();
+      new Notice("\u{1F30A} Surfed. The wave passed; you're still here.", 4000);
+      if (this.urgeSurfedCb) try { this.urgeSurfedCb(this.data.urgesSurfed); } catch (e) {}
+      return;
+    }
+    if (left !== w.lastLeft) { w.lastLeft = left; this.emitUw(); }
   }
 
   // ---------- bridge handed to the React app ----------
@@ -1663,10 +1892,11 @@ export default class FocusLogPlugin extends Plugin {
         pauseTags: self.data.pauseTags || [],
         pauses: self.data.pauses || [],
         breaks: self.data.breaks || [],
-        reflections: self.data.reflections || [],
         calibrations: self.data.calibrations || [],
         areaOptions: self.data.areaOptions || [],
         quickParents: self.data.quickParents || [],
+        doneToday: self.data.doneToday || [],
+        urgesSurfed: self.data.urgesSurfed || [],
         feelings: self.data.feelings || {},
         morningRoutine: self.data.morningRoutine || [],
         nightRoutine: self.data.nightRoutine || [],
@@ -1681,7 +1911,6 @@ export default class FocusLogPlugin extends Plugin {
       savePauseTags: async (arr: any[]) => { self.data.pauseTags = arr; await self.persist(); },
       savePauses: async (arr: any[]) => { self.data.pauses = arr; await self.persist(); },
       saveBreaks: async (arr: any[]) => { self.data.breaks = arr; await self.persist(); },
-      saveReflections: async (arr: any[]) => { self.data.reflections = arr; await self.persist(); },
       saveCalibrations: async (arr: any[]) => { self.data.calibrations = arr; await self.persist(); },
       addGuessRound: (pageId: string, count?: number) => self.addGuessRound(pageId, count),
       appendCalibration: (e: any) => self.appendCalibrationToDailyNote(e),
@@ -1699,14 +1928,20 @@ export default class FocusLogPlugin extends Plugin {
       patchSettings: async (partial: Partial<FocusLogSettings>) => { self.data.settings = Object.assign({}, self.data.settings, partial); await self.persist(); },
       sync: () => self.queryToday(),
       createTask: (name: string, parentId?: string | null, guess?: number) => self.createTask(name, parentId, guess),
-      beginReflectCountdown: (task: string) => self.beginReflectCountdown(task),
-      cancelReflectCountdown: () => self.cancelReflectCountdown(),
-      onReflectCount: (cb: (st: { left: number; task: string } | null) => void) => { self.reflectCountCb = cb; },
-      onReflectGo: (cb: (task: string) => void) => { self.reflectGoCb = cb; },
+      beginSurfCountdown: (task: string) => self.beginSurfCountdown(task),
+      cancelSurfCountdown: () => self.cancelSurfCountdown(),
+      onSurfCount: (cb: (st: { left: number; task: string } | null) => void) => { self.surfCountCb = cb; },
+      onSurfGo: (cb: (task: string) => void) => { self.surfGoCb = cb; },
+      beginUrgeWave: () => self.beginUrgeWave(),
+      onUrgeWave: (cb: (st: { left: number } | null) => void) => { self.urgeWaveCb = cb; },
+      onUrgeSurfed: (cb: (arr: any[]) => void) => { self.urgeSurfedCb = cb; },
       getQuickParents: () => self.data.quickParents || [],
       writeAct: (pageId: string) => self.incrementAct(pageId),
       writeActBy: (pageId: string, n: number) => self.incrementActBy(pageId, n),
       setDone: (pageId: string) => self.setTaskDone(pageId),
+      restoreTask: (pageId: string, schedule?: string | null) => self.restoreTask(pageId, schedule),
+      saveDoneToday: async (arr: any[]) => { self.data.doneToday = arr; await self.persist(); },
+      saveUrges: async (arr: any[]) => { self.data.urgesSurfed = arr; await self.persist(); },
       appendDaily: (p: any) => self.appendToDailyNote(p),
       openDailyNote: (ts: number) => self.openDailyNoteForDate(ts),
       hasDailyNote: (ts: number) => self.dailyNoteExists(ts),
@@ -1890,7 +2125,7 @@ class FloatTimerView extends ItemView {
     this.els.plus = row.createEl("button", { cls: "flt-btn flt-step" });
     this.els.plus.innerHTML = FLT_PLUS;
     this.els.reset = row.createEl("button", { cls: "flt-btn flt-icon" });
-    setIcon(this.els.reset, "rotate-ccw");
+    this.els.reset.innerHTML = FLT_ROTATE_LEFT;
     this.els.reset.setAttribute("aria-label", "reset");
     // Setup before-rating — the "how enjoyable do I expect this to be" set before starting.
     this.els.setupRate = wrap.createDiv({ cls: "flt-setrate" });
@@ -1906,26 +2141,31 @@ class FloatTimerView extends ItemView {
     this.els.primary.onclick = () => {
       const st = this.plugin.timer.getState();
       if (st.running) { this.plugin.timer.pause(); return; }
-      // Fresh start wants a task chosen first — but only nag when there are tasks to pick.
-      if (!st.paused && !(st.taskName || "").trim() && (this.plugin.data.tasks || []).length) { this.flash("Pick a task first."); return; }
+      // Rhythm first, feeling always: the task link is optional (a free pomodoro starts
+      // unnamed and can be named in the panel mid-run), but the expected rating is required
+      // before EVERY fresh start.
       if (!st.paused && !(st.expected >= 1)) { this.flash("Rate it first."); return; }
       this.plugin.timer.start();
     };
     this.els.reset.onclick = () => {
-      // Restarting a LIVE pomodoro opens the restart→Reflect countdown on this float's own
+      // Restarting a LIVE pomodoro opens the restart→surf countdown on this float's own
       // face (the surface being looked at); an idle reset stays a plain reset.
       const st = this.plugin.timer.getState();
       const live = st.running || st.paused;
       const tname = st.taskName || "";
       this.plugin.timer.reset();
-      if (live) this.plugin.beginReflectCountdown(tname);
+      if (live) this.plugin.beginSurfCountdown(tname);
     };
+    this.els.urge = row.createEl("button", { cls: "flt-btn flt-icon flt-urge" });
+    this.els.urge.innerHTML = SEA_WAVE_SVG;
+    this.els.urge.setAttribute("aria-label", "urge to switch? surf it: 90 quiet seconds, no questions; outlasting it is counted");
+    this.els.urge.onclick = () => this.plugin.beginUrgeWave();
     // The countdown face: covers the whole float, making everything beneath unclickable.
     this.els.rcWrap = wrap.createDiv({ cls: "flt-rc" });
-    this.els.rcWrap.createDiv({ cls: "flt-rc-title", text: "Off to Reflect in" });
+    this.els.rcWrap.createDiv({ cls: "flt-rc-title", text: "Off to the wave in" });
     this.els.rcNum = this.els.rcWrap.createDiv({ cls: "flt-rc-num" });
     this.els.rcCancel = this.els.rcWrap.createEl("button", { cls: "flt-btn flt-rc-cancel", text: "cancel, keep this task" });
-    this.els.rcCancel.onclick = () => this.plugin.cancelReflectCountdown();
+    this.els.rcCancel.onclick = () => this.plugin.cancelSurfCountdown();
 
     this.unsub = this.plugin.timer.subscribe(() => this.render());
     this.render();
@@ -1948,22 +2188,23 @@ class FloatTimerView extends ItemView {
     // A pomodoro left paused before a restart/reopen survives on the shared engine, but it must
     // not carry its task into a freshly opened float — until we've seen it run live this lifetime,
     // a paused (and not running) engine falls back to the setup picker showing "— pick a task —".
-    if (!s.running && !this.sawRun) return "setup";
+    if (!s.running && !this.sawRun && !s.adopted) return "setup";
     return "focus";
   }
 
   render() {
-    // The restart→Reflect countdown owns the float while active: poll it (this float's own
+    // The restart→surf countdown owns the float while active: poll it (this float's own
     // unthrottled tick drives expiry when the main window sleeps), mirror it, skip the rest.
-    this.plugin.pollReflectCountdown();
-    const rc = this.plugin.reflectCountdown;
+    this.plugin.pollSurfCountdown();
+    this.plugin.pollUrgeWave();
+    const rc = this.plugin.surfCountdown;
     if (this.els.rcWrap) {
       this.els.rcWrap.toggleClass("is-on", !!rc);
       if (rc && this.els.rcNum) this.els.rcNum.setText(String(Math.max(1, rc.lastLeft)));
     }
     if (rc) return;
     const s = this.plugin.timer.getState();
-    if (s.running) this.sawRun = true; // mark this lifetime as having a genuinely-live run
+    if (s.running || s.adopted) this.sawRun = true; // live now, or adopted back from a quit
     const phase = this.phaseOf(s);
     if (phase !== this.curPhase) { this.onPhaseChange(this.curPhase, phase); this.curPhase = phase; }
     this.setPhaseVisibility(phase);
@@ -1981,7 +2222,7 @@ class FloatTimerView extends ItemView {
       this.els.time.toggleClass("is-alert", alertRed);
       this.els.task.setText(s.taskName || "Focus");
       const wantIcon = s.running ? "pause" : "play";
-      if (this.lastIcon !== wantIcon) { setIcon(this.els.primary, wantIcon); this.lastIcon = wantIcon; }
+      if (this.lastIcon !== wantIcon) { this.els.primary.innerHTML = wantIcon === "pause" ? FLT_PAUSE : FLT_PLAY; this.lastIcon = wantIcon; }
       // A paused pomodoro left over from a restart/reopen is shown as setup (placeholder), so for
       // the focus-only controls below treat "paused" as false until it's the active focus screen.
       const pausedShown = s.paused && phase === "focus";
@@ -2033,6 +2274,14 @@ class FloatTimerView extends ItemView {
     this.els.time.style.display = brk ? "none" : "";
     this.els.row.style.display = brk ? "none" : "";
     this.els.reset.style.display = setup ? "none" : "";
+    if (this.els.urge) {
+      const w = this.plugin.urgeWave;
+      const ts = this.plugin.timer.getState();
+      this.els.urge.style.display = (!setup && !brk && ts.running) ? "" : "none";
+      this.els.urge.toggleClass("is-on", !!w);
+      if (w) this.els.urge.setText(String(Math.max(1, w.lastLeft)));
+      else if (!this.els.urge.querySelector("svg")) this.els.urge.innerHTML = SEA_WAVE_SVG;
+    }
     this.els.break.style.display = brk ? "" : "none";
   }
 
@@ -2056,7 +2305,7 @@ class FloatTimerView extends ItemView {
       this.skey = skey;
       const sel = this.els.setupSel as HTMLSelectElement;
       sel.empty();
-      sel.createEl("option", { text: tasks.length ? "— pick a task —" : "— no tasks (sync first) —", value: "" });
+      sel.createEl("option", { text: tasks.length ? "Link a task (optional)" : "— no tasks (sync first) —", value: "" });
       tasks.forEach((t: any) => sel.createEl("option", { text: t.task + (t.king ? " \u{1F451}" : ""), value: t.task }));
       sel.value = setupTask;
     }
@@ -2117,7 +2366,7 @@ class FloatTimerView extends ItemView {
     this.els.brkTime.toggleClass("is-done", s.breakFinished);
     this.els.brkToggle.disabled = s.breakFinished;
     const toggleIcon = s.breakRunning ? "pause" : "play";
-    if (this.lastBrkIcon !== toggleIcon) { setIcon(this.els.brkToggle, toggleIcon); this.lastBrkIcon = toggleIcon; }
+    if (this.lastBrkIcon !== toggleIcon) { this.els.brkToggle.innerHTML = toggleIcon === "pause" ? FLT_PAUSE : FLT_PLAY; this.lastBrkIcon = toggleIcon; }
     this.els.brkToggle.setAttribute("aria-label", s.breakRunning ? "pause" : "start");
     this.els.brkMinus.disabled = s.breakSecs <= 60;
     this.els.brkPlus.disabled = s.breakSecs >= 30 * 60;
@@ -2284,6 +2533,9 @@ class FloatTimerView extends ItemView {
   async onClose() {
     // Guard every teardown step: when the popout is closing, its window may already
     // be gone, and a throw here could leave a phantom leaf that blocks reopening.
+    // The user closing the float means "don't bring it back at launch"; teardown from a
+    // quit or plugin reload keeps the flag, so the float returns on its own.
+    try { if (!this.plugin.unloading && this.plugin.data.floatWasOpen) { this.plugin.data.floatWasOpen = false; void this.plugin.persist(); } } catch {}
     try { this.unsub?.(); } catch {}
     this.unsub = null;
     // Capture the final geometry so it reopens here next time (to the active phase).
@@ -2386,6 +2638,18 @@ class FocusLogSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Morning routine ends at (HH:MM)")
+      .setDesc("Until this time the Morning routine is the Plan list's current phase; after it, Morning drops into \u201Cearlier today\u201D. The day's pomodoro room is also counted from here.")
+      .addText((t) =>
+        t.setPlaceholder("09:00").setValue(fmtHM(this.plugin.data.settings.morningRoutineEnds)).onChange(async (v) => {
+          const n = parseHM(v);
+          if (n == null) return;
+          this.plugin.data.settings.morningRoutineEnds = n;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
       .setName("Morning ends at (HH:MM)")
       .setDesc("Pomodoros logged before this time are coloured as morning on the heatmap.")
       .addText((t) =>
@@ -2423,6 +2687,18 @@ class FocusLogSettingTab extends PluginSettingTab {
     dinnerSet.addText((t) => { t.setPlaceholder("17:30").setValue(fmtHM(this.plugin.data.settings.dinnerStart)).onChange(async (v) => { const n = parseHM(v); if (n == null) return; this.plugin.data.settings.dinnerStart = n; await this.plugin.persist(); }); t.inputEl.style.width = "5.5em"; });
     dinnerSet.controlEl.createEl("span", { text: "HH:MM", attr: { style: "font-size:11px;color:var(--text-muted);margin:0 12px 0 5px" } });
     dinnerSet.addText((t) => { t.setPlaceholder("60").setValue(String(this.plugin.data.settings.dinnerMinutes)).onChange(async (v) => { const n = parseInt(v, 10); if (!n || n < 5) return; this.plugin.data.settings.dinnerMinutes = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
+
+    new Setting(containerEl)
+      .setName("Night routine starts at (HH:MM)")
+      .setDesc("The evening wind-down begins here: Night becomes the Plan list's current phase, and the pomodoro counter stops counting room at this time.")
+      .addText((t) =>
+        t.setPlaceholder("20:15").setValue(fmtHM(this.plugin.data.settings.nightRoutineStarts)).onChange(async (v) => {
+          const n = parseHM(v);
+          if (n == null) return;
+          this.plugin.data.settings.nightRoutineStarts = n;
+          await this.plugin.persist();
+        })
+      );
     dinnerSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
 
     if (!this.plugin.data.settings.workDays) this.plugin.data.settings.workDays = [true, true, true, true, true, true, true];
@@ -2482,6 +2758,17 @@ class FocusLogSettingTab extends PluginSettingTab {
         })
       );
 
+    new Setting(containerEl)
+      .setName("Urge wave length (minutes)")
+      .setDesc("How long the guided urge surf runs before the decide step; 5-10 is a good range. The floating window's quick wave stays 90 seconds.")
+      .addText((t) =>
+        t.setValue(String(this.plugin.data.settings.urgeSurfMinutes ?? 5)).onChange(async (v) => {
+          const n = Math.max(2, Math.min(15, Math.round(Number(v)) || 5));
+          this.plugin.data.settings.urgeSurfMinutes = n;
+          await this.plugin.persist();
+        })
+      );
+
     containerEl.createEl("h3", { text: "Plan view" });
 
     new Setting(containerEl)
@@ -2532,11 +2819,6 @@ class FocusLogSettingTab extends PluginSettingTab {
     groupLenSet.addText((t) => { t.setPlaceholder("25").setValue(String(this.plugin.data.settings.routineGroupMinutes ?? 25)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 5) return; this.plugin.data.settings.routineGroupMinutes = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
     groupLenSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
 
-    const nightGapSet = new Setting(containerEl)
-      .setName("Night routine starts after dinner")
-      .setDesc("On the Timeline, the night routine begins this many minutes after dinner ends. Default 60.");
-    nightGapSet.addText((t) => { t.setPlaceholder("60").setValue(String(this.plugin.data.settings.nightRoutineGap ?? 60)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 0) return; this.plugin.data.settings.nightRoutineGap = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
-    nightGapSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
 
     new Setting(containerEl)
       .setName("Show Area tags on the Timeline")

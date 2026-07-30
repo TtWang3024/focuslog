@@ -14,6 +14,12 @@ export function Trash({ size = 13 }: any) {
 
 // A small info icon that reveals a formatted hover card anchored under its top-right corner —
 // the same pattern as the Timeline's how-it-works intro. The card content is the children.
+// Every view's sub-navigation bar: the segmented control on the left, anything else and the
+// info button on the right. Shared so the info button lands on exactly the same spot, and the
+// bar keeps the same height, whichever view you switch to - including views with no control.
+export const SUBBAR: any = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 32, marginBottom: 16, flexWrap: "wrap" };
+export const SUBBAR_TRACK: any = { display: "inline-flex", alignItems: "center", gap: 2, borderRadius: 10, padding: 3, flexShrink: 0, height: 32, boxSizing: "border-box" };
+
 export function InfoHover({ C, label, width = 330, children }: any) {
   const [open, setOpen] = React.useState(false);
   return (

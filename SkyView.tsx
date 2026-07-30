@@ -1,6 +1,6 @@
 import * as React from "react";
 import { createSkyMap } from "./skymap";
-import { InfoHover } from "./icons";
+import { InfoHover, SUBBAR, SUBBAR_TRACK } from "./icons";
 import skyStars from "./sky-data/sky-stars.json";
 import skyLines from "./sky-data/sky-constellations.json";
 import skyLabels from "./sky-data/sky-labels.json";
@@ -15,30 +15,33 @@ function isDarkTheme(): boolean {
   return typeof document !== "undefined" && document.body.classList.contains("theme-dark");
 }
 
-// A label for a reflection star: its first thought, else first mood word, else first body part.
-function reflectionLabel(r: any): string {
-  if (r.thoughts && r.thoughts.length) return r.thoughts[0];
-  if (r.mood && r.mood.length) return r.mood[0].name || "reflection";
-  if (r.body && r.body.length) return r.body[0].part || "reflection";
-  return "reflection";
+// A label for a wave star: what you wrote, else the first feeling word, else where you felt it,
+// else the task it interrupted. The float's 90-second waves carry only a task, and that is fine.
+function waveLabel(u: any): string {
+  if (u.note) return u.note;
+  if (u.moods && u.moods.length) return u.moods[0].name || "an urge";
+  if (u.body && u.body.length) return u.body[0].part || "an urge";
+  if (u.task) return u.task;
+  return "an urge";
 }
 
-// The Sky tab: pomodoros light amber stars; reflections light a separate silver-star sky you toggle to.
+// The Sky tab: pomodoros light amber stars; surfed urges light a separate silver-star sky you toggle to.
 // Drag to pan, scroll to zoom, hover a glow for its label, hover near a constellation for its name.
-export function SkyView({ sessions, reflections, C }: { sessions: any[]; reflections: any[]; C: any }) {
+export function SkyView({ sessions, urges, C }: { sessions: any[]; urges: any[]; C: any }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const skyRef = useRef<any>(null);
-  const [mode, setMode] = useState<"pomodoro" | "reflection">("pomodoro");
+  const [mode, setMode] = useState<"pomodoro" | "wave">("pomodoro");
   const [tip, setTip] = useState<{ x: number; y: number; title: string; sub: string } | null>(null);
   const [clabel, setClabel] = useState<{ name: string; x: number; y: number } | null>(null);
 
   const entries = useMemo(() => {
-    const src = mode === "reflection" ? (reflections || []) : (sessions || []);
+    const src = mode === "wave" ? (urges || []) : (sessions || []);
     return src
-      .map((s: any) => ({ id: String(s.id), text: mode === "reflection" ? reflectionLabel(s) : ((s.task || "pomodoro") + (s.claimed ? " (claimed)" : "")), ts: new Date(s.ts).getTime(), claimed: mode !== "reflection" && !!s.claimed }))
+      // Float waves have no id of their own, so fall back to the timestamp.
+      .map((s: any) => ({ id: String(s.id || s.ts), text: mode === "wave" ? waveLabel(s) : ((s.task || "pomodoro") + (s.claimed ? " (claimed)" : "")), ts: new Date(s.ts).getTime(), claimed: mode !== "wave" && !!s.claimed }))
       .filter((e: any) => !isNaN(e.ts));
-  }, [sessions, reflections, mode]);
+  }, [sessions, urges, mode]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -46,7 +49,7 @@ export function SkyView({ sessions, reflections, C }: { sessions: any[]; reflect
     const sky = createSkyMap(canvas, { data: SKY_DATA });
     skyRef.current = sky;
     sky.setLightMode(!isDarkTheme());
-    sky.setRefTint(mode === "reflection" ? "silver" : "amber");
+    sky.setRefTint(mode === "wave" ? "silver" : "amber");
     sky.setSize();
     const now = Date.now();
     const oldest = entries.length ? Math.min(...entries.map((e: any) => e.ts)) : now;
@@ -115,21 +118,22 @@ export function SkyView({ sessions, reflections, C }: { sessions: any[]; reflect
     };
   }, [entries, mode]);
 
-  const seg = (on: boolean): any => ({ padding: "4px 12px", borderRadius: 8, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 12.5, fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: "var(--fl-display)" });
-  const empty = mode === "reflection" ? "Save your first reflection to light a star." : "Log your first pomodoro to light a star.";
+  const seg = (on: boolean): any => ({ padding: "4px 12px", borderRadius: 8, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 12.5, fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: "var(--fl-display)", boxShadow: "none" });
+  const empty = mode === "wave" ? "Surf your first urge to light a star." : "Log your first pomodoro to light a star.";
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      {/* control left, info right - the shape every view shares, so the info button never moves */}
+      <div style={SUBBAR}>
+        <div style={{ ...SUBBAR_TRACK, background: C.line }}>
+          <button type="button" style={seg(mode === "pomodoro")} onClick={() => setMode("pomodoro")}>Pomodoros</button>
+          <button type="button" style={seg(mode === "wave")} onClick={() => setMode("wave")}>Waves</button>
+        </div>
         <InfoHover C={C} label="about your Sky" width={330}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Your Sky</div>
-          <div><b>Pomodoros</b> lights an amber star for every pomodoro you log; <b>Reflections</b> is a second, silver sky with one star per reflection you save. Recent stars shine brighter. Work you claim after the fact lights a quieter copper star: same sky, different instrument.</div>
+          <div><b>Pomodoros</b> lights an amber star for every pomodoro you log; <b>Waves</b> is a second, silver sky with one star per urge you surf — however the wave ended, noticing it is the whole achievement. Recent stars shine brighter. Work you claim after the fact lights a quieter copper star: same sky, different instrument.</div>
           <div style={{ marginTop: 6 }}>Drag to roam and scroll to zoom. Hover a star for its story, or near a constellation for its name.</div>
         </InfoHover>
-        <div style={{ display: "inline-flex", gap: 2, background: C.line, borderRadius: 10, padding: 3, flexShrink: 0 }}>
-          <button type="button" style={seg(mode === "pomodoro")} onClick={() => setMode("pomodoro")}>Pomodoros</button>
-          <button type="button" style={seg(mode === "reflection")} onClick={() => setMode("reflection")}>Reflections</button>
-        </div>
       </div>
       <div ref={wrapRef} style={{ position: "relative", width: "100%", height: "min(68vh, 560px)", minHeight: 340, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.line}` }}>
         <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block", cursor: "grab", touchAction: "none" }} />

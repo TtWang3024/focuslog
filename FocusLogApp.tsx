@@ -2,14 +2,15 @@ import * as React from "react";
 import { NOTION_LOGO } from "./notionLogo";
 import { SkyView } from "./SkyView";
 import { newestStarName } from "./skymap";
-import { ReflectPanel } from "./ReflectPanel";
-import { InfoHover } from "./icons";
+import { MoodGrid } from "./MoodGrid";
+import { BodyMap } from "./BodyMap";
+import { InfoHover, SUBBAR, SUBBAR_TRACK } from "./icons";
 import breakShortIcon from "./assets/break-short.png";
 import breakLongIcon from "./assets/break-long.png";
-import blindsImg from "./assets/blinds.png";
-import tableLampImg from "./assets/table-lamp.png";
-import dogImg from "./assets/dog.png";
-import sketchImg from "./assets/sketch.png";
+import roosterImg from "./assets/rooster.png";
+import batImg from "./assets/bat.png";
+import swanImg from "./assets/swan.png";
+import doveImg from "./assets/dove.png";
 import rateRain from "./assets/rate-rain.png";
 import rateClouds from "./assets/rate-clouds.png";
 import ratePartly from "./assets/rate-partly-sunny.png";
@@ -143,6 +144,7 @@ export const fmtHM = (min: number) => { const m = Math.max(0, Math.round(min || 
 export const parseHM = (str: string): number | null => { const m = String(str).trim().match(/^(\d{1,2})(?::(\d{1,2}))?$/); if (!m) return null; return Math.min(23, parseInt(m[1], 10) || 0) * 60 + Math.min(59, parseInt(m[2] || "0", 10) || 0); };
 const fmtDate = (d: any) => new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const fmtTime = (d: any) => new Date(d).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+const agoText = (ts: number) => { const m = Math.round((Date.now() - ts) / 60000); return m < 60 ? m + " min ago" : Math.round(m / 6) / 10 + " h ago"; };
 // enjoyment: higher actual than expected is better (green)
 function gapColor(expected: number, actual: number) {
   if (actual > expected) return C.better;
@@ -432,8 +434,10 @@ function ContribHeatmap({ sessions, settings }: any) {
   const lvlLabel = (i: number) => { const lo = TH[i]; if (i === TH.length - 1) return lo + "+"; const hi = TH[i + 1] - 1; return hi <= lo ? String(lo) : lo + "-" + hi; };
 
   const cells: any[] = [];
+  // Newest first: column 0 is the current week and time runs backwards to the right, so the
+  // days you care about are the ones you land on (and the ones a narrow panel keeps in view).
   for (let dow = 0; dow < 7; dow++) for (let w = 0; w < weeks; w++) {
-    const day = new Date(+gridStart + (w * 7 + dow) * DAY);
+    const day = new Date(+gridStart + ((weeks - 1 - w) * 7 + dow) * DAY);
     const inRange = day >= startMonth && day <= end;
     const k = ymd(day), n = counts[k] || 0;
     cells.push(<div key={dow + "-" + w} aria-label={inRange ? `${k}: ${n}${"\u{1F345}"}` : undefined} style={{ width: CELL, height: CELL, borderRadius: 2, boxSizing: "border-box", background: inRange ? heat(n) : "transparent", border: `1px solid ${inRange ? C.line : "transparent"}` }} />);
@@ -441,9 +445,15 @@ function ContribHeatmap({ sessions, settings }: any) {
   const monthLabels: any[] = [];
   let cur = new Date(startMonth);
   while (cur <= end) {
+    const nxt = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
     const col = Math.round((+weekStartOf(cur, sun) - +gridStart) / (7 * DAY));
-    if (col >= 0 && col < weeks) monthLabels.push(<span key={+cur} style={{ position: "absolute", left: col * (CELL + GAP), fontSize: 10, color: C.muted, fontFamily: "var(--fl-mono)" }}>{cur.toLocaleDateString(undefined, { month: "short" })}</span>);
-    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+    // A month's block now runs right-to-left, so its label belongs at the block's LEFT edge:
+    // the column holding its LAST day. (Not the next month's first column - that week can
+    // still contain days of this month, which would push the label one column too far right.)
+    const lastCol = Math.round((+weekStartOf(new Date(+nxt - DAY), sun) - +gridStart) / (7 * DAY));
+    const left = Math.max(0, weeks - 1 - lastCol);
+    if (col >= 0 && col < weeks) monthLabels.push(<span key={+cur} style={{ position: "absolute", left: left * (CELL + GAP), fontSize: 10, color: C.muted, fontFamily: "var(--fl-mono)" }}>{cur.toLocaleDateString(undefined, { month: "short" })}</span>);
+    cur = nxt;
   }
   const wdNames = sun ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const wd = wdNames.map((n, i) => (i === 0 || i === 2 || i === 4 ? n : ""));
@@ -498,6 +508,14 @@ export function darken(rgb: any, f: number): string {
 const ICON_BTN: any = { background: "transparent", border: "none", boxShadow: "none", padding: 2, height: "auto", cursor: "pointer", color: "#8a8175", display: "inline-flex", flexShrink: 0 };
 // The terracotta add button.
 const ADD_BTN: any = { padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "#C57B5A", border: "1px solid #C57B5A", color: "rgb(251, 248, 241)" };
+// The merged Calibrate view: five panels across the top, and two of them (Total, Log) open a
+// second control down their left side. One table per level so the control and the switch that
+// renders the panel can never drift apart.
+const FOCUS_SUB: [string, string][] = [["log", "Pomo"], ["break", "Break"], ["pause", "Pause"]];
+const isFocusView = (v: string) => FOCUS_SUB.some(([k]) => k === v);
+const CALIB_TABS: [string, string][] = [["today", "Today"], ["accuracy", "Pomo Accuracy"], ["total", "Sum"], ["log", "Log"]];
+const TOTAL_TABS: [string, string][] = [["calib", "Calibrate"], ["break", "Break"], ["pomo", "Pomo"], ["pause", "Pause"]];
+const LOG_TABS: [string, string][] = [["calib", "Tasks"], ["break", "Break"], ["pomo", "Pomo"], ["pause", "Pause"]];
 // Small uppercase heading for the today-view groups (Work / Personal) and routine blocks.
 const SECTION_HEAD: any = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: "#8a8175", margin: "2px 0 4px 2px", fontFamily: "var(--fl-display)" };
 function polarPt(cx: number, cy: number, r: number, deg: number) {
@@ -559,9 +577,8 @@ function ChevronRightIcon({ size = 16 }: any) {
 }
 function RotateCcwIcon({ size = 16 }: any) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="M1.611,12c.759,0,1.375,.57,1.485,1.32,.641,4.339,4.389,7.68,8.903,7.68,5.476,0,9.827-4.917,8.867-10.569-.453-2.665-2.148-5.023-4.523-6.313-3.506-1.903-7.48-1.253-10.18,1.045l1.13,1.13c.63,.63,.184,1.707-.707,1.707H2c-.552,0-1-.448-1-1V2.414c0-.891,1.077-1.337,1.707-.707l1.332,1.332C7.6-.115,12.921-1.068,17.637,1.408c3.32,1.743,5.664,5.027,6.223,8.735,1.122,7.437-4.633,13.857-11.86,13.857-6.021,0-11.021-4.457-11.872-10.246-.135-.92,.553-1.754,1.483-1.754Z" />
     </svg>
   );
 }
@@ -581,10 +598,10 @@ function MoonRoutineIcon({ size = 14 }: any) {
   return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></svg>);
 }
 function MinusIcon({ size = 16 }: any) {
-  return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 12h14" /></svg>);
+  return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 512 512" fill="currentColor" stroke="none" style={{ display: "block" }}><path d="M480,288H32c-17.673,0-32-14.327-32-32s14.327-32,32-32h448c17.673,0,32,14.327,32,32S497.673,288,480,288z" /></svg>);
 }
 function PlusIcon({ size = 16 }: any) {
-  return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="M5 12h14" /><path d="M12 5v14" /></svg>);
+  return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 512 512" fill="currentColor" stroke="none" style={{ display: "block" }}><path d="M480,224H288V32c0-17.673-14.327-32-32-32s-32,14.327-32,32v192H32c-17.673,0-32,14.327-32,32s14.327,32,32,32h192v192c0,17.673,14.327,32,32,32s32-14.327,32-32V288h192c17.673,0,32-14.327,32-32S497.673,224,480,224z" /></svg>);
 }
 function ExploreIcon({ size = 13 }: any) {
   return (<svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}><path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" /></svg>);
@@ -619,16 +636,16 @@ function TrashIcon({ size = 14 }: any) {
 }
 function PlayIcon({ size = 16 }: any) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" style={{ display: "block" }}>
-      <polygon points="6 3 20 12 6 21 6 3" />
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="M20.492,7.969,10.954.975A5,5,0,0,0,3,5.005V19a4.994,4.994,0,0,0,7.954,4.03l9.538-6.994a5,5,0,0,0,0-8.062Z" />
     </svg>
   );
 }
 function PauseIcon({ size = 16 }: any) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth={1} strokeLinejoin="round" style={{ display: "block" }}>
-      <rect x="14" y="4" width="4" height="16" rx="1" />
-      <rect x="6" y="4" width="4" height="16" rx="1" />
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="M6.5,0A3.5,3.5,0,0,0,3,3.5v17a3.5,3.5,0,0,0,7,0V3.5A3.5,3.5,0,0,0,6.5,0Z" />
+      <path d="M17.5,0A3.5,3.5,0,0,0,14,3.5v17a3.5,3.5,0,0,0,7,0V3.5A3.5,3.5,0,0,0,17.5,0Z" />
     </svg>
   );
 }
@@ -790,6 +807,76 @@ function WandSparklesIcon({ size = 14 }: any) {
     </svg>
   );
 }
+function SproutIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="m23.987,2.323c.017-.649-.252-1.277-.737-1.722-.49-.448-1.147-.663-1.802-.586-5.656.654-8.256,4.435-9.448,7.57C10.808,4.45,8.208.669,2.552.015,1.902-.061,1.24.153.75.601.265,1.046-.004,1.674.013,2.323c.087,3.27,1.156,5.867,3.179,7.72,2.607,2.388,6.082,2.863,7.809,2.943v10.014c0,.552.447,1,1,1s1-.448,1-1v-10.014c1.727-.08,5.202-.555,7.809-2.943,2.022-1.853,3.092-4.45,3.179-7.72Z" />
+    </svg>
+  );
+}
+function SeaWaveIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="m6.5 9c-3.006 0-6.5 1.747-6.5 4 0 1.103.897 2 2 2 .415 0 .8-.127 1.12-.344.273.78 1.008 1.344 1.88 1.344.798 0 1.483-.473 1.804-1.15.782.779 1.196 1.829 1.196 3.15 0 2.198-1.794 3.987-4 3.987-.875 0-1.68-.276-2.392-.821-.438-.334-1.065-.254-1.402.187-.336.438-.252 1.066.186 1.401 1.054.806 2.301 1.233 3.606 1.233l11 .013c.334 0 .646-.167.832-.445.048-.071 1.168-1.784 1.168-4.555 0-5.607-4.612-10-10.5-10zm16.621 13.391-.136.78c-.083.479-.499.829-.985.829h-4.132c.451-.897 1.132-2.632 1.132-5 0-4.159-2.101-7.756-5.357-9.901-.564-1.793-1.752-2.992-3.182-3.71-.182.917-.991 1.611-1.961 1.611-1.009 0-1.837-.753-1.972-1.725-.367.439-.912.725-1.528.725-1.103 0-2-.897-2-2 .006-.459.178-.929.469-1.272.965-1.37 3.401-2.728 7.09-2.728 7.565 0 13.492 5.603 13.492 12.755.148 3.468-.4 6.603-.931 9.635z" />
+    </svg>
+  );
+}
+// The surf's tab glyphs, each in two weights: the regular outline for a resting pill, the
+// heavier cut for the open one, so the active tab reads as filled-in rather than recoloured.
+function WaterIcon({ size = 14, on = false }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d={on ? "M21,17a4.875,4.875,0,0,1-2.8-.9.333.333,0,0,0-.406,0,4.91,4.91,0,0,1-5.594,0,.333.333,0,0,0-.406,0,4.91,4.91,0,0,1-5.594,0,.333.333,0,0,0-.406,0,4.759,4.759,0,0,1-5.051.3A1.5,1.5,0,1,1,2.254,13.8a1.707,1.707,0,0,0,1.805-.149,3.354,3.354,0,0,1,3.882,0,1.854,1.854,0,0,0,2.118,0,3.354,3.354,0,0,1,3.882,0,1.854,1.854,0,0,0,2.118,0,3.354,3.354,0,0,1,3.882,0,1.706,1.706,0,0,0,1.8.149,1.5,1.5,0,1,1,1.508,2.594A4.485,4.485,0,0,1,21,17Zm2.254,5.394A1.5,1.5,0,0,0,21.746,19.8a1.7,1.7,0,0,1-1.8-.149,3.352,3.352,0,0,0-3.882,0,1.854,1.854,0,0,1-2.118,0,3.352,3.352,0,0,0-3.882,0,1.854,1.854,0,0,1-2.118,0,3.352,3.352,0,0,0-3.882,0,1.7,1.7,0,0,1-1.805.149A1.5,1.5,0,0,0,.746,22.394,4.759,4.759,0,0,0,5.8,22.1a.333.333,0,0,1,.406,0,4.91,4.91,0,0,0,5.594,0,.333.333,0,0,1,.406,0,4.91,4.91,0,0,0,5.594,0,.333.333,0,0,1,.406,0A4.875,4.875,0,0,0,21,23,4.485,4.485,0,0,0,23.254,22.394Zm0-18A1.5,1.5,0,0,0,21.746,1.8a1.706,1.706,0,0,1-1.8-.149,3.352,3.352,0,0,0-3.882,0,1.854,1.854,0,0,1-2.118,0,3.352,3.352,0,0,0-3.882,0,1.854,1.854,0,0,1-2.118,0,3.352,3.352,0,0,0-3.882,0A1.707,1.707,0,0,1,2.254,1.8,1.5,1.5,0,1,0,.746,4.394,4.759,4.759,0,0,0,5.8,4.1a.333.333,0,0,1,.406,0,4.91,4.91,0,0,0,5.594,0,.333.333,0,0,1,.406,0,4.91,4.91,0,0,0,5.594,0,.333.333,0,0,1,.406,0A4.875,4.875,0,0,0,21,5,4.485,4.485,0,0,0,23.254,4.394Zm0,6A1.5,1.5,0,0,0,21.746,7.8a1.708,1.708,0,0,1-1.8-.149,3.352,3.352,0,0,0-3.882,0,1.854,1.854,0,0,1-2.118,0,3.352,3.352,0,0,0-3.882,0,1.854,1.854,0,0,1-2.118,0,3.352,3.352,0,0,0-3.882,0A1.709,1.709,0,0,1,2.254,7.8,1.5,1.5,0,0,0,.746,10.394,4.757,4.757,0,0,0,5.8,10.1a.333.333,0,0,1,.406,0,4.91,4.91,0,0,0,5.594,0,.333.333,0,0,1,.406,0,4.91,4.91,0,0,0,5.594,0,.333.333,0,0,1,.406,0A4.875,4.875,0,0,0,21,11,4.485,4.485,0,0,0,23.254,10.394Z" : "M21,23a4.375,4.375,0,0,1-3-1.225,4.336,4.336,0,0,1-6,0,4.336,4.336,0,0,1-6,0,4.186,4.186,0,0,1-5.668.2,1,1,0,1,1,1.335-1.489,2.2,2.2,0,0,0,3.388-.817,1.006,1.006,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.008,1.008,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.006,1.006,0,0,1,1.89,0,2.2,2.2,0,0,0,3.387.817,1,1,0,0,1,1.336,1.487A3.981,3.981,0,0,1,21,23Zm0-6a4.375,4.375,0,0,1-3-1.225,4.336,4.336,0,0,1-6,0,4.336,4.336,0,0,1-6,0,4.186,4.186,0,0,1-5.668.2,1,1,0,1,1,1.335-1.489,2.2,2.2,0,0,0,3.388-.817,1.006,1.006,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.007,1.007,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.007,1.007,0,0,1,1.89,0,2.2,2.2,0,0,0,3.387.817,1,1,0,0,1,1.336,1.487A3.981,3.981,0,0,1,21,17Zm0-6a4.375,4.375,0,0,1-3-1.225,4.336,4.336,0,0,1-6,0,4.336,4.336,0,0,1-6,0,4.186,4.186,0,0,1-5.668.2A1,1,0,1,1,1.667,8.489a2.2,2.2,0,0,0,3.388-.817,1.006,1.006,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.008,1.008,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.006,1.006,0,0,1,1.89,0,2.2,2.2,0,0,0,3.387.817,1,1,0,0,1,1.336,1.487A3.981,3.981,0,0,1,21,11Zm0-6a4.375,4.375,0,0,1-3-1.225,4.336,4.336,0,0,1-6,0,4.336,4.336,0,0,1-6,0,4.186,4.186,0,0,1-5.668.2A1,1,0,1,1,1.667,2.489a2.2,2.2,0,0,0,3.388-.817,1.006,1.006,0,0,1,1.89,0,2.278,2.278,0,0,0,4.11,0,1.008,1.008,0,0,1,1.875-.041h0l.015.042a2.278,2.278,0,0,0,4.11,0,1.008,1.008,0,0,1,1.89,0,2.2,2.2,0,0,0,3.387.817,1,1,0,1,1,1.336,1.487A3.981,3.981,0,0,1,21,5Z"} />
+    </svg>
+  );
+}
+function WalkingIcon({ size = 14, on = false }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      {on ? (<><circle cx="12.5" cy="2.5" r="2.5" /><path d="m20.447,12.402l-2.843-1.422c-.327-.163-.603-.413-.797-.723l-1.48-2.351c-.054-.078-1.321-1.907-3.327-1.907h-.879c-1.214,0-2.431.287-3.518.83l-2.096,1.049c-.77.384-1.338,1.082-1.559,1.914l-.783,2.951c-.142.534.177,1.082.71,1.223.534.139,1.082-.177,1.223-.71l.783-2.951c.073-.277.262-.51.519-.638l2.097-1.049c.197-.099.4-.185.607-.26l-1.026,4.385c-.301,1.286.291,2.64,1.439,3.292l3.977,2.258c.312.178.506.511.506.87v3.836c0,.552.447,1,1,1s1-.448,1-1v-3.836c0-1.077-.581-2.076-1.518-2.609l-1.95-1.108,1.538-5.784,1.044,1.659c.39.62.942,1.121,1.597,1.447l2.842,1.421c.144.072.296.105.446.105.367,0,.72-.202.896-.553.247-.494.047-1.095-.447-1.342Z" /><path d="m9.19,17.865c-.008-.005-.016-.01-.024-.014-.568-.34-1.304-.029-1.454.616l-.153.661-1.61,3.452c-.308.661.174,1.419.904,1.419.386,0,.738-.223.903-.573l1.654-3.514.228-.993c.095-.412-.086-.838-.449-1.055Z" /></>) : (<path d="m10,2.5c0-1.381,1.119-2.5,2.5-2.5s2.5,1.119,2.5,2.5-1.119,2.5-2.5,2.5-2.5-1.119-2.5-2.5Zm10.895,11.244c-.176.351-.528.553-.896.553-.15,0-.303-.034-.446-.105l-2.842-1.421c-.654-.327-1.207-.827-1.597-1.447l-.494-.784-1.408,5.296,1.27.721c.937.533,1.518,1.532,1.518,2.609v3.836c0,.552-.447,1-1,1s-1-.448-1-1v-3.836c0-.359-.194-.692-.506-.87l-3.977-2.258c-1.148-.652-1.74-2.006-1.439-3.292l1.026-4.385c-.207.076-.41.162-.607.26l-2.097,1.049c-.257.128-.446.36-.519.638l-.783,2.951c-.142.534-.689.85-1.223.71-.534-.142-.852-.689-.71-1.223l.783-2.951c.221-.832.789-1.53,1.559-1.914l2.096-1.049c1.087-.543,2.303-.83,3.518-.83h.879c2.006,0,3.273,1.829,3.327,1.907l1.48,2.351c.194.31.47.56.797.723l2.843,1.422c.494.247.694.848.447,1.342Zm-9.438,1.093l1.667-6.369c-.295-.238-.688-.467-1.124-.467h-.758l-1.217,5.2c-.1.428.097.879.48,1.097l.951.54Zm-2.266,3.029c-.008-.005-.016-.01-.024-.014-.568-.34-1.304-.029-1.454.616l-.153.661-1.61,3.452c-.308.661.174,1.419.904,1.419.386,0,.738-.223.903-.573l1.654-3.514.228-.993c.095-.412-.086-.838-.449-1.055Z" />)}
+    </svg>
+  );
+}
+function StomachIcon({ size = 14, on = false }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d={on ? "m15,3h-5c-1.398,0-2.701-.967-3.031-2.249-.138-.535-.687-.854-1.218-.72-.535.138-.857.684-.72,1.218.478,1.855,2.07,3.276,3.969,3.652v9.099c0,2.176-3.612,3.186-3.743,3.331-1.897.711-3.257,2.527-3.257,4.669v1c0,.553.447,1,1,1s1-.447,1-1v-1c0-1.305.842-2.406,2.008-2.818.167.104.342.21.504.312,2.012,1.275,3.911,2.479,8.487,2.505h.04c1.835,0,3.568-.72,4.886-2.029,1.338-1.331,2.075-3.096,2.075-4.97v-5c0-3.859-3.141-7-7-7Zm4.915,9.702c-.222.506-.811.733-1.319.511-.319-.142-.672-.213-1.05-.213-.596,0-.979.179-1.464.406-.566.265-1.271.594-2.311.594-.74,0-1.474-.161-2.181-.479-.504-.226-.729-.817-.503-1.321.227-.503.819-.729,1.321-.503.448.201.906.303,1.362.303.596,0,.979-.179,1.463-.405.566-.266,1.271-.595,2.312-.595.657,0,1.283.129,1.858.383.505.224.733.814.511,1.319Z" : "m15,3h-5c-1.398,0-2.701-.967-3.031-2.249-.138-.535-.687-.854-1.218-.72-.535.138-.857.684-.72,1.218.478,1.855,2.07,3.276,3.969,3.652v9.099c0,2.176-3.59,3.173-3.717,3.304-1.914.702-3.283,2.542-3.283,4.696v1c0,.553.447,1,1,1s1-.447,1-1v-1c0-1.304.836-2.415,2-2.828.174.108.344.216.511.322,2.012,1.275,3.911,2.479,8.487,2.505h.04c1.835,0,3.568-.72,4.886-2.029,1.338-1.331,2.075-3.096,2.075-4.97v-5c0-3.859-3.141-7-7-7Zm0,2c2.757,0,5,2.243,5,5v1.314c-.539-.181-1.205-.314-2-.314-1.185,0-1.971.301-2.664.566-.608.232-1.134.434-1.949.434-1.049,0-1.906-.335-2.387-.575v-6.425h4Zm3.515,13.552c-.939.934-2.173,1.447-3.477,1.447h-.027c-3.58-.021-5.167-.789-6.832-1.818,1.318-.731,2.821-2.035,2.821-4.181v-.41c.646.225,1.46.41,2.387.41,1.185,0,1.971-.301,2.664-.566.608-.232,1.134-.434,1.949-.434.986,0,1.65.291,2,.5v1.5c0,1.338-.527,2.599-1.485,3.552Z"} />
+    </svg>
+  );
+}
+function StarIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="M22.789,8.85c-.465-1.258-1.554-1.999-2.866-1.945-1.002,.032-2.005,.059-3.006,.079-.445,.038-.866-.284-1.004-.728-.297-.96-.595-1.919-.898-2.877-.408-1.301-1.591-2.142-3.013-2.142s-2.605,.841-3.013,2.141c-.304,.958-.602,1.917-.898,2.877-.138,.445-.54,.769-1.004,.729-1.002-.02-2.005-.046-2.996-.078-1.311-.052-2.414,.688-2.878,1.945-.507,1.372-.081,2.893,1.066,3.789,.812,.623,1.617,1.231,2.421,1.831,.382,.285,.529,.795,.367,1.27-.334,.979-.683,1.962-1.044,2.946-.492,1.301-.142,2.657,.892,3.453,1.09,.841,2.635,.828,3.847-.036l2.558-1.837c.414-.296,.95-.297,1.365,0l2.562,1.84c.613,.436,1.312,.655,1.994,.655,.664,0,1.312-.207,1.849-.621,1.033-.796,1.383-2.152,.895-3.445-.365-.992-.712-1.976-1.047-2.954-.163-.474-.015-.984,.366-1.269,.805-.601,1.611-1.209,2.429-1.837,1.14-.891,1.566-2.412,1.059-3.784Z" />
+    </svg>
+  );
+}
+function BoxIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 512.103 512.103" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="M405.333,0.052H106.667C47.756,0.052,0,47.808,0,106.718l0,0c0,35.346,28.654,64,64,64h384c33.692,0.411,61.813-25.619,64-59.243C514.568,52.562,468.892,2.721,409.979,0.153C408.431,0.085,406.882,0.052,405.333,0.052z" />
+      <path d="M469.333,213.385H42.667c-11.782,0-21.333,9.551-21.333,21.333v170.667C21.404,464.266,69.119,511.981,128,512.052h256c58.881-0.071,106.596-47.786,106.667-106.667V234.718C490.667,222.936,481.115,213.385,469.333,213.385z M320,320.052H192c-11.782,0-21.333-9.551-21.333-21.333s9.551-21.333,21.333-21.333h128c11.782,0,21.333,9.551,21.333,21.333S331.782,320.052,320,320.052z" />
+    </svg>
+  );
+}
+function ShuffleIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="M15.803,7.572h4.141c-.399,.342-.926,.708-1.615,1.047-.495,.244-.699,.844-.455,1.339,.175,.354,.529,.559,.898,.558,.148,0,.299-.033,.441-.103,2.838-1.398,3.636-3.268,3.718-3.477,.092-.235,.091-.496,0-.73-.082-.208-.88-2.069-3.717-3.468-.496-.242-1.095-.041-1.339,.455-.245,.496-.041,1.095,.454,1.339,.685,.338,1.21,.701,1.608,1.04h-4.134c-2.02,0-4.568,.929-5.243,5.357-.014,.09-.062,.331-.062,.331-.646,2.925-1.657,5.632-4.665,5.632-2.072,0-3.06-1.007-3.092-1.04-.371-.41-1.004-.44-1.413-.07-.409,.371-.44,1.003-.069,1.413,.063,.069,1.572,1.697,4.574,1.697,5.029,0,6.143-5.046,6.618-7.202,0,0,.062-.314,.085-.46,.276-1.809,.88-3.658,3.267-3.658Z" />
+      <path d="M1.323,8.203c.191,.178,.435,.266,.679,.266,.267,0,.532-.105,.73-.312,.041-.043,1.028-1.05,3.101-1.05,.87,0,1.596,.215,2.216,.657,.45,.32,1.075,.214,1.395-.235,.32-.45,.215-1.074-.234-1.395-.958-.681-2.094-1.027-3.376-1.027-3.002,0-4.511,1.628-4.574,1.697-.367,.405-.336,1.025,.064,1.398Z" />
+      <path d="M19.214,13.587c-.496-.244-1.094-.041-1.34,.455-.244,.495-.04,1.095,.455,1.339,.689,.339,1.216,.706,1.615,1.047h-4.141c-.548,0-1.029-.099-1.432-.295-.496-.242-1.096-.034-1.337,.462-.241,.497-.035,1.095,.462,1.337,.677,.329,1.453,.496,2.307,.496h4.134c-.398,.34-.923,.703-1.608,1.04-.495,.244-.699,.844-.454,1.339,.174,.353,.528,.558,.897,.558,.148,0,.299-.033,.441-.103,2.837-1.399,3.635-3.26,3.717-3.468,.092-.234,.093-.495,0-.73-.082-.209-.88-2.079-3.718-3.477Z" />
+    </svg>
+  );
+}
+function AngleIcon({ size = 14, down = false }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      {down
+        ? <path d="M19.061,7.854a1.5,1.5,0,0,0-2.122,0l-4.586,4.585a.5.5,0,0,1-.707,0L7.061,7.854A1.5,1.5,0,0,0,4.939,9.975l4.586,4.586a3.5,3.5,0,0,0,4.95,0l4.586-4.586A1.5,1.5,0,0,0,19.061,7.854Z" />
+        : <path d="M15.75,9.525,11.164,4.939A1.5,1.5,0,0,0,9.043,7.061l4.586,4.585a.5.5,0,0,1,0,.708L9.043,16.939a1.5,1.5,0,0,0,2.121,2.122l4.586-4.586A3.505,3.505,0,0,0,15.75,9.525Z" />}
+    </svg>
+  );
+}
 function Undo2Icon({ size = 14 }: any) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
@@ -831,7 +918,7 @@ function AutoTextarea({ value, onChange, placeholder, style }: any) {
   return <textarea ref={ref} value={value} onChange={onChange} placeholder={placeholder} rows={1} style={style} />;
 }
 
-function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, expected, onSetExpected, autoLogDefault, onAutoLogChange }: any) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, onSurf, whisper, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, finishedTs, expected, onSetExpected, autoLogDefault, onAutoLogChange }: any) {
   const [task, setTask] = useState(preset || "");
   const [act, setAct] = useState(0);   // 0 = not rated yet: no weather button pre-highlighted
   const [note, setNote] = useState("");
@@ -853,19 +940,32 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
 
   const mm = String(Math.floor(secs / 60)).padStart(2, "0");
   const ss = String(secs % 60).padStart(2, "0");
+  // Tiny starter (behavioral activation): a 5-minute toe-dip that counts as a real beat if
+  // you stop, and upgrades into the full pomodoro when flow catches. tinyPrev remembers the
+  // real length to restore; tinyCarry folds the dipped minutes into the upgraded log.
+  const [tinyCarry, setTinyCarry] = useState(0);
+  const tinyPrev = useRef(0);
+  const tinyRun = useRef(false);
   const meta: any = tasks.find((t: any) => t.task === task) || {};
   // Build and log the session with explicit ratings (so a tap-to-log doesn't race React state).
   const buildAndAdd = (actualVal: number, expectedVal: number) => {
-    if (!task.trim()) return;
+    // Rhythm first: an unnamed run logs as plain "Focus", and ratings the user skipped are
+    // neutralized (expected = actual) so free pomodoros never fake a feelings surprise.
+    const name = task.trim() || "Focus";
+    const expOut = expectedVal >= 1 ? expectedVal : (actualVal >= 1 ? actualVal : 0);
+    const actOut = actualVal >= 1 ? actualVal : expOut;
     // Minutes actually worked, from the countdown's progress (pauses freeze it, so
     // elapsed = work time): stopping a 25-min pomodoro with 10:00 left logs 15 min.
     // An untouched timer (a manual log) still records the full length.
     const workedSecs = pomoMin * 60 - secs;
-    const workedMin = workedSecs > 0 ? Math.max(1, Math.round(workedSecs / 60)) : pomoMin;
-    onAdd({ id: Date.now(), task: task.trim(), group: meta.group || task.trim(), hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: new Date().toISOString(), expected: expectedVal, actual: actualVal, note: note.trim(), minutes: workedMin }, markDone);
+    const workedMin = (workedSecs > 0 ? Math.max(1, Math.round(workedSecs / 60)) : pomoMin) + tinyCarry;
+    onAdd({ id: Date.now(), task: name, group: meta.group || name, hierarchy: hierarchyText(meta), load: meta.load || null, category: meta.category || null, url: meta.url || null, pageId: meta.id || null, ts: new Date(finished && finishedTs ? finishedTs : Date.now()).toISOString(), expected: expOut, actual: actOut, note: note.trim(), minutes: workedMin }, markDone);
     setNote("");
     setMarkDone(false);
     setAct(0);   // clear the rating so the next pomodoro's finish panel starts unhighlighted
+    if (tinyCarry) setTinyCarry(0);
+    if (tinyPrev.current > 0) { changePomo(tinyPrev.current); tinyPrev.current = 0; }
+    tinyRun.current = false;
   };
   const submit = () => buildAndAdd(act, expected);
   // The "before" rating lives on the timer engine (single source of truth), so the panel, the
@@ -878,9 +978,12 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   const inputStyle: any = { border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 14, width: "100%", borderRadius: 6, padding: "8px 12px", boxSizing: "border-box", lineHeight: 1.5 };
   const rated = expected >= 1 && expected <= 5;
   const hasTask = !!(task && task.trim());
-  const canLog = rated && hasTask;
-  const blockStart = !running && !paused && !pauseActive && !canLog;
-  const logBtn = <button onClick={submit} disabled={!canLog} aria-label={canLog ? undefined : "pick a task and an expected rating first"} style={{ ...btn(C.ink), width: "100%", padding: "10px", opacity: canLog ? 1 : 0.5, cursor: canLog ? "pointer" : "not-allowed" }}>log pomodoro + write Act</button>;
+  // Rhythm first, feeling always: the expected rating is REQUIRED before every fresh start
+  // (free or named), while the task link is optional; a task-less free pomodoro can be named
+  // mid-run or at the end, or logged as plain "Focus". Logging itself is never hard-blocked.
+  const canLog = true as boolean;
+  const blockStart = !running && !paused && !pauseActive && !rated;
+  const logBtn = <button onClick={submit} disabled={!canLog} aria-label={canLog ? undefined : "set an expected rating first"} style={{ ...btn(C.ink), width: "100%", padding: "10px", opacity: canLog ? 1 : 0.5, cursor: canLog ? "pointer" : "not-allowed" }}>log pomodoro + write Act</button>;
   const markDoneLabel = (
     <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 13, color: C.ink, cursor: "pointer" }}>
       <input type="checkbox" checked={markDone} onChange={(e) => setMarkDone(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.better, cursor: "pointer" }} />
@@ -902,31 +1005,23 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
     </>
   );
   return (
+    <>
     <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
         <span style={{ fontFamily: "var(--fl-mono)", fontSize: 30, color: secs === 0 ? C.better : ((running && secs > 0 && (secs <= 60 || [900, 600, 300].some((mk: number) => pomoMin * 60 > mk && secs <= mk && secs >= mk - 2))) ? C.worse : C.ink) }}>{mm}:{ss}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          <InfoHover C={C} label="how the Focus form works" width={360}>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>Focus</div>
-            <div>Pick a task, set your expected feeling, and run the timer; when it finishes you rate how it actually went and the pomodoro is logged.</div>
-            <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-              <li><b>Task</b>: today's tasks from the Plan; each pomodoro adds +1 to that task's Spend in Notion.</li>
-              <li><b>Feeling</b>: the four weathers, rain to full sun; your before and after ratings are both saved.</li>
-              <li><b>Timer</b>: the round buttons set 5 to 30 minutes (hold to speed up); the length locks while a pomodoro runs; the circle arrow resets the timer and task.</li>
-              <li><b>Pause</b>: pausing asks for a reason, yellow for internal, blue for external; it is recorded in the Pause view.</li>
-              <li><b>Log manually</b>: adds a pomodoro without running the timer.</li>
-            </ul>
-          </InfoHover>
-          <button disabled={lenLocked || pomoMin <= 5} onMouseDown={() => beginHold(-1)} onMouseUp={endHold} onMouseLeave={endHold} aria-label={lenLocked ? "length is locked while a pomodoro is running" : "shorter — hold to speed up (min 5)"} style={{ width: 24, height: 24, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: (lenLocked || pomoMin <= 5) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}><MinusIcon size={14} /></button>
-          <button onClick={running ? onPause : () => onStart(task)} disabled={blockStart} aria-label={blockStart ? "pick a task and an expected rating first" : undefined} style={{ ...btn(C.ink), borderRadius: 999, height: 32, padding: "0 21px", minWidth: 84, opacity: blockStart ? 0.5 : 1, cursor: blockStart ? "not-allowed" : "pointer" }}>{running ? "pause" : <>{(paused || pauseActive) ? "resume" : "start"}<span style={{ fontVariantNumeric: "tabular-nums", fontSize: 12.5, marginLeft: 5 }}>{pomoMin}m</span></>}</button>
-          <button disabled={lenLocked || pomoMin >= 30} onMouseDown={() => beginHold(1)} onMouseUp={endHold} onMouseLeave={endHold} aria-label={lenLocked ? "length is locked while a pomodoro is running" : "longer — hold to speed up (max 30)"} style={{ width: 24, height: 24, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: (lenLocked || pomoMin >= 30) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}><PlusIcon size={14} /></button>
-          <button onClick={() => { resetTimer(); setTask(""); onPickTask && onPickTask(""); }} aria-label="reset" style={{ width: 24, height: 24, padding: 0, borderRadius: 999, border: `1.5px solid ${C.faint}`, background: "transparent", color: C.muted, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><RotateCcwIcon size={12} /></button>
+          <button disabled={lenLocked || pomoMin <= 5} onMouseDown={() => beginHold(-1)} onMouseUp={endHold} onMouseLeave={endHold} aria-label={lenLocked ? "length is locked while a pomodoro is running" : "shorter — hold to speed up (min 5)"} style={{ width: 19, height: 19, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: (lenLocked || pomoMin <= 5) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}><MinusIcon size={10} /></button>
+          <button onClick={running ? onPause : () => onStart(task)} disabled={blockStart} aria-label={blockStart ? "rate the expected feeling first" : (running ? "pause" : ((paused || pauseActive) ? "resume" : "start"))} style={{ ...btn("#C57B5A"), borderRadius: 999, height: 32, padding: "0 21px", minWidth: 84, opacity: blockStart ? 0.5 : 1, cursor: blockStart ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>{running ? <PauseIcon size={15} /> : <><PlayIcon size={14} /><span style={{ fontVariantNumeric: "tabular-nums", fontSize: 12.5 }}>{pomoMin}m</span></>}</button>
+          <button disabled={lenLocked || pomoMin >= 30} onMouseDown={() => beginHold(1)} onMouseUp={endHold} onMouseLeave={endHold} aria-label={lenLocked ? "length is locked while a pomodoro is running" : "longer — hold to speed up (max 30)"} style={{ width: 19, height: 19, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: (lenLocked || pomoMin >= 30) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}><PlusIcon size={10} /></button>
+          {!running && !paused && !pauseActive && !finished && <button onClick={() => { tinyPrev.current = pomoMin; tinyRun.current = true; changePomo(5); onStart(task); }} aria-label="tiny start: five quiet minutes with no feeling rating needed; if flow catches you can extend to the full beat at the end" style={{ height: 24, padding: "0 8px", borderRadius: 999, border: "1.5px solid transparent", background: "#EAF3DE", color: C.muted, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 11.5, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap", gap: 3 }}><span style={{ color: C.better, display: "inline-flex" }}><SproutIcon size={13} /></span>5m</button>}
+          <button onClick={onSurf} aria-label="an urge is here? open the surf: rate it, find it on the body, breathe, and decide after the wave" style={{ width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 999, border: "1.5px solid transparent", background: "#DCEAF6", color: "#3E78B2", boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><SeaWaveIcon size={12} /></button>
+          <button onClick={() => { resetTimer(); setTask(""); onPickTask && onPickTask(""); if (tinyPrev.current > 0) { changePomo(tinyPrev.current); tinyPrev.current = 0; } tinyRun.current = false; setTinyCarry(0); }} aria-label="reset" style={{ width: 24, height: 24, padding: 0, borderRadius: 999, border: `1.5px solid ${C.faint}`, background: "transparent", color: C.muted, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><RotateCcwIcon size={12} /></button>
+
         </div>
       </div>
-      <label style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 14, fontSize: 12.5, color: C.muted, cursor: "pointer" }}>
-        <input type="checkbox" checked={!!floatOn} onChange={(e) => setFloatOn(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.ink, cursor: "pointer" }} />
-        open floating window
-      </label>
+      {finished && finishedTs != null && Date.now() - finishedTs > 120000 && (
+        <p style={{ margin: "0 0 12px", fontSize: 12.5, color: C.muted }}>It finished while you were away ({agoText(finishedTs)}). Rate it when you're ready {"\u2014"} it logs at its real end time.</p>
+      )}
       {pauseActive && (
         <div style={{ marginBottom: 14, padding: 10, borderRadius: 8, background: C.paper, border: `1px solid ${C.faint}` }}>
           <p style={{ margin: "0 0 6px", fontSize: 12, color: C.muted }}>Paused — why? Pick a tag; it's written to your note when you resume.</p>
@@ -940,24 +1035,35 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
         </div>
       )}
 
+      {/* New order (feeling first, always): the required rating leads, the optional task
+          link follows, and the floating-window toggle sits last. */}
+      {!finished && <Scale label="Feeling" value={expected} onChange={setExpected} weather />}
+      {!finished && whisper && <div style={{ fontSize: 11.5, color: C.muted, margin: "2px 0 10px" }}>{whisper}</div>}
       {/* The task picker stays visible in both phases — it's the page Act +1 writes to. */}
       <select value={task} onChange={(e) => { setTask(e.target.value); onPickTask && onPickTask(e.target.value); }} style={{ ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
-        <option value="">{tasks.length ? "— pick a task —" : "— no tasks (sync first) —"}</option>
+        <option value="">{tasks.length ? "Link a task (optional)" : "— no tasks (sync first) —"}</option>
         {task && !tasks.some((t: any) => t.task === task) && <option value={task}>{task}</option>}
         {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
       </select>
+      <label style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 14, fontSize: 12.5, color: C.muted, cursor: "pointer" }}>
+        <input type="checkbox" checked={!!floatOn} onChange={(e) => setFloatOn(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.ink, cursor: "pointer" }} />
+        open floating window
+      </label>
 
       {finished ? (
         /* ---------- AFTER the pomodoro: decide Done + next task first; the rating is the
              final tap — with auto-log on, it logs the moment you pick it. ---------- */
         <div style={{ marginTop: 4, padding: 14, borderRadius: 8, background: C.paper, border: `1px solid ${C.better}` }}>
           <p style={{ margin: "0 0 10px", fontSize: 15, fontFamily: "var(--fl-display)", color: C.ink }}>{"\u{1F389}"} Pomodoro done — how did it go?</p>
+          {tinyRun.current && (() => { const more = Math.max(5, (tinyPrev.current || (settings.pomodoroMinutes || 25)) - pomoMin); return (
+            <button onClick={() => { setTinyCarry(tinyCarry + pomoMin); tinyRun.current = false; changePomo(more); onStart(task); }} style={{ ...btn("#C57B5A"), width: "100%", padding: "9px", borderRadius: 999, marginBottom: 10, fontSize: 13 }}><span style={{ display: "inline-flex", marginRight: 6, verticalAlign: "middle" }}><SproutIcon size={14} /></span>{"flow caught: keep going " + more + "m (same beat, log at the end)"}</button>
+          ); })()}
           {markDoneLabel}
           {chooseNextControls}
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
           <Scale label="after: how enjoyable was it actually?" value={act} onChange={rateActual} weather />
           <button onClick={submit} disabled={!act || !canLog}
-            aria-label={!act ? "pick a rating first" : (canLog ? undefined : "pick a task first")}
+            aria-label={!act ? "pick a rating first" : undefined}
             style={{ ...btn(C.ink), width: "100%", padding: "10px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (act && canLog) ? 1 : 0.5, cursor: (act && canLog) ? "pointer" : "not-allowed" }}>
             <img src={starImg} alt="" draggable={false} style={{ width: 16, height: 16 }} /> Light up a star in my Sky
           </button>
@@ -965,7 +1071,6 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
       ) : (
         /* ---------- BEFORE the pomodoro: set the expectation, then start the timer ---------- */
         <div>
-          <Scale label="Feeling" value={expected} onChange={setExpected} weather />
           <button onClick={() => setShowManual((s) => !s)} style={{ ...btn(C.ink), borderRadius: 999, fontSize: 12.5, padding: "6px 14px" }}>{showManual ? "− hide manual log" : "+ log a pomodoro manually"}</button>
           {showManual && (
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
@@ -980,6 +1085,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
         </div>
       )}
     </div>
+    </>
   );
 }
 
@@ -1030,6 +1136,9 @@ export default function FocusLogApp({ api }: any) {
   const [tasks, setTasks] = useState<any[]>(init.tasks);
   // Quick-add: capture box state + the BIG TASK parent choices discovered at sync (Guess 🏔️).
   const [quickParents, setQuickParents] = useState<any[]>(init.quickParents || []);
+  // "Done today" pile: finished tasks crystallize here (restorable) instead of vanishing.
+  const [doneToday, setDoneToday] = useState<any[]>(init.doneToday || []);
+  const [doneOpen, setDoneOpen] = useState(false);
   const [qaName, setQaName] = useState("");
   const [qaParent, setQaParent] = useState("");
   const [qaGuess, setQaGuess] = useState("1");
@@ -1044,18 +1153,30 @@ export default function FocusLogApp({ api }: any) {
   const [clGuess, setClGuess] = useState("1");
   const [clCreating, setClCreating] = useState(false);
   const [clMealEdits, setClMealEdits] = useState<any>({});
-  const [reflectSeed, setReflectSeed] = useState("");
-  const [reflectCount, setReflectCount] = useState<{ left: number; task: string } | null>(null);
+  const [surfCount, setSurfCount] = useState<{ left: number; task: string } | null>(null);
+  const [urges, setUrges] = useState<any[]>(init.urgesSurfed || []);
+  // The guided urge surf (panel-only): one entry per wave, with the intensity curve, body
+  // spots, mood words and the outcome. The float keeps its quick 90-second wave.
+  const [surfOpen, setSurfOpen] = useState(false);
+  const [surf, setSurf] = useState<any>(null);
+  // Body / Emotions share one pane, so the note and the three decisions sit near the top
+  // of the dialog instead of below two full-height sections.
+  const [surfTab, setSurfTab] = useState<"wave" | "body" | "mood">("wave");
+  const [nowTick, setNowTick] = useState(Date.now());
+  useEffect(() => { if (!surfOpen) return; const iv = window.setInterval(() => setNowTick(Date.now()), 1000); return () => window.clearInterval(iv); }, [surfOpen]);
   const [pending, setPending] = useState<any[]>(init.pending);
   const [doneSess, setDoneSess] = useState<any>({});
-  const [view, setView] = useState("today");
+  const [view, setView] = useState("log");
   // Status view bundles the old week/month/totals; its right-side vertical control picks the sub-view.
-  const [statusSub, setStatusSub] = useState("month");
+  const [calibSub, setCalibSub] = useState("today");
+  // Total and Log remember their own last panel, so stepping away to Calendar and back returns
+  // you to what you were reading instead of resetting to the first entry.
+  const [totalSub, setTotalSub] = useState("calib");
+  const [logSub, setLogSub] = useState("calib");
   // The daily note focused in the workspace (ms timestamp), null when none: drives the calendar outline.
   const [activeDaily, setActiveDaily] = useState<number | null>(api.getActiveDaily ? api.getActiveDaily() : null);
   useEffect(() => { if (!api.onActiveDaily) return; return api.onActiveDaily((ts: number | null) => setActiveDaily(ts)); }, []);
   const [preset, setPreset] = useState("");
-  const [weekOff, setWeekOff] = useState(0);
   const [monthOff, setMonthOff] = useState(0);
   const [introOpen, setIntroOpen] = useState(false);   // the Timeline's formatted how-it-works hover card
   // Scroll the wheel over the "Mon Year" label to spin through months (down = next, up = previous).
@@ -1089,7 +1210,7 @@ export default function FocusLogApp({ api }: any) {
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [view, statusSub]);
+  }, [view]);
   const [sync, setSync] = useState("idle");
   const [pendingSyncRebuild, setPendingSyncRebuild] = useState(false); // sync also rebuilds the timeline (subsumes the old restart), deferred until the fresh tasks land in state
   const [flash, setFlash] = useState("");
@@ -1173,8 +1294,66 @@ export default function FocusLogApp({ api }: any) {
   const [newMorning, setNewMorning] = useState("");
   const [newNight, setNewNight] = useState("");
   const [routineDrag, setRoutineDrag] = useState<{ w: string; i: number } | null>(null);
-  const [unfoldedDone, setUnfoldedDone] = useState<any>({});   // finished routine groups the user re-opened
   const [routineOver, setRoutineOver] = useState<{ w: string; i: number } | null>(null);
+  // Pill interactions: a long-press or double-click "arms" a pill (edit + delete icons show);
+  // the pending-click timer is what tells a plain tick apart from the first half of a double.
+  const [armedRoutineId, setArmedRoutineId] = useState<string | null>(null);
+  const [addingRoutine, setAddingRoutine] = useState<string | null>(null);   // which routine's add pill is an open input
+  const routineHold = useRef<number | null>(null);
+  const routineHoldFired = useRef(false);
+  const routineClickPend = useRef<{ id: string; t: number } | null>(null);
+  const editRoutineWhich = useRef("morning");
+  // One outside-click brain for the pills, in capture phase so it runs before the click lands:
+  // an armed pill disarms, an open editor SAVES (the back arrow inside it is the only way out
+  // without saving), and an open add pill commits whatever was typed.
+  useEffect(() => {
+    if (!armedRoutineId && !editRoutineId && addingRoutine == null) return;
+    const onDown = (e: any) => {
+      const host = e.target instanceof Element ? e.target.closest("[data-rpill]") : null;
+      const key = host ? host.getAttribute("data-rpill") : null;
+      if (editRoutineId && key !== "edit:" + editRoutineId) saveEditRoutine(editRoutineWhich.current);
+      if (armedRoutineId && key !== "armed:" + armedRoutineId) setArmedRoutineId(null);
+      if (addingRoutine != null && key !== "add:" + addingRoutine) {
+        const v = (addingRoutine === "morning" ? newMorning : newNight).trim();
+        if (v) addRoutine(addingRoutine);
+        setAddingRoutine(null);
+      }
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [armedRoutineId, editRoutineId, addingRoutine, editRoutineName, editRoutineDur, newMorning, newNight]);
+  // How many pomodoros still fit between now and the night routine, once meals, short breaks
+  // and the long break every N are taken out of it. A ceiling, not a target: it answers "how
+  // much room is left" without saying which task belongs in which slot. The window is the two
+  // My-day settings: it opens when the morning routine ends and shuts when the night one starts.
+  const pomosLeftToday = (() => {
+    const dayStart = settings.dayStart ?? 240;
+    const band = (m: number) => (m < dayStart ? m + 1440 : m);
+    const pomo = Math.max(1, settings.pomodoroMinutes ?? 25);
+    const shortB = Math.max(0, settings.breakMinutes ?? 5);
+    const longB = Math.max(0, settings.longBreakMinutes ?? 20);
+    const every = Math.max(1, settings.longBreakEvery ?? 3);
+    const d = new Date();
+    let t = Math.max(band(d.getHours() * 60 + d.getMinutes()), band(settings.morningRoutineEnds ?? 540));
+    const end = band(settings.nightRoutineStarts ?? 1215);
+    const meals: any[] = [];
+    if (settings.lunchEnabled) { const s = band(settings.lunchStart ?? 750); meals.push({ s, e: s + (settings.lunchMinutes ?? 45) }); }
+    if (settings.dinnerEnabled) { const s = band(settings.dinnerStart ?? 1110); meals.push({ s, e: s + (settings.dinnerMinutes ?? 45) }); }
+    let n = 0, sinceLong = 0, guard = 0;
+    while (guard++ < 400) {
+      // A meal the pomodoro would run into pushes it past, and counts as a rest.
+      let moved = false;
+      for (const m of meals) if (t < m.e && t + pomo > m.s) { t = m.e; sinceLong = 0; moved = true; }
+      if (moved) continue;
+      if (t + pomo > end) break;
+      n++; t += pomo; sinceLong++;
+      if (t >= end) break;
+      const isLong = sinceLong >= every;
+      t += isLong ? longB : shortB;
+      if (isLong) sinceLong = 0;
+    }
+    return n;
+  })();
   // Timeline (daily plan): timelineMode swaps the today list for the time axis.
   const [timelineMode, setTimelineModeState] = useState(false);
   const [plans, setPlans] = useState<any>(init.plans || {});
@@ -1208,7 +1387,7 @@ export default function FocusLogApp({ api }: any) {
   }, [timelineMode]);
   const [expandedPast, setExpandedPast] = useState<Set<string>>(new Set());
   // The logged-history lists (All sessions / breaks / pauses) start folded.
-  const [foldedHistory, setFoldedHistory] = useState<Set<string>>(new Set(["sessions", "breaks", "pauses"]));
+  const [foldedHistory, setFoldedHistory] = useState<Set<string>>(new Set());
   const toggleFold = (k: string) => setFoldedHistory((s: Set<string>) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   // The break is now owned by the shared timer engine (so the panel and the floating
   // window stay in lock-step). `brk` below is derived from the engine state; these
@@ -1334,8 +1513,8 @@ export default function FocusLogApp({ api }: any) {
   // in this session keeps the task (sawRun stays true), but a paused pomodoro left over from before
   // a restart/reopen is never adopted, so a fresh panel shows "— pick a task —" instead of it.
   const sawRun = useRef(false);
-  if (timer.running) sawRun.current = true;
-  useEffect(() => { if (sawRun.current && (timer.running || timer.paused) && timer.taskName) setPreset(timer.taskName); }, [timer.taskName, timer.running, timer.paused]);
+  if (timer.running || timer.adopted) sawRun.current = true;   // adopted-from-disk counts as seen live
+  useEffect(() => { if (sawRun.current && (timer.running || timer.paused || (timer.adopted && timer.startedAt != null)) && timer.taskName) setPreset(timer.taskName); }, [timer.taskName, timer.running, timer.paused]);
   const pomoMin = timer.lengthMin;
   const lenLocked = timer.running || timer.paused; // freeze −/+ while a pomodoro is active
   // Pause-with-reason state is owned by the engine (shared with the floating window);
@@ -1343,36 +1522,30 @@ export default function FocusLogApp({ api }: any) {
   const pauseActive = timer.pauseStart != null;
   const pauseTag = timer.pauseTag || "";
   const setPauseTag = (t: string) => api.timer.setPauseTag(t);
-  const [reflections, setReflections] = useState<any[]>(init.reflections || []);
   const [calibrations, setCalibrations] = useState<any[]>(init.calibrations || []);
+  const [cuEdit, setCuEdit] = useState<{ id: any; v: string } | null>(null);   // the catch-up row being named
   const [calibDraft, setCalibDraft] = useState<any>(null);   // the "+ 🍅" / finished-early popup model
   const [areaOptions, setAreaOptions] = useState<string[]>(init.areaOptions || []);   // Notion Area options for the add-block dropdown
-  const reflectFeelings = init.feelings && Object.keys(init.feelings).length ? init.feelings : {};
-  const onSaveReflection = (r: any) => {
-    const entry = { id: "rf" + Date.now(), ts: new Date().toISOString(), tag: pauseTag || "", thoughts: r.thoughts || [], body: r.body || [], mood: r.mood || [] };
-    const next = [...reflections, entry];
-    setReflections(next);
-    api.saveReflections && api.saveReflections(next);
-    api.notify && api.notify("Reflection saved", 1500);
-  };
+  const feelingWords = init.feelings && Object.keys(init.feelings).length ? init.feelings : {};
 
   const resetTimer = () => api.timer.reset();
   // Restarting a LIVE pomodoro is a fork in the day ("this isn't what I want to be doing").
   // The HARD 5-second countdown is owned by the plugin core, so the float mirrors it on its
-  // own face and cancel on either surface cancels both. Expiry lands here via onReflectGo.
+  // own face and cancel on either surface cancels both. Expiry lands here via onSurfGo.
   // Only manual reset buttons take this path; logging and next-task handoffs reset silently.
   const restartTimer = () => {
     const live = running || timer.paused;
     const tname = timer.task || preset;
     resetTimer();
-    if (live && api.beginReflectCountdown) api.beginReflectCountdown(tname || "");
+    if (live && api.beginSurfCountdown) api.beginSurfCountdown(tname || "");
   };
   useEffect(() => {
-    if (api.onReflectCount) api.onReflectCount((st: any) => setReflectCount(st));
-    if (api.onReflectGo) api.onReflectGo((task: string) => {
-      setReflectSeed(task ? "restarted: " + task : "restarted a pomodoro");
-      setView("reflect");
-    });
+    if (api.onSurfCount) api.onSurfCount((st: any) => setSurfCount(st));
+    if (api.onUrgeSurfed) api.onUrgeSurfed((arr: any[]) => setUrges([...(arr || [])]));
+    // (see also the anchor-prompt interval below)
+    // The core hands back the task that was interrupted, so the wave opens named even though
+    // the timer has already been reset out from under it.
+    if (api.onSurfGo) api.onSurfGo((task: string) => openSurf(task));
   }, []);
   const changePomo = (n: number) => api.timer.setLength(n);
   const stepPomo = (delta: number) => api.timer.step(delta);
@@ -1464,6 +1637,7 @@ export default function FocusLogApp({ api }: any) {
 
   const persist = useCallback((next: any[]) => { setSessions(next); api.saveSessions(next); }, [api]);
   const savePending = useCallback((next: any[]) => { setPending(next); api.savePending(next); }, [api]);
+  const saveDone = (arr: any[]) => { setDoneToday(arr); api.saveDoneToday && api.saveDoneToday(arr); };
 
   const startEdit = (s: any) => {
     setEditingId(s.id);
@@ -1489,7 +1663,7 @@ export default function FocusLogApp({ api }: any) {
 
   const doSync = async () => {
     setSync("loading");
-    try { const fresh = await api.sync(); setTasks(fresh); setDoneSess({}); setSync("ok"); setPendingSyncRebuild(true); if (api.getInitial) setAreaOptions(api.getInitial().areaOptions || []); if (api.getQuickParents) setQuickParents(api.getQuickParents()); setFlash(fresh.length + " tasks loaded from Notion, timeline rebuilt."); }
+    try { const fresh = await api.sync(); setTasks(fresh); setDoneSess({}); setSync("ok"); setPendingSyncRebuild(true); if (api.getInitial) setAreaOptions(api.getInitial().areaOptions || []); if (api.getQuickParents) setQuickParents(api.getQuickParents()); const fids = new Set(fresh.map((t: any) => t.id)); setDoneToday((dp: any[]) => { const nd = dp.filter((e: any) => !fids.has(e.id)); if (nd.length !== dp.length && api.saveDoneToday) api.saveDoneToday(nd); return nd; }); setFlash(fresh.length + " tasks loaded from Notion; plan merged, your arrangement kept."); }
     catch (e: any) { setSync("error"); setFlash("Sync failed: " + (e?.message || e)); }
   };
 
@@ -1545,10 +1719,26 @@ export default function FocusLogApp({ api }: any) {
     if (markDone && s.pageId && api.setDone) {
       try {
         const meta = tasks.find((t) => t.id === s.pageId);
-        const name = await api.setDone(s.pageId);
+        const res: any = await api.setDone(s.pageId);
+        const doneName = res && res.name ? res.name : res;
         const nt = tasks.filter((t) => t.id !== s.pageId);
         setTasks(nt); api.saveTasks(nt);
-        msg += " Status set to " + name + ".";
+        msg += " Status set to " + doneName + ".";
+        // Finishing CRYSTALLIZES instead of erasing: the task joins the local "Done today"
+        // pile (restorable; sync reconciles it by id), its worked blocks stay struck-through
+        // on the timeline, and only its unneeded FUTURE blocks are removed.
+        if (meta) {
+          const d0 = new Date();
+          let nowTl0 = d0.getHours() * 60 + d0.getMinutes();
+          const mid0 = (tlStart + tlEnd) / 2;
+          if (Math.abs(nowTl0 + 1440 - mid0) < Math.abs(nowTl0 - mid0)) nowTl0 += 1440;
+          const bl0 = todayBlocks();
+          if (bl0.length) setTodayBlocks(bl0
+            .filter((b: any) => !(b.kind === "task" && b.pageId === meta.id && !b.claimed && b.start >= nowTl0))
+            .map((b: any) => (b.kind === "task" && b.pageId === meta.id ? { ...b, done: true, placed: true, created: b.created || Date.now() } : b)));
+          const spendFinal = newSpend != null ? newSpend : (meta.act || 0) + 1;
+          saveDone([...doneToday.filter((e: any) => e.id !== meta.id), { id: meta.id, task: meta.task, prevSchedule: res && res.prev ? res.prev : null, ts: Date.now(), spend: spendFinal, guess: meta.pomodoros || 0, meta: { ...meta, act: spendFinal } }]);
+        }
         // Finished under the guess: offer the blame-free reflection (the spare tomato is a gift).
         const spendNow = newSpend != null ? newSpend : ((meta && meta.act) || 0) + 1;
         const target = (meta && meta.pomodoros) || 0;
@@ -1590,14 +1780,6 @@ export default function FocusLogApp({ api }: any) {
     setFlash(bits.join(" "));
   };
 
-  const weekStart = new Date(logicalWeekStart(Date.now(), settings).getTime() + weekOff * 7 * DAY);
-  const weekEnd = new Date(weekStart.getTime() + 7 * DAY);
-  const weekSessions = sessions.filter((s) => { const d = logicalDay(s.ts, settings); return d >= weekStart && d < weekEnd; });
-  // Week view groups by Area (the Notion select), merging every task that shares an
-  // area into one chart. Sessions with no area are left out, so empty areas never
-  // get a plot. First-seen order is kept.
-  const weekAreas = Array.from(new Set(weekSessions.map((s) => s.category).filter(Boolean)));
-
   // "Today" for the month grid and the this-month / this-year totals is the real CALENDAR date, not
   // the day-start-shifted logical day. Otherwise, past the day-start (e.g. 20:00) the reference rolls
   // into tomorrow and the calendar jumps to next month while the wall clock still says today.
@@ -1609,6 +1791,17 @@ export default function FocusLogApp({ api }: any) {
   const countWeek = inWeek.length;
   const countMonth = inMonth.length;
   const countYear = inYear.length;
+  // The evidence whisper (CBT restructuring with the user's own data): when the current
+  // forecast is rainy (expected 1-2), quietly show how the last rainy forecasts actually
+  // landed. No pep talk, no argument — just the history, at the moment of the prediction.
+  const rainWhisper = (() => {
+    const exp = timer.expected;
+    if (!(exp >= 1 && exp <= 2)) return null;
+    const past = sessions.filter((s: any) => s.expected >= 1 && s.expected <= 2 && s.actual >= 1).slice(-12);
+    if (past.length < 3) return null;
+    const sunnier = past.filter((s: any) => s.actual > s.expected).length;
+    return "Your last " + past.length + " rainy forecasts: " + sunnier + " ended sunnier than expected.";
+  })();
   const countToday = sessions.filter((s) => sameLogicalDay(s.ts, Date.now(), settings)).length;
   const sumMin = (arr: any[]) => arr.reduce((a, s) => a + (Number(s.minutes) || 25), 0);
   const hrsOf = (mins: number) => (Math.round(mins / 6) / 10).toFixed(1);
@@ -1631,21 +1824,6 @@ export default function FocusLogApp({ api }: any) {
   });
   const bestBand = bandStats.filter((b) => b.avg != null).sort((a: any, b: any) => b.avg - a.avg)[0];
 
-  // Break-feeling insights: only rated breaks (feeling 1-5) feed these; legacy/unrated breaks
-  // (feeling null/undefined) are excluded everywhere.
-  const ratedBreaks = breaks.filter((b: any) => b.feeling != null);
-  // Per-activity restorative score: average feeling across every break whose activities include it.
-  const actScore = activities.map((a: any) => {
-    const list = ratedBreaks.filter((b: any) => (b.activities || []).includes(a.name));
-    const n = list.length;
-    return { id: a.id, name: a.name, area: a.area || "Other", n, avg: n ? list.reduce((x: number, b: any) => x + b.feeling, 0) / n : null };
-  }).filter((x: any) => x.n > 0).sort((p: any, q: any) => (q.avg as number) - (p.avg as number) || q.n - p.n);
-  // Best time of day for breaks — mirrors the pomodoro bandStats above.
-  const breakBandStats = [0, 1, 2].map((b) => {
-    const list = ratedBreaks.filter((x: any) => bandOf(x.start, settings) === b);
-    return { band: b, name: BAND_NAME[b], count: list.length, avg: list.length ? list.reduce((a: number, x: any) => a + x.feeling, 0) / list.length : null };
-  });
-  const bestBreakBand = breakBandStats.filter((b) => b.avg != null).sort((a: any, b: any) => b.avg - a.avg)[0];
   // Falling-enjoyment nudge: average actual of today's last two pomodoros dropped >=1 vs the prior two.
   const todaySess = sessions.filter((s: any) => sameLogicalDay(s.ts, Date.now(), settings)).sort((a: any, b: any) => +new Date(a.ts) - +new Date(b.ts));
   const fallingEnjoyment = (() => {
@@ -1687,9 +1865,22 @@ export default function FocusLogApp({ api }: any) {
   });
   const tagNamesSorted = pauseTags.map((t: any) => t.name).slice().sort();
   const tagIdx = (n: any) => Math.max(0, tagNamesSorted.indexOf(n)) % MACARON.length;
+  // A logged pause stores only its tag NAME, so the category comes from the live tag list.
+  const pauseCatOf = (name: any) => (pauseTags.find((t: any) => t.name === name) || {}).category;
   const tagColor = (n: any) => MACARON[tagIdx(n)].fill;
   const tagBorder = (n: any) => MACARON[tagIdx(n)].border;
   const openLog = (leafTask: string) => { setPreset(leafTask); setView("log"); };
+  const openSurf = (taskName?: any) => { const seedTask = typeof taskName === "string" ? taskName : ""; setNowTick(Date.now()); setSurfTab("wave"); setSurf({ startTs: Date.now(), task: seedTask || timer.task || preset || "", curve: [], body: [], moods: [], note: "" }); setSurfOpen(true); };
+  const finishSurf = (outcome: string) => {
+    if (!surf) return;
+    const entry = { id: surf.startTs, ts: surf.startTs, endTs: Date.now(), task: surf.task, curve: surf.curve, body: (surf.body || []).map((b: any) => ({ part: b.part, note: (b.note || "").trim() })), moods: surf.moods, note: (surf.note || "").trim(), outcome };
+    const arr = [...urges, entry];
+    setUrges(arr); api.saveUrges && api.saveUrges(arr);
+    setSurfOpen(false); setSurf(null);
+    if (outcome === "paused") { api.timer && api.timer.pause(); }
+    if (outcome === "surfed") api.notify && api.notify("\u{1F30A} Surfed. It counts.");
+    if (outcome === "acted") api.notify && api.notify("A deliberate yes after the wave is still a win.");
+  };
   // Quick-add: one box that creates the Notion page (using the user's template presets), mirrors
   // it into the task list instantly, drops a placed 25-minute block at NOW on today's plan, and
   // arms the Focus form, so capturing a spontaneous task costs one Enter.
@@ -1982,12 +2173,20 @@ export default function FocusLogApp({ api }: any) {
   const activeMorning = dayMode === "relax" ? relaxMorning : morningRoutine;
   const activeNight = dayMode === "relax" ? relaxNight : nightRoutine;
   const isRoutineDone = (id: string) => (routineDone[todayKey] || []).includes(id);
+  const morningPromptDay = useRef("");
   const toggleRoutineDone = (id: string) => {
     const cur = routineDone[todayKey] || [];
-    const nextList = cur.includes(id) ? cur.filter((x: string) => x !== id) : [...cur, id];
+    const turningOn = !cur.includes(id);
+    const nextList = turningOn ? [...cur, id] : cur.filter((x: string) => x !== id);
     const next = { ...routineDone, [todayKey]: nextList };
     setRoutineDone(next);
     api.saveRoutineDone && api.saveRoutineDone(next);
+    // Anchor prompt (after X, do Y): the moment the LAST morning step is ticked, offer the
+    // day's first beat. Once per day, and only while the engine is fully idle.
+    if (turningOn && morningPromptDay.current !== todayKey && activeMorning.length > 0 && activeMorning.some((x: any) => x.id === id) && activeMorning.every((x: any) => nextList.includes(x.id)) && !running && !timer.paused && !timer.breakActive && api.notifyClickable) {
+      morningPromptDay.current = todayKey;
+      api.notifyClickable("Morning routine done ✨ Feel, then start the first beat?", () => setView("log"));
+    }
   };
   const routineSaver = (which: string) => (dayMode === "relax" ? (which === "morning" ? saveRelaxMorning : saveRelaxNight) : (which === "morning" ? saveMorning : saveNight));
   const routineList = (which: string) => (which === "morning" ? activeMorning : activeNight);
@@ -2052,87 +2251,102 @@ export default function FocusLogApp({ api }: any) {
   const renderRoutineBlock = (which: string, hideHeader?: boolean) => {
     const list = routineList(which);
     const relax = dayMode === "relax";
-    const label = which === "morning" ? <><SectionIcon src={blindsImg} /> Morning</> : <><SectionIcon src={tableLampImg} /> Night</>;
+    const label = which === "morning" ? <><SectionIcon src={roosterImg} /> Morning</> : <><SectionIcon src={batImg} /> Night</>;
     const newVal = which === "morning" ? newMorning : newNight;
     const setNewVal = which === "morning" ? setNewMorning : setNewNight;
+    const theme = ROUTINE_THEME[which];
+    const tick = relax ? C.better : MODE_COLORS.work.solid;
+    const addLabel = which === "morning" ? "add a morning step" : "add a night step";
+    const clearHold = () => { if (routineHold.current) { window.clearTimeout(routineHold.current); routineHold.current = null; } };
+    // The add pill lives at the tail of the LAST group (or stands alone when the list is
+    // empty / the last group is folded). Click = an inline input; Enter chains more adds;
+    // clicking anywhere else commits whatever is typed (the document listener).
+    const addPill = addingRoutine === which ? (
+      <span key="add" data-rpill={"add:" + which} style={{ display: "inline-flex", alignItems: "center", padding: "4px 12px", borderRadius: 999, border: `1.5px dashed ${theme.bar}`, background: C.paper }}>
+        <input autoFocus value={newVal} onChange={(e) => setNewVal(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") addRoutine(which); if (e.key === "Escape") { setNewVal(""); setAddingRoutine(null); } }}
+          placeholder={addLabel} aria-label={addLabel}
+          style={{ width: 150, border: "none", boxShadow: "none", outline: "none", background: "transparent", color: C.ink, fontSize: 12.5, fontFamily: "var(--fl-display)", padding: 0 }} />
+      </span>
+    ) : (
+      <button key="add" onClick={() => setAddingRoutine(which)} aria-label={addLabel}
+        onDragOver={(e) => { e.preventDefault(); if (!routineOver || routineOver.w !== which || routineOver.i !== list.length) setRoutineOver({ w: which, i: list.length }); }}
+        onDrop={(e) => { e.preventDefault(); if (routineDrag && routineDrag.w === which) moveRoutine(which, routineDrag.i, list.length); setRoutineDrag(null); setRoutineOver(null); }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", height: "auto", borderRadius: 999, border: `1.5px dashed ${C.faint}`, background: "transparent", color: C.muted, boxShadow: "none", fontSize: 12.5, fontFamily: "var(--fl-display)", cursor: "pointer" }}>+ {addLabel}</button>
+    );
+    const renderPill = (it: any, i: number) => {
+      const done = isRoutineDone(it.id);
+      const dragging = !!routineDrag && routineDrag.w === which && routineDrag.i === i;
+      const over = !!routineOver && routineOver.w === which && routineOver.i === i && !!routineDrag && !dragging;
+      if (editRoutineId === it.id) {
+        // Editing in place: the back arrow leaves without saving; Enter, or a click anywhere
+        // outside the pill, keeps the change (the document listener does that part).
+        return (
+          <span key={it.id} data-rpill={"edit:" + it.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 9px 4px 12px", borderRadius: 999, border: `1.5px solid ${C.ink}`, background: C.card }}>
+            <input autoFocus value={editRoutineName} onChange={(e) => setEditRoutineName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") saveEditRoutine(which); if (e.key === "Escape") setEditRoutineId(null); }}
+              aria-label="rename this step (Enter or a click elsewhere saves; the arrow goes back without saving)"
+              style={{ width: Math.max(70, Math.min(220, editRoutineName.length * 7 + 24)), border: "none", boxShadow: "none", outline: "none", background: "transparent", color: C.ink, fontSize: 12.5, fontFamily: "var(--fl-display)", padding: 0 }} />
+            <button onClick={() => setEditRoutineId(null)} aria-label="go back without saving" style={{ ...ICON_BTN, padding: 0 }}><Undo2Icon size={13} /></button>
+          </span>
+        );
+      }
+      const armed = armedRoutineId === it.id;
+      return (
+        <span key={it.id} data-rpill={"armed:" + it.id} draggable={!armed}
+          onDragStart={(e) => { clearHold(); setRoutineDrag({ w: which, i }); e.dataTransfer.effectAllowed = "move"; }}
+          onDragEnd={() => { setRoutineDrag(null); setRoutineOver(null); }}
+          onDragOver={(e) => { e.preventDefault(); if (!routineOver || routineOver.w !== which || routineOver.i !== i) setRoutineOver({ w: which, i }); }}
+          onDrop={(e) => { e.preventDefault(); if (routineDrag && routineDrag.w === which) moveRoutine(which, routineDrag.i, i); setRoutineDrag(null); setRoutineOver(null); }}
+          onPointerDown={() => { routineHoldFired.current = false; clearHold(); routineHold.current = window.setTimeout(() => { routineHold.current = null; routineHoldFired.current = true; setArmedRoutineId(it.id); }, 500); }}
+          onPointerUp={clearHold} onPointerLeave={clearHold} onPointerCancel={clearHold}
+          onClick={() => {
+            if (routineHoldFired.current) { routineHoldFired.current = false; return; }   // the click that ends a long-press
+            if (armed) return;                                                            // the icons own an armed pill's clicks
+            const pend = routineClickPend.current;
+            if (pend && pend.id === it.id) { window.clearTimeout(pend.t); routineClickPend.current = null; setArmedRoutineId(it.id); return; }   // double click
+            if (pend) { window.clearTimeout(pend.t); routineClickPend.current = null; toggleRoutineDone(pend.id); }   // a stray pending tick on another pill
+            routineClickPend.current = { id: it.id, t: window.setTimeout(() => { routineClickPend.current = null; toggleRoutineDone(it.id); }, 260) };
+          }}
+          role="button" aria-label={it.name + (done ? " — done." : ".") + " Click to tick it off; hold or double-click for edit and delete; drag to rearrange"}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 999, fontSize: 12.5, fontFamily: "var(--fl-display)", background: armed ? C.card : theme[relax ? "relax" : "work"], border: `1.5px solid ${armed ? C.ink : theme.bar}`, color: done ? C.muted : C.ink, opacity: dragging ? 0.4 : 1, boxShadow: over ? `-3px 0 0 0 ${C.ink}` : "none", cursor: "pointer", userSelect: "none", maxWidth: "100%" }}>
+          {done && <span style={{ color: tick, display: "inline-flex", flexShrink: 0 }}><CheckIcon size={11} /></span>}
+          <span style={{ textDecoration: done ? "line-through" : "none", overflowWrap: "anywhere", minWidth: 0 }}>{it.name}</span>
+          {armed && <>
+            <button onClick={(e) => { e.stopPropagation(); setEditRoutineId(it.id); setEditRoutineName(it.name); setEditRoutineDur(it.dur || ROUTINE_MIN); editRoutineWhich.current = which; setArmedRoutineId(null); }} aria-label="edit" style={{ ...ICON_BTN, padding: 0 }}><PencilIcon size={13} /></button>
+            <button onClick={(e) => { e.stopPropagation(); setArmedRoutineId(null); removeRoutine(which, it.id); }} aria-label="delete" style={{ ...ICON_BTN, padding: 0, color: "#C06A57" }}><TrashIcon size={13} /></button>
+          </>}
+        </span>
+      );
+    };
     return (
       <div>
         {!hideHeader && <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>{label}</h3>}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {list.length === 0 && <p style={{ color: C.muted, fontSize: 12.5, margin: "0 0 0 2px" }}>None yet — add one below.</p>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {(() => {
           const groups = groupRoutine(list, settings.routineGroupMinutes || 25);
+          if (!groups.length) return <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{addPill}</div>;
           let flat = -1;
-          const renderStepRow = (it: any, i: number) => {
-            const done = isRoutineDone(it.id);
-            const dragging = !!routineDrag && routineDrag.w === which && routineDrag.i === i;
-            const over = !!routineOver && routineOver.w === which && routineOver.i === i && !!routineDrag && !(routineDrag.w === which && routineDrag.i === i);
-            if (editRoutineId === it.id) {
-              return (
-                <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
-                  <input value={editRoutineName} onChange={(e) => setEditRoutineName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveEditRoutine(which); if (e.key === "Escape") setEditRoutineId(null); }} autoFocus style={{ flex: 1, minWidth: 80, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px", fontFamily: "var(--fl-display)" }} />
-                  <input type="number" value={editRoutineDur} onChange={(e) => setEditRoutineDur(Number(e.target.value))} onKeyDown={(e) => { if (e.key === "Enter") saveEditRoutine(which); if (e.key === "Escape") setEditRoutineId(null); }} aria-label="length in minutes" style={{ width: 52, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 6px" }} />
-                  <span style={{ fontSize: 11, color: C.muted, flexShrink: 0 }}>min</span>
-                  <button onClick={() => saveEditRoutine(which)} aria-label="save" style={{ ...btn(ACCENT), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
-                  <button onClick={() => setEditRoutineId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
-                </div>
-              );
-            }
-            return (
-              <div key={it.id} className="fl-act-row"
-                onDragOver={(e) => { e.preventDefault(); if (!routineOver || routineOver.w !== which || routineOver.i !== i) setRoutineOver({ w: which, i }); }}
-                onDrop={(e) => { e.preventDefault(); if (routineDrag && routineDrag.w === which) moveRoutine(which, routineDrag.i, i); setRoutineDrag(null); setRoutineOver(null); }}
-                style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "7px 10px", background: ROUTINE_THEME[which][relax ? "relax" : "work"], border: `1px solid ${C.line}`, borderLeft: `4px solid ${ROUTINE_THEME[which].bar}`, borderRadius: 6, color: C.ink, opacity: dragging ? 0.4 : 1, boxShadow: over ? `inset 0 2px 0 ${C.ink}` : "none" }}>
-                <span draggable onDragStart={(e) => { setRoutineDrag({ w: which, i }); e.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => { setRoutineDrag(null); setRoutineOver(null); }} aria-label="drag to reorder" style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}>
-                  {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
-                </span>
-                <button onClick={() => toggleRoutineDone(it.id)} aria-label={done ? "mark not done" : "mark done"} style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 5, border: `1.5px solid ${done ? (relax ? C.better : MODE_COLORS.work.solid) : C.faint}`, background: done ? (relax ? C.better : MODE_COLORS.work.solid) : "transparent", color: "#fff", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{done && <CheckIcon size={12} />}</button>
-                <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", textDecoration: done ? "line-through" : "none", color: done ? C.muted : C.ink }}>{it.name}</span>
-                <button onClick={() => openLog(it.name)} className="fl-rowact fl-collapse" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={13} /></button>
-                <button onClick={() => { setEditRoutineId(it.id); setEditRoutineName(it.name); setEditRoutineDur(it.dur || 15); }} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-                <button onClick={() => removeRoutine(which, it.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
-              </div>
-            );
-          };
-          // One header row per pomodoro-sized group, with a play that runs the whole group as a
-          // single pomodoro (named like the timeline block), then the group's step rows.
           return groups.map((g: any, gi: number) => {
             const gname = routineGroupName(which, gi, groups.length);
-            const gKey = which + ":" + gi;
             const gDone = g.steps.length > 0 && g.steps.every((it: any) => isRoutineDone(it.id));
-            const tick = relax ? C.better : MODE_COLORS.work.solid;
-            // A fully ticked group folds to one line; click it to peek at (or untick) the steps.
-            if (gDone && !unfoldedDone[gKey]) {
-              flat += g.steps.length;
-              return (
-                <div key={"g" + gi} onClick={() => setUnfoldedDone((m: any) => ({ ...m, [gKey]: true }))} role="button" aria-label={`finished — click to show the ${g.steps.length} steps`}
-                  style={{ display: "flex", alignItems: "center", gap: 6, marginTop: gi ? 6 : 0, padding: "0 2px", cursor: "pointer" }}>
-                  <span style={{ fontSize: 10, color: C.muted, width: 14, textAlign: "center" }}>{"▸"}</span>
-                  <span style={{ color: tick, display: "inline-flex" }}><CheckIcon size={13} /></span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: C.muted, fontFamily: "var(--fl-display)", textDecoration: "line-through" }}>{gname}</span>
-                  <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>{g.dur}m</span>
-                </div>
-              );
-            }
+            const last = gi === groups.length - 1;
+            // Pills carry their own done state, so a finished group just strikes its name.
             return (
               <React.Fragment key={"g" + gi}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: gi ? 6 : 0, padding: "0 2px" }}>
-                  {gDone
-                    ? <span onClick={() => setUnfoldedDone((m: any) => ({ ...m, [gKey]: false }))} role="button" aria-label="fold the finished group" style={{ fontSize: 10, color: C.muted, width: 14, textAlign: "center", cursor: "pointer", flexShrink: 0 }}>{"▾"}</span>
-                    : <span style={{ width: 14, flexShrink: 0 }} />}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: gi ? 8 : 0, padding: "0 2px" }}>
+                  {gDone && <span style={{ color: tick, display: "inline-flex", flexShrink: 0 }}><CheckIcon size={13} /></span>}
                   <span style={{ fontSize: 12, fontWeight: 600, color: C.muted, fontFamily: "var(--fl-display)", textDecoration: gDone ? "line-through" : "none" }}>{gname}</span>
-                  <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)" }}>{g.dur}m</span>
-                  <button onClick={() => openLog(gname)} aria-label={`run "${gname}" as one pomodoro (${g.dur}m of steps)`} style={{ ...ICON_BTN, color: relax ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid, marginLeft: "auto" }}><PlayIcon size={14} /></button>
+                  <button onClick={() => openLog(gname)} aria-label={`run "${gname}" as one pomodoro`} style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 999, border: "none", boxShadow: "none", background: relax ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}><PlayIcon size={10} /></button>
                 </div>
-                {g.steps.map((it: any) => { flat++; return renderStepRow(it, flat); })}
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "2px 0 0 14px" }}>
+                  {g.steps.map((it: any) => { flat++; return renderPill(it, flat); })}
+                  {last && addPill}
+                </div>
               </React.Fragment>
             );
           });
           })()}
-        </div>
-        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-          <input value={newVal} onChange={(e) => setNewVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addRoutine(which); }} placeholder={which === "morning" ? "add a morning step" : "add a night step"} style={{ flex: 1, minWidth: 0, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)" }} />
-          <button onClick={() => addRoutine(which)} aria-label="add" style={{ ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><ListPlusIcon size={16} /></button>
         </div>
       </div>
     );
@@ -2288,7 +2502,7 @@ export default function FocusLogApp({ api }: any) {
     // treated as stale and dropped too).
     const sameDayCreated = (b: any) => !!b.created && new Date(b.created).toDateString() === new Date().toDateString();
     const survivors = todayBlocks()
-      .filter((b: any) => b.kind === "meal" || (b.claimed && sameDayCreated(b)) || (b.kind === "task" && b.locked && !b.pageId && sameDayCreated(b)))
+      .filter((b: any) => b.kind === "meal" || ((b.claimed || b.done) && sameDayCreated(b)) || (b.kind === "task" && b.locked && !b.pageId && sameDayCreated(b)))
       .map((b: any) => { const nb: any = { ...b }; delete nb.placed; return nb; });
     const blocks: any[] = [...survivors];
     let t = tlStart, seq = 0;
@@ -2321,13 +2535,55 @@ export default function FocusLogApp({ api }: any) {
     }); }
     return autoBreaksOf(blocks, { insertBreaks: false });
   };
-  // Sync now subsumes the old restart: once a sync has loaded fresh tasks into state, rebuild the
-  // day's timeline from them (no prompt). Deferred to an effect so buildInitialPlan sees fresh tasks.
+  // Sync MERGES into the day instead of rebuilding it: arranged blocks keep their exact
+  // positions; only FUTURE blocks of tasks that left today's list are removed; newcomers are
+  // appended after the later of now and the last block, in task-list order (auto-fix stays
+  // the explicit re-packer). The full build still runs when today has no plan yet.
   useEffect(() => {
     if (!pendingSyncRebuild) return;
-    setTodayBlocks(buildInitialPlan(), true);
+    const bl = todayBlocks();
+    if (!bl.length) { setTodayBlocks(buildInitialPlan(), true); setPendingSyncRebuild(false); return; }
+    const d = new Date();
+    let nowTl = d.getHours() * 60 + d.getMinutes();
+    const mid = (tlStart + tlEnd) / 2;
+    if (Math.abs(nowTl + 1440 - mid) < Math.abs(nowTl - mid)) nowTl += 1440;
+    const ids = new Set(tasks.map((t: any) => t.id).filter(Boolean));
+    const kept = bl.filter((b: any) => !(b.kind === "task" && b.pageId && !b.claimed && !b.done && !ids.has(b.pageId) && b.start >= nowTl));
+    const having = new Set(kept.filter((b: any) => b.kind === "task" && b.pageId).map((b: any) => b.pageId));
+    let tail = snap5(Math.max(nowTl, ...kept.map((b: any) => b.start + b.dur)));
+    const added: any[] = [];
+    for (const t of tasks) {
+      if (!t.id || t.local || having.has(t.id)) continue;
+      const nblocks = Math.max(1, t.pomodoros || 1);
+      for (let i = 0; i < nblocks; i++) {
+        added.push({ id: "sy" + Date.now() + "_" + String(t.id).slice(-4) + i, kind: "task", pageId: t.id, name: t.task, power: t.power || "Y", status: t.status, category: t.category, start: tail, dur: 25, created: Date.now() });
+        tail += 25 + (settings.breakMinutes || 5);
+      }
+    }
+    setTodayBlocks(resolveOverlaps([...kept, ...added]), true);
     setPendingSyncRebuild(false);
   }, [tasks, pendingSyncRebuild]);
+  // Anchor prompt #2: shortly after lunch ends (per today's plan), offer the afternoon's
+  // first beat. Once per day, and only while the engine is fully idle.
+  const lunchPromptDay = useRef("");
+  useEffect(() => {
+    const iv = window.setInterval(() => {
+      if (lunchPromptDay.current === todayKey) return;
+      if (running || timer.paused || timer.breakActive) return;
+      const lunch = todayBlocks().find((b: any) => b.kind === "meal" && b.meal === "lunch");
+      if (!lunch) return;
+      const d = new Date();
+      let m = d.getHours() * 60 + d.getMinutes();
+      const mid = (tlStart + tlEnd) / 2;
+      if (Math.abs(m + 1440 - mid) < Math.abs(m - mid)) m += 1440;
+      const end = lunch.start + lunch.dur;
+      if (m >= end && m < end + 10) {
+        lunchPromptDay.current = todayKey;
+        api.notifyClickable && api.notifyClickable("Lunch is over. Start the afternoon's first beat?", () => setView("log"));
+      }
+    }, 60000);
+    return () => window.clearInterval(iv);
+  }, [running, timer.paused, timer.breakActive, todayKey, plans]);
   const setTimelineMode = (on: boolean) => {
     const hasInput = [...workTasks, ...personalTasks].length || (!settings.skipMorningRoutine && (activeMorning || []).length) || (!settings.skipNightRoutine && (activeNight || []).length);
     if (on && !plans[todayKey] && hasInput) setTodayBlocks(buildInitialPlan(), true);
@@ -2799,7 +3055,7 @@ export default function FocusLogApp({ api }: any) {
         {isTask && b.category && settings.showAreaTimeline !== false && <span style={{ fontSize: 10, fontFamily: "var(--fl-mono)", color: personalBlk ? TAG_COFFEE.personal.text : TAG_COFFEE.project.text, background: personalBlk ? TAG_COFFEE.personal.bg : TAG_COFFEE.project.bg, border: `1px solid ${personalBlk ? TAG_COFFEE.personal.border : TAG_COFFEE.project.border}`, borderRadius: 999, height: 16, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: "0 7px", whiteSpace: "nowrap", flexShrink: 0 }}>{b.category}</span>}
         {isTask && <button onClick={() => toggleLock(b.id)} className={b.locked ? "" : "fl-rowact fl-collapse"} aria-label={b.locked ? "commitment: fixed at this time, and auto-fix adds a long break after it and restarts the pomodoro count. Click to release." : "make this a commitment: fix it at this time, with a long break after it and a fresh pomodoro count"} style={{ ...ICON_BTN, color: b.locked ? (POWER_COLOR[b.power] || POWER_COLOR.Y) : C.muted }}><LockIcon size={12} open={!b.locked} /></button>}
         {isTask && b.placed && <button onClick={() => setTodayBlocks(todayBlocks().map((x: any) => { if (x.id !== b.id) return x; const nb: any = { ...x }; delete nb.placed; return nb; }))} aria-label="placed (by right-drag): auto-fix keeps it exactly here, position only, the break rhythm is unchanged. Click to release it back into the flow." style={{ ...ICON_BTN, color: POWER_COLOR[b.power] || POWER_COLOR.Y }}><PinIcon size={12} /></button>}
-        <span aria-label={Array.isArray(b.steps) && b.steps.length ? b.steps.join(" · ") : undefined} style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: (b.kind === "routine" && Array.isArray(b.refIds) && b.refIds.length > 0 && b.refIds.every((id: string) => isRoutineDone(id))) ? "line-through" : "none" }}>{isTask ? stripLeadingTag(b.name) : b.name}{Array.isArray(b.steps) && b.steps.length ? <span style={{ color: C.muted, fontSize: 11 }}> · {b.steps.join(" · ")}</span> : null}</span>
+        <span aria-label={Array.isArray(b.steps) && b.steps.length ? b.steps.join(" · ") : undefined} style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: (b.done || (b.kind === "routine" && Array.isArray(b.refIds) && b.refIds.length > 0 && b.refIds.every((id: string) => isRoutineDone(id)))) ? "line-through" : "none" }}>{isTask ? stripLeadingTag(b.name) : b.name}{Array.isArray(b.steps) && b.steps.length ? <span style={{ color: C.muted, fontSize: 11 }}> · {b.steps.join(" · ")}</span> : null}</span>
         {isTask && b.pageId && <button onClick={() => { const t = tasks.find((x: any) => x.id === b.pageId); if (t) openOverCalib(t); }} className="fl-rowact fl-collapse" aria-label="the task grew: add a + tomato round (max two, then split)" style={{ ...ICON_BTN, fontSize: 11, whiteSpace: "nowrap" }}>{"+\u{1F345}"}</button>}
         {(isTask || b.kind === "routine") && <button onClick={() => openLog(b.name)} className="fl-rowact fl-collapse" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={12} /></button>}
         {isTask && !b.pageId && <button onClick={() => { setEditBlockId(b.id); setBlockDraft({ name: b.name, dur: b.dur, power: b.power || "Y", load: b.load || "B", category: b.category || "" }); }} className="fl-rowact fl-collapse" aria-label="edit name, power, load, tag and length" style={ICON_BTN}><PencilIcon size={13} /></button>}
@@ -2832,19 +3088,7 @@ export default function FocusLogApp({ api }: any) {
     return (
       <div style={{ marginTop: 4 }}>
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "8px 12px", marginBottom: 10 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 12, color: C.muted, whiteSpace: "nowrap" }}>Long break every</span>
-            <div style={{ display: "inline-flex", alignItems: "center", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 999, padding: 3, gap: 2, height: 30, boxSizing: "border-box" }}>
-              {[3, 4, 5].map((n) => {
-                const on = (longEvery >= 3 ? longEvery : 3) === n;
-                return (
-                  <button key={n} onClick={() => { setLongEveryState(n); api.patchSettings && api.patchSettings({ longBreakEvery: n }); }} aria-pressed={on} aria-label={`a long break every ${n} pomodoros`}
-                    style={{ border: "none", boxShadow: "none", background: on ? ACCENT : "transparent", color: on ? "#fff" : C.muted, fontFamily: "var(--fl-mono)", fontSize: 12.5, fontWeight: on ? 600 : 400, width: 22, height: 22, minWidth: 22, padding: 0, lineHeight: 1, borderRadius: 999, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{n}</button>
-                );
-              })}
-            </div>
-            <span style={{ fontSize: 12, color: C.muted, whiteSpace: "nowrap" }}>pomodoros</span>
-          </div>
+
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
             <button onClick={autoBreaks} aria-label="auto-fix: pack the day in your order around commitments, pins and meals, glue your breaks, and add only the missing rests" style={{ ...btn(ACCENT), width: 30, height: 30, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><WandSparklesIcon size={14} /></button>
             <button onClick={() => { if (!planUndo.length) return; const snap = planUndo[planUndo.length - 1]; const rest = planUndo.slice(0, -1); setTodayBlocks(snap, true); setPlanUndo(rest); }} disabled={planUndo.length === 0}
@@ -2918,26 +3162,12 @@ export default function FocusLogApp({ api }: any) {
   };
 
   // Time-aware list ordering: the phase you're in now (morning routine / work+personal /
-  // night routine) sits on top; finished phases collapse to an expandable header. Phase
-  // boundaries come from today's timeline plan if you made one, else from the morning
-  // routine length (morning) and Afternoon-ends (work/personal).
+  // night routine) sits on top; finished phases collapse into "earlier today". The two
+  // boundaries are the explicit My-day settings, the same pair the pomodoro counter uses.
   const phaseRankNow = (() => {
     const d = new Date();
     const nowM = d.getHours() * 60 + d.getMinutes();
-    const sumMorning = (activeMorning || []).reduce((s: number, it: any) => s + (it.dur || ROUTINE_MIN), 0);
-    const planB = plans[todayKey];
-    let morningEnd: number, workEnd: number;
-    if (planB && planB.length) {
-      const mIds = new Set((activeMorning || []).map((it: any) => it.id));
-      const mEnds = planB.filter((b: any) => b.kind === "routine" && mIds.has(b.refId)).map((b: any) => b.start + b.dur);
-      const tEnds = planB.filter((b: any) => b.kind === "task").map((b: any) => b.start + b.dur);
-      morningEnd = mEnds.length ? Math.max(...mEnds) : tlStart;
-      workEnd = tEnds.length ? Math.max(...tEnds) : (settings.afternoonEnd || 1080);
-    } else {
-      morningEnd = tlStart + sumMorning;
-      workEnd = settings.afternoonEnd || 1080;
-    }
-    return nowM < morningEnd ? 0 : nowM < workEnd ? 1 : 2;
+    return nowM < (settings.morningRoutineEnds ?? 540) ? 0 : nowM < (settings.nightRoutineStarts ?? 1215) ? 1 : 2;
   })();
   const renderFullSection = (key: string, hideHeader?: boolean) => {
     const headColor = dayMode === "relax" ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid;
@@ -2945,23 +3175,54 @@ export default function FocusLogApp({ api }: any) {
     if (key === "night") return renderRoutineBlock("night", hideHeader);
     if (key === "work") return (
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {workTasks.length > 0 && <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px", display: hideHeader ? "none" : undefined }}><SectionIcon src={sketchImg} /> Project</h3>}
+        {workTasks.length > 0 && <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px", display: hideHeader ? "none" : undefined }}><SectionIcon src={doveImg} /> Project</h3>}
+        {workTasks.length > 0 && (
+          <div style={{ color: C.muted, fontSize: 12.5, margin: "0 0 6px 2px", display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" }}>
+          <span>Square = ExecutionPower:</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P }} />Must Today</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y }} />Aim Today (default)</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G }} />Bonus If Done</span>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" }}>
+          <span>Icon = Status:</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ color: MODE_COLORS.relax.solid, display: "inline-flex" }}><ExploreIcon size={12} /></span> Exploring</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ color: MODE_COLORS.work.solid, display: "inline-flex" }}><HammerIcon size={12} /></span> Executing</span>
+          <span style={{ marginLeft: 4 }}><img src={crownImg} alt="King" draggable={false} style={{ width: 15, height: 15, verticalAlign: "-3px" }} /> = King {"·"} day starts at {fmtHM(settings.dayStart)}</span>
+          </div>
+          </div>
+        )}
         {workTasks.map((t: any) => renderTaskRow(t))}
       </div>
     );
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px", display: hideHeader ? "none" : undefined }}><SectionIcon src={dogImg} /> Personal</h3>
+        <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px", display: hideHeader ? "none" : undefined }}><SectionIcon src={swanImg} /> Personal</h3>
         {personalTasks.map((t: any) => renderTaskRow(t))}
       </div>
     );
   };
+  // Un-finish from the "Done today" pile: the task's previous Schedule goes back to Notion,
+  // it returns to the END of the active list with its spend intact, and its struck timeline
+  // blocks un-strike (the worked history itself stays). Sync reconciles the pile by id, so a
+  // restored task can never appear twice.
+  const restoreDone = async (e: any) => {
+    try { if (api.restoreTask) await api.restoreTask(e.id, e.prevSchedule); }
+    catch (err: any) { api.notify && api.notify("Could not restore in Notion: " + (err?.message || err)); return; }
+    const back = e.meta ? { ...e.meta, act: e.spend != null ? e.spend : e.meta.act } : { task: e.task, id: e.id, pomodoros: e.guess || 0, guessBase: e.guess || 0, guessPlus: [], act: e.spend || 0, king: false, power: "Y", status: null, category: null, parent: null, ancestor: null, group: e.task };
+    const nt = [...tasks.filter((t: any) => t.id !== e.id), back];
+    setTasks(nt); api.saveTasks && api.saveTasks(nt);
+    saveDone(doneToday.filter((x: any) => x.id !== e.id));
+    const bl = todayBlocks();
+    if (bl.some((b: any) => b.done && b.pageId === e.id)) setTodayBlocks(bl.map((b: any) => { if (!(b.done && b.pageId === e.id)) return b; const nb: any = { ...b }; delete nb.done; return nb; }));
+    api.notify && api.notify("\u201C" + e.task + "\u201D is back in play.");
+  };
   const renderTodaySections = () => {
     const defs = [
-      { key: "morning", label: <><SectionIcon src={blindsImg} /> Morning</>, rank: 0, on: !settings.skipMorningRoutine },
-      { key: "work", label: <><SectionIcon src={sketchImg} /> Project</>, rank: 1, on: true },
-      { key: "personal", label: <><SectionIcon src={dogImg} /> Personal</>, rank: 1, on: personalTasks.length > 0 },
-      { key: "night", label: <><SectionIcon src={tableLampImg} /> Night</>, rank: 2, on: !settings.skipNightRoutine },
+      { key: "morning", label: <><SectionIcon src={roosterImg} /> Morning</>, rank: 0, on: !settings.skipMorningRoutine },
+      { key: "work", label: <><SectionIcon src={doveImg} /> Project</>, rank: 1, on: true },
+      { key: "personal", label: <><SectionIcon src={swanImg} /> Personal</>, rank: 1, on: personalTasks.length > 0 },
+      { key: "night", label: <><SectionIcon src={batImg} /> Night</>, rank: 2, on: !settings.skipNightRoutine },
     ].filter((s) => s.on);
     const future = defs.filter((s) => s.rank >= phaseRankNow);
     const past = defs.filter((s) => s.rank < phaseRankNow);
@@ -2973,19 +3234,39 @@ export default function FocusLogApp({ api }: any) {
             <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6 }}>earlier today</div>
             {past.map((s) => (
               <div key={s.key}>
-                <button onClick={() => setExpandedPast((e) => { const n = new Set(e); if (n.has(s.key)) n.delete(s.key); else n.add(s.key); return n; })} style={{ margin: 0, fontFamily: "var(--fl-display)", fontSize: 13.5, fontWeight: 600, color: C.ink, background: "transparent", border: "none", boxShadow: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 0" }}>{expandedPast.has(s.key) ? "▾" : "▸"} {s.label}</button>
+                <button onClick={() => setExpandedPast((e) => { const n = new Set(e); if (n.has(s.key)) n.delete(s.key); else n.add(s.key); return n; })} style={{ margin: 0, fontFamily: "var(--fl-display)", fontSize: 13.5, fontWeight: 600, color: C.ink, background: "transparent", border: "none", boxShadow: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 0" }}><AngleIcon size={14} down={expandedPast.has(s.key)} /> {s.label}</button>
                 {expandedPast.has(s.key) && <div style={{ marginTop: 4 }}>{renderFullSection(s.key, true)}</div>}
               </div>
             ))}
           </div>
         )}
+        {(() => {
+          const pile = doneToday.filter((e: any) => sameLogicalDay(e.ts, Date.now(), settings));
+          if (!pile.length) return null;
+          return (
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+              <button onClick={() => setDoneOpen(!doneOpen)} style={{ margin: 0, fontFamily: "var(--fl-display)", fontSize: 13.5, fontWeight: 600, color: C.ink, background: "transparent", border: "none", boxShadow: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, padding: 0 }}>{doneOpen ? "\u25BE" : "\u25B8"} Done today ({pile.length})</button>
+              {doneOpen && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                  {pile.map((e: any) => (
+                    <div key={e.id} className="fl-act-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 11px", borderRadius: 6, background: "#fdfbf5", border: `1px solid ${C.line}` }}>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.muted, textDecoration: "line-through", overflowWrap: "anywhere" }}>{stripLeadingTag(e.task)}</span>
+                      <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, flexShrink: 0 }}>{(e.guess ? "guess " + e.guess + " \u00B7 " : "") + "spend " + (e.spend || 0)}</span>
+                      <button onClick={() => restoreDone(e)} className="fl-rowact fl-collapse" aria-label="not finished after all: put its previous Schedule back in Notion and return it to the list" style={ICON_BTN}><RotateCcwIcon size={13} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   };
 
   const seg = (on: boolean): any => ({ padding: "6px 14px", borderRadius: 9, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", textTransform: "capitalize", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.14)" : "none", fontFamily: "var(--fl-display)", whiteSpace: "nowrap" });
-  // Horizontal sub-view toggle, same look as the Sky view's Pomodoros/Reflections control.
-  const segH = (on: boolean): any => ({ padding: "4px 12px", borderRadius: 8, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 12.5, fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: "var(--fl-display)" });
+  // Horizontal sub-view toggle, same look as the Sky view's Pomodoros/Waves control.
+  const segH = (on: boolean): any => ({ padding: "4px 12px", borderRadius: 8, border: "none", background: on ? C.card : "transparent", color: on ? C.ink : C.muted, fontSize: 12.5, fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: "var(--fl-display)", boxShadow: "none" });
 
   return (
     <div ref={rootRef} style={{ background: C.paper, minHeight: "100%", color: C.ink, fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums" }}>
@@ -2995,21 +3276,6 @@ export default function FocusLogApp({ api }: any) {
       `}</style>
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "18px 16px 60px" }}>
         <h1 style={{ fontFamily: "var(--fl-display)", fontSize: 26, fontWeight: 600, letterSpacing: -0.5, margin: "0 0 6px" }}>Focus Log</h1>
-        <div style={{ color: C.muted, fontSize: 13, marginBottom: 14, display: "flex", flexDirection: "column", gap: 4 }}>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" }}>
-            <span>Square = ExecutionPower:</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.P }} />Must Today</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.Y }} />Aim Today (default)</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 11, height: 11, borderRadius: 3, background: POWER_COLOR.G }} />Bonus If Done</span>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px" }}>
-            <span>Icon = Status:</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ color: MODE_COLORS.relax.solid, display: "inline-flex" }}><ExploreIcon size={12} /></span> Exploring</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ color: MODE_COLORS.work.solid, display: "inline-flex" }}><HammerIcon size={12} /></span> Executing</span>
-            <span style={{ marginLeft: 4 }}><img src={crownImg} alt="King" draggable={false} style={{ width: 15, height: 15, verticalAlign: "-3px" }} /> = King {"·"} day starts at {fmtHM(settings.dayStart)}</span>
-          </div>
-        </div>
-
         {flash && (
           <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 }}>
             {flash}
@@ -3017,11 +3283,49 @@ export default function FocusLogApp({ api }: any) {
           </div>
         )}
 
-        <div style={{ marginBottom: 20, overflowX: "auto" }}>
+        <div style={{ marginBottom: 12, overflowX: "auto" }}>
           <div style={{ display: "inline-flex", gap: 2, background: C.line, borderRadius: 12, padding: 4 }}>
-            {([["log", "Focus"], ["break", "Break"], ["pause", "Pause"], ["reflect", "Reflect"], ["calibrate", "Calibrate"], ["today", "Plan"], ["status", "Stats"], ["sky", "Sky"]] as [string, string][]).map(([t, lab]) => (<button key={t} onClick={() => setView(t)} style={seg(view === t)}>{lab}</button>))}
+            {/* Focus stays lit for any of its three faces; clicking it returns to the pomodoro. */}
+            {([["log", "Focus"], ["calendar", "Calendar"], ["calibrate", "Calibrate"], ["today", "Plan"], ["sky", "Sky"]] as [string, string][]).map(([t, lab]) => (<button key={t} onClick={() => setView(t)} style={seg(t === "log" ? isFocusView(view) : view === t)}>{lab}</button>))}
           </div>
         </div>
+        {isFocusView(view) && (
+          <div style={SUBBAR}>
+            <div style={{ ...SUBBAR_TRACK, background: C.line }}>
+              {FOCUS_SUB.map(([k, lab]) => (<button key={k} onClick={() => setView(k)} style={segH(view === k)}>{lab}</button>))}
+            </div>
+            <InfoHover C={C} label="about this view" width={360}>
+              {view === "log" && (<>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>Pomo</div>
+                <div>Always set your expected feeling first; the task link is optional. The one exception is the {"\u{1F331}"} 5-minute tiny start, which may begin unrated, because starting is its whole point. A free pomodoro keeps the rhythm, can be named mid-run or at the end, and logs as plain "Focus" if it stays unnamed.</div>
+                <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                  <li><b>Task</b>: today's tasks from the Plan; each pomodoro adds +1 to that task's Spend in Notion.</li>
+                  <li><b>Feeling</b>: the four weathers, rain to full sun; your before and after ratings are both saved.</li>
+                  <li><b>Timer</b>: the round buttons set 5 to 30 minutes (hold to speed up); the length locks while a pomodoro runs; the circle arrow resets the timer and task.</li>
+                  <li><b>Pause</b>: pausing asks for a reason, yellow for internal, blue for external; it is recorded under Pause.</li>
+                  <li><b>{"\u{1F30A}"} Surf an urge</b>: mid-run, tap the wave: rate it, breathe, find it on the rabbit, name the feeling. Decide after the wave. The floating window keeps a quick 90-second version.</li>
+                </ul>
+              </>)}
+              {view === "break" && (<>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>Break</div>
+                <div>Rest you choose, and the menu you choose it from. Rate a break with the four season trees and the numbers gather under Calibrate.</div>
+                <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                  <li><b>Start a break</b>: short or long, using the lengths from settings; the floating window mirrors it.</li>
+                  <li><b>Break activities</b>: the things you actually do to recover. Tick them during a break and their restoring power shows up over time.</li>
+                </ul>
+              </>)}
+              {view === "pause" && (<>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>Pause</div>
+                <div>Rest that interrupts you. Pausing a pomodoro asks for a reason, and these are the reasons on offer.</div>
+                <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                  <li><b style={{ color: PAUSE_CAT.internal.border }}>internal</b>: the impulse came from you {"\u2014"} tired, distracted, hungry.</li>
+                  <li><b style={{ color: PAUSE_CAT.external.border }}>external</b>: something outside interrupted you {"\u2014"} a person, a call, a delivery.</li>
+                  <li>Drag to reorder; the order here is the order the pause picker offers them in.</li>
+                </ul>
+              </>)}
+            </InfoHover>
+          </div>
+        )}
 
         {calibDraft && (() => {
           const d = calibDraft;
@@ -3069,16 +3373,50 @@ export default function FocusLogApp({ api }: any) {
           );
         })()}
 
-        {view === "sky" && <SkyView sessions={sessions} reflections={reflections} C={C} />}
+        {view === "sky" && <SkyView sessions={sessions} urges={urges} C={C} />}
 
-        {view === "reflect" && <ReflectPanel feelings={reflectFeelings} C={C} onSave={onSaveReflection} seed={reflectSeed} onSeedUsed={() => setReflectSeed("")} />}
+        {view === "calendar" && (<>
+          <div style={SUBBAR}>
+            <span />
+            <InfoHover C={C} label="about this view" width={360}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>Calendar</div>
+              <div>The month as a calendar: a square for every pomodoro.</div>
+              <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                <li><b>Squares</b>: one per pomodoro, red on work days and green on relax days; the lightness is the time of day.</li>
+                <li><b>Yellow squares</b>: overnight pomodoros, done between your day start and "morning begins".</li>
+                <li><b>Changing month</b>: use the arrows or scroll on the month name; TODAY jumps back to now and opens today's daily note.</li>
+                <li><b>Days</b>: darker date numbers already have a daily note; click any day to open its note.</li>
+              </ul>
+            </InfoHover>
+          </div>
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, paddingLeft: 4 }}>
+                  <span ref={monthLabelRef} aria-label="scroll to change the month" style={{ fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums", fontSize: 16, fontWeight: "var(--h3-weight, 600)" as any, color: C.ink, letterSpacing: "-0.01em", lineHeight: 1, cursor: "ns-resize", userSelect: "none" }}>
+                    <span style={{ display: "inline-block", minWidth: "2.3em" }}>{MON3[monthRef.getMonth()]}</span>
+                    <span style={{ color: ACCENT, marginLeft: "0.1em" }}>{monthRef.getFullYear()}</span>
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <button onClick={() => setMonthOff((m) => m - 1)} aria-label="previous month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" }}><ChevronLeftIcon size={20} /></button>
+                    <button onClick={() => { setMonthOff(0); api.openDailyNote && api.openDailyNote(+logicalDay(Date.now(), settings)); }} aria-label="jump to the current month and open today's daily note — 'today' follows your day-start setting, so after an evening rollover it is already tomorrow's date" style={{ background: "transparent", border: "none", boxShadow: "none", color: ACCENT, cursor: "pointer", padding: "5px 8px", borderRadius: 7, fontFamily: "var(--fl-display)", fontWeight: 700, fontSize: 13, letterSpacing: "0.02em" }}>TODAY</button>
+                    <button onClick={() => setMonthOff((m) => m + 1)} aria-label="next month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" }}><ChevronRightIcon size={20} /></button>
+                  </div>
+                </div>
+                <Heatmap sessions={sessions} monthRef={monthRef} settings={settings} activeTs={activeDaily} override={modeOverride} hasNote={(d: Date) => !!(api.hasDailyNote && api.hasDailyNote(+d))} onOpenDay={(date: Date) => api.openDailyNote && api.openDailyNote(+date)}
+                  onDayMenu={(date: Date, e: any) => {
+                    if (!api.openDayMenu) return;
+                    const key = String(date.getTime());
+                    const cur = (modeOverride[key] === "work" || modeOverride[key] === "relax") ? modeOverride[key] : (((settings.workDays || [])[(date.getDay() + 6) % 7] === false) ? "relax" : "work");
+                    const next = cur === "work" ? "relax" : "work";
+                    api.openDayMenu(+date, e.nativeEvent || e, { flipLabel: "Flip to " + next + " day", onFlip: () => { const obj = { ...modeOverride, [key]: next }; setModeOverride(obj); api.saveModeOverride && api.saveModeOverride(obj); } });
+                  }} />
+              </div>
+        </>)}
+
 
         {view === "calibrate" && (() => {
           // Calibration surfaces tasks whose reality diverged from the guess: extra "+" rounds,
           // an early finish (Spend below the base guess), or a final Split/Solved status. The
           // reflection column fills in later, when adding a "+ tomato" in the plugin prompts for it.
-          const STATUS_META: any = { split: { label: "Split", color: C.muted }, solved: { label: "Solved", color: MODE_COLORS.relax.solid }, executing: { label: "Executing", color: MODE_COLORS.work.solid }, exploring: { label: "Exploring", color: MODE_COLORS.relax.solid } };
-          const calibList = (tasks || []).filter((t: any) => (t.guessPlus && t.guessPlus.length) || t.status === "split" || t.status === "solved" || (t.act > 0 && t.guessBase && t.act < t.guessBase));
           // Patterns: one final entry per task (the latest), hits = within one tomato of the guess.
           const perTask: any = {};
           calibrations.forEach((e: any) => { perTask[e.pageId || e.task] = e; });
@@ -3099,21 +3437,10 @@ export default function FocusLogApp({ api }: any) {
               <div style={{ fontSize: 12.5, color: C.ink }}>{body}</div>
             </div>
           );
-          return (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 8 }}>
-                <InfoHover C={C} label="what Calibrate is" width={360}>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Calibrate</div>
-                  <div>Compare what you guessed against what a task really took, so your estimates get sharper over time.</div>
-                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-                    <li><b>Guess</b>: the tomatoes you planned (📦 counts as 4).</li>
-                    <li><b>Rounds</b>: how many "+" re-guesses you added (at most two, then the task must split).</li>
-                    <li><b>Spend</b>: the pomodoros Notion actually recorded.</li>
-                    <li><b>Status</b>: the final Split or Solved.</li>
-                    <li><b>Reflection</b>: why the task grew or shrank, one chip plus an optional line, captured when you add a "+ 🍅" (hover a task's tomatoes) or finish early (click a grey tomato, or mark done under the guess).</li>
-                  </ul>
-                </InfoHover>
-              </div>
+          // ---- the eleven panels, lifted verbatim from the old Calibrate / Stats / Break / Pause
+          // views. They stay closures so every derivation above and in the component body is
+          // still in scope: nothing about the numbers changed, only where they are shown.
+          const secGuessLand = () => (
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
                 <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>How your guesses land</h3>
                 {pct == null ? (
@@ -3134,37 +3461,11 @@ export default function FocusLogApp({ api }: any) {
                   </div>
                 )}
               </div>
-              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
-                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Today's tasks</h3>
-                {calibList.length === 0 ? (
-                  <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>Nothing to calibrate yet. Tasks that overran their guess, finished early, or ended Split or Solved will appear here.</p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {calibList.map((t: any) => {
-                      const rounds = (t.guessPlus || []).length;
-                      const meta = t.status ? STATUS_META[t.status] : null;
-                      const over = t.act > (t.pomodoros || 0);
-                      const under = t.act > 0 && t.guessBase && t.act < t.guessBase;
-                      return (
-                        <div key={t.id || t.task} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 11px", borderRadius: 8, background: "#fdfbf5", border: `1px solid ${C.line}` }}>
-                          <div style={{ flex: 1, minWidth: 140 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, overflowWrap: "anywhere" }}>{stripLeadingTag(t.task)}</div>
-                            {hierarchyText(t) && <div style={{ fontSize: 11, color: C.muted }}>{hierarchyText(t)}</div>}
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted, flexShrink: 0 }}>
-                            <span aria-label="guessed pomodoros">guess {t.pomodoros || 0}</span>
-                            {rounds > 0 && <span aria-label="extra + rounds" style={{ color: rounds >= 2 ? "#c96f22" : "#b8941f" }}>+{rounds}</span>}
-                            <span aria-label="actual pomodoros" style={{ color: over ? "#c96f22" : under ? C.muted : C.ink }}>spend {t.act || 0}</span>
-                            {meta && <span style={{ color: meta.color, fontFamily: "var(--fl-display)", fontWeight: 600 }}>{meta.label}</span>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              {calibrations.length > 0 && (
-                <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 14 }}>
+          );
+          const secCalibHistory = () => (calibrations.length === 0
+            ? <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}><p style={{ color: C.muted, fontSize: 13, margin: 0 }}>No calibrations yet. Add a {"+\u{1F345}"} when a task grows, or click a grey tomato when one finishes early.</p></div>
+            : (
+                <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
                   <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Recent calibrations</h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {calibrations.slice(-20).reverse().map((e: any) => (
@@ -3178,6 +3479,389 @@ export default function FocusLogApp({ api }: any) {
                     ))}
                   </div>
                 </div>
+          ));
+          const secPomodoroStats = () => (<div>
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Pomodoro totals</h3>
+                <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around" }}>
+                  <Stat label="this week" value={countWeek} big />
+                  <Stat label="this month" value={countMonth} big />
+                  <Stat label="this year" value={countYear} big />
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 }}>
+                  <Stat label="hours, week" value={hrsOf(sumMin(inWeek))} color={C.muted} />
+                  <Stat label="hours, month" value={hrsOf(sumMin(inMonth))} color={C.muted} />
+                  <Stat label="hours, year" value={hrsOf(sumMin(inYear))} color={C.muted} />
+                </div>
+              </div>
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
+                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 12px" }}>Six-month heatmap</h3>
+                <ContribHeatmap sessions={sessions} settings={settings} />
+              </div>
+          </div>);
+          const secExpectedVsActual = () => (
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
+                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" }}>Expected vs actual</h3>
+                {rated === 0 ? (
+                  <p style={{ color: C.muted, fontSize: 13 }}>No ratings yet. Log a few pomodoros to see your calibration.</p>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 15, lineHeight: 1.5, marginBottom: surprises.length ? 14 : 0 }}>
+                      <span style={{ fontFamily: "var(--fl-mono)", fontSize: 22, color: C.better }}>{betterPct}%</span> of your pomodoros turned out <span style={{ color: C.better }}>more enjoyable</span> than you expected
+                      <span style={{ color: C.muted }}> (avg gap <span style={{ color: avgGapAll > 0 ? C.better : avgGapAll < 0 ? C.worse : C.neutral, fontFamily: "var(--fl-mono)" }}>{(avgGapAll >= 0 ? "+" : "") + avgGapAll.toFixed(1)}</span>).</span>
+                    </div>
+                    {surprises.length > 0 && (
+                      <div>
+                        <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Biggest surprises — dreaded, then enjoyed</p>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {surprises.map((s) => (
+                            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+                              <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.better, minWidth: 28 }}>+{s.actual - s.expected}</span>
+                              <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{s.task}</span>
+                              <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" }}><span style={{ color: C.ink }}>{s.expected}</span><span style={{ color: C.muted }}>{" → "}</span><span style={{ color: C.ink }}>{s.actual}</span></span>
+                              <span style={{ color: C.muted, fontSize: 11, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap" }}>{fmtDate(s.ts)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+          );
+          const secAllSessions = () => (
+              <div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+                  <h3 onClick={() => toggleFold("sessions")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><AngleIcon size={15} down={!foldedHistory.has("sessions")} /> All sessions</h3>
+                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{sessions.length} logged{(() => { const n = urges.filter((u: any) => !u.outcome || u.outcome === "surfed").length; return n ? " · \u{1F30A} " + n + " surfed" : ""; })()}</span>
+                </div>
+                {foldedHistory.has("sessions") ? null : sessions.length === 0 ? (
+                  <p style={{ color: C.muted, fontSize: 13 }}>No sessions yet. Log a pomodoro to see it here.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {[...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => (
+                      editingId === s.id ? (
+                        <SessionEditRow key={s.id} draft={editDraft} setDraft={setEditDraft} settings={settings} onSave={saveEdit} onCancel={cancelEdit} />
+                      ) : (
+                        <SessionRow key={s.id} s={s} settings={settings} onEdit={startEdit} onDelete={deleteSession} />
+                      )
+                    ))}
+                  </div>
+                )}
+                {!foldedHistory.has("sessions") && <p style={{ color: C.muted, fontSize: 11, marginTop: 10 }}>
+                  Edits and deletes only change the local log; they do not undo the Act write-back on Notion.
+                </p>}
+              </div>
+          );
+          const secBreakStats = () => (
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Break stats</h3>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 }}>
+                  <div>
+                    <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Favourites</p>
+                    {favs.length === 0 ? <span style={{ color: C.muted, fontSize: 13 }}>{"—"}</span> : favs.map((a) => (
+                      <div key={a.id} style={{ fontSize: 13 }}>{a.name} <span style={{ color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 11 }}>{a.count}{"×"}</span></div>
+                    ))}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Least chosen</p>
+                    {disliked.length === 0 ? <span style={{ color: C.muted, fontSize: 13 }}>{"—"}</span> : disliked.map((a) => (
+                      <div key={a.id} style={{ fontSize: 13, color: C.muted }}>{a.name} <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11 }}>{a.count || 0}{"×"}</span></div>
+                    ))}
+                  </div>
+                </div>
+                <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>By area</p>
+                <PieChart data={pieData} />
+              </div>
+          );
+          const secAllBreaks = () => (
+              <div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+                  <h3 onClick={() => toggleFold("breaks")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><AngleIcon size={15} down={!foldedHistory.has("breaks")} /> All breaks</h3>
+                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{breaks.length} logged</span>
+                </div>
+                {foldedHistory.has("breaks") ? null : breaks.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No breaks logged yet.</p> : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {[...breaks].sort((a, b) => b.start - a.start).map((b) => (
+                      editBreakId === b.id ? (
+                        <div key={b.id} style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
+                          <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>start<input type="datetime-local" value={breakDraft.start} onChange={(e) => setBreakDraft({ ...breakDraft, start: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
+                          <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>end<input type="datetime-local" value={breakDraft.end} onChange={(e) => setBreakDraft({ ...breakDraft, end: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
+                          <div style={{ flexBasis: "100%", display: "flex", alignItems: "flex-end", gap: 8 }}>
+                            <Scale label="feeling" value={breakDraft.feeling} onChange={(v: number) => setBreakDraft({ ...breakDraft, feeling: v })} seasons />
+                            <button onClick={() => setBreakDraft({ ...breakDraft, feeling: null })} style={{ ...btn(C.muted, true), padding: "2px 8px", fontSize: 11, marginBottom: 12 }}>clear</button>
+                          </div>
+                          <button onClick={saveEditBreak} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
+                          <button onClick={() => setEditBreakId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
+                        </div>
+                      ) : (
+                        <div key={b.id} className="fl-act-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                          <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(b.start)} {fmtTime(b.start)}{"–"}{fmtTime(b.end)}</span>
+                          <span style={{ flex: 1, minWidth: 120, overflowWrap: "anywhere" }}>{(b.activities && b.activities.length) ? b.activities.join(", ") : "—"}</span>
+                          <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>{(b.areas && b.areas.length) ? b.areas.join(" · ") : ""}</span>
+                          {b.feeling != null && (BREAK_SEASONS[b.feeling - 1]
+                            ? <img src={BREAK_SEASONS[b.feeling - 1].img} alt={BREAK_SEASONS[b.feeling - 1].name} aria-label={BREAK_SEASONS[b.feeling - 1].name} draggable={false} style={{ width: 16, height: 16, flexShrink: 0 }} />
+                            : <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.ink, whiteSpace: "nowrap" }}>{b.feeling}/5</span>)}
+                          <button onClick={() => startEditBreak(b)} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                          <button onClick={() => deleteBreak(b.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
+          );
+          const secPauseStats = () => (
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, margin: "0 0 10px" }}>
+                  <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>Pause stats</h3>
+                  <InfoHover C={C} label="about pause stats" width={330}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Pause stats</div>
+                    <div>When and why you pause: totals for this week and month, your most common reasons, and the typical time of day across all history, split into <b style={{ color: PAUSE_CAT.internal.border }}>internal</b> and <b style={{ color: PAUSE_CAT.external.border }}>external</b>.</div>
+                  </InfoHover>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 }}>
+                  <Stat label="pauses this week" value={pauseWeek.length} />
+                  <Stat label="pauses this month" value={pauseMonth.length} />
+                  <div style={{ padding: "8px 12px" }}>
+                    <div style={{ fontSize: 12, color: C.muted }}>top this week</div>
+                    <div style={{ fontSize: 14, color: C.ink }}>{topPauseWeek ? `${topPauseWeek.tag} (${topPauseWeek.n})` : "—"}</div>
+                    <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>top this month</div>
+                    <div style={{ fontSize: 14, color: C.ink }}>{topPauseMonth ? `${topPauseMonth.tag} (${topPauseMonth.n})` : "—"}</div>
+                  </div>
+                </div>
+                <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Typical time of day (all history)</p>
+                {pauses.length === 0 ? (
+                  <p style={{ color: C.muted, fontSize: 13 }}>No pauses recorded yet.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {BAND_NAME.map((band, bi) => {
+                      const s = bandSplit[bi];
+                      const total = s.internal + s.external;
+                      return (
+                        <div key={band}>
+                          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", fontSize: 11, marginBottom: 3, fontFamily: "var(--fl-mono)" }}>
+                            <span style={{ color: C.muted, textTransform: "capitalize" }}>{band}</span>
+                            <span><span style={{ color: PAUSE_CAT.internal.border }}>internal {s.internal}</span><span style={{ color: C.faint }}> · </span><span style={{ color: PAUSE_CAT.external.border }}>external {s.external}</span></span>
+                          </div>
+                          <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: C.line }}>
+                            {total > 0 && <div aria-label={`internal ${s.internal}/${total}`} style={{ width: `${(s.internal / total) * 100}%`, background: PAUSE_CAT.internal.border }} />}
+                            {total > 0 && <div aria-label={`external ${s.external}/${total}`} style={{ width: `${(s.external / total) * 100}%`, background: PAUSE_CAT.external.border }} />}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+          );
+          const secAllPauses = () => (
+              <div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+                  <h3 onClick={() => toggleFold("pauses")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}><AngleIcon size={15} down={!foldedHistory.has("pauses")} /> All pauses</h3>
+                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{pauses.length} logged</span>
+                </div>
+                {foldedHistory.has("pauses") ? null : pauses.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No pauses logged yet.</p> : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {[...pauses].sort((a, b) => (+new Date(b.ts)) - (+new Date(a.ts))).map((p) => (
+                      editPauseId === p.id ? (
+                        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
+                          <input type="datetime-local" value={pauseDraft.ts} onChange={(e) => setPauseDraft({ ...pauseDraft, ts: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
+                          <select value={pauseDraft.tag} onChange={(e) => setPauseDraft({ ...pauseDraft, tag: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }}>
+                            {pauseTags.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+                          </select>
+                          <button onClick={saveEditPause} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
+                          <button onClick={() => setEditPauseId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
+                        </div>
+                      ) : (
+                        <div key={p.id} className="fl-act-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
+                          <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(p.ts)} {fmtTime(p.ts)}</span>
+                          <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, minWidth: 34 }}>{p.mins != null ? p.mins + "m" : "—"}</span>
+                          {/* the reason wears its category: yellow came from you, blue came at you.
+                              A tag deleted since the pause was logged falls back to internal, as the stats do. */}
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ display: "inline-block", padding: "1px 10px", borderRadius: 999, background: catColor(pauseCatOf(p.tag)), border: `1px solid ${catBorder(pauseCatOf(p.tag))}`, color: C.ink, fontSize: 12, maxWidth: "100%", overflowWrap: "anywhere", lineHeight: 1.45 }}>{p.tag}</span>
+                          </span>
+                          <button onClick={() => startEditPause(p)} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
+                          <button onClick={() => deletePause(p.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
+          );
+          // The one panel with no former home: Pomo Accuracy took the whole "how your guesses
+          // land" card and Log took the entry list, so Total shows the shape of the misses.
+          const secBestTime = () => (
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
+                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Best time of day</h3>
+                {!bestBand ? (
+                  <p style={{ color: C.muted, fontSize: 13 }}>Not enough data yet.</p>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 15, marginBottom: 12 }}>Your highest-enjoyment band is <b style={{ color: C.ink }}>{bestBand.name}</b> <span style={{ color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 13 }}>({(bestBand.avg as number).toFixed(1)} / 5)</span>.</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {bandStats.map((b) => {
+                        const pct = b.avg != null ? ((b.avg as number) / 5) * 100 : 0;
+                        const isBest = bestBand && b.band === bestBand.band;
+                        return (
+                          <div key={b.band} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ width: 70, fontSize: 12, color: C.muted, textTransform: "capitalize" }}>{b.name}</span>
+                            <div style={{ flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` }}>
+                              <div style={{ width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral }} />
+                            </div>
+                            <span style={{ width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{b.avg != null ? (b.avg as number).toFixed(1) : "—"} · {b.count}{"\u{1F345}"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+          );
+          const secCalibSummary = () => {
+            const overN = calibrations.filter((e: any) => e.direction === "over").length;
+            const underN = calibrations.filter((e: any) => e.direction === "under").length;
+            const miss = finals.length ? finals.reduce((s: number, e: any) => s + Math.abs((e.spend || 0) - (e.guess || 0)), 0) / finals.length : null;
+            return (
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Calibration stats</h3>
+                {calibrations.length === 0 ? (
+                  <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>Nothing calibrated yet. The shape of your misses shows up here once a few tasks have grown or shrunk.</p>
+                ) : (
+                  <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around" }}>
+                    <Stat label="calibrations" value={calibrations.length} big />
+                    <Stat label="grew" value={overN} color={"#c96f22"} />
+                    <Stat label="shrank" value={underN} color={C.muted} />
+                    <Stat label={"avg miss " + "\u{1F345}"} value={miss == null ? "—" : miss.toFixed(1)} color={C.muted} />
+                  </div>
+                )}
+              </div>
+            );
+          };
+          const secCatchUp = () => {
+            // The catch-up day runs morning to morning: during the overnight stretch the day
+            // you just finished stays on screen, so it can still be tidied before bed. A
+            // pomodoro done NOW in that stretch belongs to tomorrow (same rule as the yellow
+            // calendar squares) and will appear starred in tomorrow's Morning group.
+            const dayKey = +logicalDay(Date.now(), settings) - (isOvernight(Date.now(), settings) ? DAY : 0);
+            const daySess = sessions
+              .filter((s: any) => +logicalDay(s.ts, settings) === dayKey)
+              .sort((a: any, b: any) => (+new Date(a.ts)) - (+new Date(b.ts)));
+            const unnamed = (s: any) => !s.task || s.task === "Focus";
+            const groupsCu: any[][] = [[], [], []];
+            daySess.forEach((s: any) => { groupsCu[isOvernight(s.ts, settings) ? 0 : bandOf(s.ts, settings)].push(s); });
+            const missing = daySess.filter(unnamed).length;
+            const saveName = (id: any) => {
+              const v = (cuEdit && cuEdit.id === id ? cuEdit.v : "").trim();
+              setCuEdit(null);
+              if (!v) return;
+              const next = sessions.map((s: any) => (s.id === id ? { ...s, task: v } : s));
+              setSessions(next); api.saveSessions && api.saveSessions(next);
+            };
+            return (
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+                  <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>Today's pomodoros</h3>
+                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{daySess.length} {"\u{1F345}"}{missing > 0 ? " · " + missing + " unnamed" : ""}</span>
+                </div>
+                <p style={{ color: C.muted, fontSize: 12.5, margin: "0 0 12px" }}>A quiet ledger, open until tomorrow morning: name the unnamed whenever it suits you. It still counts.</p>
+                {daySess.length === 0 ? (
+                  <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>No pomodoros on this day yet.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {groupsCu.map((list, gi) => list.length > 0 && (
+                      <div key={gi}>
+                        <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 5px" }}>{BAND_NAME[gi]}</p>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                          {list.map((s: any) => (
+                            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 11px", borderRadius: 8, background: "#fdfbf5", border: `1px solid ${C.line}`, fontSize: 13, color: C.ink }}>
+                              {isOvernight(s.ts, settings) && <span title="an overnight head start — done after the day started, before morning began" style={{ color: OVERNIGHT_COLOR, display: "inline-flex", flexShrink: 0 }}><StarIcon size={13} /></span>}
+                              {!unnamed(s) ? (
+                                <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{stripLeadingTag(s.task)}</span>
+                              ) : cuEdit && cuEdit.id === s.id ? (
+                                <input autoFocus list="fl-catchup-tasks" value={cuEdit.v} onChange={(e) => setCuEdit({ id: s.id, v: e.target.value })}
+                                  onKeyDown={(e) => { if (e.key === "Enter") saveName(s.id); if (e.key === "Escape") setCuEdit(null); }}
+                                  onBlur={() => saveName(s.id)} placeholder="what was this one for?"
+                                  style={{ flex: 1, minWidth: 120, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 6, padding: "4px 8px", fontFamily: "var(--fl-display)" }} />
+                              ) : (
+                                <button onClick={() => setCuEdit({ id: s.id, v: "" })} style={{ flex: 1, textAlign: "left", border: `1.5px dashed ${C.faint}`, background: "transparent", color: C.muted, boxShadow: "none", borderRadius: 999, padding: "3px 11px", fontSize: 12.5, fontFamily: "var(--fl-display)", cursor: "pointer" }}>name this pomodoro…</button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <datalist id="fl-catchup-tasks">{orderedTasks.map((t: any) => (<option key={t.id || t.task} value={t.task} />))}</datalist>
+                  </div>
+                )}
+              </div>
+            );
+          };
+          const rail: [string, string][] = calibSub === "total" ? TOTAL_TABS : LOG_TABS;
+          const railSub = calibSub === "total" ? totalSub : logSub;
+          const setRailSub = calibSub === "total" ? setTotalSub : setLogSub;
+          return (
+            <div>
+              <div style={SUBBAR}>
+                <div style={{ ...SUBBAR_TRACK, background: C.line }}>
+                  {CALIB_TABS.map(([k, lab]) => (<button key={k} onClick={() => setCalibSub(k)} style={segH(calibSub === k)}>{lab}</button>))}
+                </div>
+                <InfoHover C={C} label="about this view" width={360}>
+                  {calibSub === "today" && (<>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Today</div>
+                    <div>Every pomodoro of the day, grouped morning / afternoon / evening, oldest first — a quick catch-up for the ones that ran unnamed.</div>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                      <li><b>name this pomodoro{"\u2026"}</b>: an unnamed run (it logged as plain "Focus"); click, pick a task or type one, and Enter or a click away saves. Open until tomorrow morning.</li>
+                      <li><b style={{ color: "#D9A521" }}>{"\u2B50"} star</b>: an overnight head start, done after the day began but before morning — it counts toward the day it leads into, like the Calendar's yellow squares.</li>
+                      <li>Naming only changes the local log; nothing is written back to Notion.</li>
+                    </ul>
+                  </>)}
+                  {calibSub === "accuracy" && (<>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Pomo Accuracy</div>
+                    <div>Two kinds of guess, side by side: how long a task would take, and how it would feel.</div>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                      <li><b>How your guesses land</b>: the share of calibrated tasks that finished within one {"\u{1F345}"}, plus why they grew or shrank.</li>
+                      <li><b>Expected vs actual</b>: how often sessions turned out more enjoyable than you expected, with the biggest surprises.</li>
+                    </ul>
+                  </>)}
+                  {calibSub === "total" && (<>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Sum</div>
+                    <div>The long view: everything you have logged, gathered in one place.</div>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                      <li><b>break</b> and <b>pause</b> stats: how you rest, and when and why you stop.</li>
+                      <li><b>calibration stats</b>: how many guesses you have corrected, and the average miss.</li>
+                      <li><b>pomodoro stats</b>: counts and hours, a six-month heatmap, and your best time of day.</li>
+                    </ul>
+                  </>)}
+                  {calibSub === "log" && (<>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Log</div>
+                    <div>The full record, one list per kind. Edits and deletes only change the local log; they never undo what was written to Notion.</div>
+                  </>)}
+                </InfoHover>
+              </div>
+              {calibSub === "today" && secCatchUp()}
+              {calibSub === "accuracy" && (<>{secGuessLand()}<div style={{ marginTop: 14 }}>{secExpectedVsActual()}</div></>)}
+              {(calibSub === "total" || calibSub === "log") && (
+                <div style={{ display: "flex", flexDirection: narrowPanel ? "column" : "row", gap: 14, alignItems: "flex-start" }}>
+                  {/* the rail turns into a scrolling strip on a narrow sidebar, so the panel keeps its width */}
+                  <div style={{ display: "flex", flexDirection: narrowPanel ? "row" : "column", gap: 2, background: C.line, borderRadius: 10, padding: 3, flex: narrowPanel ? "0 0 auto" : "0 0 83px", maxWidth: "100%", overflowX: narrowPanel ? "auto" : "visible", boxSizing: "border-box" }}>
+                    {rail.map(([k, lab]) => (
+                      <button key={k} onClick={() => setRailSub(k)} style={{ ...segH(railSub === k), padding: "4px 9px", textAlign: "left", whiteSpace: "nowrap" }}>{lab}</button>
+                    ))}
+                  </div>
+                  <div style={{ flex: "1 1 auto", minWidth: 0, width: "100%" }}>
+                    {calibSub === "total" && railSub === "break" && secBreakStats()}
+                    {calibSub === "total" && railSub === "pause" && secPauseStats()}
+                    {calibSub === "total" && railSub === "calib" && (<>{secCalibSummary()}{secBestTime()}</>)}
+                    {calibSub === "total" && railSub === "pomo" && secPomodoroStats()}
+                    {calibSub === "log" && railSub === "calib" && secCalibHistory()}
+                    {calibSub === "log" && railSub === "pomo" && secAllSessions()}
+                    {calibSub === "log" && railSub === "pause" && secAllPauses()}
+                    {calibSub === "log" && railSub === "break" && secAllBreaks()}
+                  </div>
+                </div>
               )}
             </div>
           );
@@ -3185,96 +3869,98 @@ export default function FocusLogApp({ api }: any) {
 
         {view === "today" && (
           <div>
-            <div className="fl-plan-bar" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-              <div style={{ display: "inline-flex", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 999, padding: 4 }}>
-                {["work", "relax"].map((m) => {
-                  const on = dayMode === m;
-                  const col = m === "work" ? MODE_COLORS.work.solid : MODE_COLORS.relax.solid;
-                  return (
-                    <button key={m} onClick={() => { if (dayMode !== m) toggleDayMode(); }} aria-pressed={on} aria-label={`${m === "work" ? "Work" : "Relax"} mode`}
-                      style={{ border: "none", boxShadow: "none", background: on ? col : "transparent", color: on ? "#fff" : C.muted, borderRadius: 999, padding: "5px 13px", fontSize: 12, fontWeight: 600, cursor: "pointer", lineHeight: 1.2, display: "inline-flex", alignItems: "center", gap: 5 }}>{m === "work" ? <BriefcaseBusinessIcon size={13} /> : <LeafIcon size={13} />} {m === "work" ? "Work" : "Relax"}</button>
-                  );
-                })}
-              </div>
-              <button onClick={doSync} disabled={sync === "loading"} aria-label="sync from Notion and rebuild the timeline" style={{ ...btn(ACCENT, true), borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px" }}>
+            <div className="fl-plan-bar" style={SUBBAR}>
+              <span />
+              {/* sync, then the day-mode pill, then the info button last - so info lands
+                  on the same spot here as on every other view */}
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <button onClick={doSync} disabled={sync === "loading"} aria-label="sync from Notion and rebuild the timeline" style={{ ...btn(ACCENT, true), borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 6, padding: "0 14px", height: 32, boxSizing: "border-box" }}>
                 <RefreshCwIcon size={14} spin={sync === "loading"} />
                 {sync === "loading" ? "…" : <img src={NOTION_LOGO} alt="Notion" className="fl-sync-logo" style={{ width: 16, height: 16 }} />}
-              </button>
-              <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
-                {timelineMode && (
-                  <span style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
-                    onMouseEnter={() => setIntroOpen(true)} onMouseLeave={() => setIntroOpen(false)}>
-                    <span aria-label={introOpen ? undefined : "how the Timeline works"} style={{ display: "inline-flex", color: C.muted }}><InfoIcon size={16} /></span>
-                    {introOpen && (
-                      <div style={{ position: "absolute", right: 0, top: 22, width: 400, maxWidth: "84vw", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 16px", zIndex: 60, boxShadow: "0 6px 24px rgba(0,0,0,0.16)", fontSize: 12.5, fontWeight: 400, color: C.ink, lineHeight: 1.5, textAlign: "left" }}>
-                        <div style={{ fontWeight: 700, marginBottom: 4 }}>How the Timeline works</div>
-                        <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Moving blocks</div>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
-                          <li>Left-drag a task: reordering by seats. Tasks of the same length trade start times (the chocolate bar shows the seat you'll take), and nothing else in the day moves: breaks, meals, routines and pinned blocks stay put. A drag that crosses no task just nudges that one block inside its free pocket, and the break padding around it stretches or shrinks to fit.</li>
-                          <li>Right-drag: move a block plus everything after it; the grabbed task is pinned, and the gap opened in front becomes a break you own.</li>
-                        </ul>
-                        <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Breaks are yours</div>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
-                          <li>Auto-fix never deletes or resizes them; each one glues to the task before it.</li>
-                          <li>Longer than the short-break setting = a long break, and the pomodoro count restarts.</li>
-                          <li>Two long breaks back to back merge into one.</li>
-                        </ul>
-                        <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Auto-fix</div>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
-                          <li>Keeps your task order; compacts only genuinely empty gaps.</li>
-                          <li>Adds missing short breaks, plus a long one every N pomodoros; never against a meal.</li>
-                          <li>Deletes any long break sitting against lunch or dinner (the meal is the rest); later blocks move up.</li>
-                          <li>Task blocks always stay 25 minutes; the current Focus length is only recorded on them.</li>
-                          <li>After dinner: tasks stay in the evening, each with a break after it.</li>
-                        </ul>
-                        <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Anchors and meals</div>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
-                          <li>Lock = commitment: fixed time, a long break after it, rhythm restarts.</li>
-                          <li>Pin = placed: fixed position; a short break separates the task that packs in behind it.</li>
-                          <li>Meals reset the rhythm; use their pencil to re-time today's lunch or dinner.</li>
-                        </ul>
-                        <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Sync and the ruler</div>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
-                          <li>Sync deletes all breaks and rebuilds tasks fresh (unlocked, unpinned); your commitments and meals keep their time and length.</li>
-                          <li>The left ruler shows real clock times; the red line is now.</li>
-                        </ul>
-                      </div>
-                    )}
-                  </span>
-                )}
-                {!timelineMode && (
-                  <InfoHover C={C} label="how the Tasks view works" width={400}>
-                      <div style={{ fontWeight: 700, marginBottom: 4 }}>How the Tasks view works</div>
-                      <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>What's here</div>
-                      <ul style={{ margin: 0, paddingLeft: 18 }}>
-                        <li>Today's tasks from Notion, plus any local tasks added with the Timeline's add-block button (those survive sync, so the plugin also works without Notion).</li>
-                        <li>The capture box creates a task straight in Notion using your template presets: ⏳ Common task, or 🐾 a sub-task under a BIG TASK (the mountain-marked pages scheduled Today or This week, refreshed at each sync). The little number is your initial Guess: 1 to 3 become 🍅s, 4 becomes one 📦 box, empty means no guess. It also drops the task on today's plan at now and opens the pomodoro form. Push only: your timeline is never rebuilt by it.</li>
-                        <li>Grouped into Project and Personal by your Personal Areas and names settings, with the morning and night routines around them.</li>
-                      </ul>
-                      <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Reading a row</div>
-                      <ul style={{ margin: 0, paddingLeft: 18 }}>
-                        <li>The little icon is the Notion Status: a green search while Exploring, an orange hammer while Executing. The chip beside it is the Notion Area.</li>
-                        <li>A crown marks the King task; bookmarked tasks sort first, then the King, then the rest (new tasks arrive ranked Must, then Aim, then Bonus).</li>
-                        <li>The tomatoes count today's pomodoros on that task: bright are done, grey still planned.</li>
-                      </ul>
-                      <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>On hover</div>
-                      <ul style={{ margin: 0, paddingLeft: 18 }}>
-                        <li>Drag the dots to reorder; the person/briefcase moves a task between Personal and Work.</li>
-                        <li>The bookmark pins a task to the top by name, so it survives the daily re-created Notion tasks.</li>
-                        <li>The play button runs a pomodoro on that task.</li>
-                      </ul>
-                  </InfoHover>
-                )}
-                <div style={{ display: "inline-flex", gap: 2, background: C.line, borderRadius: 10, padding: 3, flexShrink: 0 }}>
-                  <button onClick={() => setTimelineMode(false)} aria-pressed={!timelineMode} style={segH(!timelineMode)}>Tasks</button>
-                  <button onClick={() => setTimelineMode(true)} aria-pressed={timelineMode} style={segH(timelineMode)}>Timeline</button>
+                </button>
+                <div style={{ display: "inline-flex", alignItems: "center", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 999, padding: "0 4px", height: 32, boxSizing: "border-box" }}>
+                {["work", "relax"].map((m) => {
+                const on = dayMode === m;
+                const col = m === "work" ? MODE_COLORS.work.solid : MODE_COLORS.relax.solid;
+                return (
+                <button key={m} onClick={() => { if (dayMode !== m) toggleDayMode(); }} aria-pressed={on} aria-label={`${m === "work" ? "Work" : "Relax"} mode`}
+                style={{ border: "none", boxShadow: "none", background: on ? col : "transparent", color: on ? "#fff" : C.muted, borderRadius: 999, padding: "0 13px", height: 24, fontSize: 12, fontWeight: 600, cursor: "pointer", lineHeight: 1.2, display: "inline-flex", alignItems: "center", gap: 5 }}>{m === "work" ? <BriefcaseBusinessIcon size={13} /> : <LeafIcon size={13} />} {m === "work" ? "Work" : "Relax"}</button>
+                );
+                })}
                 </div>
+                {false && (
+                <span style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
+                onMouseEnter={() => setIntroOpen(true)} onMouseLeave={() => setIntroOpen(false)}>
+                <span aria-label={introOpen ? undefined : "how the Timeline works"} style={{ display: "inline-flex", color: C.muted }}><InfoIcon size={16} /></span>
+                {introOpen && (
+                <div style={{ position: "absolute", right: 0, top: 22, width: 400, maxWidth: "84vw", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 16px", zIndex: 60, boxShadow: "0 6px 24px rgba(0,0,0,0.16)", fontSize: 12.5, fontWeight: 400, color: C.ink, lineHeight: 1.5, textAlign: "left" }}>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>How the Timeline works</div>
+                <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Moving blocks</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <li>Left-drag a task: reordering by seats. Tasks of the same length trade start times (the chocolate bar shows the seat you'll take), and nothing else in the day moves: breaks, meals, routines and pinned blocks stay put. A drag that crosses no task just nudges that one block inside its free pocket, and the break padding around it stretches or shrinks to fit.</li>
+                <li>Right-drag: move a block plus everything after it; the grabbed task is pinned, and the gap opened in front becomes a break you own.</li>
+                </ul>
+                <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Breaks are yours</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <li>Auto-fix never deletes or resizes them; each one glues to the task before it.</li>
+                <li>Longer than the short-break setting = a long break, and the pomodoro count restarts.</li>
+                <li>Two long breaks back to back merge into one.</li>
+                </ul>
+                <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Auto-fix</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <li>Keeps your task order; compacts only genuinely empty gaps.</li>
+                <li>Adds missing short breaks, plus a long one every N pomodoros; never against a meal.</li>
+                <li>Deletes any long break sitting against lunch or dinner (the meal is the rest); later blocks move up.</li>
+                <li>Task blocks always stay 25 minutes; the current Focus length is only recorded on them.</li>
+                <li>After dinner: tasks stay in the evening, each with a break after it.</li>
+                </ul>
+                <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Anchors and meals</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <li>Lock = commitment: fixed time, a long break after it, rhythm restarts.</li>
+                <li>Pin = placed: fixed position; a short break separates the task that packs in behind it.</li>
+                <li>Meals reset the rhythm; use their pencil to re-time today's lunch or dinner.</li>
+                </ul>
+                <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Sync and the ruler</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <li>Sync deletes all breaks and rebuilds tasks fresh (unlocked, unpinned); your commitments and meals keep their time and length.</li>
+                <li>The left ruler shows real clock times; the red line is now.</li>
+                </ul>
+                </div>
+                )}
+                </span>
+                )}
+                {(
+                <InfoHover C={C} label="about this view" width={400}>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>How the Tasks view works</div>
+                <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>What's here</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <li>Today's tasks from Notion, plus any local tasks added with the Timeline's add-block button (those survive sync, so the plugin also works without Notion).</li>
+                <li>The capture box creates a task straight in Notion using your template presets: ⏳ Common task, or 🐾 a sub-task under a BIG TASK (the mountain-marked pages scheduled Today or This week, refreshed at each sync). The little number is your initial Guess: 1 to 3 become 🍅s, 4 becomes one 📦 box, empty means no guess. It also drops the task on today's plan at now and opens the pomodoro form. Push only: your timeline is never rebuilt by it.</li>
+                <li>Grouped into Project and Personal by your Personal Areas and names settings, with the morning and night routines around them.</li>
+                </ul>
+                <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Reading a row</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <li>The little icon is the Notion Status: a green search while Exploring, an orange hammer while Executing. The chip beside it is the Notion Area.</li>
+                <li>A crown marks the King task; bookmarked tasks sort first, then the King, then the rest (new tasks arrive ranked Must, then Aim, then Bonus).</li>
+                <li>The tomatoes count today's pomodoros on that task: bright are done, grey still planned.</li>
+                </ul>
+                <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>On hover</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <li>Drag the dots to reorder; the person/briefcase moves a task between Personal and Work.</li>
+                <li>The bookmark pins a task to the top by name, so it survives the daily re-created Notion tasks.</li>
+                <li>The play button runs a pomodoro on that task.</li>
+                </ul>
+                </InfoHover>
+                )}
               </div>
             </div>
             <div style={{ margin: "0 0 12px" }}>
               <span style={{ color: C.ink, fontSize: 16, fontWeight: 700, display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
                 {tasks.length} tasks {"·"} {countToday} / {plannedPomos} {"\u{1F345}"}
-                {timelineMode && planEndMin > 0 &&
+                {isOvernight(Date.now(), settings)
+                  ? <span style={{ fontWeight: 600, fontSize: 13, color: C.muted }} title="between your day start and morning-begins, pomodoros stack on the day they lead into — the same stretch the Calendar paints yellow">{"·"} a head start: anything now counts toward tomorrow</span>
+                  : <span style={{ fontWeight: 600, fontSize: 13, color: C.muted }} title="how many more pomodoros fit between now and the night routine, once meals and breaks are taken out">{"·"} room for {pomosLeftToday} more today</span>}
+                {false && planEndMin > 0 &&
                   <span style={{ fontWeight: 600 }}>{" · ends " + fmtClock(planEndMin)}{planOverflow > 0 && <span style={{ color: C.worse }}>{" (overflows by " + planOverflow + "m)"}</span>}</span>}
               </span>
             </div>
@@ -3285,7 +3971,7 @@ export default function FocusLogApp({ api }: any) {
               </div>
             )}
             {tasks.length === 0 && <p style={{ color: C.muted, fontSize: 13 }}>No tasks yet. Set your Notion token in settings, then press sync.</p>}
-            {!timelineMode && !!api.createTask && !!settings.notionToken && (
+            {!!api.createTask && !!settings.notionToken && (
               <div style={{ display: "flex", gap: 6, alignItems: "center", margin: "0 0 12px" }}>
                 <input value={qaName} onChange={(e) => setQaName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") quickAdd(); }}
                   placeholder="capture a task: Enter = into Notion + do now"
@@ -3305,213 +3991,119 @@ export default function FocusLogApp({ api }: any) {
                   style={{ ...btn(ACCENT), width: 30, height: 30, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: qaBusy || !qaName.trim() ? 0.5 : 1, flexShrink: 0 }}><ListPlusIcon size={14} /></button>
               </div>
             )}
-            {timelineMode ? <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>{renderTimeline()}</div> : renderTodaySections()}
+            {renderTodaySections()}
           </div>
         )}
 
-        {view === "status" && (
-          <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 12 }}>
-              <InfoHover C={C} label="about this view" width={340}>
-                {statusSub === "week" && (<>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Week</div>
-                  <div>One week at a time: your pomodoros grouped by Area.</div>
-                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-                    <li><b>Charts</b>: one per Notion Area, with a row for each task worked on that week.</li>
-                    <li><b>Marks</b>: {"○"} is expected, {"●"} is actual; green means better than expected, red worse.</li>
-                    <li><b>Arrows</b>: step between weeks; the right arrow stops at the current week.</li>
-                  </ul>
-                </>)}
-                {statusSub === "month" && (<>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Month</div>
-                  <div>The month as a calendar: a square for every pomodoro.</div>
-                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-                    <li><b>Squares</b>: one per pomodoro, red on work days and green on relax days; the lightness is the time of day (light morning, medium afternoon, darkest evening).</li>
-                    <li><b>Yellow squares</b>: overnight pomodoros, done between your day start and "morning begins"; they stack on the day they lead into.</li>
-                    <li><b>Changing month</b>: use the arrows or scroll on the month name; TODAY jumps back to now and opens today's daily note.</li>
-                    <li><b>Days</b>: darker brown date numbers already have a daily note; click any day to open its note. The outline follows the daily note you have open, or today.</li>
-                  </ul>
-                </>)}
-                {statusSub === "totals" && (<>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Total</div>
-                  <div>The long view: everything you have logged, all projects combined.</div>
-                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-                    <li><b>Pomodoro totals</b>: counts and hours for this week, this month and this year.</li>
-                    <li><b>Six-month heatmap</b>: pomodoros per day over the last six months; darker means more.</li>
-                    <li><b>Expected vs actual</b>: how often sessions turned out more enjoyable than you expected, with the biggest surprises (dreaded, then enjoyed).</li>
-                    <li><b>Best time of day</b>: average enjoyment for morning, afternoon and evening.</li>
-                    <li><b>All sessions</b>: the full editable log; edits and deletes only change the local log, not Notion.</li>
-                  </ul>
-                </>)}
-              </InfoHover>
-              <div style={{ display: "inline-flex", gap: 2, background: C.line, borderRadius: 10, padding: 3, flexShrink: 0 }}>
-                {([["week", "Week"], ["month", "Month"], ["totals", "Total"]] as [string, string][]).map(([k, lab]) => (
-                  <button key={k} onClick={() => setStatusSub(k)} style={segH(statusSub === k)}>{lab}</button>
-                ))}
-              </div>
-            </div>
-            <div style={{ minWidth: 0 }}>
-        {statusSub === "week" && (
-          <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <button onClick={() => setWeekOff((w) => w - 1)} style={btn(C.muted, true)}>{"\u2190"}</button>
-              <span style={{ fontFamily: "var(--fl-mono)", fontSize: 13 }}>{fmtDate(weekStart)} {"\u2013"} {fmtDate(new Date(+weekEnd - DAY))}</span>
-              <button onClick={() => setWeekOff((w) => Math.min(0, w + 1))} style={btn(C.muted, true)}>{"\u2192"}</button>
-            </div>
-            {weekAreas.length === 0 ? <p style={{ color: C.muted, textAlign: "center", padding: "40px 0" }}>{weekSessions.length ? "No pomodoros with an Area this week." : "No pomodoros this week."}</p> :
-              weekAreas.map((a) => (<GroupChart key={a} group={a} sessions={weekSessions.filter((x) => x.category === a)} settings={settings} override={modeOverride} />))}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "center", marginTop: 8, fontSize: 11, color: C.muted }}>
-              <span><span style={{ color: C.ink }}>{"\u25CB"}</span> expected</span>
-              <span><span style={{ color: C.ink }}>{"\u25CF"}</span> actual</span>
-              <span><span style={{ color: C.better }}>{"\u2014"}</span> better than expected</span>
-              <span><span style={{ color: C.worse }}>{"\u2014"}</span> worse than expected</span>
-            </div>
-          </div>
-        )}
 
-        {statusSub === "month" && (
-          <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginBottom: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, paddingLeft: 4 }}>
-              <span ref={monthLabelRef} aria-label="scroll to change the month" style={{ fontFamily: "var(--fl-display)", fontVariantNumeric: "tabular-nums", fontSize: 16, fontWeight: "var(--h3-weight, 600)" as any, color: C.ink, letterSpacing: "-0.01em", lineHeight: 1, cursor: "ns-resize", userSelect: "none" }}>
-                <span style={{ display: "inline-block", minWidth: "2.3em" }}>{MON3[monthRef.getMonth()]}</span>
-                <span style={{ color: ACCENT, marginLeft: "0.1em" }}>{monthRef.getFullYear()}</span>
-              </span>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <button onClick={() => setMonthOff((m) => m - 1)} aria-label="previous month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" }}><ChevronLeftIcon size={20} /></button>
-                <button onClick={() => { setMonthOff(0); api.openDailyNote && api.openDailyNote(+logicalDay(Date.now(), settings)); }} aria-label="jump to the current month and open today's daily note — 'today' follows your day-start setting, so after an evening rollover it is already tomorrow's date" style={{ background: "transparent", border: "none", boxShadow: "none", color: ACCENT, cursor: "pointer", padding: "5px 8px", borderRadius: 7, fontFamily: "var(--fl-display)", fontWeight: 700, fontSize: 13, letterSpacing: "0.02em" }}>TODAY</button>
-                <button onClick={() => setMonthOff((m) => m + 1)} aria-label="next month" style={{ background: "transparent", border: "none", boxShadow: "none", color: C.ink, cursor: "pointer", padding: 5, borderRadius: 7, display: "inline-flex", alignItems: "center" }}><ChevronRightIcon size={20} /></button>
-              </div>
-            </div>
-            <Heatmap sessions={sessions} monthRef={monthRef} settings={settings} activeTs={activeDaily} override={modeOverride} hasNote={(d: Date) => !!(api.hasDailyNote && api.hasDailyNote(+d))} onOpenDay={(date: Date) => api.openDailyNote && api.openDailyNote(+date)}
-              onDayMenu={(date: Date, e: any) => {
-                if (!api.openDayMenu) return;
-                const key = String(date.getTime());
-                const cur = (modeOverride[key] === "work" || modeOverride[key] === "relax") ? modeOverride[key] : (((settings.workDays || [])[(date.getDay() + 6) % 7] === false) ? "relax" : "work");
-                const next = cur === "work" ? "relax" : "work";
-                api.openDayMenu(+date, e.nativeEvent || e, { flipLabel: "Flip to " + next + " day", onFlip: () => { const obj = { ...modeOverride, [key]: next }; setModeOverride(obj); api.saveModeOverride && api.saveModeOverride(obj); } });
-              }} />
-          </div>
-        )}
-
-        {statusSub === "totals" && (
-          <div>
-            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
-              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Pomodoro totals</h3>
-              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around" }}>
-                <Stat label="this week" value={countWeek} big />
-                <Stat label="this month" value={countMonth} big />
-                <Stat label="this year" value={countYear} big />
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around", borderTop: `1px solid ${C.line}`, paddingTop: 8, marginTop: 4 }}>
-                <Stat label="hours, week" value={hrsOf(sumMin(inWeek))} color={C.muted} />
-                <Stat label="hours, month" value={hrsOf(sumMin(inMonth))} color={C.muted} />
-                <Stat label="hours, year" value={hrsOf(sumMin(inYear))} color={C.muted} />
-              </div>
-            </div>
-
-            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
-              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 12px" }}>Six-month heatmap</h3>
-              <ContribHeatmap sessions={sessions} settings={settings} />
-            </div>
-
-            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
-              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 4px" }}>Expected vs actual</h3>
-              {rated === 0 ? (
-                <p style={{ color: C.muted, fontSize: 13 }}>No ratings yet. Log a few pomodoros to see your calibration.</p>
-              ) : (
-                <>
-                  <div style={{ fontSize: 15, lineHeight: 1.5, marginBottom: surprises.length ? 14 : 0 }}>
-                    <span style={{ fontFamily: "var(--fl-mono)", fontSize: 22, color: C.better }}>{betterPct}%</span> of your pomodoros turned out <span style={{ color: C.better }}>more enjoyable</span> than you expected
-                    <span style={{ color: C.muted }}> (avg gap <span style={{ color: avgGapAll > 0 ? C.better : avgGapAll < 0 ? C.worse : C.neutral, fontFamily: "var(--fl-mono)" }}>{(avgGapAll >= 0 ? "+" : "") + avgGapAll.toFixed(1)}</span>).</span>
-                  </div>
-                  {surprises.length > 0 && (
-                    <div>
-                      <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Biggest surprises — dreaded, then enjoyed</p>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {surprises.map((s) => (
-                          <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-                            <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.better, minWidth: 28 }}>+{s.actual - s.expected}</span>
-                            <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{s.task}</span>
-                            <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, whiteSpace: "nowrap" }}><span style={{ color: C.ink }}>{s.expected}</span><span style={{ color: C.muted }}>{" → "}</span><span style={{ color: C.ink }}>{s.actual}</span></span>
-                            <span style={{ color: C.muted, fontSize: 11, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap" }}>{fmtDate(s.ts)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginTop: 20 }}>
-              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Best time of day</h3>
-              {!bestBand ? (
-                <p style={{ color: C.muted, fontSize: 13 }}>Not enough data yet.</p>
-              ) : (
-                <>
-                  <div style={{ fontSize: 15, marginBottom: 12 }}>Your highest-enjoyment band is <b style={{ color: C.ink }}>{bestBand.name}</b> <span style={{ color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 13 }}>({(bestBand.avg as number).toFixed(1)} / 5)</span>.</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {bandStats.map((b) => {
-                      const pct = b.avg != null ? ((b.avg as number) / 5) * 100 : 0;
-                      const isBest = bestBand && b.band === bestBand.band;
-                      return (
-                        <div key={b.band} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ width: 70, fontSize: 12, color: C.muted, textTransform: "capitalize" }}>{b.name}</span>
-                          <div style={{ flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` }}>
-                            <div style={{ width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral }} />
-                          </div>
-                          <span style={{ width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{b.avg != null ? (b.avg as number).toFixed(1) : "—"} · {b.count}{"\u{1F345}"}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div style={{ marginTop: 20 }}>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-                <h3 onClick={() => toggleFold("sessions")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>{foldedHistory.has("sessions") ? "▸" : "▾"} All sessions</h3>
-                <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{sessions.length} logged</span>
-              </div>
-              {foldedHistory.has("sessions") ? null : sessions.length === 0 ? (
-                <p style={{ color: C.muted, fontSize: 13 }}>No sessions yet. Log a pomodoro to see it here.</p>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {[...sessions].sort((a, b) => +new Date(b.ts) - +new Date(a.ts)).map((s) => (
-                    editingId === s.id ? (
-                      <SessionEditRow key={s.id} draft={editDraft} setDraft={setEditDraft} settings={settings} onSave={saveEdit} onCancel={cancelEdit} />
-                    ) : (
-                      <SessionRow key={s.id} s={s} settings={settings} onEdit={startEdit} onDelete={deleteSession} />
-                    )
-                  ))}
-                </div>
-              )}
-              {!foldedHistory.has("sessions") && <p style={{ color: C.muted, fontSize: 11, marginTop: 10 }}>
-                Edits and deletes only change the local log; they do not undo the Act write-back on Notion.
-              </p>}
-            </div>
-          </div>
-        )}
-            </div>
-          </div>
-        )}
-
-        {reflectCount && (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 95, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => (api.cancelReflectCountdown ? api.cancelReflectCountdown() : setReflectCount(null))}>
+        {surfCount && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 95, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => (api.cancelSurfCountdown ? api.cancelSurfCountdown() : setSurfCount(null))}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: "min(340px, 92vw)", background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: 18, textAlign: "center", boxShadow: "0 10px 30px rgba(0,0,0,0.25)" }}>
-              <div style={{ fontFamily: "var(--fl-display)", fontSize: 15, fontWeight: 700, color: C.ink }}>Off to Reflect in</div>
-              <div style={{ fontFamily: "var(--fl-mono)", fontSize: 44, fontWeight: 700, color: ACCENT, lineHeight: 1.2, margin: "6px 0 2px", fontVariantNumeric: "tabular-nums" }}>{reflectCount.left}</div>
-              <button onClick={() => (api.cancelReflectCountdown ? api.cancelReflectCountdown() : setReflectCount(null))} style={{ ...btn(C.muted, true), padding: "6px 16px", fontSize: 12.5, borderRadius: 999, marginTop: 10, maxWidth: "100%", overflowWrap: "anywhere" }}>{reflectCount.task ? "cancel, continue on “" + stripLeadingTag(reflectCount.task) + "”" : "cancel"}</button>
+              <div style={{ fontFamily: "var(--fl-display)", fontSize: 15, fontWeight: 700, color: C.ink }}>Off to the wave in</div>
+              <div style={{ fontFamily: "var(--fl-mono)", fontSize: 44, fontWeight: 700, color: ACCENT, lineHeight: 1.2, margin: "6px 0 2px", fontVariantNumeric: "tabular-nums" }}>{surfCount.left}</div>
+              <button onClick={() => (api.cancelSurfCountdown ? api.cancelSurfCountdown() : setSurfCount(null))} style={{ ...btn(C.muted, true), padding: "6px 16px", fontSize: 12.5, borderRadius: 999, marginTop: 10, maxWidth: "100%", overflowWrap: "anywhere" }}>{surfCount.task ? "cancel, continue on “" + stripLeadingTag(surfCount.task) + "”" : "cancel"}</button>
             </div>
           </div>
         )}
+        {surfOpen && surf && (() => {
+          const surfMins = Math.max(2, Math.min(15, settings.urgeSurfMinutes || 5));
+          const deadline = surf.startTs + surfMins * 60000;
+          const rem = Math.max(0, deadline - nowTick);
+          const over = rem <= 0;
+          const lastRate = surf.curve.length ? surf.curve[surf.curve.length - 1] : null;
+          const nudge = !over && (!lastRate || nowTick - lastRate.t > 90000);
+          const remTxt = String(Math.floor(rem / 60000)) + ":" + String(Math.floor((rem % 60000) / 1000)).padStart(2, "0");
+          // The rating buttons ARE the chart's y-axis. A six-item column laid out with
+          // space-between over H puts each button's centre exactly on yOf(v) - but only while
+          // the vertical padding stays half a button tall, so keep PTT/PBT tied to RBTN.
+          const RATES = [10, 8, 6, 4, 2, 0], RBTN = 24;
+          const W = 490, H = 200, PLT = 6, PRT = 8, PTT = RBTN / 2, PBT = RBTN / 2;
+          const span = Math.max(surfMins * 60000, nowTick - surf.startTs);
+          const xOf = (t: number) => PLT + ((t - surf.startTs) / span) * (W - PLT - PRT);
+          const yOf = (v: number) => PTT + (1 - v / 10) * (H - PTT - PBT);
+          const pts = surf.curve.map((c: any) => ({ x: xOf(c.t), y: yOf(c.v) }));
+          let path = "";
+          if (pts.length === 1) path = "M " + pts[0].x + " " + pts[0].y + " L " + (pts[0].x + 0.01) + " " + pts[0].y;
+          else if (pts.length > 1) {
+            path = "M " + pts[0].x + " " + pts[0].y;
+            for (let i = 0; i < pts.length - 1; i++) {
+              const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+              path += " C " + (p1.x + (p2.x - p0.x) / 6) + " " + (p1.y + (p2.y - p0.y) / 6) + ", " + (p2.x - (p3.x - p1.x) / 6) + " " + (p2.y - (p3.y - p1.y) / 6) + ", " + p2.x + " " + p2.y;
+            }
+          }
+          const area = pts.length > 1 ? path + " L " + pts[pts.length - 1].x + " " + yOf(0) + " L " + pts[0].x + " " + yOf(0) + " Z" : "";
+          const cur = lastRate ? lastRate.v : null;
+          const setS = (patch: any) => setSurf((s0: any) => ({ ...s0, ...patch }));
+          return (
+            <div style={{ position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 92, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => { setSurfOpen(false); setSurf(null); }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 94vw)", maxHeight: "88vh", overflowY: "auto", background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: 18, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ fontFamily: "var(--fl-display)", fontSize: 15.5, fontWeight: 700, color: C.ink, flex: 1, display: "flex", alignItems: "center", gap: 7 }}><span style={{ color: "#3E78B2", display: "inline-flex" }}><SeaWaveIcon size={16} /></span>An urge is here</div>
+                  <span style={{ fontFamily: "var(--fl-mono)", fontSize: 13, color: over ? "#3E78B2" : C.muted, fontVariantNumeric: "tabular-nums" }}>{over ? "the wave has had its time" : remTxt}</span>
+                </div>
+                <div className="fl-surf-tabs" role="tablist" aria-label="the wave, the body, the feeling around it" style={{ display: "inline-flex", gap: 3, padding: 3, borderRadius: 999, border: `1px solid ${C.line}`, background: C.paper, margin: "10px 0 0" }}>
+                  {[{ k: "wave", label: "Wave", n: surf.curve.length, Icon: WaterIcon }, { k: "body", label: "Body", n: (surf.body || []).length, Icon: WalkingIcon }, { k: "mood", label: "Emotions", n: (surf.moods || []).length, Icon: StomachIcon }].map((t) => {
+                    const on = surfTab === t.k;
+                    // The 90-second nudge follows the Wave pill while another tab is open.
+                    const call = t.k === "wave" && nudge && !on;
+                    return (
+                      <button key={t.k} role="tab" aria-selected={on} onClick={() => setSurfTab(t.k as any)}
+                        style={{ padding: "4px 13px", borderRadius: 999, border: "none", background: on ? "#DCEAF6" : "transparent", color: on ? "#1d4f80" : C.muted, boxShadow: call ? "0 0 0 2px #DCEAF6" : "none", transition: "box-shadow 0.4s", fontSize: 12.5, fontWeight: on ? 600 : 400, fontFamily: "var(--fl-display)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        <t.Icon size={13} on={on} />{t.label}
+                        {/* a quiet dot, so picks on the hidden sides are still visible */}
+                        {t.n > 0 && <span aria-label={t.n + " chosen"} style={{ width: 5, height: 5, borderRadius: 999, background: "#3E78B2", display: "inline-block" }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 12.5, color: (surfTab === "wave" && nudge) ? "#3E78B2" : C.muted, margin: "7px 0 8px", transition: "color 0.4s" }}>{surfTab === "wave" ? "How strong is it now?" : surfTab === "body" ? "Where do I feel this in my body?" : "What emotions am I experiencing?"}</div>
+                {/* One slot, one height: the three decisions below never move when tabs change. */}
+                <div className="fl-surf-pane" style={{ minHeight: 320 }}>
+                  {surfTab === "wave" && (
+                    <>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 12px" }}>
+                        <div className="fl-breath" aria-hidden="true" />
+                        <div style={{ fontSize: 12.5, color: C.muted }}>Each breath helps you stay balanced on the wave.</div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                        <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: H, flexShrink: 0 }}>
+                          {RATES.map((v) => (
+                            <button key={v} onClick={() => setS({ curve: [...surf.curve, { t: Date.now(), v }] })} aria-label={"rate the urge " + v + " of 10"}
+                              style={{ width: RBTN, height: RBTN, minWidth: RBTN, padding: 0, borderRadius: 999, border: `1.5px solid ${cur === v ? "#3E78B2" : C.faint}`, background: cur === v ? "#DCEAF6" : "transparent", color: cur === v ? "#3E78B2" : C.muted, boxShadow: "none", fontSize: 11.5, fontFamily: "var(--fl-mono)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{v}</button>
+                          ))}
+                        </div>
+                        {/* preserveAspectRatio=none keeps the 200px height (and so the axis
+                            alignment) when the dialog narrows; strokes opt out of the stretch. */}
+                        <svg viewBox={"0 0 " + W + " " + H} preserveAspectRatio="none" style={{ flex: "1 1 auto", minWidth: 0, height: H, display: "block" }} aria-label="the wave: your ratings over time">
+                          {RATES.map((g) => (<line key={g} x1={PLT} x2={W - PRT} y1={yOf(g)} y2={yOf(g)} stroke={g === 0 ? C.faint : C.line} strokeWidth={1} vectorEffect="non-scaling-stroke" />))}
+                          {area && <path d={area} fill="#DCEAF6" opacity={0.55} stroke="none" />}
+                          {path && <path d={path} fill="none" stroke="#3E78B2" strokeWidth={2} strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+                          {pts.map((pt: any, i: number) => (<circle key={i} cx={pt.x} cy={pt.y} r={2.6} fill="#3E78B2" />))}
+                          <line x1={xOf(nowTick)} x2={xOf(nowTick)} y1={PTT} y2={H - PBT} stroke={C.faint} strokeWidth={1} strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
+                        </svg>
+                      </div>
+                      <input value={surf.note} onChange={(e) => setS({ note: e.target.value })} placeholder="This is an urge, not a command. I decide after the wave has passed"
+                        style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "7px 10px", fontFamily: "var(--fl-display)", marginTop: 12 }} />
+                    </>
+                  )}
+                  {surfTab === "body" && <BodyMap value={surf.body} onChange={(b: any) => setS({ body: b })} C={C} />}
+                  {surfTab === "mood" && <MoodGrid feelings={feelingWords} C={C} value={surf.moods} onChange={(m: any) => setS({ moods: m })} />}
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                  <button onClick={() => finishSurf("paused")} aria-label="park this thought: pause the pomodoro and tag why" style={{ ...btn(C.muted, true), padding: "6px 12px", fontSize: 12.5, borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 6 }}><BoxIcon size={13} />Park this thought</button>
+                  <button onClick={() => finishSurf("acted")} aria-label="switch intentionally: a deliberate yes, decided after the wave" style={{ ...btn(C.muted, true), padding: "6px 12px", fontSize: 12.5, borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 6 }}><ShuffleIcon size={13} />Switch intentionally</button>
+                  <button onClick={() => finishSurf("surfed")} aria-label="return to my task: the urge was outlasted, and it counts" style={{ ...btn("#3E78B2"), padding: "6px 14px", fontSize: 12.5, borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 6 }}><SeaWaveIcon size={13} />Return to my task</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         {claimOpen && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setClaimOpen(false)}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 92vw)", background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: 18, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" }}>
               <div style={{ fontWeight: 700, fontSize: 15.5, color: C.ink, marginBottom: 2, fontFamily: "var(--fl-display)" }}>Claim finished work</div>
               <div style={{ fontSize: 12.5, color: C.muted, marginBottom: 10 }}>Work done off the timer still counts. Rough is fine; when unsure, claim the smaller number.</div>
-              <input list="fl-claim-tasks" value={clTask} onChange={(e) => setClTask(e.target.value)} placeholder="which task? pick or type freely"
+              <input list="fl-claim-tasks" value={clTask} onChange={(e) => setClTask(e.target.value)} placeholder="link a task, or type a name"
                 style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "7px 10px", fontFamily: "var(--fl-display)", marginBottom: 10 }} />
               <datalist id="fl-claim-tasks">{tasks.map((t: any) => (<option key={t.id || t.task} value={t.task} />))}</datalist>
               {clTask.trim() !== "" && !tasks.some((t: any) => t.task === clTask.trim()) && !!api.createTask && !!settings.notionToken && (
@@ -3578,7 +4170,7 @@ export default function FocusLogApp({ api }: any) {
             </div>
           </div>
         )}
-        {view === "log" && <LogForm tasks={orderedTasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={restartTimer} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPickTask={(v: string) => { setPreset(v); api.timer && api.timer.setTask(v); }} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} finished={finished} expected={timer.expected} onSetExpected={setExpectedRating} autoLogDefault={settings.autoLogOnRate !== false} onAutoLogChange={(v: boolean) => api.patchSettings && api.patchSettings({ autoLogOnRate: v })} />}
+        {view === "log" && <LogForm tasks={orderedTasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={restartTimer} onSurf={openSurf} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPickTask={(v: string) => { setPreset(v); api.timer && api.timer.setTask(v); }} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} finished={finished} finishedTs={timer.finishedAt} expected={timer.expected} onSetExpected={setExpectedRating} whisper={rainWhisper} autoLogDefault={settings.autoLogOnRate !== false} onAutoLogChange={(v: boolean) => api.patchSettings && api.patchSettings({ autoLogOnRate: v })} />}
         {view === "log" && (
           <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
             <div style={{ minWidth: 200, flex: 1 }}>
@@ -3595,6 +4187,21 @@ export default function FocusLogApp({ api }: any) {
               <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>Start a break</h3>
               <button onClick={() => startBreak(settings.breakMinutes)} style={{ ...btn(C.ink, true), borderRadius: 999, padding: "6px 16px" }}>short · {settings.breakMinutes}m</button>
               <button onClick={() => startBreak(settings.longBreakMinutes)} style={{ ...btn(C.ink, true), borderRadius: 999, padding: "6px 16px" }}>long · {settings.longBreakMinutes}m</button>
+            </div>
+            {/* Moved off the old Timeline toolbar: it sets the rhythm of the day's rests,
+                so it belongs with the breaks rather than with a schedule. */}
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+              <span style={{ fontSize: 12, color: C.muted, whiteSpace: "nowrap" }}>Long break every</span>
+              <div style={{ display: "inline-flex", alignItems: "center", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 999, padding: 3, gap: 2, height: 32, boxSizing: "border-box" }}>
+                {[3, 4, 5].map((n) => {
+                  const on = (longEvery >= 3 ? longEvery : 3) === n;
+                  return (
+                    <button key={n} onClick={() => { setLongEveryState(n); api.patchSettings && api.patchSettings({ longBreakEvery: n }); }} aria-pressed={on} aria-label={`a long break every ${n} pomodoros`}
+                      style={{ border: "none", boxShadow: "none", background: on ? ACCENT : "transparent", color: on ? "#fff" : C.muted, fontFamily: "var(--fl-mono)", fontSize: 12, fontWeight: on ? 700 : 500, borderRadius: 999, padding: "0 11px", height: 24, cursor: "pointer" }}>{n}</button>
+                  );
+                })}
+              </div>
+              <span style={{ fontSize: 12, color: C.muted, whiteSpace: "nowrap" }}>pomodoros</span>
             </div>
             {brk.active && (
               <div style={{ background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
@@ -3636,98 +4243,6 @@ export default function FocusLogApp({ api }: any) {
               </div>
             </div>
 
-            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
-              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Break stats</h3>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 }}>
-                <div>
-                  <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Favourites</p>
-                  {favs.length === 0 ? <span style={{ color: C.muted, fontSize: 13 }}>{"—"}</span> : favs.map((a) => (
-                    <div key={a.id} style={{ fontSize: 13 }}>{a.name} <span style={{ color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 11 }}>{a.count}{"×"}</span></div>
-                  ))}
-                </div>
-                <div>
-                  <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Least chosen</p>
-                  {disliked.length === 0 ? <span style={{ color: C.muted, fontSize: 13 }}>{"—"}</span> : disliked.map((a) => (
-                    <div key={a.id} style={{ fontSize: 13, color: C.muted }}>{a.name} <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11 }}>{a.count || 0}{"×"}</span></div>
-                  ))}
-                </div>
-              </div>
-              <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>By area</p>
-              <PieChart data={pieData} />
-            </div>
-
-            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
-              <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>Break insights</h3>
-              {ratedBreaks.length === 0 ? (
-                <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>Rate a few breaks to see what restores you best.</p>
-              ) : (
-                <>
-                  <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" }}>Most restorative activities</p>
-                  {actScore.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No rated breaks had activities yet.</p> : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 18 }}>
-                      {actScore.slice(0, 3).map((x: any, i: number) => (
-                        <div key={x.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 13 }}>
-                          <span style={{ width: 16, color: C.muted, fontFamily: "var(--fl-mono)", fontSize: 12 }}>{i + 1}.</span>
-                          <span style={{ flex: 1, color: C.ink, overflowWrap: "anywhere" }}>{x.name}{x.n < 3 && <span style={{ fontSize: 10, color: C.muted }}> (low sample)</span>}</span>
-                          <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{x.avg.toFixed(1)} / 5</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 8px" }}>Best time for breaks</p>
-                  {bestBreakBand ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      {breakBandStats.map((b) => {
-                        const isBest = bestBreakBand && b.band === bestBreakBand.band;
-                        return (
-                          <div key={b.band} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 13 }}>
-                            <span style={{ flex: 1, textTransform: "capitalize", color: isBest ? C.ink : C.muted, fontWeight: isBest ? 700 : 400 }}>{b.name}{isBest ? " — best" : ""}</span>
-                            <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{b.avg != null ? (b.avg as number).toFixed(1) + " / 5" : "—"}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>Not enough rated breaks yet.</p>}
-                </>
-              )}
-            </div>
-
-            <div style={{ marginTop: 20 }}>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-                <h3 onClick={() => toggleFold("breaks")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>{foldedHistory.has("breaks") ? "▸" : "▾"} All breaks</h3>
-                <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{breaks.length} logged</span>
-              </div>
-              {foldedHistory.has("breaks") ? null : breaks.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No breaks logged yet.</p> : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {[...breaks].sort((a, b) => b.start - a.start).map((b) => (
-                    editBreakId === b.id ? (
-                      <div key={b.id} style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
-                        <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>start<input type="datetime-local" value={breakDraft.start} onChange={(e) => setBreakDraft({ ...breakDraft, start: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
-                        <label style={{ fontSize: 11, color: C.muted, display: "flex", flexDirection: "column", gap: 2 }}>end<input type="datetime-local" value={breakDraft.end} onChange={(e) => setBreakDraft({ ...breakDraft, end: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} /></label>
-                        <div style={{ flexBasis: "100%", display: "flex", alignItems: "flex-end", gap: 8 }}>
-                          <Scale label="feeling" value={breakDraft.feeling} onChange={(v: number) => setBreakDraft({ ...breakDraft, feeling: v })} seasons />
-                          <button onClick={() => setBreakDraft({ ...breakDraft, feeling: null })} style={{ ...btn(C.muted, true), padding: "2px 8px", fontSize: 11, marginBottom: 12 }}>clear</button>
-                        </div>
-                        <button onClick={saveEditBreak} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
-                        <button onClick={() => setEditBreakId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
-                      </div>
-                    ) : (
-                      <div key={b.id} className="fl-act-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
-                        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(b.start)} {fmtTime(b.start)}{"–"}{fmtTime(b.end)}</span>
-                        <span style={{ flex: 1, minWidth: 120, overflowWrap: "anywhere" }}>{(b.activities && b.activities.length) ? b.activities.join(", ") : "—"}</span>
-                        <span style={{ fontSize: 11, color: C.muted, fontFamily: "var(--fl-mono)", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>{(b.areas && b.areas.length) ? b.areas.join(" · ") : ""}</span>
-                        {b.feeling != null && (BREAK_SEASONS[b.feeling - 1]
-                          ? <img src={BREAK_SEASONS[b.feeling - 1].img} alt={BREAK_SEASONS[b.feeling - 1].name} aria-label={BREAK_SEASONS[b.feeling - 1].name} draggable={false} style={{ width: 16, height: 16, flexShrink: 0 }} />
-                          : <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: C.ink, whiteSpace: "nowrap" }}>{b.feeling}/5</span>)}
-                        <button onClick={() => startEditBreak(b)} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-                        <button onClick={() => deleteBreak(b.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
-                      </div>
-                    )
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
@@ -3765,79 +4280,7 @@ export default function FocusLogApp({ api }: any) {
               </div>
             </div>
 
-            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, margin: "0 0 10px" }}>
-                <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>Pause stats</h3>
-                <InfoHover C={C} label="about pause stats" width={330}>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Pause stats</div>
-                  <div>When and why you pause: totals for this week and month, your most common reasons, and the typical time of day across all history, split into <b style={{ color: PAUSE_CAT.internal.border }}>internal</b> and <b style={{ color: PAUSE_CAT.external.border }}>external</b>.</div>
-                </InfoHover>
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 16 }}>
-                <Stat label="pauses this week" value={pauseWeek.length} />
-                <Stat label="pauses this month" value={pauseMonth.length} />
-                <div style={{ padding: "8px 12px" }}>
-                  <div style={{ fontSize: 12, color: C.muted }}>top this week</div>
-                  <div style={{ fontSize: 14, color: C.ink }}>{topPauseWeek ? `${topPauseWeek.tag} (${topPauseWeek.n})` : "—"}</div>
-                  <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>top this month</div>
-                  <div style={{ fontSize: 14, color: C.ink }}>{topPauseMonth ? `${topPauseMonth.tag} (${topPauseMonth.n})` : "—"}</div>
-                </div>
-              </div>
-              <p style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Typical time of day (all history)</p>
-              {pauses.length === 0 ? (
-                <p style={{ color: C.muted, fontSize: 13 }}>No pauses recorded yet.</p>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {BAND_NAME.map((band, bi) => {
-                    const s = bandSplit[bi];
-                    const total = s.internal + s.external;
-                    return (
-                      <div key={band}>
-                        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", fontSize: 11, marginBottom: 3, fontFamily: "var(--fl-mono)" }}>
-                          <span style={{ color: C.muted, textTransform: "capitalize" }}>{band}</span>
-                          <span><span style={{ color: PAUSE_CAT.internal.border }}>internal {s.internal}</span><span style={{ color: C.faint }}> · </span><span style={{ color: PAUSE_CAT.external.border }}>external {s.external}</span></span>
-                        </div>
-                        <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: C.line }}>
-                          {total > 0 && <div aria-label={`internal ${s.internal}/${total}`} style={{ width: `${(s.internal / total) * 100}%`, background: PAUSE_CAT.internal.border }} />}
-                          {total > 0 && <div aria-label={`external ${s.external}/${total}`} style={{ width: `${(s.external / total) * 100}%`, background: PAUSE_CAT.external.border }} />}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
 
-            <div style={{ marginTop: 20 }}>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-                <h3 onClick={() => toggleFold("pauses")} style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>{foldedHistory.has("pauses") ? "▸" : "▾"} All pauses</h3>
-                <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{pauses.length} logged</span>
-              </div>
-              {foldedHistory.has("pauses") ? null : pauses.length === 0 ? <p style={{ color: C.muted, fontSize: 13 }}>No pauses logged yet.</p> : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {[...pauses].sort((a, b) => (+new Date(b.ts)) - (+new Date(a.ts))).map((p) => (
-                    editPauseId === p.id ? (
-                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
-                        <input type="datetime-local" value={pauseDraft.ts} onChange={(e) => setPauseDraft({ ...pauseDraft, ts: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
-                        <select value={pauseDraft.tag} onChange={(e) => setPauseDraft({ ...pauseDraft, tag: e.target.value })} style={{ border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }}>
-                          {pauseTags.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
-                        </select>
-                        <button onClick={saveEditPause} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
-                        <button onClick={() => setEditPauseId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
-                      </div>
-                    ) : (
-                      <div key={p.id} className="fl-act-row" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, fontSize: 13, padding: "8px 12px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 6 }}>
-                        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{fmtDate(p.ts)} {fmtTime(p.ts)}</span>
-                        <span style={{ fontFamily: "var(--fl-mono)", fontSize: 12, minWidth: 34 }}>{p.mins != null ? p.mins + "m" : "—"}</span>
-                        <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{p.tag}</span>
-                        <button onClick={() => startEditPause(p)} className="fl-rowact fl-collapse" aria-label="edit" style={ICON_BTN}><PencilIcon size={14} /></button>
-                        <button onClick={() => deletePause(p.id)} className="fl-rowact fl-rowdel fl-collapse" aria-label="delete" style={ICON_BTN}><TrashIcon size={14} /></button>
-                      </div>
-                    )
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         )}
       </div>
