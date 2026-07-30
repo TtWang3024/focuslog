@@ -1985,6 +1985,8 @@ export default class FocusLogPlugin extends Plugin {
       onRequestSkyView: (fn: () => void) => self.onRequestSkyView(fn),
       getActiveDaily: () => self.getActiveDaily(),
       onActiveDaily: (fn: (ts: number | null) => void) => self.onActiveDaily(fn),
+      // The gear in the panel's corner: jump straight to this plugin's settings tab.
+      openSettings: () => { try { const s = (self.app as any).setting; s.open(); s.openTabById("focuslog"); } catch (e) {} },
       openFloating: () => self.openFloating(),
       closeFloating: () => self.closeFloating(),
       toggleFloating: () => self.toggleFloating(),
