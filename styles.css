@@ -8,6 +8,9 @@
 .workspace-leaf-content[data-type="focuslog-view"] .view-content {
   padding: 0;
   overflow: auto;
+  /* Reserve the scrollbar's lane even when a view is short enough not to scroll, so the
+     centred column doesn't hop left/right when switching between views (e.g. Pomo - Break). */
+  scrollbar-gutter: stable;
 }
 
 /* Native date-time input: keep the calendar icon clear of the digits in every theme.
