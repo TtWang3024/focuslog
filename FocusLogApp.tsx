@@ -643,7 +643,7 @@ function VolumeSlashIcon({ size = 14 }: any) {
     </svg>
   );
 }
-// One waveform for both noises; the picker tells white from pink by color alone.
+// One waveform for every noise; the picker tells white, pink and brown apart by color alone.
 function WaveformIcon({ size = 14 }: any) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
@@ -658,6 +658,7 @@ function NoiseControl({ value, onPick }: any) {
     ["off", VolumeSlashIcon, "muted"],
     ["white", WaveformIcon, "white noise"],
     ["pink", WaveformIcon, "pink noise"],
+    ["brown", WaveformIcon, "brown noise"],
   ];
   return (
     <span className="fl-noise" style={{ display: "inline-flex", alignItems: "center" }}>

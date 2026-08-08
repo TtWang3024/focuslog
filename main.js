@@ -24835,7 +24835,8 @@ function NoiseControl({ value, onPick }) {
   const opts = [
     ["off", VolumeSlashIcon, "muted"],
     ["white", WaveformIcon, "white noise"],
-    ["pink", WaveformIcon, "pink noise"]
+    ["pink", WaveformIcon, "pink noise"],
+    ["brown", WaveformIcon, "brown noise"]
   ];
   return /* @__PURE__ */ React5.createElement("span", { className: "fl-noise", style: { display: "inline-flex", alignItems: "center" } }, opts.map(([v, Icon, label]) => /* @__PURE__ */ React5.createElement(
     "button",
@@ -30746,6 +30747,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     this.els.noiseMute = mkNoise("flt-noise-mute", FLT_NOISE_MUTE, "off", "background noise: muted");
     this.els.noiseWhite = mkNoise("flt-noise-white", FLT_NOISE_WAVE, "white", "background noise: white noise");
     this.els.noisePink = mkNoise("flt-noise-pink", FLT_NOISE_WAVE, "pink", "background noise: pink noise");
+    this.els.noiseBrown = mkNoise("flt-noise-brown", FLT_NOISE_WAVE, "brown", "background noise: brown noise");
     this.els.rcWrap = wrap.createDiv({ cls: "flt-rc" });
     this.els.rcWrap.createDiv({ cls: "flt-rc-title", text: "Off to the wave in" });
     this.els.rcNum = this.els.rcWrap.createDiv({ cls: "flt-rc-num" });
@@ -30796,6 +30798,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
         this.els.noiseMute.toggleClass("is-active", cur === "off");
         this.els.noiseWhite.toggleClass("is-active", cur === "white");
         this.els.noisePink.toggleClass("is-active", cur === "pink");
+        this.els.noiseBrown.toggleClass("is-active", cur === "brown");
       }
     }
     const phase = this.phaseOf(s);
@@ -31469,7 +31472,7 @@ var FocusLogSettingTab = class extends import_obsidian.PluginSettingTab {
         });
       }
     );
-    new import_obsidian.Setting(containerEl).setName("Background noise volume").setDesc("How loud the white or pink noise plays, as a percent. The noise itself is chosen next to the timer - one choice for focus, one for breaks.").addText(
+    new import_obsidian.Setting(containerEl).setName("Background noise volume").setDesc("How loud the white, pink or brown noise plays, as a percent. The noise itself is chosen next to the timer - one choice for focus, one for breaks.").addText(
       (t) => {
         var _a2;
         return t.setValue(String((_a2 = this.plugin.data.settings.noiseVolume) != null ? _a2 : 40)).onChange(async (v) => {

@@ -12,7 +12,7 @@ const FLT_PLAY = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
 const FLT_PAUSE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6.5,0A3.5,3.5,0,0,0,3,3.5v17a3.5,3.5,0,0,0,7,0V3.5A3.5,3.5,0,0,0,6.5,0Z"/><path d="M17.5,0A3.5,3.5,0,0,0,14,3.5v17a3.5,3.5,0,0,0,7,0V3.5A3.5,3.5,0,0,0,17.5,0Z"/></svg>`;
 const FLT_ROTATE_LEFT = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M1.611,12c.759,0,1.375,.57,1.485,1.32,.641,4.339,4.389,7.68,8.903,7.68,5.476,0,9.827-4.917,8.867-10.569-.453-2.665-2.148-5.023-4.523-6.313-3.506-1.903-7.48-1.253-10.18,1.045l1.13,1.13c.63,.63,.184,1.707-.707,1.707H2c-.552,0-1-.448-1-1V2.414c0-.891,1.077-1.337,1.707-.707l1.332,1.332C7.6-.115,12.921-1.068,17.637,1.408c3.32,1.743,5.664,5.027,6.223,8.735,1.122,7.437-4.633,13.857-11.86,13.857-6.021,0-11.021-4.457-11.872-10.246-.135-.92,.553-1.754,1.483-1.754Z"/></svg>`;
 // Background-noise picker glyphs: a struck speaker for muted, a waveform for the two
-// noises (told apart by color, not shape). Sized by the .flt-noise svg rule.
+// noises (told apart by color, not shape: white, pink, brown). Sized by the .flt-noise svg rule.
 const FLT_NOISE_MUTE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="m23.707,22.293c.391.391.391,1.023,0,1.414-.195.195-.451.293-.707.293s-.512-.098-.707-.293L.293,1.707C-.098,1.316-.098.684.293.293S1.316-.098,1.707.293l4.628,4.628C8.142,2.461,10.839.757,13.828.207c.288-.056.593.025.82.215.229.19.36.472.36.769v12.404l1.688,1.688c1.806-1.817,1.803-4.763-.01-6.576-.391-.391-.391-1.023,0-1.414.391-.391,1.023-.391,1.414,0,2.592,2.592,2.596,6.808.01,9.404l1.44,1.44c3.316-3.481,3.266-9.011-.152-12.43-.391-.391-.391-1.023,0-1.414s1.023-.391,1.414,0c4.198,4.198,4.249,10.997.152,15.258l2.742,2.742ZM.009,10v4c0,2.757,2.243,5,5,5h1.269c1.807,2.502,4.53,4.237,7.551,4.793.06.011.12.017.181.017.232,0,.459-.081.64-.231.229-.19.36-.472.36-.769v-3.579L1.881,6.103C.74,7.02.009,8.426.009,10Z"/></svg>`;
 const FLT_NOISE_WAVE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="m18,17c-.553,0-1-.447-1-1v-8c0-.553.447-1,1-1s1,.447,1,1v8c0,.553-.447,1-1,1Zm-3,6V1c0-.553-.447-1-1-1s-1,.447-1,1v22c0,.553.447,1,1,1s1-.447,1-1Zm8-4V5c0-.553-.447-1-1-1s-1,.447-1,1v14c0,.553.447,1,1,1s1-.447,1-1Zm-12,0V5c0-.553-.447-1-1-1s-1,.447-1,1v14c0,.553.447,1,1,1s1-.447,1-1Zm-4-3v-8c0-.553-.447-1-1-1s-1,.447-1,1v8c0,.553.447,1,1,1s1-.447,1-1Zm-4-2v-4c0-.553-.447-1-1-1s-1,.447-1,1v4c0,.553.447,1,1,1s1-.447,1-1Z"/></svg>`;
 import starImg from "./assets/star.png";
@@ -141,7 +141,7 @@ export interface FocusLogSettings {
   noiseVolume: number;       // loudness percent, 0-100
 }
 
-export type NoiseChoice = "off" | "white" | "pink";
+export type NoiseChoice = "off" | "white" | "pink" | "brown";
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
   notionToken: "",
@@ -2306,6 +2306,7 @@ class FloatTimerView extends ItemView {
     this.els.noiseMute = mkNoise("flt-noise-mute", FLT_NOISE_MUTE, "off", "background noise: muted");
     this.els.noiseWhite = mkNoise("flt-noise-white", FLT_NOISE_WAVE, "white", "background noise: white noise");
     this.els.noisePink = mkNoise("flt-noise-pink", FLT_NOISE_WAVE, "pink", "background noise: pink noise");
+    this.els.noiseBrown = mkNoise("flt-noise-brown", FLT_NOISE_WAVE, "brown", "background noise: brown noise");
     // The countdown face: covers the whole float, making everything beneath unclickable.
     this.els.rcWrap = wrap.createDiv({ cls: "flt-rc" });
     this.els.rcWrap.createDiv({ cls: "flt-rc-title", text: "Off to the wave in" });
@@ -2360,6 +2361,7 @@ class FloatTimerView extends ItemView {
         this.els.noiseMute.toggleClass("is-active", cur === "off");
         this.els.noiseWhite.toggleClass("is-active", cur === "white");
         this.els.noisePink.toggleClass("is-active", cur === "pink");
+        this.els.noiseBrown.toggleClass("is-active", cur === "brown");
       }
     }
     const phase = this.phaseOf(s);
@@ -2948,7 +2950,7 @@ class FocusLogSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Background noise volume")
-      .setDesc("How loud the white or pink noise plays, as a percent. The noise itself is chosen next to the timer - one choice for focus, one for breaks.")
+      .setDesc("How loud the white, pink or brown noise plays, as a percent. The noise itself is chosen next to the timer - one choice for focus, one for breaks.")
       .addText((t) =>
         t.setValue(String(this.plugin.data.settings.noiseVolume ?? 40)).onChange(async (v) => {
           const n = Math.max(0, Math.min(100, Math.round(Number(v)) || 0));

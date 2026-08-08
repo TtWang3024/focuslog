@@ -86,6 +86,7 @@
 .workspace-leaf-content[data-type="focuslog-view"] .fl-noise .fl-noise-mute.is-active { background: rgba(43, 39, 35, 0.07); }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-noise .fl-noise-white { background: #ffffff; color: #6b4423; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-noise .fl-noise-pink { background: #F8E1E4; color: #A03A3A; }
+.workspace-leaf-content[data-type="focuslog-view"] .fl-noise .fl-noise-brown { background: #6b4423; color: #ffffff; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-noise .fl-noise-opt.is-active { border: 1.5px solid currentColor; }
 
 /* ---------- Floating timer (popout window) ---------- */
@@ -225,6 +226,7 @@ body.focuslog-float-window .notice { display: none !important; }
 .focuslog-float .flt-noise .flt-noise-mute.is-active { background: rgba(43, 39, 35, 0.07); }
 .focuslog-float .flt-noise .flt-noise-white { background: #ffffff; color: #6b4423; }
 .focuslog-float .flt-noise .flt-noise-pink { background: #F8E1E4; color: #A03A3A; }
+.focuslog-float .flt-noise .flt-noise-brown { background: #6b4423; color: #ffffff; }
 .focuslog-float .flt-noise .flt-noise-opt.is-active { border: 1.5px solid currentColor; }
 .focuslog-float .flt-btn.flt-brk-toggle { background: #2b2723; color: #fdfbf6; border-color: #2b2723; }
 .focuslog-float .flt-btn.flt-brk-toggle:hover { background: #423b34; }
