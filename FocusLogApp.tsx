@@ -636,6 +636,40 @@ function TrashIcon({ size = 14 }: any) {
     </svg>
   );
 }
+function VolumeSlashIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="m23.707,22.293c.391.391.391,1.023,0,1.414-.195.195-.451.293-.707.293s-.512-.098-.707-.293L.293,1.707C-.098,1.316-.098.684.293.293S1.316-.098,1.707.293l4.628,4.628C8.142,2.461,10.839.757,13.828.207c.288-.056.593.025.82.215.229.19.36.472.36.769v12.404l1.688,1.688c1.806-1.817,1.803-4.763-.01-6.576-.391-.391-.391-1.023,0-1.414.391-.391,1.023-.391,1.414,0,2.592,2.592,2.596,6.808.01,9.404l1.44,1.44c3.316-3.481,3.266-9.011-.152-12.43-.391-.391-.391-1.023,0-1.414s1.023-.391,1.414,0c4.198,4.198,4.249,10.997.152,15.258l2.742,2.742ZM.009,10v4c0,2.757,2.243,5,5,5h1.269c1.807,2.502,4.53,4.237,7.551,4.793.06.011.12.017.181.017.232,0,.459-.081.64-.231.229-.19.36-.472.36-.769v-3.579L1.881,6.103C.74,7.02.009,8.426.009,10Z" />
+    </svg>
+  );
+}
+// One waveform for both noises; the picker tells white from pink by color alone.
+function WaveformIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="m18,17c-.553,0-1-.447-1-1v-8c0-.553.447-1,1-1s1,.447,1,1v8c0,.553-.447,1-1,1Zm-3,6V1c0-.553-.447-1-1-1s-1,.447-1,1v22c0,.553.447,1,1,1s1-.447,1-1Zm8-4V5c0-.553-.447-1-1-1s-1,.447-1,1v14c0,.553.447,1,1,1s1-.447,1-1Zm-12,0V5c0-.553-.447-1-1-1s-1,.447-1,1v14c0,.553.447,1,1,1s1-.447,1-1Zm-4-3v-8c0-.553-.447-1-1-1s-1,.447-1,1v8c0,.553.447,1,1,1s1-.447,1-1Zm-4-2v-4c0-.553-.447-1-1-1s-1,.447-1,1v4c0,.553.447,1,1,1s1-.447,1-1Z" />
+    </svg>
+  );
+}
+// The background-noise picker: rests as just the active choice; hovering slides the other
+// two open (the fl-noise rules in styles.css). Muted, white noise, pink noise.
+function NoiseControl({ value, onPick }: any) {
+  const opts: [string, any, string][] = [
+    ["off", VolumeSlashIcon, "muted"],
+    ["white", WaveformIcon, "white noise"],
+    ["pink", WaveformIcon, "pink noise"],
+  ];
+  return (
+    <span className="fl-noise" style={{ display: "inline-flex", alignItems: "center" }}>
+      {opts.map(([v, Icon, label]) => (
+        <button key={v} onClick={() => onPick(v)} aria-label={"background noise: " + label} title={"background noise: " + label}
+          className={"fl-noise-opt fl-noise-" + (v === "off" ? "mute" : v) + (value === v ? " is-active" : "")}>
+          <Icon size={12} />
+        </button>
+      ))}
+    </span>
+  );
+}
 function PlayIcon({ size = 16 }: any) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
@@ -1775,6 +1809,13 @@ export default function FocusLogApp({ api }: any) {
   useEffect(() => {
     if (!api.onRequestSkyView) return;
     return api.onRequestSkyView(() => setView("sky"));
+  }, []);
+  // Background-noise choices live on the plugin core (the float edits them too); mirror
+  // them here rather than reading api.settings, which patchSettings replaces.
+  const [noise, setNoiseState] = useState<any>(() => (api.getNoise ? api.getNoise() : { focus: "off", break: "off", volume: 40 }));
+  useEffect(() => {
+    if (!api.onNoiseChange) return;
+    return api.onNoiseChange(() => setNoiseState(api.getNoise ? { ...api.getNoise() } : { focus: "off", break: "off" }));
   }, []);
   // A float quick-log adds a session (and may mark a task Done or choose the next task)
   // outside React; re-read everything it can touch, and adopt its next-task pick as the
@@ -3551,6 +3592,8 @@ export default function FocusLogApp({ api }: any) {
         <div style={SUBTAB_ROW}>
           {FOCUS_SUB.map(([k, lab, Icon]) => (<button key={k} onClick={() => setView(k)} style={subTab(view === k)}><Icon size={13} on={view === k} />{lab}</button>))}
         </div>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+        <NoiseControl value={view === "break" ? noise.break : noise.focus} onPick={(v: string) => api.setNoise && api.setNoise(view === "break" ? "break" : "focus", v)} />
         <InfoHover C={C} label="about this view" width={360}>
           {view === "log" && (<>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>Pomo</div>
@@ -3581,6 +3624,7 @@ export default function FocusLogApp({ api }: any) {
             </ul>
           </>)}
         </InfoHover>
+        </div>
       </div>
     );
     if (view === "calendar") return (

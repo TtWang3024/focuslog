@@ -11,6 +11,10 @@ const FLT_PLUS = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
 const FLT_PLAY = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.492,7.969,10.954.975A5,5,0,0,0,3,5.005V19a4.994,4.994,0,0,0,7.954,4.03l9.538-6.994a5,5,0,0,0,0-8.062Z"/></svg>`;
 const FLT_PAUSE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6.5,0A3.5,3.5,0,0,0,3,3.5v17a3.5,3.5,0,0,0,7,0V3.5A3.5,3.5,0,0,0,6.5,0Z"/><path d="M17.5,0A3.5,3.5,0,0,0,14,3.5v17a3.5,3.5,0,0,0,7,0V3.5A3.5,3.5,0,0,0,17.5,0Z"/></svg>`;
 const FLT_ROTATE_LEFT = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M1.611,12c.759,0,1.375,.57,1.485,1.32,.641,4.339,4.389,7.68,8.903,7.68,5.476,0,9.827-4.917,8.867-10.569-.453-2.665-2.148-5.023-4.523-6.313-3.506-1.903-7.48-1.253-10.18,1.045l1.13,1.13c.63,.63,.184,1.707-.707,1.707H2c-.552,0-1-.448-1-1V2.414c0-.891,1.077-1.337,1.707-.707l1.332,1.332C7.6-.115,12.921-1.068,17.637,1.408c3.32,1.743,5.664,5.027,6.223,8.735,1.122,7.437-4.633,13.857-11.86,13.857-6.021,0-11.021-4.457-11.872-10.246-.135-.92,.553-1.754,1.483-1.754Z"/></svg>`;
+// Background-noise picker glyphs: a struck speaker for muted, a waveform for the two
+// noises (told apart by color, not shape). Sized by the .flt-noise svg rule.
+const FLT_NOISE_MUTE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="m23.707,22.293c.391.391.391,1.023,0,1.414-.195.195-.451.293-.707.293s-.512-.098-.707-.293L.293,1.707C-.098,1.316-.098.684.293.293S1.316-.098,1.707.293l4.628,4.628C8.142,2.461,10.839.757,13.828.207c.288-.056.593.025.82.215.229.19.36.472.36.769v12.404l1.688,1.688c1.806-1.817,1.803-4.763-.01-6.576-.391-.391-.391-1.023,0-1.414.391-.391,1.023-.391,1.414,0,2.592,2.592,2.596,6.808.01,9.404l1.44,1.44c3.316-3.481,3.266-9.011-.152-12.43-.391-.391-.391-1.023,0-1.414s1.023-.391,1.414,0c4.198,4.198,4.249,10.997.152,15.258l2.742,2.742ZM.009,10v4c0,2.757,2.243,5,5,5h1.269c1.807,2.502,4.53,4.237,7.551,4.793.06.011.12.017.181.017.232,0,.459-.081.64-.231.229-.19.36-.472.36-.769v-3.579L1.881,6.103C.74,7.02.009,8.426.009,10Z"/></svg>`;
+const FLT_NOISE_WAVE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="m18,17c-.553,0-1-.447-1-1v-8c0-.553.447-1,1-1s1,.447,1,1v8c0,.553-.447,1-1,1Zm-3,6V1c0-.553-.447-1-1-1s-1,.447-1,1v22c0,.553.447,1,1,1s1-.447,1-1Zm8-4V5c0-.553-.447-1-1-1s-1,.447-1,1v14c0,.553.447,1,1,1s1-.447,1-1Zm-12,0V5c0-.553-.447-1-1-1s-1,.447-1,1v14c0,.553.447,1,1,1s1-.447,1-1Zm-4-3v-8c0-.553-.447-1-1-1s-1,.447-1,1v8c0,.553.447,1,1,1s1-.447,1-1Zm-4-2v-4c0-.553-.447-1-1-1s-1,.447-1,1v4c0,.553.447,1,1,1s1-.447,1-1Z"/></svg>`;
 import starImg from "./assets/star.png";
 import rateRain from "./assets/rate-rain.png";
 import rateClouds from "./assets/rate-clouds.png";
@@ -132,7 +136,12 @@ export interface FocusLogSettings {
   longBreakEvery: number;
   timeFmtV2: boolean;
   workDays: boolean[];
+  noiseFocus: NoiseChoice;   // background noise while a pomodoro runs
+  noiseBreak: NoiseChoice;   // and while a break runs - a muted break stays silent
+  noiseVolume: number;       // loudness percent, 0-100
 }
+
+export type NoiseChoice = "off" | "white" | "pink";
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
   notionToken: "",
@@ -201,6 +210,9 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   longBreakEvery: 3,
   timeFmtV2: true,
   workDays: [true, true, true, true, true, true, true],
+  noiseFocus: "off",
+  noiseBreak: "off",
+  noiseVolume: 40,
 };
 
 // Pause tags carry a category: "internal" (the impulse came from you) or
@@ -789,6 +801,11 @@ export default class FocusLogPlugin extends Plugin {
   timer: TimerEngine;
   floatWin: any = null;
   private floatSubs = new Set<() => void>();
+  // Background noise lives on the MAIN window (the float popout is rebuilt from scratch
+  // every open, so audio owned there would die with it). Lazy: never allocated while muted.
+  private noiseEl: HTMLAudioElement | null = null;
+  private noiseTrack = "";
+  private noiseSubs = new Set<() => void>();
   private pauseSubs = new Set<() => void>();   // panel re-syncs its pauses list when these fire
   private sessionSubs = new Set<() => void>(); // panel re-reads its sessions when these fire (e.g. a float quick-log)
   private breakSubs = new Set<() => void>();   // panel re-reads activities + breaks when the engine commits a break
@@ -880,6 +897,8 @@ export default class FocusLogPlugin extends Plugin {
     }
 
     this.timer = new TimerEngine(this, this.data.settings.pomodoroMinutes);
+    // Background noise follows the engine: every transition re-derives what should sound.
+    this.register(this.timer.subscribe(() => this.updateNoise()));
     // Pick back up whatever was running when Obsidian last quit: a still-live run resumes on
     // the wall clock; one whose time passed while away opens on the finished screen instead.
     {
@@ -889,6 +908,7 @@ export default class FocusLogPlugin extends Plugin {
       else if (kind === "break-running") this.timerNotify("Picked your break back up - " + Math.max(1, Math.ceil(this.timer.getState().breakSecs / 60)) + " min left.");
       else if (kind === "break-finished") this.timerNotify("Your break ended while you were away.");
     }
+    this.updateNoise();   // covers a run adopted straight from disk
     // When the main window is revealed again, recompute at once so any alert or
     // finish that came due while it was hidden (and its timers throttled) fires.
     this.registerDomEvent(document, "visibilitychange", () => { if (!document.hidden) this.timer.poll(); });
@@ -922,6 +942,8 @@ export default class FocusLogPlugin extends Plugin {
   unloading = false;   // distinguishes app-quit/plugin-reload teardown from the user closing the float
   onunload() {
     this.unloading = true;
+    try { if (this.noiseEl) { this.noiseEl.pause(); this.noiseEl.src = ""; } } catch {}
+    this.noiseEl = null;
     this.timer?.dispose();
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_FLOAT);
   }
@@ -1105,6 +1127,37 @@ export default class FocusLogPlugin extends Plugin {
   }
   notifyFloatChange() {
     this.floatSubs.forEach((fn) => { try { fn(); } catch {} });
+  }
+
+  // Derives what should be sounding from engine state + settings and nudges the element
+  // only on differences: the engine emits every second, so every write here is guarded.
+  // Element pause keeps currentTime, which is exactly the pause-holds-resume-continues rule.
+  updateNoise() {
+    const st = this.data ? this.data.settings : null;
+    const s = this.timer ? this.timer.getState() : null;
+    const want: NoiseChoice = !s || !st ? "off" : s.breakRunning ? (st.noiseBreak || "off") : s.running ? (st.noiseFocus || "off") : "off";
+    if (want === "off" || !st) { if (this.noiseEl && !this.noiseEl.paused) this.noiseEl.pause(); return; }
+    if (!this.noiseEl) { this.noiseEl = new Audio(); this.noiseEl.loop = true; }
+    const vol = Math.max(0, Math.min(1, (st.noiseVolume ?? 40) / 100));
+    if (this.noiseEl.volume !== vol) this.noiseEl.volume = vol;
+    if (this.noiseTrack !== want) {
+      this.noiseEl.src = this.app.vault.adapter.getResourcePath(normalizePath((this.manifest.dir || "") + "/assets/" + want + "_noise.mp3"));
+      this.noiseTrack = want;
+    }
+    if (this.noiseEl.paused) this.noiseEl.play().catch(() => {});
+  }
+  async setNoisePref(phase: "focus" | "break", v: NoiseChoice) {
+    if (phase === "break") this.data.settings.noiseBreak = v; else this.data.settings.noiseFocus = v;
+    await this.persist();
+    this.updateNoise();
+    this.notifyNoiseChange();
+  }
+  onNoiseChange(fn: () => void): () => void {
+    this.noiseSubs.add(fn);
+    return () => this.noiseSubs.delete(fn);
+  }
+  notifyNoiseChange() {
+    this.noiseSubs.forEach((fn) => { try { fn(); } catch {} });
   }
   isFloatingOpen(): boolean {
     return this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT).some((l) => { const w = (l.view as any)?.containerEl?.win; return w && !w.closed; });
@@ -2066,6 +2119,9 @@ export default class FocusLogPlugin extends Plugin {
       toggleFloating: () => self.toggleFloating(),
       floatingOpen: () => self.isFloatingOpen(),
       onFloatChange: (fn: () => void) => self.onFloatChange(fn),
+      getNoise: () => ({ focus: self.data.settings.noiseFocus || "off", break: self.data.settings.noiseBreak || "off", volume: self.data.settings.noiseVolume ?? 40 }),
+      setNoise: (phase: "focus" | "break", v: NoiseChoice) => self.setNoisePref(phase, v),
+      onNoiseChange: (fn: () => void) => self.onNoiseChange(fn),
     };
   }
 }
@@ -2148,6 +2204,7 @@ class FloatTimerView extends ItemView {
     } catch {}
   }
   private lastIcon = ""; // avoid re-rendering the play/pause svg every tick
+  private lastNoiseKey = ""; // avoid churning the noise picker's classes every tick
   private lastBrkIcon = ""; // break toggle (pause/play) icon, re-set only on change
   private lastEndIcon = ""; // break end (check/next) icon, re-set only on change
   private pickerShown = false; // whether the pause reason picker is currently expanded
@@ -2236,6 +2293,19 @@ class FloatTimerView extends ItemView {
     this.els.urge.innerHTML = SEA_WAVE_SVG;
     this.els.urge.setAttribute("aria-label", "urge to switch? surf it: 90 quiet seconds, no questions; outlasting it is counted");
     this.els.urge.onclick = () => this.plugin.beginUrgeWave();
+    // Background-noise picker, top right: rests as the active choice; hover opens all
+    // three. It edits the choice for whatever phase the float is showing.
+    this.els.noise = wrap.createDiv({ cls: "flt-noise" });
+    const mkNoise = (cls: string, svg: string, val: NoiseChoice, label: string) => {
+      const b = this.els.noise.createEl("button", { cls: "flt-noise-opt " + cls });
+      b.innerHTML = svg;
+      b.setAttribute("aria-label", label);
+      b.onclick = () => { this.plugin.setNoisePref(this.plugin.timer.getState().breakActive ? "break" : "focus", val); };
+      return b;
+    };
+    this.els.noiseMute = mkNoise("flt-noise-mute", FLT_NOISE_MUTE, "off", "background noise: muted");
+    this.els.noiseWhite = mkNoise("flt-noise-white", FLT_NOISE_WAVE, "white", "background noise: white noise");
+    this.els.noisePink = mkNoise("flt-noise-pink", FLT_NOISE_WAVE, "pink", "background noise: pink noise");
     // The countdown face: covers the whole float, making everything beneath unclickable.
     this.els.rcWrap = wrap.createDiv({ cls: "flt-rc" });
     this.els.rcWrap.createDiv({ cls: "flt-rc-title", text: "Off to the wave in" });
@@ -2281,6 +2351,17 @@ class FloatTimerView extends ItemView {
     if (rc) return;
     const s = this.plugin.timer.getState();
     if (s.running || s.adopted) this.sawRun = true; // live now, or adopted back from a quit
+    if (this.els.noise) {
+      // The picker mirrors the choice for the phase on screen (the break pref during a break).
+      const cur = s.breakActive ? (this.plugin.data.settings.noiseBreak || "off") : (this.plugin.data.settings.noiseFocus || "off");
+      const nkey = (s.breakActive ? "b" : "f") + ":" + cur;
+      if (nkey !== this.lastNoiseKey) {
+        this.lastNoiseKey = nkey;
+        this.els.noiseMute.toggleClass("is-active", cur === "off");
+        this.els.noiseWhite.toggleClass("is-active", cur === "white");
+        this.els.noisePink.toggleClass("is-active", cur === "pink");
+      }
+    }
     const phase = this.phaseOf(s);
     if (phase !== this.curPhase) { this.onPhaseChange(this.curPhase, phase); this.curPhase = phase; }
     this.setPhaseVisibility(phase);
@@ -2862,6 +2943,18 @@ class FocusLogSettingTab extends PluginSettingTab {
           const n = Math.max(2, Math.min(15, Math.round(Number(v)) || 5));
           this.plugin.data.settings.urgeSurfMinutes = n;
           await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Background noise volume")
+      .setDesc("How loud the white or pink noise plays, as a percent. The noise itself is chosen next to the timer - one choice for focus, one for breaks.")
+      .addText((t) =>
+        t.setValue(String(this.plugin.data.settings.noiseVolume ?? 40)).onChange(async (v) => {
+          const n = Math.max(0, Math.min(100, Math.round(Number(v)) || 0));
+          this.plugin.data.settings.noiseVolume = n;
+          await this.plugin.persist();
+          this.plugin.updateNoise();
         })
       );
 
