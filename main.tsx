@@ -85,11 +85,16 @@ export interface FocusLogSettings {
   dinnerStart: number;
   dinnerMinutes: number;
   nightRoutineGap: number;       // retired from the UI (was "starts N min after dinner"); still read once to seed nightRoutineStarts
+  morningRoutinePomos: number;   // the routines' declared pomodoro cost (step lengths left the UI),
+  nightRoutinePomos: number;     // one pair per day mode: work-day here, relax-day below
+  relaxMorningRoutinePomos: number;
+  relaxNightRoutinePomos: number;
   morningRoutineEnds: number;    // the Plan list's morning phase ends here, and counted pomodoro room begins
   nightRoutineStarts: number;    // the night phase begins here, and counted pomodoro room stops
   routineGroupMinutes: number;
   addBlockEnabled: boolean;
   showAreaTimeline: boolean;
+  hideBonusByDefault: boolean;   // Bonus-If-Done rows start hidden in the Plan list
   heatThresholds: string;
   dailyNoteWrite: boolean;
   dailyNoteTrueDate: boolean;
@@ -148,11 +153,16 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   dinnerStart: 1110,
   dinnerMinutes: 45,
   nightRoutineGap: 60,
+  morningRoutinePomos: 2,
+  nightRoutinePomos: 2,
+  relaxMorningRoutinePomos: 2,
+  relaxNightRoutinePomos: 2,
   morningRoutineEnds: 540,
   nightRoutineStarts: 1215,
   routineGroupMinutes: 25,
   addBlockEnabled: false,
   showAreaTimeline: true,
+  hideBonusByDefault: true,
   heatThresholds: "1,2,4,6,8,10",
   dailyNoteWrite: true,
   dailyNoteTrueDate: true,
@@ -209,7 +219,7 @@ const PAUSE_TAG_DEFAULT_CAT: Record<string, string> = { phone: "external", inter
 const DEFAULT_ACTIVITIES = [
   { id: "a-stretch", name: "Stretch", area: "Body", count: 0, lastUsed: null },
   { id: "a-water", name: "Drink water", area: "Body", count: 0, lastUsed: null },
-  { id: "a-eyes", name: "Rest eyes — look far", area: "Body", count: 0, lastUsed: null },
+  { id: "a-eyes", name: "Rest eyes - look far", area: "Body", count: 0, lastUsed: null },
   { id: "a-breathe", name: "Deep breathing", area: "Mind", count: 0, lastUsed: null },
 ];
 
@@ -228,7 +238,7 @@ const DEFAULT_RELAX_MORNING = [
   { id: "rm-coffee", name: "Slow coffee" },
 ];
 const DEFAULT_RELAX_NIGHT = [
-  { id: "rn-unwind", name: "Unwind — no screens" },
+  { id: "rn-unwind", name: "Unwind - no screens" },
   { id: "rn-read", name: "Read for fun" },
 ];
 
@@ -842,6 +852,22 @@ export default class FocusLogPlugin extends Plugin {
       s.nightRoutineStarts = s.dinnerEnabled ? (s.dinnerStart ?? 1110) + (s.dinnerMinutes ?? 45) + (s.nightRoutineGap ?? 60) : 1215;
       await this.persist();
     }
+    // The routines' pomodoro cost becomes a declared setting; seed it from what the old
+    // duration-chunking displayed (a routine that read "1/5" seeds as 5).
+    if (loaded.settings && (loaded.settings as any).morningRoutinePomos == null) {
+      const s = this.data.settings;
+      const cost = (list: any[]) => Math.max(1, Math.ceil(((list || []).reduce((a: number, it: any) => a + (it.dur || 15), 0) || 1) / (s.routineGroupMinutes || 25)));
+      s.morningRoutinePomos = cost(this.data.morningRoutine);
+      s.nightRoutinePomos = cost(this.data.nightRoutine);
+      await this.persist();
+    }
+    if (loaded.settings && (loaded.settings as any).relaxMorningRoutinePomos == null) {
+      const s = this.data.settings;
+      const cost = (list: any[]) => Math.max(1, Math.ceil(((list || []).reduce((a: number, it: any) => a + (it.dur || 15), 0) || 1) / (s.routineGroupMinutes || 25)));
+      s.relaxMorningRoutinePomos = cost(this.data.relaxMorningRoutine);
+      s.relaxNightRoutinePomos = cost(this.data.relaxNightRoutine);
+      await this.persist();
+    }
     if (loaded.settings && !loaded.settings.timeFmtV2) {
       for (const k of ["dayStart", "morningBegins", "dayEnds", "morningEnd", "afternoonEnd"] as const) {
         const v = (this.data.settings as any)[k];
@@ -858,9 +884,9 @@ export default class FocusLogPlugin extends Plugin {
     // the wall clock; one whose time passed while away opens on the finished screen instead.
     {
       const kind = this.timer.adopt(this.data.timerRun);
-      if (kind === "running") this.timerNotify("Picked your pomodoro back up \u2014 " + Math.max(1, Math.ceil(this.timer.getState().secs / 60)) + " min left.");
-      else if (kind === "finished") this.timerNotify("A pomodoro finished while you were away. Rate it when you're ready \u2014 it still counts.");
-      else if (kind === "break-running") this.timerNotify("Picked your break back up \u2014 " + Math.max(1, Math.ceil(this.timer.getState().breakSecs / 60)) + " min left.");
+      if (kind === "running") this.timerNotify("Picked your pomodoro back up - " + Math.max(1, Math.ceil(this.timer.getState().secs / 60)) + " min left.");
+      else if (kind === "finished") this.timerNotify("A pomodoro finished while you were away. Rate it when you're ready - it still counts.");
+      else if (kind === "break-running") this.timerNotify("Picked your break back up - " + Math.max(1, Math.ceil(this.timer.getState().breakSecs / 60)) + " min left.");
       else if (kind === "break-finished") this.timerNotify("Your break ended while you were away.");
     }
     // When the main window is revealed again, recompute at once so any alert or
@@ -937,7 +963,7 @@ export default class FocusLogPlugin extends Plugin {
   private notifyBreaksChange() { this.breakSubs.forEach((fn) => { try { fn(); } catch {} }); }
   // Fired by the engine when a break finishes its countdown on its own.
   breakDone() {
-    this.timerNotify("Break over — ready for the next pomodoro?");
+    this.timerNotify("Break over - ready for the next pomodoro?");
   }
   // Write a finished break to the log: bump the chosen activities' counts and record the
   // break (activities, areas, feeling). Called by the engine's endBreak so it works from
@@ -999,7 +1025,7 @@ export default class FocusLogPlugin extends Plugin {
     // Notices are hidden inside the float window, so flash the star there too (5s banner) —
     // unless the float is playing its own star reveal (delayBreakMs set), which already shows it.
     if (!(opts && opts.delayBreakMs)) try { this.floatView()?.flash(starName ? "Logged ✓  You lit up " + starName + " ✨" : "Logged ✓"); } catch {}
-    let msg = "Logged “" + taskName + "” — felt " + s.actual + "/4.";
+    let msg = "Logged “" + taskName + "” - felt " + s.actual + "/4.";
     if (s.pageId) {
       try { await this.incrementAct(s.pageId); }
       catch (e) { this.data.pending = [...(this.data.pending || []), { sessionId: s.id, pageId: s.pageId, task: s.task }]; await this.persist(); msg += " Spend write queued."; }
@@ -1275,7 +1301,7 @@ export default class FocusLogPlugin extends Plugin {
     this.floatView()?.flash(msg);
   }
   timerDone() {
-    this.osNotify("Pomodoro complete \u{1F389}", "One block done — log how enjoyable it actually was.");
+    this.osNotify("Pomodoro complete \u{1F389}", "One block done - log how enjoyable it actually was.");
     // When the floating window is up, it owns the celebration (tap it to jump to the
     // log view) — no extra modal. Fall back to the modal only if there's no float.
     if (this.isFloatingOpen()) this.floatView()?.celebrate();
@@ -1488,12 +1514,12 @@ export default class FocusLogPlugin extends Plugin {
   // a parentId = "This is sub tasks under BIG TASK" (Area Pro, 🐾 icon, Parent item relation).
   // Both get Schedule 🌻 Today, Status Exploring, ExecutionPower 🌤️ Aim Today, empty Guess —
   // the same values the real templates preset. One-way push: nothing is pulled back.
-  async createTask(name: string, parentId?: string | null, guess?: number): Promise<any> {
+  async createTask(name: string, parentId?: string | null, guess?: number, status?: string): Promise<any> {
     const sub = !!parentId;
     const props: any = {
       Task: { title: [{ text: { content: name } }] },
       Schedule: { select: { name: "\u{1F33B} Today" } },
-      Status: { select: { name: "Exploring" } },
+      Status: { select: { name: status === "Executing" ? "Executing" : "Exploring" } },
       ExecutionPower: { select: { name: "\u{1F324}️ Aim Today" } },
     };
     // Optional initial Guess, entered as a plain number: 1-3 become 🍅 strings, 4 becomes one 📦
@@ -1511,7 +1537,7 @@ export default class FocusLogPlugin extends Plugin {
     // Mirror queryToday's task shape and put the newcomer on top, so the panel updates
     // instantly without pulling from Notion (Sync stays manual; the timeline is not rebuilt).
     const t = {
-      task: name, status: "exploring", power: "Y", king: false,
+      task: name, status: status === "Executing" ? "executing" : "exploring", power: "Y", king: false,
       category: sub ? "Pro" : "Task", pomodoros: g, guessBase: g, guessPlus: [],
       act: 0, url: page.url, id: page.id,
       parent: parentName, ancestor: parentName, group: parentName || name,
@@ -1636,7 +1662,7 @@ export default class FocusLogPlugin extends Plugin {
       }
       return out;
     });
-    if (counterStatus === "ambiguous") new Notice("Focus Log: the counter prefix matches more than one line — counter not updated.");
+    if (counterStatus === "ambiguous") new Notice("Focus Log: the counter prefix matches more than one line - counter not updated.");
   }
 
   // The catch-up can rename a logged pomodoro after the fact; the daily note follows. The
@@ -1974,7 +2000,7 @@ export default class FocusLogPlugin extends Plugin {
       saveTasks: async (arr: any[]) => { self.data.tasks = arr; await self.persist(); },
       patchSettings: async (partial: Partial<FocusLogSettings>) => { self.data.settings = Object.assign({}, self.data.settings, partial); await self.persist(); },
       sync: () => self.queryToday(),
-      createTask: (name: string, parentId?: string | null, guess?: number) => self.createTask(name, parentId, guess),
+      createTask: (name: string, parentId?: string | null, guess?: number, status?: string) => self.createTask(name, parentId, guess, status),
       beginSurfCountdown: (task: string) => self.beginSurfCountdown(task),
       cancelSurfCountdown: () => self.cancelSurfCountdown(),
       onSurfCount: (cb: (st: { left: number; task: string } | null) => void) => { self.surfCountCb = cb; },
@@ -2355,7 +2381,7 @@ class FloatTimerView extends ItemView {
       this.skey = skey;
       const sel = this.els.setupSel as HTMLSelectElement;
       sel.empty();
-      sel.createEl("option", { text: tasks.length ? "Link a task (optional)" : "— no tasks (sync first) —", value: "" });
+      sel.createEl("option", { text: tasks.length ? "Link a task (optional)" : "- no tasks (sync first) -", value: "" });
       tasks.forEach((t: any) => sel.createEl("option", { text: t.task + (t.king ? " \u{1F451}" : ""), value: t.task }));
       sel.value = setupTask;
     }
@@ -2434,7 +2460,7 @@ class FloatTimerView extends ItemView {
     const el = this.els.brkActs;
     const keepScroll = el.scrollTop; // a pick rebuilds the list — don't jump back to the top
     el.empty();
-    if (!acts.length) { el.createDiv({ cls: "flt-brk-empty", text: "No activities yet — add some in the panel's Break tab." }); return; }
+    if (!acts.length) { el.createDiv({ cls: "flt-brk-empty", text: "No activities yet - add some in the panel's Break tab." }); return; }
     // Rows in the same format as the panel's Break-activities list: a coloured left
     // bar + #area pill + name, tappable to toggle (up to 3). Colours match the panel
     // (each area takes the next macaron colour, keyed by sorted name).
@@ -2482,10 +2508,10 @@ class FloatTimerView extends ItemView {
     if (!el) return;
     const keepScroll = el.scrollTop; // picking a tag rebuilds — preserve scroll position
     el.empty();
-    el.createDiv({ cls: "flt-picker-q", text: "Paused — why? Pick a reason." });
+    el.createDiv({ cls: "flt-picker-q", text: "Paused - why? Pick a reason." });
     const chips = el.createDiv({ cls: "flt-picker-chips" });
     const tags = this.plugin.data.pauseTags || [];
-    if (!tags.length) { chips.createDiv({ cls: "flt-picker-empty", text: "No tags — add some in the Pause tab." }); return; }
+    if (!tags.length) { chips.createDiv({ cls: "flt-picker-empty", text: "No tags - add some in the Pause tab." }); return; }
     tags.forEach((t: any) => {
       const cat = t.category === "external" ? "external" : "internal";
       const on = selected === t.name;
@@ -2527,7 +2553,7 @@ class FloatTimerView extends ItemView {
     doneLabel.onclick = (ev: any) => { if (ev && ev.stopPropagation) ev.stopPropagation(); };
     doneBox.onchange = () => { done = doneBox.checked; };
     const sel = opts.createEl("select", { cls: "flt-next" }) as HTMLSelectElement;
-    sel.createEl("option", { text: "— next task: decide later —", value: "" });
+    sel.createEl("option", { text: "- next task: decide later -", value: "" });
     (this.plugin.data.tasks || []).forEach((t: any) => { sel.createEl("option", { text: t.task + (t.king ? " \u{1F451}" : ""), value: t.task }); });
     sel.onclick = (ev: any) => { if (ev && ev.stopPropagation) ev.stopPropagation(); };
     el.createDiv({ cls: "flt-cask", text: "how enjoyable was it?" });
@@ -2621,7 +2647,7 @@ class FocusLogSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h3", { text: "Focus Log — Notion connection" });
+    containerEl.createEl("h3", { text: "Focus Log - Notion connection" });
 
     new Setting(containerEl)
       .setName("Notion integration token")
@@ -2667,7 +2693,7 @@ class FocusLogSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Day starts at (HH:MM)")
-      .setDesc("The clock time your day rolls over — the end of one day and the start of the next, and the bottom of the Timeline. A morning value like 04:00 keeps late-night work on the previous day (anything up to 03:59 counts as yesterday). An evening value like 22:00 starts a fresh day that night, so a pomodoro after 22:00 counts toward the next date.")
+      .setDesc("The clock time your day rolls over - the end of one day and the start of the next, and the bottom of the Timeline. A morning value like 04:00 keeps late-night work on the previous day (anything up to 03:59 counts as yesterday). An evening value like 22:00 starts a fresh day that night, so a pomodoro after 22:00 counts toward the next date.")
       .addText((t) =>
         t.setPlaceholder("04:00").setValue(fmtHM(this.plugin.data.settings.dayStart)).onChange(async (v) => {
           const n = parseHM(v); if (n == null) return;
@@ -2678,7 +2704,7 @@ class FocusLogSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Morning begins at (HH:MM)")
-      .setDesc("When your active day starts — the top of the Timeline. e.g. 08:00, or 08:15.")
+      .setDesc("When your active day starts - the top of the Timeline. e.g. 08:00, or 08:15.")
       .addText((t) =>
         t.setPlaceholder("08:00").setValue(fmtHM(this.plugin.data.settings.morningBegins)).onChange(async (v) => {
           const n = parseHM(v); if (n == null) return;
@@ -2739,6 +2765,26 @@ class FocusLogSettingTab extends PluginSettingTab {
     dinnerSet.addText((t) => { t.setPlaceholder("60").setValue(String(this.plugin.data.settings.dinnerMinutes)).onChange(async (v) => { const n = parseInt(v, 10); if (!n || n < 5) return; this.plugin.data.settings.dinnerMinutes = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
 
     new Setting(containerEl)
+      .setName("Morning routine pomodoros (work day)")
+      .setDesc("How many pomodoro sessions the morning routine splits into on work days.")
+      .addText((t) => { t.setPlaceholder("2").setValue(String(this.plugin.data.settings.morningRoutinePomos ?? 2)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 1 || n > 8) return; this.plugin.data.settings.morningRoutinePomos = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
+
+    new Setting(containerEl)
+      .setName("Morning routine pomodoros (relax day)")
+      .setDesc("How many pomodoro sessions the morning routine splits into on relax days.")
+      .addText((t) => { t.setPlaceholder("2").setValue(String(this.plugin.data.settings.relaxMorningRoutinePomos ?? 2)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 1 || n > 8) return; this.plugin.data.settings.relaxMorningRoutinePomos = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
+
+    new Setting(containerEl)
+      .setName("Night routine pomodoros (work day)")
+      .setDesc("How many pomodoro sessions the night routine splits into on work days.")
+      .addText((t) => { t.setPlaceholder("2").setValue(String(this.plugin.data.settings.nightRoutinePomos ?? 2)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 1 || n > 8) return; this.plugin.data.settings.nightRoutinePomos = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
+
+    new Setting(containerEl)
+      .setName("Night routine pomodoros (relax day)")
+      .setDesc("How many pomodoro sessions the night routine splits into on relax days.")
+      .addText((t) => { t.setPlaceholder("2").setValue(String(this.plugin.data.settings.relaxNightRoutinePomos ?? 2)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 1 || n > 8) return; this.plugin.data.settings.relaxNightRoutinePomos = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
+
+    new Setting(containerEl)
       .setName("Night routine starts at (HH:MM)")
       .setDesc("The evening wind-down begins here: Night becomes the Plan list's current phase, and the pomodoro counter stops counting room at this time.")
       .addText((t) =>
@@ -2754,13 +2800,13 @@ class FocusLogSettingTab extends PluginSettingTab {
     if (!this.plugin.data.settings.workDays) this.plugin.data.settings.workDays = [true, true, true, true, true, true, true];
     const schedSet = new Setting(containerEl)
       .setName("Work and relax days")
-      .setDesc("Working days (orange) open the today view in Work mode; rest days (dark green) open in Relax mode with your relax routines. Tap a day to flip it — the switch in the today view overrides just one day.");
+      .setDesc("Working days (orange) open the today view in Work mode; rest days (dark green) open in Relax mode with your relax routines. Tap a day to flip it - the switch in the today view overrides just one day.");
     const schedRow = schedSet.infoEl.createDiv();
     schedRow.style.display = "flex"; schedRow.style.gap = "6px"; schedRow.style.flexWrap = "wrap"; schedRow.style.marginTop = "10px";
     ["M", "T", "W", "T", "F", "S", "S"].forEach((lab, i) => {
       const b = schedRow.createEl("button", { text: lab });
       b.style.width = "36px"; b.style.height = "36px"; b.style.borderRadius = "9px"; b.style.border = "none"; b.style.color = "#fff"; b.style.fontWeight = "700"; b.style.fontSize = "14px"; b.style.cursor = "default"; b.style.padding = "0"; b.style.boxShadow = "none";
-      const paint = () => { const rest = this.plugin.data.settings.workDays[i] === false; b.style.background = rest ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid; b.setAttribute("aria-label", rest ? "rest day — tap to make it a working day" : "working day — tap to make it a rest day"); };
+      const paint = () => { const rest = this.plugin.data.settings.workDays[i] === false; b.style.background = rest ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid; b.setAttribute("aria-label", rest ? "rest day - tap to make it a working day" : "working day - tap to make it a rest day"); };
       paint();
       b.onclick = async () => { const arr = this.plugin.data.settings.workDays.slice(); arr[i] = arr[i] === false; this.plugin.data.settings.workDays = arr; await this.plugin.persist(); paint(); };
     });
@@ -2822,6 +2868,16 @@ class FocusLogSettingTab extends PluginSettingTab {
     containerEl.createEl("h3", { text: "Plan view" });
 
     new Setting(containerEl)
+      .setName("Hide Bonus-If-Done tasks by default")
+      .setDesc("Bonus tasks start hidden in the Plan list. The eye on a section header reveals hidden tasks, and each task's own eye can override either way.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.hideBonusByDefault !== false).onChange(async (v) => {
+          this.plugin.data.settings.hideBonusByDefault = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
       .setName("Show category in the today list")
       .setDesc("Show each task's Area as a chip in the panel's today view. Off hides the chip and keeps the full task title.")
       .addToggle((t) =>
@@ -2863,16 +2919,11 @@ class FocusLogSettingTab extends PluginSettingTab {
         })
       );
 
-    const groupLenSet = new Setting(containerEl)
-      .setName("Routine group length")
-      .setDesc("Morning and night routine steps are packed into groups of at most this many minutes; each group runs as one pomodoro. Independent of the timer's current pomodoro length, so shortening the timer never splits the groups. Default 25.");
-    groupLenSet.addText((t) => { t.setPlaceholder("25").setValue(String(this.plugin.data.settings.routineGroupMinutes ?? 25)).onChange(async (v) => { const n = parseInt(v, 10); if (!Number.isFinite(n) || n < 5) return; this.plugin.data.settings.routineGroupMinutes = n; await this.plugin.persist(); }); t.inputEl.style.width = "4em"; });
-    groupLenSet.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
 
 
     new Setting(containerEl)
       .setName("Show Area tags on the Timeline")
-      .setDesc("Show each task's Notion Area tag on its timeline block — including manual blocks added with the add-block button. Default on.")
+      .setDesc("Show each task's Notion Area tag on its timeline block - including manual blocks added with the add-block button. Default on.")
       .addToggle((t) =>
         t.setValue(this.plugin.data.settings.showAreaTimeline !== false).onChange(async (v) => {
           this.plugin.data.settings.showAreaTimeline = v;
@@ -2906,7 +2957,7 @@ class FocusLogSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Open the floating window when a pomodoro starts")
-      .setDesc("A small always-on-top window that shows the countdown over your other apps. You can also toggle it any time from the ribbon clock or the “Toggle floating timer” command. It stays in sync with the panel — start, pause, or reset from either.")
+      .setDesc("A small always-on-top window that shows the countdown over your other apps. You can also toggle it any time from the ribbon clock or the “Toggle floating timer” command. It stays in sync with the panel - start, pause, or reset from either.")
       .addToggle((t) =>
         t.setValue(this.plugin.data.settings.floatOnStart).onChange(async (v) => {
           this.plugin.data.settings.floatOnStart = v;
@@ -2916,7 +2967,7 @@ class FocusLogSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Keep it above other apps")
-      .setDesc("Pin the floating window on top of every other window. If your Obsidian build doesn't allow this, the window still opens — it just won't stay in front.")
+      .setDesc("Pin the floating window on top of every other window. If your Obsidian build doesn't allow this, the window still opens - it just won't stay in front.")
       .addToggle((t) =>
         t.setValue(this.plugin.data.settings.floatAlwaysOnTop).onChange(async (v) => {
           this.plugin.data.settings.floatAlwaysOnTop = v;

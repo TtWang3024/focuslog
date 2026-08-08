@@ -1,6 +1,5 @@
 import * as React from "react";
 import { createSkyMap } from "./skymap";
-import { InfoHover, SUBBAR, SUBTAB_ROW, subTab, TomatoIcon, WaterIcon } from "./icons";
 import skyStars from "./sky-data/sky-stars.json";
 import skyLines from "./sky-data/sky-constellations.json";
 import skyLabels from "./sky-data/sky-labels.json";
@@ -27,11 +26,12 @@ function waveLabel(u: any): string {
 
 // The Sky tab: pomodoros light amber stars; surfed urges light a separate silver-star sky you toggle to.
 // Drag to pan, scroll to zoom, hover a glow for its label, hover near a constellation for its name.
-export function SkyView({ sessions, urges, C }: { sessions: any[]; urges: any[]; C: any }) {
+// `mode` is owned by the panel now: the Pomo/Waves bar renders in the pinned header zone
+// beside every other view's bar, so this component only paints the sky it is told to.
+export function SkyView({ sessions, urges, C, mode }: { sessions: any[]; urges: any[]; C: any; mode: "pomodoro" | "wave" }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const skyRef = useRef<any>(null);
-  const [mode, setMode] = useState<"pomodoro" | "wave">("pomodoro");
   const [tip, setTip] = useState<{ x: number; y: number; title: string; sub: string } | null>(null);
   const [clabel, setClabel] = useState<{ name: string; x: number; y: number } | null>(null);
 
@@ -122,18 +122,6 @@ export function SkyView({ sessions, urges, C }: { sessions: any[]; urges: any[];
 
   return (
     <div>
-      {/* control left, info right - the shape every view shares, so the info button never moves */}
-      <div style={SUBBAR}>
-        <div style={SUBTAB_ROW}>
-          <button type="button" style={subTab(mode === "pomodoro")} onClick={() => setMode("pomodoro")}><TomatoIcon size={13} on={mode === "pomodoro"} />Pomo</button>
-          <button type="button" style={subTab(mode === "wave")} onClick={() => setMode("wave")}><WaterIcon size={13} on={mode === "wave"} />Waves</button>
-        </div>
-        <InfoHover C={C} label="about your Sky" width={330}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Your Sky</div>
-          <div><b>Pomo</b> lights an amber star for every pomodoro you log; <b>Waves</b> is a second, silver sky with one star per urge you surf — however the wave ended, noticing it is the whole achievement. Recent stars shine brighter. Work you claim after the fact lights a quieter copper star: same sky, different instrument.</div>
-          <div style={{ marginTop: 6 }}>Drag to roam and scroll to zoom. Hover a star for its story, or near a constellation for its name.</div>
-        </InfoHover>
-      </div>
       <div ref={wrapRef} style={{ position: "relative", width: "100%", height: "min(68vh, 560px)", minHeight: 340, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.line}` }}>
         <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block", cursor: "grab", touchAction: "none" }} />
         {tip && (

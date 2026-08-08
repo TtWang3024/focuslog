@@ -28,7 +28,7 @@ export const subTab = (on: boolean): any => ({
   color: on ? "#2b2723" : "#8a8175", fontSize: 13, fontWeight: on ? 700 : 500,
   cursor: "pointer", fontFamily: "var(--fl-display)",
   display: "inline-flex", alignItems: "center", gap: 5 });
-export const SUBTAB_ROW: any = { display: "inline-flex", alignItems: "center", gap: 14, flexShrink: 0 };
+export const SUBTAB_ROW: any = { display: "inline-flex", alignItems: "center", gap: 14, flexShrink: 0, marginLeft: -2 };
 
 // Two-weight glyphs shared across views (the Focus/Sky tomato, the surf/Sky water):
 // the regular outline resting, the heavier cut when that tab is the open one.
