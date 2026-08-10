@@ -661,11 +661,11 @@ function NoiseControl({ value, onPick }: any) {
     ["brown", WaveformIcon, "brown noise"],
   ];
   return (
-    <span className="fl-noise" style={{ display: "inline-flex", alignItems: "center" }}>
+    <span className="fl-noise" style={{ display: "inline-flex", alignItems: "center", marginBottom: 4 }}>
       {opts.map(([v, Icon, label]) => (
         <button key={v} onClick={() => onPick(v)} aria-label={"background noise: " + label} title={"background noise: " + label}
           className={"fl-noise-opt fl-noise-" + (v === "off" ? "mute" : v) + (value === v ? " is-active" : "")}>
-          <Icon size={12} />
+          <Icon size={13} />
         </button>
       ))}
     </span>
@@ -3588,13 +3588,25 @@ export default function FocusLogApp({ api }: any) {
   // The pinned title names the place you are in, the way Slack's pane header does.
   const viewTitle = isFocusView(view) ? "Focus" : view === "calendar" ? "Calendar" : view === "calibrate" ? "Calibrate" : view === "today" ? "Plan" : view === "sky" ? "Sky" : view === "history" ? "History" : "Focus Log";
   const pinnedBar = () => {
+    // One sync button, shared by the Plan and Focus bars: the Notion badge resting as a
+    // 24px square, the refresh sliding in on hover or while a sync runs.
+    const syncBtn = (
+      <button onClick={doSync} disabled={sync === "loading"} className="fl-sync-btn" aria-label="sync from Notion: pull today's tasks and merge the plan" title="sync from Notion"
+        style={{ display: "inline-flex", alignItems: "center", height: 24, boxSizing: "border-box", padding: "0 4px", borderRadius: 9, border: `1px solid ${ACCENT}`, background: "transparent", color: ACCENT, boxShadow: "none", cursor: "pointer", marginBottom: 4, opacity: sync === "loading" ? 0.7 : 1 }}>
+        <span className={"fl-sync-refresh" + (sync === "loading" ? " is-on" : "")} style={{ display: "inline-flex", alignItems: "center" }}>
+          <RefreshCwIcon size={14} spin={sync === "loading"} />
+        </span>
+        <img src={NOTION_LOGO} alt="" draggable={false} style={{ width: 16, height: 16 }} />
+      </button>
+    );
     if (isFocusView(view)) return (
       <div style={{ ...SUBBAR, marginBottom: 0, alignItems: "flex-end" }}>
         <div style={SUBTAB_ROW}>
           {FOCUS_SUB.map(([k, lab, Icon]) => (<button key={k} onClick={() => setView(k)} style={subTab(view === k)}><Icon size={13} on={view === k} />{lab}</button>))}
         </div>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <NoiseControl value={view === "break" ? noise.break : noise.focus} onPick={(v: string) => api.setNoise && api.setNoise(view === "break" ? "break" : "focus", v)} />
+        {syncBtn}
         <InfoHover C={C} label="about this view" width={360}>
           {view === "log" && (<>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>Pomo</div>
@@ -3637,6 +3649,7 @@ export default function FocusLogApp({ api }: any) {
           </span>
           <span style={{ color: C.muted, fontWeight: 600, fontSize: 13 }}>{"·"} {countWeek} {"\u{1F345}"} this week</span>
         </span>
+        <div style={{ display: "inline-flex", alignItems: "center", height: 28 }}>
         <InfoHover C={C} label="about this view" width={360}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Calendar</div>
           <div>The month as a calendar: a square for every pomodoro.</div>
@@ -3647,6 +3660,7 @@ export default function FocusLogApp({ api }: any) {
             <li><b>Days</b>: darker date numbers already have a daily note; click any day to open its note.</li>
           </ul>
         </InfoHover>
+        </div>
       </div>
     );
     if (view === "calibrate") return (
@@ -3654,6 +3668,7 @@ export default function FocusLogApp({ api }: any) {
         <div style={SUBTAB_ROW}>
           {CALIB_TABS.map(([k, lab, Icon]) => (<button key={k} onClick={() => setCalibSub(k)} style={subTab(calibSub === k)}><Icon size={13} on={calibSub === k} />{lab}</button>))}
         </div>
+        <div style={{ display: "inline-flex", alignItems: "center", height: 28 }}>
         <InfoHover C={C} label="about this view" width={360}>
           {calibSub === "today" && (<>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>Today</div>
@@ -3678,6 +3693,7 @@ export default function FocusLogApp({ api }: any) {
             <div>The long view, four cards in one scroll: pomodoro totals with the six-month heatmap, your best time of day, how you rest, and when and why you stop.</div>
           </>)}
         </InfoHover>
+        </div>
       </div>
     );
     if (view === "history") return (
@@ -3685,10 +3701,12 @@ export default function FocusLogApp({ api }: any) {
         <div style={SUBTAB_ROW}>
           {HIST_TABS.map(([k, lab]) => (<button key={k} onClick={() => setHistorySub(k)} style={subTab(historySub === k)}>{lab}</button>))}
         </div>
+        <div style={{ display: "inline-flex", alignItems: "center", height: 28 }}>
         <InfoHover C={C} label="about this view" width={360}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>History</div>
           <div>The full record, one list per kind: calibrations, breaks, pomodoros, pauses. Edits and deletes only change the local log; they never undo what was written to Notion.</div>
         </InfoHover>
+        </div>
       </div>
     );
     if (view === "today") return (
@@ -3730,13 +3748,7 @@ export default function FocusLogApp({ api }: any) {
             )}
           </span>
           {/* sync wears the Notion badge; the refresh slides in on hover (or while running) */}
-          <button onClick={doSync} disabled={sync === "loading"} className="fl-sync-btn" aria-label="sync from Notion: pull today's tasks and merge the plan" title="sync from Notion"
-            style={{ display: "inline-flex", alignItems: "center", height: 24, boxSizing: "border-box", padding: "0 4px", borderRadius: 9, border: `1px solid ${ACCENT}`, background: "transparent", color: ACCENT, boxShadow: "none", cursor: "pointer", marginBottom: 4, opacity: sync === "loading" ? 0.7 : 1 }}>
-            <span className={"fl-sync-refresh" + (sync === "loading" ? " is-on" : "")} style={{ display: "inline-flex", alignItems: "center" }}>
-              <RefreshCwIcon size={14} spin={sync === "loading"} />
-            </span>
-            <img src={NOTION_LOGO} alt="" draggable={false} style={{ width: 16, height: 16 }} />
-          </button>
+          {syncBtn}
           {false && (
           <span style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
           onMouseEnter={() => setIntroOpen(true)} onMouseLeave={() => setIntroOpen(false)}>
@@ -3810,11 +3822,13 @@ export default function FocusLogApp({ api }: any) {
           <button type="button" style={subTab(skyMode === "pomodoro")} onClick={() => setSkyMode("pomodoro")}><TomatoIcon size={13} on={skyMode === "pomodoro"} />Pomo</button>
           <button type="button" style={subTab(skyMode === "wave")} onClick={() => setSkyMode("wave")}><WaterIcon size={13} on={skyMode === "wave"} />Waves</button>
         </div>
+        <div style={{ display: "inline-flex", alignItems: "center", height: 28 }}>
         <InfoHover C={C} label="about your Sky" width={330}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Your Sky</div>
           <div><b>Pomo</b> lights an amber star for every pomodoro you log; <b>Waves</b> is a second, silver sky with one star per urge you surf - however the wave ended, noticing it is the whole achievement. Recent stars shine brighter. Work you claim after the fact lights a quieter copper star: same sky, different instrument.</div>
           <div style={{ marginTop: 6 }}>Drag to roam and scroll to zoom. Hover a star for its story, or near a constellation for its name.</div>
         </InfoHover>
+        </div>
       </div>
     );
     return null;
