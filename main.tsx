@@ -1487,6 +1487,9 @@ export default class FocusLogPlugin extends Plugin {
         status: mapStatus(selectName(p, "Status")),
         power: mapPower(selectName(p, "ExecutionPower")),
         king: (selectName(p, "Schedule") || "").includes("King"),
+        // A Guess carrying the mountain marks a BIG TASK: the work happens in its
+        // sub-tasks, so the list hides the parent by default (the eye reveals it).
+        big: (p?.properties?.["Guess"]?.multi_select || []).some((o: any) => /\u{1F3D4}/u.test(o.name || "")),
         category: categoryName(p, this.data.settings.categoryProperty) || null,
         pomodoros: g.base + g.plus.reduce((a, b) => a + b, 0),
         guessBase: g.base,

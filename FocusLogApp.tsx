@@ -1456,13 +1456,15 @@ export default function FocusLogApp({ api }: any) {
   const [hiddenNames, setHiddenNames] = useState<string[]>(Array.isArray(settings.hiddenTaskNames) ? settings.hiddenTaskNames : []);
   const [shownNames, setShownNames] = useState<string[]>(Array.isArray(settings.shownTaskNames) ? settings.shownTaskNames : []);
   const [showHidden, setShowHidden] = useState(false);   // the header eye: reveal hidden rows, dimmed
-  const isTaskHidden = (t: any) => hiddenNames.includes(t.task) || (settings.hideBonusByDefault !== false && t.power === "G" && !shownNames.includes(t.task));
+  // Hidden: named by hand, a bonus task (unless the setting shows them), or a BIG TASK
+  // (the Guess mountain) whose real work lives in its sub-tasks. The eye reveals any of them.
+  const isTaskHidden = (t: any) => hiddenNames.includes(t.task) || ((!!t.big || (settings.hideBonusByDefault !== false && t.power === "G")) && !shownNames.includes(t.task));
   const toggleTaskHidden = (t: any) => {
     if (isTaskHidden(t)) {
       const h = hiddenNames.filter((n) => n !== t.task);
       setHiddenNames(h);
       let s = shownNames;
-      if (settings.hideBonusByDefault !== false && t.power === "G" && !s.includes(t.task)) { s = [...s, t.task]; setShownNames(s); }
+      if ((!!t.big || (settings.hideBonusByDefault !== false && t.power === "G")) && !s.includes(t.task)) { s = [...s, t.task]; setShownNames(s); }
       api.patchSettings && api.patchSettings({ hiddenTaskNames: h, shownTaskNames: s });
     } else {
       const h = [...hiddenNames, t.task];
