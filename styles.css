@@ -215,6 +215,9 @@ body.focuslog-float-window .notice { display: none !important; }
 .focuslog-float .flt-btn.flt-urge { background: #DCEAF6; border-color: #3E78B2; color: #3E78B2; }
 .focuslog-float .flt-btn.flt-urge:hover { background: #CCE0F0; }
 .focuslog-float .flt-btn.flt-urge.is-on { background: #DCEAF6; border-color: #3E78B2; color: #3E78B2; font-variant-numeric: tabular-nums; }
+/* Early finish: the check.svg tick on a light green chip; the run ends now, rates, and logs. */
+.focuslog-float .flt-btn.flt-finish { background: #EAF3DE; border-color: #5b8c5a; color: #5b8c5a; }
+.focuslog-float .flt-btn.flt-finish:hover { background: #DFEDCE; }
 /* Background-noise picker, top right of the float: same collapsed-until-hover behaviour as
    the panel's. Not a .flt-btn, so the 18px svg rule and button chrome stay off it. */
 .focuslog-float .flt-noise { position: absolute; top: 6px; right: 8px; display: flex; align-items: center; z-index: 5; }

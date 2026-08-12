@@ -1098,6 +1098,18 @@ function AutoTextarea({ value, onChange, placeholder, style }: any) {
   return <textarea ref={ref} value={value} onChange={onChange} placeholder={placeholder} rows={1} style={style} />;
 }
 
+// The quick note grows with its content (to a cap, then scrolls), so a long thought
+// stays fully readable instead of sliding out of a one-line window.
+function AutoNote({ value, onChange, style }: any) {
+  const ref = useRef<any>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(200, el.scrollHeight) + "px";
+  }, [value]);
+  return <textarea ref={ref} rows={1} value={value} onChange={onChange} placeholder="quick note (optional)" style={{ ...style, resize: "none", overflowY: "auto", lineHeight: 1.5 }} />;
+}
 function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, onSurf, whisper, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, finishedTs, expected, onSetExpected, autoLogDefault, onAutoLogChange }: any) {
   const [task, setTask] = useState(preset || "");
   const [act, setAct] = useState(0);   // 0 = not rated yet: no weather button pre-highlighted
@@ -1242,7 +1254,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
           ); })()}
           {markDoneLabel}
           {chooseNextControls}
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
+          <AutoNote value={note} onChange={(e: any) => setNote(e.target.value)} style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
           <Scale label="after: how enjoyable was it actually?" value={act} onChange={rateActual} weather />
           <button onClick={submit} disabled={!act || !canLog}
             aria-label={!act ? "pick a rating first" : undefined}
@@ -1258,7 +1270,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
               <p style={{ fontSize: 12, color: C.muted, margin: "0 0 10px" }}>Logs the task above with the "before" rating as the expectation, and the timer's elapsed time (a full {pomoMin}m if the timer wasn't used).</p>
               <Scale label="after: how enjoyable was it actually?" value={act} onChange={setAct} weather />
-              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="quick note (optional)" style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
+              <AutoNote value={note} onChange={(e: any) => setNote(e.target.value)} style={{ ...inputStyle, marginBottom: 14, marginTop: 4 }} />
               {markDoneLabel}
               {chooseNextControls}
               {logBtn}

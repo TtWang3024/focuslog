@@ -30,7 +30,7 @@ const context = await esbuild.context({
   logLevel: "info",
   sourcemap: prod ? false : "inline",
   treeShaking: true,
-  loader: { ".png": "dataurl" },
+  loader: { ".png": "dataurl", ".mp3": "dataurl" },
   outfile: "main.js",
   jsx: "transform",
   jsxFactory: "React.createElement",

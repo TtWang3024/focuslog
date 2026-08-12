@@ -15,7 +15,15 @@ const FLT_ROTATE_LEFT = `<svg xmlns="http://www.w3.org/2000/svg" width="24" heig
 // noises (told apart by color, not shape: white, pink, brown). Sized by the .flt-noise svg rule.
 const FLT_NOISE_MUTE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="m23.707,22.293c.391.391.391,1.023,0,1.414-.195.195-.451.293-.707.293s-.512-.098-.707-.293L.293,1.707C-.098,1.316-.098.684.293.293S1.316-.098,1.707.293l4.628,4.628C8.142,2.461,10.839.757,13.828.207c.288-.056.593.025.82.215.229.19.36.472.36.769v12.404l1.688,1.688c1.806-1.817,1.803-4.763-.01-6.576-.391-.391-.391-1.023,0-1.414.391-.391,1.023-.391,1.414,0,2.592,2.592,2.596,6.808.01,9.404l1.44,1.44c3.316-3.481,3.266-9.011-.152-12.43-.391-.391-.391-1.023,0-1.414s1.023-.391,1.414,0c4.198,4.198,4.249,10.997.152,15.258l2.742,2.742ZM.009,10v4c0,2.757,2.243,5,5,5h1.269c1.807,2.502,4.53,4.237,7.551,4.793.06.011.12.017.181.017.232,0,.459-.081.64-.231.229-.19.36-.472.36-.769v-3.579L1.881,6.103C.74,7.02.009,8.426.009,10Z"/></svg>`;
 const FLT_NOISE_WAVE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="m18,17c-.553,0-1-.447-1-1v-8c0-.553.447-1,1-1s1,.447,1,1v8c0,.553-.447,1-1,1Zm-3,6V1c0-.553-.447-1-1-1s-1,.447-1,1v22c0,.553.447,1,1,1s1-.447,1-1Zm8-4V5c0-.553-.447-1-1-1s-1,.447-1,1v14c0,.553.447,1,1,1s1-.447,1-1Zm-12,0V5c0-.553-.447-1-1-1s-1,.447-1,1v14c0,.553.447,1,1,1s1-.447,1-1Zm-4-3v-8c0-.553-.447-1-1-1s-1,.447-1,1v8c0,.553.447,1,1,1s1-.447,1-1Zm-4-2v-4c0-.553-.447-1-1-1s-1,.447-1,1v4c0,.553.447,1,1,1s1-.447,1-1Z"/></svg>`;
+// The early-finish tick: the exact check.svg vector (the routine done-badge's tick).
+const FLT_CHECK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 507.506 507.506" fill="currentColor"><path d="M163.865,436.934c-14.406,0.006-28.222-5.72-38.4-15.915L9.369,304.966c-12.492-12.496-12.492-32.752,0-45.248l0,0c12.496-12.492,32.752-12.492,45.248,0l109.248,109.248L452.889,79.942c12.496-12.492,32.752-12.492,45.248,0l0,0c12.492,12.496,12.492,32.752,0,45.248L202.265,421.019C192.087,431.214,178.271,436.94,163.865,436.934z"/></svg>`;
 import starImg from "./assets/star.png";
+// The three noises ship inside main.js (dataurl imports), so the plugin is one
+// self-contained piece: sync and fresh installs need no extra files or folders.
+import whiteNoiseMp3 from "./assets/white_noise.mp3";
+import pinkNoiseMp3 from "./assets/pink_noise.mp3";
+import brownNoiseMp3 from "./assets/brown_noise.mp3";
+const NOISE_SRC: Record<string, string> = { white: whiteNoiseMp3, pink: pinkNoiseMp3, brown: brownNoiseMp3 };
 import rateRain from "./assets/rate-rain.png";
 import rateClouds from "./assets/rate-clouds.png";
 import ratePartly from "./assets/rate-partly-sunny.png";
@@ -637,6 +645,16 @@ class TimerEngine {
     this.pushSnap();
   }
   resume() { this.start(); }
+  // Finish the run RIGHT NOW: the countdown jumps to zero and the normal finish path
+  // (emit, timerDone, snapshot) runs, so rating and logging work exactly like a natural
+  // finish with the time actually spent. A paused run resumes for the same instant,
+  // committing its open pause first.
+  finishNow() {
+    if (!this.running && !this.paused) return;
+    if (!this.running) this.start();
+    this.endTs = Date.now();
+    this.poll();
+  }
   reset() {
     // A tagged pause is written (event + daily-note block) just like on resume,
     // so tagging and then restarting doesn't lose the pause. An untagged pause
@@ -1141,7 +1159,7 @@ export default class FocusLogPlugin extends Plugin {
     const vol = Math.max(0, Math.min(1, (st.noiseVolume ?? 40) / 100));
     if (this.noiseEl.volume !== vol) this.noiseEl.volume = vol;
     if (this.noiseTrack !== want) {
-      this.noiseEl.src = this.app.vault.adapter.getResourcePath(normalizePath((this.manifest.dir || "") + "/assets/" + want + "_noise.mp3"));
+      this.noiseEl.src = NOISE_SRC[want];
       this.noiseTrack = want;
     }
     if (this.noiseEl.paused) this.noiseEl.play().catch(() => {});
@@ -2260,6 +2278,10 @@ class FloatTimerView extends ItemView {
     this.els.primary = row.createEl("button", { cls: "flt-btn flt-primary" });
     this.els.plus = row.createEl("button", { cls: "flt-btn flt-step" });
     this.els.plus.innerHTML = FLT_PLUS;
+    this.els.finish = row.createEl("button", { cls: "flt-btn flt-icon flt-finish" });
+    this.els.finish.innerHTML = FLT_CHECK;
+    this.els.finish.setAttribute("aria-label", "finish this pomodoro now: rate it and it logs with the time you actually spent");
+    this.els.finish.onclick = () => this.plugin.timer.finishNow();
     this.els.reset = row.createEl("button", { cls: "flt-btn flt-icon" });
     this.els.reset.innerHTML = FLT_ROTATE_LEFT;
     this.els.reset.setAttribute("aria-label", "reset");
@@ -2436,6 +2458,10 @@ class FloatTimerView extends ItemView {
     this.els.time.style.display = brk ? "none" : "";
     this.els.row.style.display = brk ? "none" : "";
     this.els.reset.style.display = setup ? "none" : "";
+    if (this.els.finish) {
+      const tf = this.plugin.timer.getState();
+      this.els.finish.style.display = (!setup && !brk && (tf.running || tf.paused)) ? "" : "none";
+    }
     if (this.els.urge) {
       const w = this.plugin.urgeWave;
       const ts = this.plugin.timer.getState();
@@ -2533,7 +2559,13 @@ class FloatTimerView extends ItemView {
     this.els.brkMinus.disabled = s.breakSecs <= 60;
     this.els.brkPlus.disabled = s.breakSecs >= 30 * 60;
     const endIcon = s.breakFinished ? "arrow-right" : "check";
-    if (this.lastEndIcon !== endIcon) { setIcon(this.els.brkEnd, endIcon); this.lastEndIcon = endIcon; }
+    if (this.lastEndIcon !== endIcon) {
+      // The tick is the exact check.svg vector (the early-finish button's twin);
+      // the finished state's arrow stays Obsidian's built-in.
+      if (endIcon === "check") this.els.brkEnd.innerHTML = FLT_CHECK;
+      else setIcon(this.els.brkEnd, endIcon);
+      this.lastEndIcon = endIcon;
+    }
     this.els.brkEnd.setAttribute("aria-label", s.breakFinished ? "next task" : "end break");
     const acts = this.plugin.data.activities || [];
     const picked = s.breakPicked || [];
@@ -2962,6 +2994,7 @@ class FocusLogSettingTab extends PluginSettingTab {
           this.plugin.updateNoise();
         })
       );
+
 
     containerEl.createEl("h3", { text: "Plan view" });
 

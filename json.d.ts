@@ -5,6 +5,11 @@ declare module "*.json" {
   export default value;
 }
 
+declare module "*.mp3" {
+  // esbuild dataurl loader -> a data: URL string
+  const url: string;
+  export default url;
+}
 declare module "*.png" {
   const value: string;   // esbuild dataurl loader → a data: URL string
   export default value;
