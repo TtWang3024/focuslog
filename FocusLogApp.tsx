@@ -515,7 +515,7 @@ const ADD_BTN: any = { padding: "7px 14px", borderRadius: 8, fontSize: 13, curso
 const FOCUS_SUB: [string, string, any][] = [["log", "Pomo", TomatoIcon], ["break", "Break", MugIcon], ["pause", "Pause", PlayPauseIcon]];
 const isFocusView = (v: string) => FOCUS_SUB.some(([k]) => k === v);
 // The left rail, Slack-style: icon above a small label, one entry per view.
-const NAV_TABS: [string, string, any][] = [["log", "Focus", CrosshairsIcon], ["calendar", "Calendar", CalendarTabIcon], ["calibrate", "Calibrate", TachometerIcon], ["today", "Plan", KiteIcon], ["sky", "Sky", ConstellationIcon]];
+const NAV_TABS: [string, string, any][] = [["log", "Focus", CrosshairsIcon], ["today", "Plan", KiteIcon], ["calendar", "Calendar", CalendarTabIcon], ["calibrate", "Calibrate", TachometerIcon], ["sky", "Sky", ConstellationIcon]];
 const CALIB_TABS: [string, string, any][] = [["today", "Today", RoseIcon], ["accuracy", "Pomo Accuracy", TemperatureIcon], ["total", "Sum", EggIcon]];
 const HIST_TABS: [string, string][] = [["calib", "Calibration"], ["break", "Break"], ["pomo", "Pomo"], ["pause", "Pause"]];
 // Small uppercase heading for the today-view groups (Work / Personal) and routine blocks.
@@ -669,6 +669,22 @@ function NoiseControl({ value, onPick }: any) {
         </button>
       ))}
     </span>
+  );
+}
+function CircleXmarkIcon({ size = 16, on = false }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      {on
+        ? <path d="m12 1c-7.71 0-11 3.29-11 11s3.29 11 11 11 11-3.29 11-11-3.29-11-11-11zm3.707 13.293c.391.391.391 1.023 0 1.414s-1.023.391-1.414 0l-2.293-2.293-2.293 2.293c-.391.391-1.023.391-1.414 0s-.391-1.023 0-1.414l2.293-2.293-2.293-2.293c-.391-.391-.391-1.023 0-1.414s1.023-.391 1.414 0l2.293 2.293 2.293-2.293c.391-.391 1.023-.391 1.414 0s.391 1.023 0 1.414l-2.293 2.293z" />
+        : <path d="m15.707 9.707-2.293 2.293 2.293 2.293c.391.391.391 1.023 0 1.414s-1.023.391-1.414 0l-2.293-2.293-2.293 2.293c-.391.391-1.023.391-1.414 0s-.391-1.023 0-1.414l2.293-2.293-2.293-2.293c-.391-.391-.391-1.023 0-1.414s1.023-.391 1.414 0l2.293 2.293 2.293-2.293c.391-.391 1.023-.391 1.414 0s.391 1.023 0 1.414zm7.293 2.293c0 7.71-3.29 11-11 11s-11-3.29-11-11 3.29-11 11-11 11 3.29 11 11zm-2 0c0-6.561-2.439-9-9-9s-9 2.439-9 9 2.439 9 9 9 9-2.439 9-9z" />}
+    </svg>
+  );
+}
+function SortDownIcon({ size = 14 }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      <path d="M11.744,18c-.757,0-1.48-.323-1.985-.886L3.328,10.587c-.602-.657-.747-1.535-.402-2.317,.345-.783,1.09-1.27,1.945-1.27h13.745c.854,0,1.6,.486,1.944,1.269s.2,1.66-.376,2.291l-6.487,6.589c-.474,.528-1.197,.852-1.953,.852Z" />
+    </svg>
   );
 }
 function PlayIcon({ size = 16 }: any) {
@@ -1368,6 +1384,13 @@ export default function FocusLogApp({ api }: any) {
   // Body / Emotions share one pane, so the note and the three decisions sit near the top
   // of the dialog instead of below two full-height sections.
   const [surfTab, setSurfTab] = useState<"wave" | "body" | "mood">("wave");
+  const [surfIdeaDraft, setSurfIdeaDraft] = useState("");
+  const [surfIdeaArmed, setSurfIdeaArmed] = useState<number | null>(null);
+  const [surfIdeaEdit, setSurfIdeaEdit] = useState<{ i: number; v: string } | null>(null);
+  const surfIdeaEsc = useRef(false);   // an Escape (or the back arrow) skips the blur-save that follows
+  const [surfUrgeMenu, setSurfUrgeMenu] = useState(false);
+  const [surfXHover, setSurfXHover] = useState(false);
+  const surfIdeaPend = useRef<{ i: number; t: number } | null>(null);   // one click waits 260ms in case a second arrives
   const [nowTick, setNowTick] = useState(Date.now());
   useEffect(() => { if (!surfOpen) return; const iv = window.setInterval(() => setNowTick(Date.now()), 1000); return () => window.clearInterval(iv); }, [surfOpen]);
   const [pending, setPending] = useState<any[]>(init.pending);
@@ -1387,6 +1410,20 @@ export default function FocusLogApp({ api }: any) {
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("pointerdown", onDown, true); document.removeEventListener("keydown", onKey); };
   }, [modeMenuOpen]);
+  useEffect(() => {
+    if (!surfUrgeMenu) return;
+    const onDown = (e: any) => { if (!(e.target instanceof Element && e.target.closest("[data-urgemenu]"))) setSurfUrgeMenu(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSurfUrgeMenu(false); };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("pointerdown", onDown, true); document.removeEventListener("keydown", onKey); };
+  }, [surfUrgeMenu]);
+  useEffect(() => {
+    if (surfIdeaArmed == null) return;
+    const onDown = (e: any) => { if (!(e.target instanceof Element && e.target.closest("[data-ideapill]"))) setSurfIdeaArmed(null); };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [surfIdeaArmed]);
   const [historySub, setHistorySub] = useState("calib");
   // The daily note focused in the workspace (ms timestamp), null when none: drives the calendar outline.
   const [activeDaily, setActiveDaily] = useState<number | null>(api.getActiveDaily ? api.getActiveDaily() : null);
@@ -2122,10 +2159,10 @@ export default function FocusLogApp({ api }: any) {
   const tagColor = (n: any) => MACARON[tagIdx(n)].fill;
   const tagBorder = (n: any) => MACARON[tagIdx(n)].border;
   const openLog = (leafTask: string) => { setPreset(leafTask); setView("log"); };
-  const openSurf = (taskName?: any) => { const seedTask = typeof taskName === "string" ? taskName : ""; setNowTick(Date.now()); setSurfTab("wave"); setSurf({ startTs: Date.now(), task: seedTask || timer.task || preset || "", curve: [], body: [], moods: [], note: "" }); setSurfOpen(true); };
+  const openSurf = (taskName?: any) => { const seedTask = typeof taskName === "string" ? taskName : ""; setNowTick(Date.now()); setSurfTab("wave"); setSurfIdeaDraft(""); setSurfIdeaArmed(null); setSurfIdeaEdit(null); setSurfUrgeMenu(false); setSurf({ startTs: Date.now(), task: seedTask || timer.task || preset || "", urge: "", ideas: [], curve: [], body: [], moods: [], note: "" }); setSurfOpen(true); };
   const finishSurf = (outcome: string) => {
     if (!surf) return;
-    const entry = { id: surf.startTs, ts: surf.startTs, endTs: Date.now(), task: surf.task, curve: surf.curve, body: (surf.body || []).map((b: any) => ({ part: b.part, note: (b.note || "").trim() })), moods: surf.moods, note: (surf.note || "").trim(), outcome };
+    const entry = { id: surf.startTs, ts: surf.startTs, endTs: Date.now(), task: surf.task, urge: (surf.urge || "").trim(), ideas: (surf.ideas || []).map((x: any) => String(x || "").trim()).filter(Boolean), curve: surf.curve, body: (surf.body || []).map((b: any) => ({ part: b.part, note: (b.note || "").trim() })), moods: surf.moods, note: (surf.note || "").trim(), outcome };
     const arr = [...urges, entry];
     setUrges(arr); api.saveUrges && api.saveUrges(arr);
     setSurfOpen(false); setSurf(null);
@@ -4483,14 +4520,66 @@ export default function FocusLogApp({ api }: any) {
           const area = pts.length > 1 ? path + " L " + pts[pts.length - 1].x + " " + yOf(0) + " L " + pts[0].x + " " + yOf(0) + " Z" : "";
           const cur = lastRate ? lastRate.v : null;
           const setS = (patch: any) => setSurf((s0: any) => ({ ...s0, ...patch }));
+          // The familiar visitors: the three most-named urges and most-caught ideas from
+          // every past surf, ranked by how often they came, ready to reuse with one click.
+          const topOf = (vals: any[]) => {
+            const c: Record<string, { n: number; label: string }> = {};
+            vals.forEach((raw: any) => { const t = String(raw || "").trim(); if (!t) return; const k = t.toLowerCase(); if (!c[k]) c[k] = { n: 0, label: t }; c[k].n++; });
+            return Object.values(c).sort((a, b) => b.n - a.n).slice(0, 3).map((x) => x.label);
+          };
+          const topUrgeNames = topOf(urges.map((u: any) => u.urge));
+          const topIdeaNames = topOf(urges.reduce((a: any[], u: any) => a.concat(u.ideas || []), []));
+          const caughtIdeas: string[] = surf.ideas || [];
+          const catchIdea = (t: string) => { const v = (t || "").trim(); if (!v) return; if (caughtIdeas.some((x) => x.toLowerCase() === v.toLowerCase())) return; setS({ ideas: [...caughtIdeas, v] }); };
+          const saveIdeaEdit = () => {
+            const ed = surfIdeaEdit;
+            if (!ed) return;
+            setSurfIdeaEdit(null);
+            const v = String(ed.v || "").trim();
+            if (!v) return;   // an emptied pill keeps its old words; deleting is the trash's job
+            const next = caughtIdeas.slice();
+            next[ed.i] = v;
+            setS({ ideas: next });
+          };
           return (
-            <div style={{ position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 92, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => { setSurfOpen(false); setSurf(null); }}>
-              <div onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 94vw)", maxHeight: "88vh", overflowY: "auto", background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: 18, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" }}>
+            <div style={{ position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 92, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 94vw)", maxHeight: "88vh", overflowY: "auto", background: C.card, border: `1px solid ${C.faint}`, borderRadius: 12, padding: 18, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ fontFamily: "var(--fl-display)", fontSize: 15.5, fontWeight: 700, color: C.ink, flex: 1, display: "flex", alignItems: "center", gap: 7 }}><span style={{ color: "#3E78B2", display: "inline-flex" }}><SeaWaveIcon size={16} /></span>An urge is here</div>
                   <span style={{ fontFamily: "var(--fl-mono)", fontSize: 13, color: over ? "#3E78B2" : C.muted, fontVariantNumeric: "tabular-nums" }}>{over ? "the wave has had its time" : remTxt}</span>
+                  <button onMouseEnter={() => setSurfXHover(true)} onMouseLeave={() => setSurfXHover(false)}
+                    onClick={() => { setSurfXHover(false); setSurfOpen(false); setSurf(null); }}
+                    aria-label="close the urge surf without saving"
+                    style={{ width: 24, height: 24, minWidth: 24, padding: 0, border: "none", boxShadow: "none", background: "transparent", color: surfXHover ? C.ink : C.muted, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <CircleXmarkIcon size={18} on={surfXHover} />
+                  </button>
                 </div>
-                <div className="fl-surf-tabs" role="tablist" aria-label="the wave, the body, the feeling around it" style={{ display: "inline-flex", gap: 3, padding: 3, borderRadius: 999, border: `1px solid ${C.line}`, background: C.paper, margin: "10px 0 0" }}>
+                {/* Naming the urge is the first act of observing it. One blank: type a new
+                    name, or the round sort-down beside it offers the three usual visitors. */}
+                <div data-urgemenu style={{ position: "relative", display: "flex", alignItems: "center", gap: 6, margin: "10px 0 0" }}>
+                  <input value={surf.urge || ""} onChange={(e) => setS({ urge: e.target.value })}
+                    aria-label="name the urge you are choosing to observe"
+                    placeholder="What is calling you away? A named urge is a wave to watch, not a command to obey."
+                    style={{ flex: 1, minWidth: 0, boxSizing: "border-box", border: `1.5px solid ${C.muted}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "7px 10px", fontFamily: "var(--fl-display)" }} />
+                  {topUrgeNames.length > 0 && (
+                    <button onClick={() => setSurfUrgeMenu((o) => !o)} aria-expanded={surfUrgeMenu} aria-label="the usual visitors: your three most frequent urges"
+                      style={{ width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 999, border: `1.5px solid ${C.muted}`, background: C.paper, color: C.muted, boxShadow: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <SortDownIcon size={11} />
+                    </button>
+                  )}
+                  {surfUrgeMenu && (
+                    <div role="menu" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 60, background: C.card, border: `1px solid ${C.faint}`, borderRadius: 10, boxShadow: "0 6px 22px rgba(0,0,0,0.16)", padding: 6, minWidth: 220, maxWidth: "100%", display: "flex", flexDirection: "column", gap: 2 }}>
+                      {topUrgeNames.map((nm: string) => {
+                        const on = (surf.urge || "").trim().toLowerCase() === nm.toLowerCase();
+                        return (
+                          <button key={nm} role="menuitem" onClick={() => { setS({ urge: nm }); setSurfUrgeMenu(false); }}
+                            style={{ display: "flex", width: "100%", alignItems: "center", padding: "6px 9px", border: "none", boxShadow: "none", background: on ? "#DCEAF6" : "transparent", borderRadius: 7, color: on ? "#1d4f80" : C.ink, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", textAlign: "left", overflowWrap: "anywhere" }}>{nm}</button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div className="fl-surf-tabs" role="tablist" aria-label="the wave, the body, the feeling around it" style={{ display: "inline-flex", gap: 3, padding: 3, borderRadius: 999, border: `1px solid ${C.faint}`, background: C.paper, margin: "10px 0 0" }}>
                   {[{ k: "wave", label: "Wave", n: surf.curve.length, Icon: WaterIcon }, { k: "body", label: "Body", n: (surf.body || []).length, Icon: WalkingIcon }, { k: "mood", label: "Emotions", n: (surf.moods || []).length, Icon: StomachIcon }].map((t) => {
                     const on = surfTab === t.k;
                     // The 90-second nudge follows the Wave pill while another tab is open.
@@ -4507,7 +4596,7 @@ export default function FocusLogApp({ api }: any) {
                 </div>
                 <div style={{ fontSize: 12.5, color: (surfTab === "wave" && nudge) ? "#3E78B2" : C.muted, margin: "7px 0 8px", transition: "color 0.4s" }}>{surfTab === "wave" ? "How strong is it now?" : surfTab === "body" ? "Where do I feel this in my body?" : "What emotions am I experiencing?"}</div>
                 {/* One slot, one height: the three decisions below never move when tabs change. */}
-                <div className="fl-surf-pane" style={{ minHeight: 320 }}>
+                <div className="fl-surf-pane" style={{ minHeight: 396 }}>
                   {surfTab === "wave" && (
                     <>
                       <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 12px" }}>
@@ -4518,21 +4607,70 @@ export default function FocusLogApp({ api }: any) {
                         <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: H, flexShrink: 0 }}>
                           {RATES.map((v) => (
                             <button key={v} onClick={() => setS({ curve: [...surf.curve, { t: Date.now(), v }] })} aria-label={"rate the urge " + v + " of 10"}
-                              style={{ width: RBTN, height: RBTN, minWidth: RBTN, padding: 0, borderRadius: 999, border: `1.5px solid ${cur === v ? "#3E78B2" : C.faint}`, background: cur === v ? "#DCEAF6" : "transparent", color: cur === v ? "#3E78B2" : C.muted, boxShadow: "none", fontSize: 11.5, fontFamily: "var(--fl-mono)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{v}</button>
+                              style={{ width: RBTN, height: RBTN, minWidth: RBTN, padding: 0, borderRadius: 999, border: `1.5px solid ${cur === v ? "#3E78B2" : C.muted}`, background: cur === v ? "#DCEAF6" : "transparent", color: cur === v ? "#3E78B2" : C.muted, boxShadow: "none", fontSize: 11.5, fontFamily: "var(--fl-mono)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{v}</button>
                           ))}
                         </div>
                         {/* preserveAspectRatio=none keeps the 200px height (and so the axis
                             alignment) when the dialog narrows; strokes opt out of the stretch. */}
                         <svg viewBox={"0 0 " + W + " " + H} preserveAspectRatio="none" style={{ flex: "1 1 auto", minWidth: 0, height: H, display: "block" }} aria-label="the wave: your ratings over time">
-                          {RATES.map((g) => (<line key={g} x1={PLT} x2={W - PRT} y1={yOf(g)} y2={yOf(g)} stroke={g === 0 ? C.faint : C.line} strokeWidth={1} vectorEffect="non-scaling-stroke" />))}
+                          {RATES.map((g) => (<line key={g} x1={PLT} x2={W - PRT} y1={yOf(g)} y2={yOf(g)} stroke={g === 0 ? C.muted : C.faint} strokeWidth={1} vectorEffect="non-scaling-stroke" />))}
                           {area && <path d={area} fill="#DCEAF6" opacity={0.55} stroke="none" />}
                           {path && <path d={path} fill="none" stroke="#3E78B2" strokeWidth={2} strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
                           {pts.map((pt: any, i: number) => (<circle key={i} cx={pt.x} cy={pt.y} r={2.6} fill="#3E78B2" />))}
-                          <line x1={xOf(nowTick)} x2={xOf(nowTick)} y1={PTT} y2={H - PBT} stroke={C.faint} strokeWidth={1} strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
+                          <line x1={xOf(nowTick)} x2={xOf(nowTick)} y1={PTT} y2={H - PBT} stroke={C.muted} strokeWidth={1} strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
                         </svg>
                       </div>
+                      {/* Other thoughts drift past while you watch the wave; caught ones wait on
+                          the shore as filled pills (click to arm edit and delete, the routine-pill
+                          way), and the familiar three offer themselves as dashed ones. */}
+                      <input value={surfIdeaDraft} onChange={(e) => setSurfIdeaDraft(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") { catchIdea(surfIdeaDraft); setSurfIdeaDraft(""); } }}
+                        aria-label="catch a passing idea; Enter sets it down on the shore"
+                        placeholder="Other ideas will drift by. Catch one in a few words; it will wait on the shore."
+                        style={{ width: "100%", boxSizing: "border-box", border: `1.5px solid ${C.muted}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "7px 10px", fontFamily: "var(--fl-display)", marginTop: 12 }} />
+                      {(caughtIdeas.length > 0 || topIdeaNames.length > 0) && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                          {caughtIdeas.map((nm: string, i: number) => {
+                            if (surfIdeaEdit && surfIdeaEdit.i === i) {
+                              return (
+                                <span key={"e" + i} data-ideapill style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 28, boxSizing: "border-box", padding: "0 9px 0 11px", borderRadius: 999, border: `1.5px solid ${C.ink}`, background: C.card }}>
+                                  <input autoFocus value={surfIdeaEdit.v} onChange={(e) => setSurfIdeaEdit({ i, v: e.target.value })}
+                                    onKeyDown={(e) => { if (e.key === "Enter") saveIdeaEdit(); if (e.key === "Escape") { surfIdeaEsc.current = true; setSurfIdeaEdit(null); } }}
+                                    onBlur={() => { if (surfIdeaEsc.current) { surfIdeaEsc.current = false; return; } saveIdeaEdit(); }}
+                                    aria-label="rewrite this idea (Enter or a click away saves; the arrow goes back without saving)"
+                                    style={{ width: Math.max(60, Math.min(200, surfIdeaEdit.v.length * 7 + 20)), border: "none", boxShadow: "none", outline: "none", background: "transparent", color: C.ink, fontSize: 12, fontFamily: "var(--fl-display)", padding: 0 }} />
+                                  <span role="button" aria-label="go back without saving" onMouseDown={(e) => e.preventDefault()} onClick={() => { surfIdeaEsc.current = true; setSurfIdeaEdit(null); }} style={{ display: "inline-flex", cursor: "pointer", color: C.muted }}><Undo2Icon size={12} /></span>
+                                </span>
+                              );
+                            }
+                            const armed = surfIdeaArmed === i;
+                            return (
+                              <span key={"c" + i} data-ideapill role="button" aria-pressed={armed}
+                                onClick={() => {
+                                  if (armed) { setSurfIdeaArmed(null); return; }
+                                  const pend = surfIdeaPend.current;
+                                  if (pend && pend.i === i) { window.clearTimeout(pend.t); surfIdeaPend.current = null; setSurfIdeaArmed(i); return; }   // the second click arms
+                                  if (pend) window.clearTimeout(pend.t);
+                                  surfIdeaPend.current = { i, t: window.setTimeout(() => { surfIdeaPend.current = null; setS({ ideas: caughtIdeas.filter((_: any, j: number) => j !== i) }); }, 260) };
+                                }}
+                                aria-label={nm + " - caught. One click lets it go; a double click opens edit and delete"}
+                                style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 28, boxSizing: "border-box", padding: "0 11px", borderRadius: 999, border: `1.5px solid ${armed ? C.ink : "#3E78B2"}`, background: armed ? C.card : "#DCEAF6", color: armed ? C.ink : "#1d4f80", fontSize: 12, fontFamily: "var(--fl-display)", cursor: "pointer", userSelect: "none" }}>
+                                {nm}
+                                {armed && (<>
+                                  <span role="button" aria-label="edit" onClick={(e) => { e.stopPropagation(); surfIdeaEsc.current = false; setSurfIdeaEdit({ i, v: nm }); setSurfIdeaArmed(null); }} style={{ display: "inline-flex", cursor: "pointer" }}><PencilIcon size={12} /></span>
+                                  <span role="button" aria-label="delete" onClick={(e) => { e.stopPropagation(); setSurfIdeaArmed(null); setS({ ideas: caughtIdeas.filter((_: any, j: number) => j !== i) }); }} style={{ display: "inline-flex", cursor: "pointer", color: "#C06A57" }}><TrashIcon size={12} /></span>
+                                </>)}
+                              </span>
+                            );
+                          })}
+                          {topIdeaNames.filter((nm: string) => !caughtIdeas.some((x) => x.toLowerCase() === nm.toLowerCase())).map((nm: string) => (
+                            <button key={nm} onClick={() => catchIdea(nm)} title="a familiar one; click to catch it again"
+                              style={{ height: 28, boxSizing: "border-box", padding: "0 11px", borderRadius: 999, border: `1.5px dashed ${C.muted}`, background: "transparent", color: C.muted, boxShadow: "none", fontSize: 12, fontFamily: "var(--fl-display)", cursor: "pointer" }}>{nm}</button>
+                          ))}
+                        </div>
+                      )}
                       <input value={surf.note} onChange={(e) => setS({ note: e.target.value })} placeholder="This is an urge, not a command. I decide after the wave has passed"
-                        style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "7px 10px", fontFamily: "var(--fl-display)", marginTop: 12 }} />
+                        style={{ width: "100%", boxSizing: "border-box", border: `1.5px solid ${C.muted}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "7px 10px", fontFamily: "var(--fl-display)", marginTop: 10 }} />
                     </>
                   )}
                   {surfTab === "body" && <BodyMap value={surf.body} onChange={(b: any) => setS({ body: b })} C={C} />}

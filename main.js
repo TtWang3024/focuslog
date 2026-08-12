@@ -24756,7 +24756,7 @@ var ICON_BTN = { background: "transparent", border: "none", boxShadow: "none", p
 var ADD_BTN = { padding: "7px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "var(--fl-display)", background: "#C57B5A", border: "1px solid #C57B5A", color: "rgb(251, 248, 241)" };
 var FOCUS_SUB = [["log", "Pomo", TomatoIcon], ["break", "Break", MugIcon], ["pause", "Pause", PlayPauseIcon]];
 var isFocusView = (v) => FOCUS_SUB.some(([k]) => k === v);
-var NAV_TABS = [["log", "Focus", CrosshairsIcon], ["calendar", "Calendar", CalendarTabIcon], ["calibrate", "Calibrate", TachometerIcon], ["today", "Plan", KiteIcon], ["sky", "Sky", ConstellationIcon]];
+var NAV_TABS = [["log", "Focus", CrosshairsIcon], ["today", "Plan", KiteIcon], ["calendar", "Calendar", CalendarTabIcon], ["calibrate", "Calibrate", TachometerIcon], ["sky", "Sky", ConstellationIcon]];
 var CALIB_TABS = [["today", "Today", RoseIcon], ["accuracy", "Pomo Accuracy", TemperatureIcon], ["total", "Sum", EggIcon]];
 var HIST_TABS = [["calib", "Calibration"], ["break", "Break"], ["pomo", "Pomo"], ["pause", "Pause"]];
 function polarPt(cx, cy, r, deg) {
@@ -24849,6 +24849,12 @@ function NoiseControl({ value, onPick }) {
     },
     /* @__PURE__ */ React5.createElement(Icon, { size: 13 })
   )));
+}
+function CircleXmarkIcon({ size = 16, on = false }) {
+  return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", stroke: "none", style: { display: "block" } }, on ? /* @__PURE__ */ React5.createElement("path", { d: "m12 1c-7.71 0-11 3.29-11 11s3.29 11 11 11 11-3.29 11-11-3.29-11-11-11zm3.707 13.293c.391.391.391 1.023 0 1.414s-1.023.391-1.414 0l-2.293-2.293-2.293 2.293c-.391.391-1.023.391-1.414 0s-.391-1.023 0-1.414l2.293-2.293-2.293-2.293c-.391-.391-.391-1.023 0-1.414s1.023-.391 1.414 0l2.293 2.293 2.293-2.293c.391-.391 1.023-.391 1.414 0s.391 1.023 0 1.414l-2.293 2.293z" }) : /* @__PURE__ */ React5.createElement("path", { d: "m15.707 9.707-2.293 2.293 2.293 2.293c.391.391.391 1.023 0 1.414s-1.023.391-1.414 0l-2.293-2.293-2.293 2.293c-.391.391-1.023.391-1.414 0s-.391-1.023 0-1.414l2.293-2.293-2.293-2.293c-.391-.391-.391-1.023 0-1.414s1.023-.391 1.414 0l2.293 2.293 2.293-2.293c.391-.391 1.023-.391 1.414 0s.391 1.023 0 1.414zm7.293 2.293c0 7.71-3.29 11-11 11s-11-3.29-11-11 3.29-11 11-11 11 3.29 11 11zm-2 0c0-6.561-2.439-9-9-9s-9 2.439-9 9 2.439 9 9 9 9-2.439 9-9z" }));
+}
+function SortDownIcon({ size = 14 }) {
+  return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", stroke: "none", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "M11.744,18c-.757,0-1.48-.323-1.985-.886L3.328,10.587c-.602-.657-.747-1.535-.402-2.317,.345-.783,1.09-1.27,1.945-1.27h13.745c.854,0,1.6,.486,1.944,1.269s.2,1.66-.376,2.291l-6.487,6.589c-.474,.528-1.197,.852-1.953,.852Z" }));
 }
 function PlayIcon({ size = 16 }) {
   return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", stroke: "none", style: { display: "block" } }, /* @__PURE__ */ React5.createElement("path", { d: "M20.492,7.969,10.954.975A5,5,0,0,0,3,5.005V19a4.994,4.994,0,0,0,7.954,4.03l9.538-6.994a5,5,0,0,0,0-8.062Z" }));
@@ -25167,6 +25173,13 @@ function FocusLogApp({ api }) {
   const [surfOpen, setSurfOpen] = useState4(false);
   const [surf, setSurf] = useState4(null);
   const [surfTab, setSurfTab] = useState4("wave");
+  const [surfIdeaDraft, setSurfIdeaDraft] = useState4("");
+  const [surfIdeaArmed, setSurfIdeaArmed] = useState4(null);
+  const [surfIdeaEdit, setSurfIdeaEdit] = useState4(null);
+  const surfIdeaEsc = useRef3(false);
+  const [surfUrgeMenu, setSurfUrgeMenu] = useState4(false);
+  const [surfXHover, setSurfXHover] = useState4(false);
+  const surfIdeaPend = useRef3(null);
   const [nowTick, setNowTick] = useState4(Date.now());
   useEffect2(() => {
     if (!surfOpen)
@@ -25198,6 +25211,34 @@ function FocusLogApp({ api }) {
       document.removeEventListener("keydown", onKey);
     };
   }, [modeMenuOpen]);
+  useEffect2(() => {
+    if (!surfUrgeMenu)
+      return;
+    const onDown = (e) => {
+      if (!(e.target instanceof Element && e.target.closest("[data-urgemenu]")))
+        setSurfUrgeMenu(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape")
+        setSurfUrgeMenu(false);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [surfUrgeMenu]);
+  useEffect2(() => {
+    if (surfIdeaArmed == null)
+      return;
+    const onDown = (e) => {
+      if (!(e.target instanceof Element && e.target.closest("[data-ideapill]")))
+        setSurfIdeaArmed(null);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [surfIdeaArmed]);
   const [historySub, setHistorySub] = useState4("calib");
   const [activeDaily, setActiveDaily] = useState4(api.getActiveDaily ? api.getActiveDaily() : null);
   useEffect2(() => {
@@ -26063,13 +26104,17 @@ ${s.task}`))
     const seedTask = typeof taskName === "string" ? taskName : "";
     setNowTick(Date.now());
     setSurfTab("wave");
-    setSurf({ startTs: Date.now(), task: seedTask || timer.task || preset || "", curve: [], body: [], moods: [], note: "" });
+    setSurfIdeaDraft("");
+    setSurfIdeaArmed(null);
+    setSurfIdeaEdit(null);
+    setSurfUrgeMenu(false);
+    setSurf({ startTs: Date.now(), task: seedTask || timer.task || preset || "", urge: "", ideas: [], curve: [], body: [], moods: [], note: "" });
     setSurfOpen(true);
   };
   const finishSurf = (outcome) => {
     if (!surf)
       return;
-    const entry = { id: surf.startTs, ts: surf.startTs, endTs: Date.now(), task: surf.task, curve: surf.curve, body: (surf.body || []).map((b) => ({ part: b.part, note: (b.note || "").trim() })), moods: surf.moods, note: (surf.note || "").trim(), outcome };
+    const entry = { id: surf.startTs, ts: surf.startTs, endTs: Date.now(), task: surf.task, urge: (surf.urge || "").trim(), ideas: (surf.ideas || []).map((x) => String(x || "").trim()).filter(Boolean), curve: surf.curve, body: (surf.body || []).map((b) => ({ part: b.part, note: (b.note || "").trim() })), moods: surf.moods, note: (surf.note || "").trim(), outcome };
     const arr = [...urges, entry];
     setUrges(arr);
     api.saveUrges && api.saveUrges(arr);
@@ -27988,10 +28033,90 @@ ${s.task}`))
     const area = pts.length > 1 ? path + " L " + pts[pts.length - 1].x + " " + yOf(0) + " L " + pts[0].x + " " + yOf(0) + " Z" : "";
     const cur = lastRate ? lastRate.v : null;
     const setS = (patch) => setSurf((s0) => ({ ...s0, ...patch }));
-    return /* @__PURE__ */ React5.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 92, display: "flex", alignItems: "center", justifyContent: "center" }, onClick: () => {
-      setSurfOpen(false);
-      setSurf(null);
-    } }, /* @__PURE__ */ React5.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: "min(560px, 94vw)", maxHeight: "88vh", overflowY: "auto", background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: 18, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React5.createElement("div", { style: { fontFamily: "var(--fl-display)", fontSize: 15.5, fontWeight: 700, color: C.ink, flex: 1, display: "flex", alignItems: "center", gap: 7 } }, /* @__PURE__ */ React5.createElement("span", { style: { color: "#3E78B2", display: "inline-flex" } }, /* @__PURE__ */ React5.createElement(SeaWaveIcon, { size: 16 })), "An urge is here"), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13, color: over ? "#3E78B2" : C.muted, fontVariantNumeric: "tabular-nums" } }, over ? "the wave has had its time" : remTxt)), /* @__PURE__ */ React5.createElement("div", { className: "fl-surf-tabs", role: "tablist", "aria-label": "the wave, the body, the feeling around it", style: { display: "inline-flex", gap: 3, padding: 3, borderRadius: 999, border: `1px solid ${C.line}`, background: C.paper, margin: "10px 0 0" } }, [{ k: "wave", label: "Wave", n: surf.curve.length, Icon: WaterIcon }, { k: "body", label: "Body", n: (surf.body || []).length, Icon: WalkingIcon }, { k: "mood", label: "Emotions", n: (surf.moods || []).length, Icon: StomachIcon }].map((t) => {
+    const topOf = (vals) => {
+      const c = {};
+      vals.forEach((raw) => {
+        const t = String(raw || "").trim();
+        if (!t)
+          return;
+        const k = t.toLowerCase();
+        if (!c[k])
+          c[k] = { n: 0, label: t };
+        c[k].n++;
+      });
+      return Object.values(c).sort((a, b) => b.n - a.n).slice(0, 3).map((x) => x.label);
+    };
+    const topUrgeNames = topOf(urges.map((u) => u.urge));
+    const topIdeaNames = topOf(urges.reduce((a, u) => a.concat(u.ideas || []), []));
+    const caughtIdeas = surf.ideas || [];
+    const catchIdea = (t) => {
+      const v = (t || "").trim();
+      if (!v)
+        return;
+      if (caughtIdeas.some((x) => x.toLowerCase() === v.toLowerCase()))
+        return;
+      setS({ ideas: [...caughtIdeas, v] });
+    };
+    const saveIdeaEdit = () => {
+      const ed = surfIdeaEdit;
+      if (!ed)
+        return;
+      setSurfIdeaEdit(null);
+      const v = String(ed.v || "").trim();
+      if (!v)
+        return;
+      const next = caughtIdeas.slice();
+      next[ed.i] = v;
+      setS({ ideas: next });
+    };
+    return /* @__PURE__ */ React5.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 92, display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React5.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: "min(560px, 94vw)", maxHeight: "88vh", overflowY: "auto", background: C.card, border: `1px solid ${C.faint}`, borderRadius: 12, padding: 18, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React5.createElement("div", { style: { fontFamily: "var(--fl-display)", fontSize: 15.5, fontWeight: 700, color: C.ink, flex: 1, display: "flex", alignItems: "center", gap: 7 } }, /* @__PURE__ */ React5.createElement("span", { style: { color: "#3E78B2", display: "inline-flex" } }, /* @__PURE__ */ React5.createElement(SeaWaveIcon, { size: 16 })), "An urge is here"), /* @__PURE__ */ React5.createElement("span", { style: { fontFamily: "var(--fl-mono)", fontSize: 13, color: over ? "#3E78B2" : C.muted, fontVariantNumeric: "tabular-nums" } }, over ? "the wave has had its time" : remTxt), /* @__PURE__ */ React5.createElement(
+      "button",
+      {
+        onMouseEnter: () => setSurfXHover(true),
+        onMouseLeave: () => setSurfXHover(false),
+        onClick: () => {
+          setSurfXHover(false);
+          setSurfOpen(false);
+          setSurf(null);
+        },
+        "aria-label": "close the urge surf without saving",
+        style: { width: 24, height: 24, minWidth: 24, padding: 0, border: "none", boxShadow: "none", background: "transparent", color: surfXHover ? C.ink : C.muted, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
+      },
+      /* @__PURE__ */ React5.createElement(CircleXmarkIcon, { size: 18, on: surfXHover })
+    )), /* @__PURE__ */ React5.createElement("div", { "data-urgemenu": true, style: { position: "relative", display: "flex", alignItems: "center", gap: 6, margin: "10px 0 0" } }, /* @__PURE__ */ React5.createElement(
+      "input",
+      {
+        value: surf.urge || "",
+        onChange: (e) => setS({ urge: e.target.value }),
+        "aria-label": "name the urge you are choosing to observe",
+        placeholder: "What is calling you away? A named urge is a wave to watch, not a command to obey.",
+        style: { flex: 1, minWidth: 0, boxSizing: "border-box", border: `1.5px solid ${C.muted}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "7px 10px", fontFamily: "var(--fl-display)" }
+      }
+    ), topUrgeNames.length > 0 && /* @__PURE__ */ React5.createElement(
+      "button",
+      {
+        onClick: () => setSurfUrgeMenu((o) => !o),
+        "aria-expanded": surfUrgeMenu,
+        "aria-label": "the usual visitors: your three most frequent urges",
+        style: { width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 999, border: `1.5px solid ${C.muted}`, background: C.paper, color: C.muted, boxShadow: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
+      },
+      /* @__PURE__ */ React5.createElement(SortDownIcon, { size: 11 })
+    ), surfUrgeMenu && /* @__PURE__ */ React5.createElement("div", { role: "menu", style: { position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 60, background: C.card, border: `1px solid ${C.faint}`, borderRadius: 10, boxShadow: "0 6px 22px rgba(0,0,0,0.16)", padding: 6, minWidth: 220, maxWidth: "100%", display: "flex", flexDirection: "column", gap: 2 } }, topUrgeNames.map((nm) => {
+      const on = (surf.urge || "").trim().toLowerCase() === nm.toLowerCase();
+      return /* @__PURE__ */ React5.createElement(
+        "button",
+        {
+          key: nm,
+          role: "menuitem",
+          onClick: () => {
+            setS({ urge: nm });
+            setSurfUrgeMenu(false);
+          },
+          style: { display: "flex", width: "100%", alignItems: "center", padding: "6px 9px", border: "none", boxShadow: "none", background: on ? "#DCEAF6" : "transparent", borderRadius: 7, color: on ? "#1d4f80" : C.ink, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", textAlign: "left", overflowWrap: "anywhere" }
+        },
+        nm
+      );
+    }))), /* @__PURE__ */ React5.createElement("div", { className: "fl-surf-tabs", role: "tablist", "aria-label": "the wave, the body, the feeling around it", style: { display: "inline-flex", gap: 3, padding: 3, borderRadius: 999, border: `1px solid ${C.faint}`, background: C.paper, margin: "10px 0 0" } }, [{ k: "wave", label: "Wave", n: surf.curve.length, Icon: WaterIcon }, { k: "body", label: "Body", n: (surf.body || []).length, Icon: WalkingIcon }, { k: "mood", label: "Emotions", n: (surf.moods || []).length, Icon: StomachIcon }].map((t) => {
       const on = surfTab === t.k;
       const call = t.k === "wave" && nudge && !on;
       return /* @__PURE__ */ React5.createElement(
@@ -28007,22 +28132,119 @@ ${s.task}`))
         t.label,
         t.n > 0 && /* @__PURE__ */ React5.createElement("span", { "aria-label": t.n + " chosen", style: { width: 5, height: 5, borderRadius: 999, background: "#3E78B2", display: "inline-block" } })
       );
-    })), /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12.5, color: surfTab === "wave" && nudge ? "#3E78B2" : C.muted, margin: "7px 0 8px", transition: "color 0.4s" } }, surfTab === "wave" ? "How strong is it now?" : surfTab === "body" ? "Where do I feel this in my body?" : "What emotions am I experiencing?"), /* @__PURE__ */ React5.createElement("div", { className: "fl-surf-pane", style: { minHeight: 320 } }, surfTab === "wave" && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, margin: "0 0 12px" } }, /* @__PURE__ */ React5.createElement("div", { className: "fl-breath", "aria-hidden": "true" }), /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12.5, color: C.muted } }, "Each breath helps you stay balanced on the wave.")), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 8, alignItems: "flex-start" } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", justifyContent: "space-between", height: H, flexShrink: 0 } }, RATES.map((v) => /* @__PURE__ */ React5.createElement(
+    })), /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12.5, color: surfTab === "wave" && nudge ? "#3E78B2" : C.muted, margin: "7px 0 8px", transition: "color 0.4s" } }, surfTab === "wave" ? "How strong is it now?" : surfTab === "body" ? "Where do I feel this in my body?" : "What emotions am I experiencing?"), /* @__PURE__ */ React5.createElement("div", { className: "fl-surf-pane", style: { minHeight: 396 } }, surfTab === "wave" && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, margin: "0 0 12px" } }, /* @__PURE__ */ React5.createElement("div", { className: "fl-breath", "aria-hidden": "true" }), /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12.5, color: C.muted } }, "Each breath helps you stay balanced on the wave.")), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", gap: 8, alignItems: "flex-start" } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", flexDirection: "column", justifyContent: "space-between", height: H, flexShrink: 0 } }, RATES.map((v) => /* @__PURE__ */ React5.createElement(
       "button",
       {
         key: v,
         onClick: () => setS({ curve: [...surf.curve, { t: Date.now(), v }] }),
         "aria-label": "rate the urge " + v + " of 10",
-        style: { width: RBTN, height: RBTN, minWidth: RBTN, padding: 0, borderRadius: 999, border: `1.5px solid ${cur === v ? "#3E78B2" : C.faint}`, background: cur === v ? "#DCEAF6" : "transparent", color: cur === v ? "#3E78B2" : C.muted, boxShadow: "none", fontSize: 11.5, fontFamily: "var(--fl-mono)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }
+        style: { width: RBTN, height: RBTN, minWidth: RBTN, padding: 0, borderRadius: 999, border: `1.5px solid ${cur === v ? "#3E78B2" : C.muted}`, background: cur === v ? "#DCEAF6" : "transparent", color: cur === v ? "#3E78B2" : C.muted, boxShadow: "none", fontSize: 11.5, fontFamily: "var(--fl-mono)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }
       },
       v
-    ))), /* @__PURE__ */ React5.createElement("svg", { viewBox: "0 0 " + W + " " + H, preserveAspectRatio: "none", style: { flex: "1 1 auto", minWidth: 0, height: H, display: "block" }, "aria-label": "the wave: your ratings over time" }, RATES.map((g) => /* @__PURE__ */ React5.createElement("line", { key: g, x1: PLT, x2: W - PRT, y1: yOf(g), y2: yOf(g), stroke: g === 0 ? C.faint : C.line, strokeWidth: 1, vectorEffect: "non-scaling-stroke" })), area && /* @__PURE__ */ React5.createElement("path", { d: area, fill: "#DCEAF6", opacity: 0.55, stroke: "none" }), path && /* @__PURE__ */ React5.createElement("path", { d: path, fill: "none", stroke: "#3E78B2", strokeWidth: 2, strokeLinecap: "round", vectorEffect: "non-scaling-stroke" }), pts.map((pt, i) => /* @__PURE__ */ React5.createElement("circle", { key: i, cx: pt.x, cy: pt.y, r: 2.6, fill: "#3E78B2" })), /* @__PURE__ */ React5.createElement("line", { x1: xOf(nowTick), x2: xOf(nowTick), y1: PTT, y2: H - PBT, stroke: C.faint, strokeWidth: 1, strokeDasharray: "2 3", vectorEffect: "non-scaling-stroke" }))), /* @__PURE__ */ React5.createElement(
+    ))), /* @__PURE__ */ React5.createElement("svg", { viewBox: "0 0 " + W + " " + H, preserveAspectRatio: "none", style: { flex: "1 1 auto", minWidth: 0, height: H, display: "block" }, "aria-label": "the wave: your ratings over time" }, RATES.map((g) => /* @__PURE__ */ React5.createElement("line", { key: g, x1: PLT, x2: W - PRT, y1: yOf(g), y2: yOf(g), stroke: g === 0 ? C.muted : C.faint, strokeWidth: 1, vectorEffect: "non-scaling-stroke" })), area && /* @__PURE__ */ React5.createElement("path", { d: area, fill: "#DCEAF6", opacity: 0.55, stroke: "none" }), path && /* @__PURE__ */ React5.createElement("path", { d: path, fill: "none", stroke: "#3E78B2", strokeWidth: 2, strokeLinecap: "round", vectorEffect: "non-scaling-stroke" }), pts.map((pt, i) => /* @__PURE__ */ React5.createElement("circle", { key: i, cx: pt.x, cy: pt.y, r: 2.6, fill: "#3E78B2" })), /* @__PURE__ */ React5.createElement("line", { x1: xOf(nowTick), x2: xOf(nowTick), y1: PTT, y2: H - PBT, stroke: C.muted, strokeWidth: 1, strokeDasharray: "2 3", vectorEffect: "non-scaling-stroke" }))), /* @__PURE__ */ React5.createElement(
+      "input",
+      {
+        value: surfIdeaDraft,
+        onChange: (e) => setSurfIdeaDraft(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") {
+            catchIdea(surfIdeaDraft);
+            setSurfIdeaDraft("");
+          }
+        },
+        "aria-label": "catch a passing idea; Enter sets it down on the shore",
+        placeholder: "Other ideas will drift by. Catch one in a few words; it will wait on the shore.",
+        style: { width: "100%", boxSizing: "border-box", border: `1.5px solid ${C.muted}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "7px 10px", fontFamily: "var(--fl-display)", marginTop: 12 }
+      }
+    ), (caughtIdeas.length > 0 || topIdeaNames.length > 0) && /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 6 } }, caughtIdeas.map((nm, i) => {
+      if (surfIdeaEdit && surfIdeaEdit.i === i) {
+        return /* @__PURE__ */ React5.createElement("span", { key: "e" + i, "data-ideapill": true, style: { display: "inline-flex", alignItems: "center", gap: 6, height: 28, boxSizing: "border-box", padding: "0 9px 0 11px", borderRadius: 999, border: `1.5px solid ${C.ink}`, background: C.card } }, /* @__PURE__ */ React5.createElement(
+          "input",
+          {
+            autoFocus: true,
+            value: surfIdeaEdit.v,
+            onChange: (e) => setSurfIdeaEdit({ i, v: e.target.value }),
+            onKeyDown: (e) => {
+              if (e.key === "Enter")
+                saveIdeaEdit();
+              if (e.key === "Escape") {
+                surfIdeaEsc.current = true;
+                setSurfIdeaEdit(null);
+              }
+            },
+            onBlur: () => {
+              if (surfIdeaEsc.current) {
+                surfIdeaEsc.current = false;
+                return;
+              }
+              saveIdeaEdit();
+            },
+            "aria-label": "rewrite this idea (Enter or a click away saves; the arrow goes back without saving)",
+            style: { width: Math.max(60, Math.min(200, surfIdeaEdit.v.length * 7 + 20)), border: "none", boxShadow: "none", outline: "none", background: "transparent", color: C.ink, fontSize: 12, fontFamily: "var(--fl-display)", padding: 0 }
+          }
+        ), /* @__PURE__ */ React5.createElement("span", { role: "button", "aria-label": "go back without saving", onMouseDown: (e) => e.preventDefault(), onClick: () => {
+          surfIdeaEsc.current = true;
+          setSurfIdeaEdit(null);
+        }, style: { display: "inline-flex", cursor: "pointer", color: C.muted } }, /* @__PURE__ */ React5.createElement(Undo2Icon, { size: 12 })));
+      }
+      const armed = surfIdeaArmed === i;
+      return /* @__PURE__ */ React5.createElement(
+        "span",
+        {
+          key: "c" + i,
+          "data-ideapill": true,
+          role: "button",
+          "aria-pressed": armed,
+          onClick: () => {
+            if (armed) {
+              setSurfIdeaArmed(null);
+              return;
+            }
+            const pend = surfIdeaPend.current;
+            if (pend && pend.i === i) {
+              window.clearTimeout(pend.t);
+              surfIdeaPend.current = null;
+              setSurfIdeaArmed(i);
+              return;
+            }
+            if (pend)
+              window.clearTimeout(pend.t);
+            surfIdeaPend.current = { i, t: window.setTimeout(() => {
+              surfIdeaPend.current = null;
+              setS({ ideas: caughtIdeas.filter((_, j) => j !== i) });
+            }, 260) };
+          },
+          "aria-label": nm + " - caught. One click lets it go; a double click opens edit and delete",
+          style: { display: "inline-flex", alignItems: "center", gap: 6, height: 28, boxSizing: "border-box", padding: "0 11px", borderRadius: 999, border: `1.5px solid ${armed ? C.ink : "#3E78B2"}`, background: armed ? C.card : "#DCEAF6", color: armed ? C.ink : "#1d4f80", fontSize: 12, fontFamily: "var(--fl-display)", cursor: "pointer", userSelect: "none" }
+        },
+        nm,
+        armed && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("span", { role: "button", "aria-label": "edit", onClick: (e) => {
+          e.stopPropagation();
+          surfIdeaEsc.current = false;
+          setSurfIdeaEdit({ i, v: nm });
+          setSurfIdeaArmed(null);
+        }, style: { display: "inline-flex", cursor: "pointer" } }, /* @__PURE__ */ React5.createElement(PencilIcon, { size: 12 })), /* @__PURE__ */ React5.createElement("span", { role: "button", "aria-label": "delete", onClick: (e) => {
+          e.stopPropagation();
+          setSurfIdeaArmed(null);
+          setS({ ideas: caughtIdeas.filter((_, j) => j !== i) });
+        }, style: { display: "inline-flex", cursor: "pointer", color: "#C06A57" } }, /* @__PURE__ */ React5.createElement(TrashIcon, { size: 12 })))
+      );
+    }), topIdeaNames.filter((nm) => !caughtIdeas.some((x) => x.toLowerCase() === nm.toLowerCase())).map((nm) => /* @__PURE__ */ React5.createElement(
+      "button",
+      {
+        key: nm,
+        onClick: () => catchIdea(nm),
+        title: "a familiar one; click to catch it again",
+        style: { height: 28, boxSizing: "border-box", padding: "0 11px", borderRadius: 999, border: `1.5px dashed ${C.muted}`, background: "transparent", color: C.muted, boxShadow: "none", fontSize: 12, fontFamily: "var(--fl-display)", cursor: "pointer" }
+      },
+      nm
+    ))), /* @__PURE__ */ React5.createElement(
       "input",
       {
         value: surf.note,
         onChange: (e) => setS({ note: e.target.value }),
         placeholder: "This is an urge, not a command. I decide after the wave has passed",
-        style: { width: "100%", boxSizing: "border-box", border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "7px 10px", fontFamily: "var(--fl-display)", marginTop: 12 }
+        style: { width: "100%", boxSizing: "border-box", border: `1.5px solid ${C.muted}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 8, padding: "7px 10px", fontFamily: "var(--fl-display)", marginTop: 10 }
       }
     )), surfTab === "body" && /* @__PURE__ */ React5.createElement(BodyMap, { value: surf.body, onChange: (b) => setS({ body: b }), C }), surfTab === "mood" && /* @__PURE__ */ React5.createElement(MoodGrid, { feelings: feelingWords, C, value: surf.moods, onChange: (m) => setS({ moods: m }) })), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, flexWrap: "wrap" } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => finishSurf("paused"), "aria-label": "park this thought: pause the pomodoro and tag why", style: { ...btn(C.muted, true), padding: "6px 12px", fontSize: 12.5, borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React5.createElement(BoxIcon, { size: 13 }), "Park this thought"), /* @__PURE__ */ React5.createElement("button", { onClick: () => finishSurf("acted"), "aria-label": "switch intentionally: a deliberate yes, decided after the wave", style: { ...btn(C.muted, true), padding: "6px 12px", fontSize: 12.5, borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React5.createElement(ShuffleIcon, { size: 13 }), "Switch intentionally"), /* @__PURE__ */ React5.createElement("button", { onClick: () => finishSurf("surfed"), "aria-label": "return to my task: the urge was outlasted, and it counts", style: { ...btn("#3E78B2"), padding: "6px 14px", fontSize: 12.5, borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React5.createElement(SeaWaveIcon, { size: 13 }), "Return to my task"))));
   })(), claimOpen && /* @__PURE__ */ React5.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(43,39,35,0.35)", zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center" }, onClick: () => setClaimOpen(false) }, /* @__PURE__ */ React5.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: "min(560px, 92vw)", background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: 18, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" } }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, fontSize: 15.5, color: C.ink, marginBottom: 2, fontFamily: "var(--fl-display)" } }, "Claim finished work"), /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12.5, color: C.muted, marginBottom: 10 } }, "Work done off the timer still counts. Rough is fine; when unsure, claim the smaller number."), /* @__PURE__ */ React5.createElement(
@@ -28227,7 +28449,7 @@ var FLOAT_CAT = {
 var FLOAT_PHASE_DEFAULTS = {
   setup: { w: 300, h: 240 },
   // pick a task + before-rating
-  focus: { w: 300, h: 170 },
+  focus: { w: 300, h: 212 },
   // the pomodoro countdown
   pause: { w: 300, h: 320 },
   // countdown + reason chips
@@ -30775,11 +30997,13 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     this.els.primary = row.createEl("button", { cls: "flt-btn flt-primary" });
     this.els.plus = row.createEl("button", { cls: "flt-btn flt-step" });
     this.els.plus.innerHTML = FLT_PLUS;
-    this.els.finish = row.createEl("button", { cls: "flt-btn flt-icon flt-finish" });
+    const row2 = wrap.createDiv({ cls: "flt-row" });
+    this.els.row2 = row2;
+    this.els.finish = row2.createEl("button", { cls: "flt-btn flt-icon flt-finish" });
     this.els.finish.innerHTML = FLT_CHECK;
     this.els.finish.setAttribute("aria-label", "finish this pomodoro now: rate it and it logs with the time you actually spent");
     this.els.finish.onclick = () => this.plugin.timer.finishNow();
-    this.els.reset = row.createEl("button", { cls: "flt-btn flt-icon" });
+    this.els.reset = row2.createEl("button", { cls: "flt-btn flt-icon" });
     this.els.reset.innerHTML = FLT_ROTATE_LEFT;
     this.els.reset.setAttribute("aria-label", "reset");
     this.els.setupRate = wrap.createDiv({ cls: "flt-setrate" });
@@ -30809,7 +31033,7 @@ var FloatTimerView = class extends import_obsidian.ItemView {
       if (live)
         this.plugin.beginSurfCountdown(tname);
     };
-    this.els.urge = row.createEl("button", { cls: "flt-btn flt-icon flt-urge" });
+    this.els.urge = row2.createEl("button", { cls: "flt-btn flt-icon flt-urge" });
     this.els.urge.innerHTML = SEA_WAVE_SVG;
     this.els.urge.setAttribute("aria-label", "urge to switch? surf it: 90 quiet seconds, no questions; outlasting it is counted");
     this.els.urge.onclick = () => this.plugin.beginUrgeWave();
@@ -30943,6 +31167,8 @@ var FloatTimerView = class extends import_obsidian.ItemView {
     this.els.task.style.display = !setup && !brk ? "" : "none";
     this.els.time.style.display = brk ? "none" : "";
     this.els.row.style.display = brk ? "none" : "";
+    if (this.els.row2)
+      this.els.row2.style.display = brk || setup ? "none" : "";
     this.els.reset.style.display = setup ? "none" : "";
     if (this.els.finish) {
       const tf = this.plugin.timer.getState();
