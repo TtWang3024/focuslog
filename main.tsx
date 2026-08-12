@@ -72,7 +72,7 @@ const FLOAT_CAT: any = {
 // remembers its own bounds (settings.floatPhaseBounds) and the default is ignored.
 const FLOAT_PHASE_DEFAULTS: any = {
   setup: { w: 300, h: 240 },     // pick a task + before-rating
-  focus: { w: 300, h: 170 },     // the pomodoro countdown
+  focus: { w: 300, h: 212 },     // the pomodoro countdown
   pause: { w: 300, h: 320 },     // countdown + reason chips
   break: { w: 380, h: 400 },     // rest timer + activities + feeling
   celebrate: { w: 320, h: 440 }, // done + next-task + rating
@@ -2278,11 +2278,14 @@ class FloatTimerView extends ItemView {
     this.els.primary = row.createEl("button", { cls: "flt-btn flt-primary" });
     this.els.plus = row.createEl("button", { cls: "flt-btn flt-step" });
     this.els.plus.innerHTML = FLT_PLUS;
-    this.els.finish = row.createEl("button", { cls: "flt-btn flt-icon flt-finish" });
+    // Second line of controls: finish, reset and the wave, centered under the steppers.
+    const row2 = wrap.createDiv({ cls: "flt-row" });
+    this.els.row2 = row2;
+    this.els.finish = row2.createEl("button", { cls: "flt-btn flt-icon flt-finish" });
     this.els.finish.innerHTML = FLT_CHECK;
     this.els.finish.setAttribute("aria-label", "finish this pomodoro now: rate it and it logs with the time you actually spent");
     this.els.finish.onclick = () => this.plugin.timer.finishNow();
-    this.els.reset = row.createEl("button", { cls: "flt-btn flt-icon" });
+    this.els.reset = row2.createEl("button", { cls: "flt-btn flt-icon" });
     this.els.reset.innerHTML = FLT_ROTATE_LEFT;
     this.els.reset.setAttribute("aria-label", "reset");
     // Setup before-rating — the "how enjoyable do I expect this to be" set before starting.
@@ -2314,7 +2317,7 @@ class FloatTimerView extends ItemView {
       this.plugin.timer.reset();
       if (live) this.plugin.beginSurfCountdown(tname);
     };
-    this.els.urge = row.createEl("button", { cls: "flt-btn flt-icon flt-urge" });
+    this.els.urge = row2.createEl("button", { cls: "flt-btn flt-icon flt-urge" });
     this.els.urge.innerHTML = SEA_WAVE_SVG;
     this.els.urge.setAttribute("aria-label", "urge to switch? surf it: 90 quiet seconds, no questions; outlasting it is counted");
     this.els.urge.onclick = () => this.plugin.beginUrgeWave();
@@ -2457,6 +2460,7 @@ class FloatTimerView extends ItemView {
     this.els.task.style.display = (!setup && !brk) ? "" : "none";
     this.els.time.style.display = brk ? "none" : "";
     this.els.row.style.display = brk ? "none" : "";
+    if (this.els.row2) this.els.row2.style.display = (brk || setup) ? "none" : "";
     this.els.reset.style.display = setup ? "none" : "";
     if (this.els.finish) {
       const tf = this.plugin.timer.getState();
