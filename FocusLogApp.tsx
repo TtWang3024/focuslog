@@ -1330,13 +1330,23 @@ export default function FocusLogApp({ api }: any) {
   // Back door: claim work done off the timer. Recorded with a mark, counted like the rest.
   const [claimOpen, setClaimOpen] = useState(false);
   const [clTask, setClTask] = useState("");
-  const [clMins, setClMins] = useState(25);
-  const [clSince, setClSince] = useState("");
+  const [clStart, setClStart] = useState("");
+  const [clEnd, setClEnd] = useState("");
+  const [clAnchor, setClAnchor] = useState<"start" | "end">("end");
   const [clBusy, setClBusy] = useState(false);
   const [clParent, setClParent] = useState("");
   const [clGuess, setClGuess] = useState("1");
   const [clCreating, setClCreating] = useState(false);
   const [clMealEdits, setClMealEdits] = useState<any>({});
+  // A fresh claim opens as "one pomodoro ending now": end = now, start = 25 minutes ago.
+  // Editing a field makes it the anchor the tomato chips complete FROM.
+  useEffect(() => {
+    if (!claimOpen) return;
+    const d = new Date();
+    const nt = d.getHours() * 60 + d.getMinutes();
+    const clk = (m: number) => { const v = ((m % 1440) + 1440) % 1440; return String(Math.floor(v / 60)).padStart(2, "0") + ":" + String(v % 60).padStart(2, "0"); };
+    setClEnd(clk(nt)); setClStart(clk(nt - 25)); setClAnchor("end"); setClMealEdits({});
+  }, [claimOpen]);
   const [surfCount, setSurfCount] = useState<{ left: number; task: string } | null>(null);
   const [urges, setUrges] = useState<any[]>(init.urgesSurfed || []);
   // The guided urge surf (panel-only): one entry per wave, with the intensity curve, body
@@ -2149,6 +2159,25 @@ export default function FocusLogApp({ api }: any) {
     }
     return best;
   };
+  // Shared by the popup and doClaim: both claim times parsed into timeline minutes (banded
+  // around now, so 23:50 during the overnight stretch means yesterday evening), plus the one
+  // error that blocks the claim button. Claims are finished work: the span must sit wholly
+  // in the past, start before end, at most 8 hours.
+  const claimParse = () => {
+    const d = new Date();
+    let nt = d.getHours() * 60 + d.getMinutes();
+    const mid = (tlStart + tlEnd) / 2;
+    if (Math.abs(nt + 1440 - mid) < Math.abs(nt - mid)) nt += 1440;
+    const parse = (s0: string) => { const m = (s0 || "").match(/^(\d{1,2}):(\d{2})$/); if (!m) return null; let v = Number(m[1]) * 60 + Number(m[2]); if (Math.abs(v + 1440 - nt) < Math.abs(v - nt)) v += 1440; return v; };
+    const st0 = parse(clStart), en0 = parse(clEnd);
+    const span = st0 != null && en0 != null ? en0 - st0 : null;
+    const err = st0 == null || en0 == null ? "both times are needed"
+      : en0 > nt ? "that ends in the future - claims are for finished work"
+      : (span as number) <= 0 ? "the start needs to come before the end"
+      : (span as number) > 480 ? "that is over 8 hours - claim it in smaller chunks"
+      : "";
+    return { nt, st0, en0, span, err };
+  };
   // Claim finished work (the back door): a recorder, not a simulator. Spend and stars use the
   // rounded pomodoro count (min 1); the Timeline block keeps the REAL span; the live break
   // counter is never touched; everything claimed wears a mark so future-you knows the instrument.
@@ -2156,38 +2185,23 @@ export default function FocusLogApp({ api }: any) {
     const name = clTask.trim();
     if (!name || clBusy) return;
     setClBusy(true);
+    const cp = claimParse();
+    if (cp.err || cp.st0 == null || cp.en0 == null) return;   // the popup names the problem
     const meta = tasks.find((t: any) => t.task === name) || null;
     const now = Date.now();
-    let mins = clMins;
-    if (clSince) {
-      const mm = clSince.match(/^(\d{1,2}):(\d{2})$/);
-      if (mm) {
-        const d = new Date();
-        let diff = d.getHours() * 60 + d.getMinutes() - (Number(mm[1]) * 60 + Number(mm[2]));
-        if (diff < 0) diff += 1440;   // started before midnight
-        if (diff > 0) mins = Math.min(diff, 8 * 60);
-      }
-    }
-    mins = Math.max(5, Math.round(mins));
     const bl = todayBlocks();
-    const d1 = new Date(now);
-    let nowTl = d1.getHours() * 60 + d1.getMinutes();
-    const mid = (tlStart + tlEnd) / 2;
-    if (Math.abs(nowTl + 1440 - mid) < Math.abs(nowTl - mid)) nowTl += 1440;
-    // Stacking several claims: the first claim hugs now; each further claim slides in just
-    // before the ones already there, so back-to-back chunks land most-recent-closest-to-now.
-    let endTl = nowTl, sguard = 0, movedFlag = true;
-    const claimedBl = bl.filter((x: any) => x.claimed);
-    while (movedFlag && sguard++ < 20) {
-      movedFlag = false;
-      for (const cb of claimedBl) if (cb.start < endTl && cb.start + cb.dur > endTl - mins) { endTl = Math.min(endTl, cb.start); movedFlag = true; }
-    }
-    const startTl = endTl - mins;
+    // The claim owns the exact span you typed: end from the popup (now by default), start
+    // before it. Nothing auto-slides any more; a collision is an error to adjust around.
+    const nowTl = cp.nt;
+    const endTl = cp.en0 as number;
+    const startTl = cp.st0 as number;
+    const mins = endTl - startTl;
     // The MORNING routine and commitments cannot be worked through: refuse, log NOTHING.
     // Meals are different: the claim SPLITS around them (the popup fields give actual times).
     // The NIGHT routine is different too: it simply hasn't happened yet, so it is put off,
     // slid later past the pinned claim by resolveOverlaps, instead of blocking the claim.
-    const clash = bl.find((x: any) => ((x.kind === "routine" && !x.night) || x.kind === "meeting" || (x.kind === "task" && x.locked)) && x.start < endTl && x.start + x.dur > startTl);
+    // Earlier claims block too: with explicit times, an overlap is an error, not a slide.
+    const clash = bl.find((x: any) => (x.claimed || (x.kind === "routine" && !x.night) || x.kind === "meeting" || (x.kind === "task" && x.locked)) && x.start < endTl && x.start + x.dur > startTl);
     if (clash) {
       api.notify && api.notify("Nothing logged: that span overlaps “" + (clash.name || clash.kind) + "”. Adjust the time, or claim the chunks around it separately.", 8000);
       setClBusy(false);
@@ -2226,7 +2240,12 @@ export default function FocusLogApp({ api }: any) {
       return;
     }
     const workedMins = segs.reduce((s2, g) => s2 + (g.e - g.s), 0);
-    const n = tomatoesFor(workedMins);
+    // A chip-exact span claims its tomato count outright: clicking two tomatoes MEANS two.
+    // Hand-edited spans keep the break-aware rounding, and a span carved by meals always
+    // re-derives from the minutes actually worked.
+    const sb0 = settings.breakMinutes || 5;
+    const chipN = [1, 2, 3, 4].find((k) => k * 25 + (k - 1) * sb0 === mins) || 0;
+    const n = !mealsCovered.length && chipN ? chipN : tomatoesFor(workedMins);
     const realTs = (tl: number) => now - (nowTl - tl) * 60000;
     // ONE session and ONE star per claim, however long: the stats and the Sky count deep-work
     // sittings, while Notion's Spend still receives the full rounded tomato count (n) so the
@@ -4539,31 +4558,48 @@ export default function FocusLogApp({ api }: any) {
                     style={{ ...btn(ACCENT, true), padding: "4px 10px", fontSize: 12, borderRadius: 999, opacity: clCreating ? 0.6 : 1 }}>add to Notion</button>
                 </div>
               )}
-              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-                {[25, 50, 75].map((m) => {
-                  const on = clMins === m && !clSince;
-                  return <button key={m} onClick={() => { setClMins(m); setClSince(""); }} aria-pressed={on} style={{ ...btn(on ? ACCENT : C.muted, !on), padding: "4px 10px", fontSize: 12, borderRadius: 999 }}>{"~" + m + "m"}</button>;
-                })}
-                <span style={{ fontSize: 12, color: C.muted, marginLeft: 4 }}>or since</span>
-                <input type="time" value={clSince} onChange={(e) => setClSince(e.target.value)} aria-label="when you started; the length is measured from here to now"
-                  style={{ border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 8, padding: "3px 6px", fontFamily: "var(--fl-mono)" }} />
-              </div>
               {(() => {
-                // Meals inside the current span: confirm when they ACTUALLY happened. The claim
+                const cp = claimParse();
+                const sb1 = settings.breakMinutes || 5;
+                // The claim's pomodoro is always the classic 25 minutes, whatever the live
+                // timer is set to; n pomodoros span n*25 plus the short breaks between them.
+                const chips = [1, 2, 3, 4].map((k) => ({ k, mins: k * 25 + (k - 1) * sb1, label: k === 4 ? "\u{1F4E6}" : "\u{1F345}".repeat(k) }));
+                const clk = (m: number) => { const v = ((m % 1440) + 1440) % 1440; return String(Math.floor(v / 60)).padStart(2, "0") + ":" + String(v % 60).padStart(2, "0"); };
+                const pick = (c: any) => {
+                  if (clAnchor === "start" && cp.st0 != null) setClEnd(clk(cp.st0 + c.mins));
+                  else if (cp.en0 != null) setClStart(clk(cp.en0 - c.mins));
+                };
+                return (<>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                    {chips.map((c) => {
+                      const on = cp.span === c.mins;
+                      return <button key={c.k} onClick={() => pick(c)} aria-pressed={on}
+                        title={c.k === 1 ? "one pomodoro - 25m" : c.k === 4 ? "a box: four pomodoros and their short breaks - " + c.mins + "m" : c.k + " pomodoros and " + (c.k - 1) + " short break" + (c.k > 2 ? "s" : "") + " - " + c.mins + "m"}
+                        aria-label={"claim " + (c.k === 4 ? "a box, four pomodoros" : c.k + " pomodoro" + (c.k > 1 ? "s" : "")) + ", " + c.mins + " minutes"}
+                        style={{ ...btn(on ? ACCENT : C.muted, !on), padding: "4px 10px", fontSize: 12.5, borderRadius: 999 }}>{c.label}</button>;
+                    })}
+                    <span style={{ fontSize: 11.5, color: C.muted }}>{clAnchor === "start" ? "a tomato sets the end, forward from your start" : "a tomato sets the start, back from the end"}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                    <span style={{ fontSize: 12, color: C.muted }}>from</span>
+                    <input type="time" value={clStart} onChange={(e) => { setClStart(e.target.value); setClAnchor("start"); }} aria-label="when you started"
+                      style={{ border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 8, padding: "3px 6px", fontFamily: "var(--fl-mono)" }} />
+                    <span style={{ fontSize: 12, color: C.muted }}>to</span>
+                    <input type="time" value={clEnd} onChange={(e) => { setClEnd(e.target.value); setClAnchor("end"); }} aria-label="when you finished - now, if it just ended"
+                      style={{ border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 8, padding: "3px 6px", fontFamily: "var(--fl-mono)" }} />
+                    {cp.err && <span role="alert" style={{ fontSize: 11.5, color: C.worse }}>{cp.err}</span>}
+                  </div>
+                </>);
+              })()}
+              {(() => {
+                // Meals inside the claimed span: confirm when they ACTUALLY happened. The claim
                 // splits around them, and the meal block moves to the time typed here.
                 const bl0 = todayBlocks();
                 if (!bl0.length) return null;
-                const d2 = new Date();
-                let nt = d2.getHours() * 60 + d2.getMinutes();
-                const mid0 = (tlStart + tlEnd) / 2;
-                if (Math.abs(nt + 1440 - mid0) < Math.abs(nt - mid0)) nt += 1440;
-                let mm0 = clMins;
-                if (clSince) {
-                  const m2 = clSince.match(/^(\d{1,2}):(\d{2})$/);
-                  if (m2) { let diff = d2.getHours() * 60 + d2.getMinutes() - (Number(m2[1]) * 60 + Number(m2[2])); if (diff < 0) diff += 1440; if (diff > 0) mm0 = Math.min(diff, 8 * 60); }
-                }
-                const st0 = nt - Math.max(5, Math.round(mm0));
-                const covered = bl0.filter((x: any) => x.kind === "meal" && x.start < nt && x.start + x.dur > st0);
+                const cp = claimParse();
+                if (cp.err || cp.st0 == null || cp.en0 == null) return null;
+                const sA = cp.st0 as number, sB = cp.en0 as number;
+                const covered = bl0.filter((x: any) => x.kind === "meal" && x.start < sB && x.start + x.dur > sA);
                 if (!covered.length) return null;
                 return (
                   <div style={{ border: `1px solid ${C.line}`, background: C.paper, borderRadius: 8, padding: "8px 10px", marginBottom: 12 }}>
@@ -4583,7 +4619,7 @@ export default function FocusLogApp({ api }: any) {
               })()}
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
                 <button onClick={() => setClaimOpen(false)} style={{ ...btn(C.muted, true), padding: "5px 12px", fontSize: 12.5 }}>cancel</button>
-                <button onClick={doClaim} disabled={clBusy || !clTask.trim()} style={{ ...btn(ACCENT), padding: "5px 14px", fontSize: 12.5, opacity: clBusy || !clTask.trim() ? 0.6 : 1 }}>claim it</button>
+                <button onClick={doClaim} disabled={clBusy || !clTask.trim() || !!claimParse().err} style={{ ...btn(ACCENT), padding: "5px 14px", fontSize: 12.5, opacity: clBusy || !clTask.trim() || !!claimParse().err ? 0.6 : 1 }}>claim it</button>
               </div>
             </div>
           </div>
@@ -4595,7 +4631,7 @@ export default function FocusLogApp({ api }: any) {
               <div style={{ fontFamily: "var(--fl-display)", fontSize: 15, fontWeight: 700, color: C.ink }}>It still counts</div>
               <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Focus that happened off the timer still moved your goal. Claim it and let it count.</div>
             </div>
-            <button onClick={() => { setClaimOpen(true); setClTask(preset || ""); setClMins(25); setClSince(""); setClMealEdits({}); }} aria-label="log work you already did off the timer: Spend, timeline, star and daily note, all marked as claimed" style={{ ...btn(C.muted, true), padding: "5px 14px", fontSize: 12.5, borderRadius: 999, flexShrink: 0 }}>{"✋ claim finished work"}</button>
+            <button onClick={() => { setClaimOpen(true); setClTask(preset || ""); }} aria-label="log work you already did off the timer: Spend, timeline, star and daily note, all marked as claimed" style={{ ...btn(C.muted, true), padding: "5px 14px", fontSize: 12.5, borderRadius: 999, flexShrink: 0 }}>{"✋ claim finished work"}</button>
           </div>
         )}
 
