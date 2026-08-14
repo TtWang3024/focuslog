@@ -2111,6 +2111,7 @@ export default class FocusLogPlugin extends Plugin {
         pause: () => self.timer.pause(),
         resume: () => self.timer.resume(),
         reset: () => self.timer.reset(),
+        finishNow: () => self.timer.finishNow(),
         setLength: (m: number) => self.timer.setLength(m),
         step: (d: number) => self.timer.step(d),
         setPauseTag: (tag: string) => self.timer.setPauseTag(tag),

@@ -671,6 +671,15 @@ function NoiseControl({ value, onPick }: any) {
     </span>
   );
 }
+function ArrowUpRightSquareIcon({ size = 14, on = false }: any) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
+      {on
+        ? <path d="M20,10.5v8.5c0,2.757-2.243,5-5,5H5c-2.757,0-5-2.243-5-5V9c0-2.757,2.243-5,5-5H13.5c.404,0,.769,.244,.924,.617,.155,.374,.069,.804-.217,1.09l-7.319,7.319c-1.102,1.102-1.136,2.861-.078,4.005,.539,.582,1.272,.911,2.065,.926,.777,.023,1.538-.285,2.099-.846l7.319-7.319c.286-.287,.715-.372,1.09-.217,.374,.155,.617,.52,.617,.924ZM21,0h-7c-.552,0-1,.448-1,1s.448,1,1,1h6.586L8.293,14.293c-.391,.391-.391,1.023,0,1.414,.195,.195,.451,.293,.707,.293s.512-.098,.707-.293L22,3.414v6.586c0,.552,.448,1,1,1s1-.448,1-1V3c0-1.654-1.346-3-3-3Z" />
+        : <path d="M20,11v8c0,2.757-2.243,5-5,5H5c-2.757,0-5-2.243-5-5V9c0-2.757,2.243-5,5-5H13c.552,0,1,.448,1,1s-.448,1-1,1H5c-1.654,0-3,1.346-3,3v10c0,1.654,1.346,3,3,3H15c1.654,0,3-1.346,3-3V11c0-.552,.448-1,1-1s1,.448,1,1ZM21,0h-7c-.552,0-1,.448-1,1s.448,1,1,1h6.586L8.293,14.293c-.391,.391-.391,1.023,0,1.414,.195,.195,.451,.293,.707,.293s.512-.098,.707-.293L22,3.414v6.586c0,.552,.448,1,1,1s1-.448,1-1V3c0-1.654-1.346-3-3-3Z" />}
+    </svg>
+  );
+}
 function CircleXmarkIcon({ size = 16, on = false }: any) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" style={{ display: "block" }}>
@@ -1126,7 +1135,7 @@ function AutoNote({ value, onChange, style }: any) {
   }, [value]);
   return <textarea ref={ref} rows={1} value={value} onChange={onChange} placeholder="quick note (optional)" style={{ ...style, resize: "none", overflowY: "auto", lineHeight: 1.5 }} />;
 }
-function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, onSurf, whisper, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, finishedTs, expected, onSetExpected, autoLogDefault, onAutoLogChange }: any) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, onSurf, onFinishNow, whisper, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, finishedTs, expected, onSetExpected, autoLogDefault, onAutoLogChange }: any) {
   const [task, setTask] = useState(preset || "");
   const [act, setAct] = useState(0);   // 0 = not rated yet: no weather button pre-highlighted
   const [note, setNote] = useState("");
@@ -1224,6 +1233,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
           <button onClick={running ? onPause : () => onStart(task)} disabled={blockStart} aria-label={blockStart ? "rate the expected feeling first" : (running ? "pause" : ((paused || pauseActive) ? "resume" : "start"))} style={{ ...btn("#C57B5A"), borderRadius: 999, height: 32, padding: "0 21px", minWidth: 84, opacity: blockStart ? 0.5 : 1, cursor: blockStart ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>{running ? <PauseIcon size={15} /> : <><PlayIcon size={14} /><span style={{ fontVariantNumeric: "tabular-nums", fontSize: 12.5 }}>{pomoMin}m</span></>}</button>
           <button disabled={lenLocked || pomoMin >= 30} onMouseDown={() => beginHold(1)} onMouseUp={endHold} onMouseLeave={endHold} aria-label={lenLocked ? "length is locked while a pomodoro is running" : "longer - hold to speed up (max 30)"} style={{ width: 19, height: 19, padding: 0, borderRadius: 999, border: `1.5px solid ${C.ink}`, background: "transparent", color: C.ink, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", opacity: (lenLocked || pomoMin >= 30) ? 0.4 : 1, cursor: lenLocked ? "not-allowed" : "pointer" }}><PlusIcon size={10} /></button>
           {!running && !paused && !pauseActive && !finished && <button onClick={() => { tinyPrev.current = pomoMin; tinyRun.current = true; changePomo(5); onStart(task); }} aria-label="tiny start: five quiet minutes with no feeling rating needed; if flow catches you can extend to the full beat at the end" style={{ height: 24, padding: "0 8px", borderRadius: 999, border: "1.5px solid transparent", background: "#EAF3DE", color: C.muted, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 11.5, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap", gap: 3 }}><span style={{ color: C.better, display: "inline-flex" }}><SproutIcon size={13} /></span>5m</button>}
+          {(running || paused) && <button onClick={onFinishNow} aria-label="finish this pomodoro now: rate it and it logs with the time you actually spent" style={{ width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 999, border: "1.5px solid transparent", background: "#EAF3DE", color: "#5b8c5a", boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><CheckSolidIcon size={11} /></button>}
           <button onClick={onSurf} aria-label="an urge is here? open the surf: rate it, find it on the body, breathe, and decide after the wave" style={{ width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 999, border: "1.5px solid transparent", background: "#DCEAF6", color: "#3E78B2", boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><SeaWaveIcon size={12} /></button>
           <button onClick={() => { resetTimer(); setTask(""); onPickTask && onPickTask(""); if (tinyPrev.current > 0) { changePomo(tinyPrev.current); tinyPrev.current = 0; } tinyRun.current = false; setTinyCarry(0); }} aria-label="reset" style={{ width: 24, height: 24, padding: 0, borderRadius: 999, border: `1.5px solid ${C.faint}`, background: "transparent", color: C.muted, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><RotateCcwIcon size={12} /></button>
 
@@ -2437,6 +2447,7 @@ export default function FocusLogApp({ api }: any) {
         </div>
         <button onClick={() => togglePersonal(t.task)} className="fl-rowact fl-collapse" aria-label={personal ? "move to Project" : "move to Personal"} style={ICON_BTN}>{personal ? <BriefcaseIcon size={14} /> : <UserIcon size={14} />}</button>
         {t.id && <button onClick={() => openOverCalib(t)} className="fl-rowact fl-collapse" aria-label="the task grew: add a + tomato round (max two, then split)" style={{ ...ICON_BTN, fontSize: 12, whiteSpace: "nowrap" }}>{"+\u{1F345}"}</button>}
+        {t.id && <button onClick={() => { const u = String(t.url || "").replace(/^https?:\/\//, "notion://"); if (u.startsWith("notion://")) window.open(u); else window.open("notion://www.notion.so/" + String(t.id).replace(/-/g, "")); }} className="fl-rowact fl-collapse fl-nopen-btn" aria-label="open this task in the Notion app" style={ICON_BTN}><span className="fl-on-rr"><ArrowUpRightSquareIcon size={13} /></span><span className="fl-on-sr"><ArrowUpRightSquareIcon size={13} on /></span></button>}
         <button onClick={() => toggleTaskHidden(t)} className="fl-rowact fl-collapse" aria-label={isTaskHidden(t) ? "show this task again" : "hide this task (the header eye can reveal it)"} style={ICON_BTN}>{isTaskHidden(t) ? <EyeIcon size={14} /> : <EyeCrossedIcon size={14} />}</button>
                 <button onClick={() => openLog(t.task)} className="fl-rowact fl-collapse" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={14} /></button>
         <button
@@ -3660,14 +3671,24 @@ export default function FocusLogApp({ api }: any) {
   const pinnedBar = () => {
     // One sync button, shared by the Plan and Focus bars: the Notion badge resting as a
     // 24px square, the refresh sliding in on hover or while a sync runs.
+    // The Notion badge rests as just the logo; hovering slides out its two hands - the
+    // refresh that syncs and the boxed arrow that opens the database in the Notion app.
+    const openNotionDb = () => { const id = String(settings.databaseId || "").replace(/-/g, ""); if (id) window.open("notion://www.notion.so/" + id); };
+    const BARE_IN_PILL: any = { padding: 0, border: "none", boxShadow: "none", background: "transparent", color: ACCENT, cursor: "pointer", display: "inline-flex", alignItems: "center" };
     const syncBtn = (
-      <button onClick={doSync} disabled={sync === "loading"} className="fl-sync-btn" aria-label="sync from Notion: pull today's tasks and merge the plan" title="sync from Notion"
-        style={{ display: "inline-flex", alignItems: "center", height: 24, boxSizing: "border-box", padding: "0 4px", borderRadius: 9, border: `1px solid ${ACCENT}`, background: "transparent", color: ACCENT, boxShadow: "none", cursor: "pointer", marginBottom: 4, opacity: sync === "loading" ? 0.7 : 1 }}>
-        <span className={"fl-sync-refresh" + (sync === "loading" ? " is-on" : "")} style={{ display: "inline-flex", alignItems: "center" }}>
+      <span className="fl-sync-btn" title="Notion: sync, or open the database"
+        style={{ display: "inline-flex", alignItems: "center", height: 24, boxSizing: "border-box", padding: "0 4px", borderRadius: 9, border: `1px solid ${ACCENT}`, background: "transparent", color: ACCENT, marginBottom: 4, opacity: sync === "loading" ? 0.7 : 1 }}>
+        <button onClick={doSync} disabled={sync === "loading"} className={"fl-sync-refresh" + (sync === "loading" ? " is-on" : "")} aria-label="sync from Notion: pull today's tasks and merge the plan" style={BARE_IN_PILL}>
           <RefreshCwIcon size={14} spin={sync === "loading"} />
-        </span>
-        <img src={NOTION_LOGO} alt="" draggable={false} style={{ width: 16, height: 16 }} />
-      </button>
+        </button>
+        <button onClick={openNotionDb} className="fl-nopen fl-nopen-btn" aria-label="open the Pressure to Progress database in the Notion app" style={BARE_IN_PILL}>
+          <span className="fl-on-rr"><ArrowUpRightSquareIcon size={13} /></span>
+          <span className="fl-on-sr"><ArrowUpRightSquareIcon size={13} on /></span>
+        </button>
+        <button onClick={doSync} disabled={sync === "loading"} aria-label="sync from Notion" style={BARE_IN_PILL}>
+          <img src={NOTION_LOGO} alt="" draggable={false} style={{ width: 16, height: 16 }} />
+        </button>
+      </span>
     );
     if (isFocusView(view)) return (
       <div style={{ ...SUBBAR, marginBottom: 0, alignItems: "flex-end" }}>
@@ -4774,7 +4795,7 @@ export default function FocusLogApp({ api }: any) {
             </div>
           </div>
         )}
-        {view === "log" && <LogForm tasks={orderedTasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={restartTimer} onSurf={openSurf} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPickTask={(v: string) => { setPreset(v); api.timer && api.timer.setTask(v); }} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} finished={finished} finishedTs={timer.finishedAt} expected={timer.expected} onSetExpected={setExpectedRating} whisper={rainWhisper} autoLogDefault={settings.autoLogOnRate !== false} onAutoLogChange={(v: boolean) => api.patchSettings && api.patchSettings({ autoLogOnRate: v })} />}
+        {view === "log" && <LogForm tasks={orderedTasks} preset={preset} onAdd={logPomodoro} settings={settings} secs={secs} running={running} resetTimer={restartTimer} onSurf={openSurf} onFinishNow={() => api.timer && api.timer.finishNow && api.timer.finishNow()} pomoMin={pomoMin} changePomo={changePomo} stepPomo={stepPomo} chooseNext={chooseNext} setChooseNext={setChooseNext} nextTask={nextTask} setNextTask={setNextTask} onStart={onStart} onPickTask={(v: string) => { setPreset(v); api.timer && api.timer.setTask(v); }} onPause={onPause} pauseActive={pauseActive} paused={timer.paused} pauseTags={pauseTags} pauseTag={pauseTag} setPauseTag={setPauseTag} tagColor={tagColor} tagBorder={tagBorder} floatOn={floatOn} setFloatOn={setFloatOn} lenLocked={lenLocked} finished={finished} finishedTs={timer.finishedAt} expected={timer.expected} onSetExpected={setExpectedRating} whisper={rainWhisper} autoLogDefault={settings.autoLogOnRate !== false} onAutoLogChange={(v: boolean) => api.patchSettings && api.patchSettings({ autoLogOnRate: v })} />}
         {view === "log" && (
           <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
             <div style={{ minWidth: 200, flex: 1 }}>
