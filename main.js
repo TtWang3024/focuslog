@@ -24850,6 +24850,9 @@ function NoiseControl({ value, onPick }) {
     /* @__PURE__ */ React5.createElement(Icon, { size: 13 })
   )));
 }
+function ArrowUpRightSquareIcon({ size = 14, on = false }) {
+  return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", stroke: "none", style: { display: "block" } }, on ? /* @__PURE__ */ React5.createElement("path", { d: "M20,10.5v8.5c0,2.757-2.243,5-5,5H5c-2.757,0-5-2.243-5-5V9c0-2.757,2.243-5,5-5H13.5c.404,0,.769,.244,.924,.617,.155,.374,.069,.804-.217,1.09l-7.319,7.319c-1.102,1.102-1.136,2.861-.078,4.005,.539,.582,1.272,.911,2.065,.926,.777,.023,1.538-.285,2.099-.846l7.319-7.319c.286-.287,.715-.372,1.09-.217,.374,.155,.617,.52,.617,.924ZM21,0h-7c-.552,0-1,.448-1,1s.448,1,1,1h6.586L8.293,14.293c-.391,.391-.391,1.023,0,1.414,.195,.195,.451,.293,.707,.293s.512-.098,.707-.293L22,3.414v6.586c0,.552,.448,1,1,1s1-.448,1-1V3c0-1.654-1.346-3-3-3Z" }) : /* @__PURE__ */ React5.createElement("path", { d: "M20,11v8c0,2.757-2.243,5-5,5H5c-2.757,0-5-2.243-5-5V9c0-2.757,2.243-5,5-5H13c.552,0,1,.448,1,1s-.448,1-1,1H5c-1.654,0-3,1.346-3,3v10c0,1.654,1.346,3,3,3H15c1.654,0,3-1.346,3-3V11c0-.552,.448-1,1-1s1,.448,1,1ZM21,0h-7c-.552,0-1,.448-1,1s.448,1,1,1h6.586L8.293,14.293c-.391,.391-.391,1.023,0,1.414,.195,.195,.451,.293,.707,.293s.512-.098,.707-.293L22,3.414v6.586c0,.552,.448,1,1,1s1-.448,1-1V3c0-1.654-1.346-3-3-3Z" }));
+}
 function CircleXmarkIcon({ size = 16, on = false }) {
   return /* @__PURE__ */ React5.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", stroke: "none", style: { display: "block" } }, on ? /* @__PURE__ */ React5.createElement("path", { d: "m12 1c-7.71 0-11 3.29-11 11s3.29 11 11 11 11-3.29 11-11-3.29-11-11-11zm3.707 13.293c.391.391.391 1.023 0 1.414s-1.023.391-1.414 0l-2.293-2.293-2.293 2.293c-.391.391-1.023.391-1.414 0s-.391-1.023 0-1.414l2.293-2.293-2.293-2.293c-.391-.391-.391-1.023 0-1.414s1.023-.391 1.414 0l2.293 2.293 2.293-2.293c.391-.391 1.023-.391 1.414 0s.391 1.023 0 1.414l-2.293 2.293z" }) : /* @__PURE__ */ React5.createElement("path", { d: "m15.707 9.707-2.293 2.293 2.293 2.293c.391.391.391 1.023 0 1.414s-1.023.391-1.414 0l-2.293-2.293-2.293 2.293c-.391.391-1.023.391-1.414 0s-.391-1.023 0-1.414l2.293-2.293-2.293-2.293c-.391-.391-.391-1.023 0-1.414s1.023-.391 1.414 0l2.293 2.293 2.293-2.293c.391-.391 1.023-.391 1.414 0s.391 1.023 0 1.414zm7.293 2.293c0 7.71-3.29 11-11 11s-11-3.29-11-11 3.29-11 11-11 11 3.29 11 11zm-2 0c0-6.561-2.439-9-9-9s-9 2.439-9 9 2.439 9 9 9 9-2.439 9-9z" }));
 }
@@ -25007,7 +25010,7 @@ function AutoNote({ value, onChange, style }) {
   }, [value]);
   return /* @__PURE__ */ React5.createElement("textarea", { ref, rows: 1, value, onChange, placeholder: "quick note (optional)", style: { ...style, resize: "none", overflowY: "auto", lineHeight: 1.5 } });
 }
-function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, onSurf, whisper, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, finishedTs, expected, onSetExpected, autoLogDefault, onAutoLogChange }) {
+function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetTimer, onSurf, onFinishNow, whisper, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask, onPause, pauseActive, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, finishedTs, expected, onSetExpected, autoLogDefault, onAutoLogChange }) {
   const [task, setTask] = useState4(preset || "");
   const [act, setAct] = useState4(0);
   const [note, setNote] = useState4("");
@@ -25079,7 +25082,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
     tinyRun.current = true;
     changePomo(5);
     onStart(task);
-  }, "aria-label": "tiny start: five quiet minutes with no feeling rating needed; if flow catches you can extend to the full beat at the end", style: { height: 24, padding: "0 8px", borderRadius: 999, border: "1.5px solid transparent", background: "#EAF3DE", color: C.muted, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 11.5, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap", gap: 3 } }, /* @__PURE__ */ React5.createElement("span", { style: { color: C.better, display: "inline-flex" } }, /* @__PURE__ */ React5.createElement(SproutIcon, { size: 13 })), "5m"), /* @__PURE__ */ React5.createElement("button", { onClick: onSurf, "aria-label": "an urge is here? open the surf: rate it, find it on the body, breathe, and decide after the wave", style: { width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 999, border: "1.5px solid transparent", background: "#DCEAF6", color: "#3E78B2", boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" } }, /* @__PURE__ */ React5.createElement(SeaWaveIcon, { size: 12 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
+  }, "aria-label": "tiny start: five quiet minutes with no feeling rating needed; if flow catches you can extend to the full beat at the end", style: { height: 24, padding: "0 8px", borderRadius: 999, border: "1.5px solid transparent", background: "#EAF3DE", color: C.muted, boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 11.5, fontFamily: "var(--fl-mono)", whiteSpace: "nowrap", gap: 3 } }, /* @__PURE__ */ React5.createElement("span", { style: { color: C.better, display: "inline-flex" } }, /* @__PURE__ */ React5.createElement(SproutIcon, { size: 13 })), "5m"), (running || paused) && /* @__PURE__ */ React5.createElement("button", { onClick: onFinishNow, "aria-label": "finish this pomodoro now: rate it and it logs with the time you actually spent", style: { width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 999, border: "1.5px solid transparent", background: "#EAF3DE", color: "#5b8c5a", boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" } }, /* @__PURE__ */ React5.createElement(CheckSolidIcon, { size: 11 })), /* @__PURE__ */ React5.createElement("button", { onClick: onSurf, "aria-label": "an urge is here? open the surf: rate it, find it on the body, breathe, and decide after the wave", style: { width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 999, border: "1.5px solid transparent", background: "#DCEAF6", color: "#3E78B2", boxShadow: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" } }, /* @__PURE__ */ React5.createElement(SeaWaveIcon, { size: 12 })), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
     resetTimer();
     setTask("");
     onPickTask && onPickTask("");
@@ -25178,6 +25181,7 @@ function FocusLogApp({ api }) {
   const [surfIdeaEdit, setSurfIdeaEdit] = useState4(null);
   const surfIdeaEsc = useRef3(false);
   const [surfUrgeMenu, setSurfUrgeMenu] = useState4(false);
+  const [rowMenu, setRowMenu] = useState4(null);
   const [surfXHover, setSurfXHover] = useState4(false);
   const surfIdeaPend = useRef3(null);
   const [nowTick, setNowTick] = useState4(Date.now());
@@ -25229,6 +25233,24 @@ function FocusLogApp({ api }) {
       document.removeEventListener("keydown", onKey);
     };
   }, [surfUrgeMenu]);
+  useEffect2(() => {
+    if (!rowMenu)
+      return;
+    const onDown = (e) => {
+      if (!(e.target instanceof Element && e.target.closest("[data-rowmenu]")))
+        setRowMenu(null);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape")
+        setRowMenu(null);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [rowMenu]);
   useEffect2(() => {
     if (surfIdeaArmed == null)
       return;
@@ -26396,7 +26418,7 @@ ${s.task}`))
           setDragIndex(null);
           setOverIndex(null);
         },
-        style: { display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: 6, background: "#fff", border: `1px solid ${isOver ? C.ink : C.line}`, borderLeft: `4px solid ${POWER_COLOR[t.power] || POWER_COLOR.Y}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }
+        style: { display: "flex", alignItems: "flex-start", gap: 11, padding: "9px 11px", borderRadius: 6, background: "#fff", border: `1px solid ${isOver ? C.ink : C.line}`, borderLeft: `4px solid ${POWER_COLOR[t.power] || POWER_COLOR.Y}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }
       },
       /* @__PURE__ */ React5.createElement(
         "span",
@@ -26412,16 +26434,12 @@ ${s.task}`))
             setOverIndex(null);
           },
           "aria-label": "drag to reorder",
-          style: { display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }
+          style: { display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "6px 1px 0" }
         },
         Array.from({ length: 6 }).map((_, k) => /* @__PURE__ */ React5.createElement("span", { key: k, style: { width: 3, height: 3, borderRadius: "50%", background: C.faint } }))
       ),
-      /* @__PURE__ */ React5.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 6, rowGap: 2 } }, t.status === "exploring" ? /* @__PURE__ */ React5.createElement("span", { style: { color: MODE_COLORS.relax.solid, display: "inline-flex", flexShrink: 0 }, "aria-label": "Exploring" }, /* @__PURE__ */ React5.createElement(ExploreIcon, { size: 13 })) : t.status === "executing" ? /* @__PURE__ */ React5.createElement("span", { style: { color: MODE_COLORS.work.solid, display: "inline-flex", flexShrink: 0 }, "aria-label": "Executing" }, /* @__PURE__ */ React5.createElement(HammerIcon, { size: 13 })) : null, cat && /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11, fontFamily: "var(--fl-mono)", color: personal ? TAG_COFFEE.personal.text : TAG_COFFEE.project.text, background: personal ? TAG_COFFEE.personal.bg : TAG_COFFEE.project.bg, border: `1px solid ${personal ? TAG_COFFEE.personal.border : TAG_COFFEE.project.border}`, borderRadius: 999, height: 16, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: "0 7px", whiteSpace: "nowrap", flexShrink: 0 } }, cat), /* @__PURE__ */ React5.createElement("span", { style: { minWidth: 0, overflowWrap: "anywhere" } }, titleText), t.king ? /* @__PURE__ */ React5.createElement("img", { src: crown_default, alt: "king", draggable: false, style: { width: 13, height: 13, flexShrink: 0 } }) : null), hier && /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hier)),
-      /* @__PURE__ */ React5.createElement("button", { onClick: () => togglePersonal(t.task), className: "fl-rowact fl-collapse", "aria-label": personal ? "move to Project" : "move to Personal", style: ICON_BTN }, personal ? /* @__PURE__ */ React5.createElement(BriefcaseIcon, { size: 14 }) : /* @__PURE__ */ React5.createElement(UserIcon, { size: 14 })),
-      t.id && /* @__PURE__ */ React5.createElement("button", { onClick: () => openOverCalib(t), className: "fl-rowact fl-collapse", "aria-label": "the task grew: add a + tomato round (max two, then split)", style: { ...ICON_BTN, fontSize: 12, whiteSpace: "nowrap" } }, "+\u{1F345}"),
-      /* @__PURE__ */ React5.createElement("button", { onClick: () => toggleTaskHidden(t), className: "fl-rowact fl-collapse", "aria-label": isTaskHidden(t) ? "show this task again" : "hide this task (the header eye can reveal it)", style: ICON_BTN }, isTaskHidden(t) ? /* @__PURE__ */ React5.createElement(EyeIcon, { size: 14 }) : /* @__PURE__ */ React5.createElement(EyeCrossedIcon, { size: 14 })),
-      /* @__PURE__ */ React5.createElement("button", { onClick: () => openLog(t.task), className: "fl-rowact fl-collapse", "aria-label": "run a pomodoro", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PlayIcon, { size: 14 })),
-      /* @__PURE__ */ React5.createElement(
+      /* @__PURE__ */ React5.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 6, fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.35 } }, t.status === "exploring" ? /* @__PURE__ */ React5.createElement("span", { style: { color: MODE_COLORS.relax.solid, display: "inline-flex", flexShrink: 0, paddingTop: 2 }, "aria-label": "Exploring" }, /* @__PURE__ */ React5.createElement(ExploreIcon, { size: 13 })) : t.status === "executing" ? /* @__PURE__ */ React5.createElement("span", { style: { color: MODE_COLORS.work.solid, display: "inline-flex", flexShrink: 0, paddingTop: 2 }, "aria-label": "Executing" }, /* @__PURE__ */ React5.createElement(HammerIcon, { size: 13 })) : null, /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } }, titleText, t.king ? /* @__PURE__ */ React5.createElement("img", { src: crown_default, alt: "king", draggable: false, style: { width: 13, height: 13, marginLeft: 5, verticalAlign: "-2px" } }) : null)), (cat || hier) && /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 3 } }, cat && /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11, fontFamily: "var(--fl-mono)", color: personal ? TAG_COFFEE.personal.text : TAG_COFFEE.project.text, background: personal ? TAG_COFFEE.personal.bg : TAG_COFFEE.project.bg, border: `1px solid ${personal ? TAG_COFFEE.personal.border : TAG_COFFEE.project.border}`, borderRadius: 999, height: 16, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: "0 7px", whiteSpace: "nowrap", flexShrink: 0 } }, cat), hier && /* @__PURE__ */ React5.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hier))),
+      /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexShrink: 0, paddingTop: 1 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => openLog(t.task), className: "fl-rowact fl-collapse", "aria-label": "run a pomodoro", style: ICON_BTN }, /* @__PURE__ */ React5.createElement(PlayIcon, { size: 14 })), /* @__PURE__ */ React5.createElement(
         "button",
         {
           onClick: () => toggleFreeze(t.task),
@@ -26430,8 +26448,42 @@ ${s.task}`))
           style: { background: "transparent", border: "none", boxShadow: "none", height: "auto", cursor: "pointer", padding: 2, color: isFrozen ? C.ink : C.muted, flexShrink: 0, display: "inline-flex" }
         },
         /* @__PURE__ */ React5.createElement(BookmarkIcon, { size: 13, filled: isFrozen })
-      ),
-      /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", flexShrink: 0 }, "aria-label": `${completed} of ${est} done for this task` }, /* @__PURE__ */ React5.createElement(TomatoPips, { vivid: done, grey: remaining, base: t.guessBase, plus: t.guessPlus, overInfo, underInfo: underCal ? underCal.reason + (underCal.note ? ": " + underCal.note : "") : null, onGrey: t.id ? () => openUnderCalib(t) : void 0 }))
+      ), /* @__PURE__ */ React5.createElement("span", { "data-rowmenu": true, style: { position: "relative", display: "inline-flex" } }, /* @__PURE__ */ React5.createElement(
+        "button",
+        {
+          onClick: () => setRowMenu(rowMenu === key ? null : key),
+          "aria-expanded": rowMenu === key,
+          "aria-label": "more for this task: open in Notion, add a tomato round, move it, hide it",
+          className: "fl-rowact fl-collapse" + (rowMenu === key ? " is-on" : ""),
+          style: { ...ICON_BTN, padding: "2px 3px" }
+        },
+        /* @__PURE__ */ React5.createElement("span", { style: { display: "grid", gridTemplateColumns: "3px", gap: 2 } }, Array.from({ length: 3 }).map((_, k) => /* @__PURE__ */ React5.createElement("span", { key: k, style: { width: 3, height: 3, borderRadius: "50%", background: "currentColor" } })))
+      ), rowMenu === key && /* @__PURE__ */ React5.createElement("div", { role: "menu", style: { position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 60, background: C.card, border: `1px solid ${C.faint}`, borderRadius: 10, boxShadow: "0 6px 22px rgba(0,0,0,0.16)", padding: 6, minWidth: 190, display: "flex", flexDirection: "column", gap: 2 } }, [
+        t.id ? { k: "open", icon: /* @__PURE__ */ React5.createElement(ArrowUpRightSquareIcon, { size: 13 }), label: "Open in Notion", run: () => {
+          const u = String(t.url || "").replace(/^https?:\/\//, "notion://");
+          if (u.startsWith("notion://"))
+            window.open(u);
+          else
+            window.open("notion://www.notion.so/" + String(t.id).replace(/-/g, ""));
+        } } : null,
+        t.id ? { k: "grew", icon: /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 12 } }, "\u{1F345}"), label: "Add a tomato round", run: () => openOverCalib(t) } : null,
+        { k: "move", icon: personal ? /* @__PURE__ */ React5.createElement(BriefcaseIcon, { size: 13 }) : /* @__PURE__ */ React5.createElement(UserIcon, { size: 13 }), label: personal ? "Move to Project" : "Move to Personal", run: () => togglePersonal(t.task) },
+        { k: "hide", icon: isTaskHidden(t) ? /* @__PURE__ */ React5.createElement(EyeIcon, { size: 13 }) : /* @__PURE__ */ React5.createElement(EyeCrossedIcon, { size: 13 }), label: isTaskHidden(t) ? "Show this task" : "Hide this task", run: () => toggleTaskHidden(t) }
+      ].filter(Boolean).map((it) => /* @__PURE__ */ React5.createElement(
+        "button",
+        {
+          key: it.k,
+          role: "menuitem",
+          onClick: () => {
+            setRowMenu(null);
+            it.run();
+          },
+          style: { display: "flex", width: "100%", alignItems: "center", gap: 8, padding: "6px 9px", border: "none", boxShadow: "none", background: "transparent", borderRadius: 7, color: C.ink, fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--fl-display)", textAlign: "left" }
+        },
+        /* @__PURE__ */ React5.createElement("span", { style: { color: C.muted, display: "inline-flex", flexShrink: 0 } }, it.icon),
+        it.label
+      ))))),
+      /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", alignItems: "center", flexShrink: 0, paddingTop: 2 }, "aria-label": `${completed} of ${est} done for this task` }, /* @__PURE__ */ React5.createElement(TomatoPips, { vivid: done, grey: remaining, base: t.guessBase, plus: t.guessPlus, overInfo, underInfo: underCal ? underCal.reason + (underCal.note ? ": " + underCal.note : "") : null, onGrey: t.id ? () => openUnderCalib(t) : void 0 }))
     );
   };
   const todayKey = String(logicalDay(Date.now(), settings).getTime());
@@ -27790,18 +27842,22 @@ ${s.task}`))
   };
   const viewTitle = isFocusView(view) ? "Focus" : view === "calendar" ? "Calendar" : view === "calibrate" ? "Calibrate" : view === "today" ? "Plan" : view === "sky" ? "Sky" : view === "history" ? "History" : "Focus Log";
   const pinnedBar = () => {
+    const openNotionDb = () => {
+      const id = String(settings.databaseId || "").replace(/-/g, "");
+      if (id)
+        window.open("notion://www.notion.so/" + id);
+    };
+    const BARE_IN_PILL = { padding: 0, border: "none", boxShadow: "none", background: "transparent", color: ACCENT, cursor: "pointer", display: "inline-flex", alignItems: "center" };
     const syncBtn = /* @__PURE__ */ React5.createElement(
-      "button",
+      "span",
       {
-        onClick: doSync,
-        disabled: sync === "loading",
         className: "fl-sync-btn",
-        "aria-label": "sync from Notion: pull today's tasks and merge the plan",
-        title: "sync from Notion",
-        style: { display: "inline-flex", alignItems: "center", height: 24, boxSizing: "border-box", padding: "0 4px", borderRadius: 9, border: `1px solid ${ACCENT}`, background: "transparent", color: ACCENT, boxShadow: "none", cursor: "pointer", marginBottom: 4, opacity: sync === "loading" ? 0.7 : 1 }
+        title: "Notion: sync, or open the database",
+        style: { display: "inline-flex", alignItems: "center", height: 24, boxSizing: "border-box", padding: "0 4px", borderRadius: 9, border: `1px solid ${ACCENT}`, background: "transparent", color: ACCENT, marginBottom: 4, opacity: sync === "loading" ? 0.7 : 1 }
       },
-      /* @__PURE__ */ React5.createElement("span", { className: "fl-sync-refresh" + (sync === "loading" ? " is-on" : ""), style: { display: "inline-flex", alignItems: "center" } }, /* @__PURE__ */ React5.createElement(RefreshCwIcon, { size: 14, spin: sync === "loading" })),
-      /* @__PURE__ */ React5.createElement("img", { src: NOTION_LOGO, alt: "", draggable: false, style: { width: 16, height: 16 } })
+      /* @__PURE__ */ React5.createElement("button", { onClick: doSync, disabled: sync === "loading", className: "fl-sync-refresh" + (sync === "loading" ? " is-on" : ""), "aria-label": "sync from Notion: pull today's tasks and merge the plan", style: BARE_IN_PILL }, /* @__PURE__ */ React5.createElement(RefreshCwIcon, { size: 14, spin: sync === "loading" })),
+      /* @__PURE__ */ React5.createElement("button", { onClick: openNotionDb, className: "fl-nopen fl-nopen-btn", "aria-label": "open the Pressure to Progress database in the Notion app", style: BARE_IN_PILL }, /* @__PURE__ */ React5.createElement("span", { className: "fl-on-rr" }, /* @__PURE__ */ React5.createElement(ArrowUpRightSquareIcon, { size: 13 })), /* @__PURE__ */ React5.createElement("span", { className: "fl-on-sr" }, /* @__PURE__ */ React5.createElement(ArrowUpRightSquareIcon, { size: 13, on: true }))),
+      /* @__PURE__ */ React5.createElement("button", { onClick: doSync, disabled: sync === "loading", "aria-label": "sync from Notion", style: BARE_IN_PILL }, /* @__PURE__ */ React5.createElement("img", { src: NOTION_LOGO, alt: "", draggable: false, style: { width: 16, height: 16 } }))
     );
     if (isFocusView(view))
       return /* @__PURE__ */ React5.createElement("div", { style: { ...SUBBAR, marginBottom: 0, alignItems: "flex-end" } }, /* @__PURE__ */ React5.createElement("div", { style: SUBTAB_ROW }, FOCUS_SUB.map(([k, lab, Icon]) => /* @__PURE__ */ React5.createElement("button", { key: k, onClick: () => setView(k), style: subTab(view === k) }, /* @__PURE__ */ React5.createElement(Icon, { size: 13, on: view === k }), lab))), /* @__PURE__ */ React5.createElement("div", { style: { display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React5.createElement(NoiseControl, { value: view === "break" ? noise.break : noise.focus, onPick: (v) => api.setNoise && api.setNoise(view === "break" ? "break" : "focus", v) }), syncBtn, /* @__PURE__ */ React5.createElement(InfoHover, { C, label: "about this view", width: 360 }, view === "log" && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Pomo"), /* @__PURE__ */ React5.createElement("div", null, "Always set your expected feeling first; the task link is optional. The one exception is the ", "\u{1F331}", ' 5-minute tiny start, which may begin unrated, because starting is its whole point. A free pomodoro keeps the rhythm, can be named mid-run or at the end, and logs as plain "Focus" if it stays unnamed.'), /* @__PURE__ */ React5.createElement("ul", { style: { margin: "6px 0 0", paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Task"), ": today's tasks from the Plan; each pomodoro adds +1 to that task's Spend in Notion."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Feeling"), ": the four weathers, rain to full sun; your before and after ratings are both saved."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Timer"), ": the round buttons set 5 to 30 minutes (hold to speed up); the length locks while a pomodoro runs; the circle arrow resets the timer and task."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Pause"), ": pausing asks for a reason, orange for internal, blue for external; it is recorded under Pause."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "\u{1F30A}", " Surf an urge"), ": mid-run, tap the wave: rate it, breathe, find it on the rabbit, name the feeling. Decide after the wave. The floating window keeps a quick 90-second version."))), view === "break" && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Break"), /* @__PURE__ */ React5.createElement("div", null, "Rest you choose, and the menu you choose it from. Rate a break with the four season trees and the numbers gather under Calibrate."), /* @__PURE__ */ React5.createElement("ul", { style: { margin: "6px 0 0", paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Start a break"), ": short or long, using the lengths from settings; the floating window mirrors it."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", null, "Break activities"), ": the things you actually do to recover. Tick them during a break and their restoring power shows up over time."))), view === "pause" && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement("div", { style: { fontWeight: 700, marginBottom: 4 } }, "Pause"), /* @__PURE__ */ React5.createElement("div", null, "Rest that interrupts you. Pausing a pomodoro asks for a reason, and these are the reasons on offer."), /* @__PURE__ */ React5.createElement("ul", { style: { margin: "6px 0 0", paddingLeft: 18 } }, /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", { style: { color: PAUSE_CAT.internal.border } }, "internal"), ": the impulse came from you ", "-", " tired, distracted, hungry."), /* @__PURE__ */ React5.createElement("li", null, /* @__PURE__ */ React5.createElement("b", { style: { color: PAUSE_CAT.external.border } }, "external"), ": something outside interrupted you ", "-", " a person, a call, a delivery."), /* @__PURE__ */ React5.createElement("li", null, "Drag to reorder; the order here is the order the pause picker offers them in."))))));
@@ -28365,7 +28421,7 @@ ${s.task}`))
         }
       ), /* @__PURE__ */ React5.createElement("span", { style: { fontSize: 11.5, color: C.muted } }, "min"));
     }));
-  })(), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setClaimOpen(false), style: { ...btn(C.muted, true), padding: "5px 12px", fontSize: 12.5 } }, "cancel"), /* @__PURE__ */ React5.createElement("button", { onClick: doClaim, disabled: clBusy || !clTask.trim() || !!claimParse().err, style: { ...btn(ACCENT), padding: "5px 14px", fontSize: 12.5, opacity: clBusy || !clTask.trim() || !!claimParse().err ? 0.6 : 1 } }, "claim it")))), view === "log" && /* @__PURE__ */ React5.createElement(LogForm, { tasks: orderedTasks, preset, onAdd: logPomodoro, settings, secs, running, resetTimer: restartTimer, onSurf: openSurf, pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask: (v) => {
+  })(), /* @__PURE__ */ React5.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8 } }, /* @__PURE__ */ React5.createElement("button", { onClick: () => setClaimOpen(false), style: { ...btn(C.muted, true), padding: "5px 12px", fontSize: 12.5 } }, "cancel"), /* @__PURE__ */ React5.createElement("button", { onClick: doClaim, disabled: clBusy || !clTask.trim() || !!claimParse().err, style: { ...btn(ACCENT), padding: "5px 14px", fontSize: 12.5, opacity: clBusy || !clTask.trim() || !!claimParse().err ? 0.6 : 1 } }, "claim it")))), view === "log" && /* @__PURE__ */ React5.createElement(LogForm, { tasks: orderedTasks, preset, onAdd: logPomodoro, settings, secs, running, resetTimer: restartTimer, onSurf: openSurf, onFinishNow: () => api.timer && api.timer.finishNow && api.timer.finishNow(), pomoMin, changePomo, stepPomo, chooseNext, setChooseNext, nextTask, setNextTask, onStart, onPickTask: (v) => {
     setPreset(v);
     api.timer && api.timer.setTask(v);
   }, onPause, pauseActive, paused: timer.paused, pauseTags, pauseTag, setPauseTag, tagColor, tagBorder, floatOn, setFloatOn, lenLocked, finished, finishedTs: timer.finishedAt, expected: timer.expected, onSetExpected: setExpectedRating, whisper: rainWhisper, autoLogDefault: settings.autoLogOnRate !== false, onAutoLogChange: (v) => api.patchSettings && api.patchSettings({ autoLogOnRate: v }) }), view === "log" && /* @__PURE__ */ React5.createElement("div", { style: { background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React5.createElement("div", { style: { minWidth: 200, flex: 1 } }, /* @__PURE__ */ React5.createElement("div", { style: { fontFamily: "var(--fl-display)", fontSize: 15, fontWeight: 700, color: C.ink } }, "It still counts"), /* @__PURE__ */ React5.createElement("div", { style: { fontSize: 12, color: C.muted, marginTop: 2 } }, "Focus that happened off the timer still moved your goal. Claim it and let it count.")), /* @__PURE__ */ React5.createElement("button", { onClick: () => {
@@ -30803,6 +30859,7 @@ var FocusLogPlugin = class extends import_obsidian.Plugin {
         pause: () => self.timer.pause(),
         resume: () => self.timer.resume(),
         reset: () => self.timer.reset(),
+        finishNow: () => self.timer.finishNow(),
         setLength: (m) => self.timer.setLength(m),
         step: (d) => self.timer.step(d),
         setPauseTag: (tag) => self.timer.setPauseTag(tag),

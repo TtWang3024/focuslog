@@ -1399,6 +1399,7 @@ export default function FocusLogApp({ api }: any) {
   const [surfIdeaEdit, setSurfIdeaEdit] = useState<{ i: number; v: string } | null>(null);
   const surfIdeaEsc = useRef(false);   // an Escape (or the back arrow) skips the blur-save that follows
   const [surfUrgeMenu, setSurfUrgeMenu] = useState(false);
+  const [rowMenu, setRowMenu] = useState<string | null>(null);   // the task row whose dots menu is open
   const [surfXHover, setSurfXHover] = useState(false);
   const surfIdeaPend = useRef<{ i: number; t: number } | null>(null);   // one click waits 260ms in case a second arrives
   const [nowTick, setNowTick] = useState(Date.now());
@@ -1428,6 +1429,14 @@ export default function FocusLogApp({ api }: any) {
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("pointerdown", onDown, true); document.removeEventListener("keydown", onKey); };
   }, [surfUrgeMenu]);
+  useEffect(() => {
+    if (!rowMenu) return;
+    const onDown = (e: any) => { if (!(e.target instanceof Element && e.target.closest("[data-rowmenu]"))) setRowMenu(null); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setRowMenu(null); };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("pointerdown", onDown, true); document.removeEventListener("keydown", onKey); };
+  }, [rowMenu]);
   useEffect(() => {
     if (surfIdeaArmed == null) return;
     const onDown = (e: any) => { if (!(e.target instanceof Element && e.target.closest("[data-ideapill]"))) setSurfIdeaArmed(null); };
@@ -2430,35 +2439,68 @@ export default function FocusLogApp({ api }: any) {
         aria-label={POWER_LABEL[t.power] || POWER_LABEL.Y}
         onDragOver={(e) => { e.preventDefault(); if (overIndex !== i) setOverIndex(i); }}
         onDrop={(e) => { e.preventDefault(); moveTask(dragIndex, i); setDragIndex(null); setOverIndex(null); }}
-        style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: 6, background: "#fff", border: `1px solid ${isOver ? C.ink : C.line}`, borderLeft: `4px solid ${POWER_COLOR[t.power] || POWER_COLOR.Y}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }}
+        style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "9px 11px", borderRadius: 6, background: "#fff", border: `1px solid ${isOver ? C.ink : C.line}`, borderLeft: `4px solid ${POWER_COLOR[t.power] || POWER_COLOR.Y}`, boxShadow: isOver ? `inset 0 2px 0 ${C.ink}` : "none", opacity: isDragging ? 0.4 : 1 }}
       >
         <span
           draggable
           onDragStart={(e) => { setDragIndex(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }}
           onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
           aria-label="drag to reorder"
-          style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "2px 1px" }}
+          style={{ display: "grid", gridTemplateColumns: "3px 3px", gap: 3, cursor: "grab", flexShrink: 0, padding: "6px 1px 0" }}
         >
           {Array.from({ length: 6 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: C.faint }} />))}
         </span>
+        {/* Two lines: the status icon leads the title (the crown rides the last word), and
+            the area chip + parent trail sit beneath, sharing the icon's left edge. */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.3, display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 6, rowGap: 2 }}>{t.status === "exploring" ? <span style={{ color: MODE_COLORS.relax.solid, display: "inline-flex", flexShrink: 0 }} aria-label="Exploring"><ExploreIcon size={13} /></span> : t.status === "executing" ? <span style={{ color: MODE_COLORS.work.solid, display: "inline-flex", flexShrink: 0 }} aria-label="Executing"><HammerIcon size={13} /></span> : null}{cat &&<span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: personal ? TAG_COFFEE.personal.text : TAG_COFFEE.project.text, background: personal ? TAG_COFFEE.personal.bg : TAG_COFFEE.project.bg, border: `1px solid ${personal ? TAG_COFFEE.personal.border : TAG_COFFEE.project.border}`, borderRadius: 999, height: 16, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: "0 7px", whiteSpace: "nowrap", flexShrink: 0 }}>{cat}</span>}<span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{titleText}</span>{t.king ? <img src={crownImg} alt="king" draggable={false} style={{ width: 13, height: 13, flexShrink: 0 }} /> : null}</div>
-          {hier && <div style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hier}</div>}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 6, fontWeight: 600, fontSize: 14, color: C.ink, lineHeight: 1.35 }}>
+            {t.status === "exploring" ? <span style={{ color: MODE_COLORS.relax.solid, display: "inline-flex", flexShrink: 0, paddingTop: 2 }} aria-label="Exploring"><ExploreIcon size={13} /></span>
+              : t.status === "executing" ? <span style={{ color: MODE_COLORS.work.solid, display: "inline-flex", flexShrink: 0, paddingTop: 2 }} aria-label="Executing"><HammerIcon size={13} /></span> : null}
+            <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{titleText}{t.king ? <img src={crownImg} alt="king" draggable={false} style={{ width: 13, height: 13, marginLeft: 5, verticalAlign: "-2px" }} /> : null}</span>
+          </div>
+          {(cat || hier) && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+              {cat && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)", color: personal ? TAG_COFFEE.personal.text : TAG_COFFEE.project.text, background: personal ? TAG_COFFEE.personal.bg : TAG_COFFEE.project.bg, border: `1px solid ${personal ? TAG_COFFEE.personal.border : TAG_COFFEE.project.border}`, borderRadius: 999, height: 16, boxSizing: "border-box", display: "inline-flex", alignItems: "center", padding: "0 7px", whiteSpace: "nowrap", flexShrink: 0 }}>{cat}</span>}
+              {hier && <span style={{ flex: 1, minWidth: 0, fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{hier}</span>}
+            </div>
+          )}
         </div>
-        <button onClick={() => togglePersonal(t.task)} className="fl-rowact fl-collapse" aria-label={personal ? "move to Project" : "move to Personal"} style={ICON_BTN}>{personal ? <BriefcaseIcon size={14} /> : <UserIcon size={14} />}</button>
-        {t.id && <button onClick={() => openOverCalib(t)} className="fl-rowact fl-collapse" aria-label="the task grew: add a + tomato round (max two, then split)" style={{ ...ICON_BTN, fontSize: 12, whiteSpace: "nowrap" }}>{"+\u{1F345}"}</button>}
-        {t.id && <button onClick={() => { const u = String(t.url || "").replace(/^https?:\/\//, "notion://"); if (u.startsWith("notion://")) window.open(u); else window.open("notion://www.notion.so/" + String(t.id).replace(/-/g, "")); }} className="fl-rowact fl-collapse fl-nopen-btn" aria-label="open this task in the Notion app" style={ICON_BTN}><span className="fl-on-rr"><ArrowUpRightSquareIcon size={13} /></span><span className="fl-on-sr"><ArrowUpRightSquareIcon size={13} on /></span></button>}
-        <button onClick={() => toggleTaskHidden(t)} className="fl-rowact fl-collapse" aria-label={isTaskHidden(t) ? "show this task again" : "hide this task (the header eye can reveal it)"} style={ICON_BTN}>{isTaskHidden(t) ? <EyeIcon size={14} /> : <EyeCrossedIcon size={14} />}</button>
-                <button onClick={() => openLog(t.task)} className="fl-rowact fl-collapse" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={14} /></button>
-        <button
-          onClick={() => toggleFreeze(t.task)}
-          className={"fl-lock" + (isFrozen ? " is-locked" : "")}
-          aria-label={isFrozen ? "unpin from the top" : "pin to the top (by name, so it survives daily re-created Notion tasks)"}
-          style={{ background: "transparent", border: "none", boxShadow: "none", height: "auto", cursor: "pointer", padding: 2, color: isFrozen ? C.ink : C.muted, flexShrink: 0, display: "inline-flex" }}
-        >
-          <BookmarkIcon size={13} filled={isFrozen} />
-        </button>
-        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }} aria-label={`${completed} of ${est} done for this task`}>
+        {/* The short rail: run it, pin it, and the dots that name the rarer four in words. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, paddingTop: 1 }}>
+          <button onClick={() => openLog(t.task)} className="fl-rowact fl-collapse" aria-label="run a pomodoro" style={ICON_BTN}><PlayIcon size={14} /></button>
+          <button
+            onClick={() => toggleFreeze(t.task)}
+            className={"fl-lock" + (isFrozen ? " is-locked" : "")}
+            aria-label={isFrozen ? "unpin from the top" : "pin to the top (by name, so it survives daily re-created Notion tasks)"}
+            style={{ background: "transparent", border: "none", boxShadow: "none", height: "auto", cursor: "pointer", padding: 2, color: isFrozen ? C.ink : C.muted, flexShrink: 0, display: "inline-flex" }}
+          >
+            <BookmarkIcon size={13} filled={isFrozen} />
+          </button>
+          <span data-rowmenu style={{ position: "relative", display: "inline-flex" }}>
+            <button onClick={() => setRowMenu(rowMenu === key ? null : key)} aria-expanded={rowMenu === key} aria-label="more for this task: open in Notion, add a tomato round, move it, hide it"
+              className={"fl-rowact fl-collapse" + (rowMenu === key ? " is-on" : "")} style={{ ...ICON_BTN, padding: "2px 3px" }}>
+              <span style={{ display: "grid", gridTemplateColumns: "3px", gap: 2 }}>
+                {Array.from({ length: 3 }).map((_, k) => (<span key={k} style={{ width: 3, height: 3, borderRadius: "50%", background: "currentColor" }} />))}
+              </span>
+            </button>
+            {rowMenu === key && (
+              <div role="menu" style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 60, background: C.card, border: `1px solid ${C.faint}`, borderRadius: 10, boxShadow: "0 6px 22px rgba(0,0,0,0.16)", padding: 6, minWidth: 190, display: "flex", flexDirection: "column", gap: 2 }}>
+                {[
+                  t.id ? { k: "open", icon: <ArrowUpRightSquareIcon size={13} />, label: "Open in Notion", run: () => { const u = String(t.url || "").replace(/^https?:\/\//, "notion://"); if (u.startsWith("notion://")) window.open(u); else window.open("notion://www.notion.so/" + String(t.id).replace(/-/g, "")); } } : null,
+                  t.id ? { k: "grew", icon: <span style={{ fontSize: 12 }}>{"\u{1F345}"}</span>, label: "Add a tomato round", run: () => openOverCalib(t) } : null,
+                  { k: "move", icon: personal ? <BriefcaseIcon size={13} /> : <UserIcon size={13} />, label: personal ? "Move to Project" : "Move to Personal", run: () => togglePersonal(t.task) },
+                  { k: "hide", icon: isTaskHidden(t) ? <EyeIcon size={13} /> : <EyeCrossedIcon size={13} />, label: isTaskHidden(t) ? "Show this task" : "Hide this task", run: () => toggleTaskHidden(t) },
+                ].filter(Boolean).map((it: any) => (
+                  <button key={it.k} role="menuitem" onClick={() => { setRowMenu(null); it.run(); }}
+                    style={{ display: "flex", width: "100%", alignItems: "center", gap: 8, padding: "6px 9px", border: "none", boxShadow: "none", background: "transparent", borderRadius: 7, color: C.ink, fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--fl-display)", textAlign: "left" }}>
+                    <span style={{ color: C.muted, display: "inline-flex", flexShrink: 0 }}>{it.icon}</span>{it.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", flexShrink: 0, paddingTop: 2 }} aria-label={`${completed} of ${est} done for this task`}>
           <TomatoPips vivid={done} grey={remaining} base={t.guessBase} plus={t.guessPlus} overInfo={overInfo} underInfo={underCal ? underCal.reason + (underCal.note ? ": " + underCal.note : "") : null} onGrey={t.id ? () => openUnderCalib(t) : undefined} />
         </div>
       </div>

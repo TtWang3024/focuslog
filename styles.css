@@ -61,6 +61,18 @@
 }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-act-row:hover .fl-rowact { opacity: 0.65; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-rowact:hover { opacity: 1; }
+/* Task rows keep one fixed height: the floor covers the hover-revealed icons, so the
+   card never grows; the hovered card is ringed darker instead. The ring is an outline,
+   which never fights the inline border (drag-over ink stays the strongest voice). */
+.workspace-leaf-content[data-type="focuslog-view"] .fl-task-row { min-height: 40px; box-sizing: border-box; }
+.workspace-leaf-content[data-type="focuslog-view"] .fl-task-row:hover { outline: 1.5px solid #8a8175; outline-offset: -1.5px; }
+/* Inside task rows the hidden actions RESERVE their width (visibility, not display):
+   revealing them steals no width, so the title never re-wraps and the row never grows. */
+.workspace-leaf-content[data-type="focuslog-view"] .fl-task-row .fl-collapse { display: inline-flex !important; visibility: hidden; }
+.workspace-leaf-content[data-type="focuslog-view"] .fl-task-row:hover .fl-collapse { visibility: visible; }
+/* An open dots menu keeps its button lit while the cursor is inside the menu card. */
+.workspace-leaf-content[data-type="focuslog-view"] .fl-task-row .fl-collapse.is-on { visibility: visible; }
+.workspace-leaf-content[data-type="focuslog-view"] .fl-rowact.is-on { opacity: 1; }
 /* The per-task lock toggle collapses its space (not just its icon) until the row is hovered. */
 .workspace-leaf-content[data-type="focuslog-view"] .fl-collapse { display: none !important; }
 .workspace-leaf-content[data-type="focuslog-view"] .fl-act-row:hover .fl-collapse { display: inline-flex !important; }
