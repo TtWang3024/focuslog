@@ -2487,12 +2487,12 @@ export default function FocusLogApp({ api }: any) {
               <div role="menu" style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 60, background: C.card, border: `1px solid ${C.faint}`, borderRadius: 10, boxShadow: "0 6px 22px rgba(0,0,0,0.16)", padding: 6, minWidth: 190, display: "flex", flexDirection: "column", gap: 2 }}>
                 {[
                   t.id ? { k: "open", icon: <ArrowUpRightSquareIcon size={13} />, label: "Open in Notion", run: () => { const u = String(t.url || "").replace(/^https?:\/\//, "notion://"); if (u.startsWith("notion://")) window.open(u); else window.open("notion://www.notion.so/" + String(t.id).replace(/-/g, "")); } } : null,
-                  t.id ? { k: "grew", icon: <span style={{ fontSize: 12 }}>{"\u{1F345}"}</span>, label: "Add a tomato round", run: () => openOverCalib(t) } : null,
+                  t.id ? { k: "grew", icon: <PlusBoldIcon size={11} />, label: "Add a tomato round", run: () => openOverCalib(t) } : null,
                   { k: "move", icon: personal ? <BriefcaseIcon size={13} /> : <UserIcon size={13} />, label: personal ? "Move to Project" : "Move to Personal", run: () => togglePersonal(t.task) },
                   { k: "hide", icon: isTaskHidden(t) ? <EyeIcon size={13} /> : <EyeCrossedIcon size={13} />, label: isTaskHidden(t) ? "Show this task" : "Hide this task", run: () => toggleTaskHidden(t) },
                 ].filter(Boolean).map((it: any) => (
                   <button key={it.k} role="menuitem" onClick={() => { setRowMenu(null); it.run(); }}
-                    style={{ display: "flex", width: "100%", alignItems: "center", gap: 8, padding: "6px 9px", border: "none", boxShadow: "none", background: "transparent", borderRadius: 7, color: C.ink, fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--fl-display)", textAlign: "left" }}>
+                    style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "flex-start", gap: 8, padding: "6px 9px", border: "none", boxShadow: "none", background: "transparent", borderRadius: 7, color: C.ink, fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--fl-display)", textAlign: "left" }}>
                     <span style={{ color: C.muted, display: "inline-flex", flexShrink: 0 }}>{it.icon}</span>{it.label}
                   </button>
                 ))}
@@ -3561,13 +3561,7 @@ export default function FocusLogApp({ api }: any) {
           <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, flex: 1, minWidth: 0 }}><SectionIcon src={doveImg} /> Project</h3>
           {/* what you hid stays out of sight (and out of guilt) until asked for; counts
               elsewhere still include it */}
-          {workTasks.some((t: any) => isTaskHidden(t)) && (
-            <button onClick={() => setShowHidden((v) => !v)} aria-label={showHidden ? "tuck the hidden tasks away again" : "reveal the hidden tasks, dimmed"}
-              style={{ ...ICON_BTN, display: "inline-flex", alignItems: "center", gap: 4, color: C.muted }}>
-              {showHidden ? <EyeIcon size={15} /> : <EyeCrossedIcon size={15} />}
-              {!showHidden && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)" }}>{workTasks.filter((t: any) => isTaskHidden(t)).length}</span>}
-            </button>
-          )}
+          {hiddenEye(workTasks)}
           {!!api.createTask && !!settings.notionToken && (
             <button onClick={() => setQaOpen((v) => !v)} aria-label={qaOpen ? "fold the capture form" : "add a task: opens the capture form"} aria-expanded={qaOpen}
               style={{ ...btn(ACCENT), width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><PlusBoldIcon size={9} /></button>
@@ -3627,13 +3621,7 @@ export default function FocusLogApp({ api }: any) {
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ display: hideHeader ? "none" : "flex", alignItems: "center", gap: 8, margin: "0 0 4px" }}>
           <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0, flex: 1, minWidth: 0 }}><SectionIcon src={swanImg} /> Personal</h3>
-          {personalTasks.some((t: any) => isTaskHidden(t)) && (
-            <button onClick={() => setShowHidden((v) => !v)} aria-label={showHidden ? "tuck the hidden tasks away again" : "reveal the hidden tasks, dimmed"}
-              style={{ ...ICON_BTN, display: "inline-flex", alignItems: "center", gap: 4, color: C.muted }}>
-              {showHidden ? <EyeIcon size={15} /> : <EyeCrossedIcon size={15} />}
-              {!showHidden && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)" }}>{personalTasks.filter((t: any) => isTaskHidden(t)).length}</span>}
-            </button>
-          )}
+          {hiddenEye(personalTasks)}
         </div>
         {personalTasks.filter((t: any) => showHidden || !isTaskHidden(t)).map((t: any) => (
           isTaskHidden(t) ? <div key={"hid" + (t.id || t.task)} style={{ opacity: 0.55 }}>{renderTaskRow(t)}</div> : renderTaskRow(t)
@@ -3656,6 +3644,15 @@ export default function FocusLogApp({ api }: any) {
     if (bl.some((b: any) => b.done && b.pageId === e.id)) setTodayBlocks(bl.map((b: any) => { if (!(b.done && b.pageId === e.id)) return b; const nb: any = { ...b }; delete nb.done; return nb; }));
     api.notify && api.notify("\u201C" + e.task + "\u201D is back in play.");
   };
+  // The reveal eye: shown wherever a group's rows are on screen, so a group folded into
+  // "earlier today" can still let its hidden tasks out.
+  const hiddenEye = (list: any[]) => (list.some((t: any) => isTaskHidden(t)) ? (
+    <button onClick={() => setShowHidden((v) => !v)} aria-label={showHidden ? "tuck the hidden tasks away again" : "reveal the hidden tasks, dimmed"}
+      style={{ ...ICON_BTN, display: "inline-flex", alignItems: "center", gap: 4, color: C.muted, flexShrink: 0 }}>
+      {showHidden ? <EyeIcon size={15} /> : <EyeCrossedIcon size={15} />}
+      {!showHidden && <span style={{ fontSize: 11, fontFamily: "var(--fl-mono)" }}>{list.filter((t: any) => isTaskHidden(t)).length}</span>}
+    </button>
+  ) : null);
   const renderTodaySections = () => {
     const defs = [
       { key: "morning", label: <><SectionIcon src={roosterImg} /> Morning</>, rank: 0, on: !settings.skipMorningRoutine },
@@ -3673,7 +3670,11 @@ export default function FocusLogApp({ api }: any) {
             <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6 }}>earlier today</div>
             {past.map((s) => (
               <div key={s.key}>
-                <button onClick={() => setExpandedPast((e) => { const n = new Set(e); if (n.has(s.key)) n.delete(s.key); else n.add(s.key); return n; })} style={{ margin: 0, fontFamily: "var(--fl-display)", fontSize: 13.5, fontWeight: 600, color: C.ink, background: "transparent", border: "none", boxShadow: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 0" }}><AngleIcon size={14} down={expandedPast.has(s.key)} /> {s.label}</button>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button onClick={() => setExpandedPast((e) => { const n = new Set(e); if (n.has(s.key)) n.delete(s.key); else n.add(s.key); return n; })} style={{ margin: 0, fontFamily: "var(--fl-display)", fontSize: 13.5, fontWeight: 600, color: C.ink, background: "transparent", border: "none", boxShadow: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "flex-start", gap: 5, padding: "2px 0", flex: 1, minWidth: 0, textAlign: "left" }}><AngleIcon size={14} down={expandedPast.has(s.key)} /> {s.label}</button>
+                  {expandedPast.has(s.key) && s.key === "work" && hiddenEye(workTasks)}
+                  {expandedPast.has(s.key) && s.key === "personal" && hiddenEye(personalTasks)}
+                </div>
                 {expandedPast.has(s.key) && <div style={{ marginTop: 4 }}>{renderFullSection(s.key, true)}</div>}
               </div>
             ))}
@@ -4636,7 +4637,7 @@ export default function FocusLogApp({ api }: any) {
                         const on = (surf.urge || "").trim().toLowerCase() === nm.toLowerCase();
                         return (
                           <button key={nm} role="menuitem" onClick={() => { setS({ urge: nm }); setSurfUrgeMenu(false); }}
-                            style={{ display: "flex", width: "100%", alignItems: "center", padding: "6px 9px", border: "none", boxShadow: "none", background: on ? "#DCEAF6" : "transparent", borderRadius: 7, color: on ? "#1d4f80" : C.ink, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", textAlign: "left", overflowWrap: "anywhere" }}>{nm}</button>
+                            style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "flex-start", padding: "6px 9px", border: "none", boxShadow: "none", background: on ? "#DCEAF6" : "transparent", borderRadius: 7, color: on ? "#1d4f80" : C.ink, fontWeight: on ? 700 : 500, fontSize: 12.5, cursor: "pointer", fontFamily: "var(--fl-display)", textAlign: "left", overflowWrap: "anywhere" }}>{nm}</button>
                         );
                       })}
                     </div>

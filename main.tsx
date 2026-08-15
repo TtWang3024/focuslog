@@ -1774,7 +1774,7 @@ export default class FocusLogPlugin extends Plugin {
         .replace(/\{task\}/g, task || "")
         .replace(/\{hierarchy\}/g, hier)
         .replace(/\{tag\}/g, tag)
-        .replace(/\{note\}/g, p.note || "");
+          .replace(/\{note\}/g, p.note || "");
       const oldBlock = mk(p.oldTask);
       const newBlock = mk(p.newTask);
       let done = false;
