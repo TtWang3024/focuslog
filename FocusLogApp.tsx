@@ -17,6 +17,7 @@ import rateClouds from "./assets/rate-clouds.png";
 import ratePartly from "./assets/rate-partly-sunny.png";
 import rateSun from "./assets/rate-sun.png";
 import crownImg from "./assets/crown.png";
+import tomatoImg from "./assets/tomato.png";
 import starImg from "./assets/star.png";
 import treeSpring from "./assets/tree-spring.png";
 import treeSummer from "./assets/tree-summer.png";
@@ -202,10 +203,19 @@ function TomatoPips({ vivid, grey, base, plus, overInfo, underInfo, onGrey }: an
       : (!doneOne && onGrey ? (underInfo ? "finished early: " + underInfo : "finished early? click to reflect on why it was lighter") : undefined);
     items.push(
       <span key={i} onClick={!doneOne ? onGrey : undefined} role={!doneOne && onGrey ? "button" : undefined} aria-label={label}
-        style={{ fontSize: 13, opacity: doneOne ? 1 : round === 0 ? 0.28 : 0.5, background: bg, borderRadius: 4, padding: round === 0 ? 0 : "0 1px", cursor: !doneOne && onGrey ? "pointer" : "default" }}>{"\u{1F345}"}</span>
+        style={{ fontSize: 13, opacity: doneOne ? 1 : round === 0 ? 0.28 : 0.5, background: bg, borderRadius: 4, padding: round === 0 ? 0 : "0 1px", cursor: !doneOne && onGrey ? "pointer" : "default", display: "inline-flex", alignItems: "center" }}><Tom size={13} style={{ verticalAlign: 0 }} /></span>
     );
   }
   return <span style={{ letterSpacing: 1, display: "inline-flex", gap: 1, alignItems: "center" }}>{items}</span>;
+}
+// The tomato everywhere it is SEEN: one drawn fruit instead of the system emoji, whose
+// shape drifts between platforms. Strings that get written (daily notes, Notion) and the
+// screen-reader labels keep the plain character.
+function Tom({ size = 12, style }: any) {
+  // Nudged up a touch: a square sitting on the baseline (or centred in a flex line) reads
+  // low against text, whose optical weight lives at x-height. `top` moves it without
+  // touching the layout, so nothing around it shifts.
+  return <img src={tomatoImg} alt="" draggable={false} style={{ width: size, height: size, verticalAlign: "-1px", position: "relative", top: -1, flexShrink: 0, ...(style || {}) }} />;
 }
 const btn = (color: string, ghost?: boolean): any => ({
   padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${color}`, background: ghost ? "transparent" : color,
@@ -244,7 +254,7 @@ function GroupChart({ group, sessions, settings, override }: any) {
     <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 0" }}>
         <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>{group}</h3>
-        <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{n} {"\u{1F345}"}</span>
+        <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)", display: "inline-flex", alignItems: "center", gap: 3 }}>{n} <Tom /></span>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", borderBottom: `1px solid ${C.line}` }}>
         <Stat label="avg expected" value={avg("expected").toFixed(1)} color={C.ink} />
@@ -3573,7 +3583,7 @@ export default function FocusLogApp({ api }: any) {
               placeholder="capture a task: Enter = into Notion"
               style={{ flex: 1, minWidth: 140, border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12.5, borderRadius: 999, padding: "6px 12px", fontFamily: "var(--fl-display)", height: 32, boxSizing: "border-box" }} />
             <span style={{ display: "inline-flex", alignItems: "center", gap: 2, border: `1px solid ${C.line}`, background: C.paper, borderRadius: 999, padding: "0 6px 0 9px", height: 32, boxSizing: "border-box", flexShrink: 0 }}>
-              <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1 }}>{"\u{1F345}"}</span>
+              <Tom />
               <input type="number" min={1} max={4} value={qaGuess} onChange={(e) => setQaGuess(e.target.value)}
                 aria-label="initial Guess in pomodoros: 1 to 3 write tomatoes, 4 writes one box; empty = no guess"
                 style={{ width: 28, border: "none", boxShadow: "none", background: "transparent", color: C.ink, fontSize: 12, textAlign: "center", fontFamily: "var(--fl-mono)", padding: 0 }} />
@@ -3781,7 +3791,7 @@ export default function FocusLogApp({ api }: any) {
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: dayMode === "relax" ? MODE_COLORS.relax.solid : MODE_COLORS.work.solid }}>
             {dayMode === "relax" ? <LeafIcon size={14} /> : <BriefcaseBusinessIcon size={14} />} {dayMode === "relax" ? "Relax day" : "Work day"}
           </span>
-          <span style={{ color: C.muted, fontWeight: 600, fontSize: 13 }}>{"·"} {countWeek} {"\u{1F345}"} this week</span>
+          <span style={{ color: C.muted, fontWeight: 600, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 3 }}>{"·"} {countWeek} <Tom /> this week</span>
         </span>
         <div style={{ display: "inline-flex", alignItems: "center", height: 28 }}>
         <InfoHover C={C} label="about this view" width={360}>
@@ -3818,7 +3828,7 @@ export default function FocusLogApp({ api }: any) {
             <div style={{ fontWeight: 700, marginBottom: 4 }}>Pomo Accuracy</div>
             <div>Two kinds of guess, side by side: how long a task would take, and how it would feel.</div>
             <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-              <li><b>How your guesses land</b>: the share of calibrated tasks that finished within one {"\u{1F345}"}, the average miss, and why tasks grew or shrank.</li>
+              <li><b>How your guesses land</b>: the share of calibrated tasks that finished within one <Tom size={11} />, the average miss, and why tasks grew or shrank.</li>
               <li><b>Expected vs actual</b>: how often sessions turned out more enjoyable than you expected, with the biggest surprises.</li>
             </ul>
           </>)}
@@ -3848,7 +3858,7 @@ export default function FocusLogApp({ api }: any) {
         {/* the day's facts hold the bar's left lane, where other views put their tabs */}
         <span style={{ paddingBottom: 6, minWidth: 0 }}>
           <span style={{ color: C.ink, fontSize: 13.5, fontWeight: 700, display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
-            {tasks.length} tasks {"·"} {countToday} / {plannedPomos} {"\u{1F345}"}
+            {tasks.length} tasks {"·"} {countToday} / {plannedPomos} <Tom size={13} />
             {isOvernight(Date.now(), settings)
               ? <span style={{ fontWeight: 600, fontSize: 13, color: C.muted }} title="between your day start and morning-begins, pomodoros stack on the day they lead into - the same stretch the Calendar paints yellow">{"·"} a head start: anything now counts toward tomorrow</span>
               : <span style={{ fontWeight: 600, fontSize: 13, color: C.muted }} title="how many more pomodoros fit between now and the night routine, once meals and breaks are taken out">{"·"} room for {pomosLeftToday} more today</span>}
@@ -3930,7 +3940,7 @@ export default function FocusLogApp({ api }: any) {
           <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>What's here</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
           <li>Today's tasks from Notion, plus any local tasks added with the Timeline's add-block button (those survive sync, so the plugin also works without Notion).</li>
-          <li>The (+) on the Project card opens the capture form: name, {"\u{1F345}"} guess, a status choice (search = Exploring, hammer = Executing), and where it goes in Notion. Enter or the disk saves, then a sync brings the task into the list; the back arrow folds the form without saving.</li>
+          <li>The (+) on the Project card opens the capture form: name, <Tom size={11} /> guess, a status choice (search = Exploring, hammer = Executing), and where it goes in Notion. Enter or the disk saves, then a sync brings the task into the list; the back arrow folds the form without saving.</li>
           <li>Grouped into Project and Personal by your Personal Areas and names settings, with the morning and night routines around them.</li>
           </ul>
           <div style={{ fontWeight: 600, margin: "8px 0 2px" }}>Reading a row</div>
@@ -4045,7 +4055,7 @@ export default function FocusLogApp({ api }: any) {
                     {[1, 2, 3, 4].map((n) => (
                       <button key={n} onClick={() => setCalibDraft({ ...d, count: n })} aria-label={n === 4 ? "add one box (4 pomodoros)" : "add " + n + " pomodoro" + (n > 1 ? "s" : "")}
                         style={{ padding: "3px 11px", borderRadius: 999, border: `1px solid ${(d.count || 1) === n ? "#c96f22" : C.faint}`, background: (d.count || 1) === n ? "#F8D8B4" : "#fffefc", color: "#2b2723", fontSize: 12, cursor: "pointer", boxShadow: "none", fontFamily: "var(--fl-display)" }}>
-                        {n === 4 ? "\u{1F4E6}" : "\u{1F345}".repeat(n)}
+                        {n === 4 ? "\u{1F4E6}" : Array.from({ length: n }).map((_, ti) => (<Tom key={ti} size={12} />))}
                       </button>
                     ))}
                   </div>
@@ -4129,11 +4139,11 @@ export default function FocusLogApp({ api }: any) {
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
                 <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: "0 0 10px" }}>How your guesses land</h3>
                 {pct == null ? (
-                  <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>No calibrations yet. Add a {"+\u{1F345}"} when a task grows, or click a grey tomato when one finishes early, and your calibration score builds from there.</p>
+                  <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>No calibrations yet. Add a +<Tom size={11} /> when a task grows, or click a grey tomato when one finishes early, and your calibration score builds from there.</p>
                 ) : (
                   <div style={{ fontSize: 15, color: C.ink, marginBottom: (grew.length || shrank.length || multipliers.length) ? 12 : 0 }}>
                     <span style={{ color: MODE_COLORS.relax.solid, fontSize: 22, fontWeight: 700 }}>{pct}%</span>
-                    {" of your calibrated tasks landed within one "}{"\u{1F345}"}
+                    {" of your calibrated tasks landed within one "}<Tom size={13} />
                     {improving && <span style={{ color: C.muted }}> (and improving)</span>}
                     <span style={{ color: C.muted, fontSize: 12 }}>{" · " + finals.length + " task" + (finals.length === 1 ? "" : "s")}{avgMiss != null ? " · avg miss " + avgMiss.toFixed(1) + " \u{1F345}" : ""}</span>
                   </div>
@@ -4290,7 +4300,7 @@ export default function FocusLogApp({ api }: any) {
                     <div>The average after-rating (1{"\u2013"}5) of your pomodoros in each band; the green bar is your best.</div>
                     <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
                       <li>Bands follow the My-day settings: morning until \u201CMorning ends\u201D, afternoon until \u201CAfternoon ends\u201D, evening after.</li>
-                      <li>The {"\u{1F345}"} count beside each bar is the sample size {"-"} small samples wobble.</li>
+                      <li>The <Tom size={11} /> count beside each bar is the sample size {"-"} small samples wobble.</li>
                     </ul>
                   </InfoHover>
                 </div>
@@ -4309,7 +4319,7 @@ export default function FocusLogApp({ api }: any) {
                             <div style={{ flex: 1, height: 14, background: C.paper, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.line}` }}>
                               <div style={{ width: pct + "%", height: "100%", background: isBest ? C.better : C.neutral }} />
                             </div>
-                            <span style={{ width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{b.avg != null ? (b.avg as number).toFixed(1) : "-"} · {b.count}{"\u{1F345}"}</span>
+                            <span style={{ width: 64, textAlign: "right", fontFamily: "var(--fl-mono)", fontSize: 12, color: C.muted }}>{b.avg != null ? (b.avg as number).toFixed(1) : "-"} · {b.count}<Tom size={11} /></span>
                           </div>
                         );
                       })}
@@ -4348,7 +4358,7 @@ export default function FocusLogApp({ api }: any) {
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
                   <h3 style={{ fontFamily: "var(--fl-display)", fontSize: 16, color: C.ink, margin: 0 }}>Today's pomodoros</h3>
-                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)" }}>{daySess.length} {"\u{1F345}"}{missing > 0 ? " · " + missing + " unnamed" : ""}</span>
+                  <span style={{ color: C.muted, fontSize: 12, fontFamily: "var(--fl-mono)", display: "inline-flex", alignItems: "center", gap: 3 }}>{daySess.length} <Tom />{missing > 0 ? " · " + missing + " unnamed" : ""}</span>
                 </div>
                 <p style={{ color: C.muted, fontSize: 12.5, margin: "0 0 12px" }}>A quiet ledger, open until tomorrow morning: name the unnamed whenever it suits you. It still counts.</p>
                 {daySess.length === 0 ? (
@@ -4405,7 +4415,7 @@ export default function FocusLogApp({ api }: any) {
             levels of title only. Edits and deletes only change the local log. */}
         {view === "history" && (() => {
           const secCalibHistory = () => (calibrations.length === 0
-            ? <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}><p style={{ color: C.muted, fontSize: 13, margin: 0 }}>No calibrations yet. Add a {"+\u{1F345}"} when a task grows, or click a grey tomato when one finishes early.</p></div>
+            ? <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}><p style={{ color: C.muted, fontSize: 13, margin: 0 }}>No calibrations yet. Add a +<Tom size={11} /> when a task grows, or click a grey tomato when one finishes early.</p></div>
             : (
                 <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: 16 }}>
                   <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: foldedHistory.has("calibrations") ? 0 : 10 }}>
@@ -4761,7 +4771,7 @@ export default function FocusLogApp({ api }: any) {
                 <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>not in your list yet:</span>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 2, border: `1px solid ${C.line}`, background: C.paper, borderRadius: 999, padding: "0 6px 0 9px", height: 28, boxSizing: "border-box", flexShrink: 0 }}>
-                    <span aria-hidden="true" style={{ fontSize: 11, lineHeight: 1 }}>{"\u{1F345}"}</span>
+                    <Tom size={11} />
                     <input type="number" min={1} max={4} value={clGuess} onChange={(e) => setClGuess(e.target.value)} aria-label="initial Guess in pomodoros" style={{ width: 26, border: "none", boxShadow: "none", background: "transparent", color: C.ink, fontSize: 12, textAlign: "center", fontFamily: "var(--fl-mono)", padding: 0 }} />
                   </span>
                   <select value={clParent} onChange={(e) => setClParent(e.target.value)} aria-label="where it goes in Notion: a common task, or a sub-task under a BIG TASK" style={{ maxWidth: 150, border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 12, borderRadius: 999, padding: "5px 8px", fontFamily: "var(--fl-display)", flexShrink: 0 }}>
@@ -4777,7 +4787,7 @@ export default function FocusLogApp({ api }: any) {
                 const sb1 = settings.breakMinutes || 5;
                 // The claim's pomodoro is always the classic 25 minutes, whatever the live
                 // timer is set to; n pomodoros span n*25 plus the short breaks between them.
-                const chips = [1, 2, 3, 4].map((k) => ({ k, mins: k * 25 + (k - 1) * sb1, label: k === 4 ? "\u{1F4E6}" : "\u{1F345}".repeat(k) }));
+                const chips = [1, 2, 3, 4].map((k) => ({ k, mins: k * 25 + (k - 1) * sb1, label: k === 4 ? <span style={{ fontSize: 12.5 }}>{"\u{1F4E6}"}</span> : Array.from({ length: k }).map((_, ti) => (<Tom key={ti} size={13} />)) }));
                 const clk = (m: number) => { const v = ((m % 1440) + 1440) % 1440; return String(Math.floor(v / 60)).padStart(2, "0") + ":" + String(v % 60).padStart(2, "0"); };
                 const pick = (c: any) => {
                   if (clAnchor === "start" && cp.st0 != null) setClEnd(clk(cp.st0 + c.mins));

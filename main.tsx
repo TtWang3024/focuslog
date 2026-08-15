@@ -1435,6 +1435,13 @@ export default class FocusLogPlugin extends Plugin {
     const key = this.noteDateKey(ts);
     return (this.data.sessions || []).filter((x: any) => this.noteDateKey(+new Date(x.ts)) === key).length;
   }
+  // {count}: which pomodoro of that day this one is, counted by the clock rather than by
+  // the running total, so the number stays the same when a line is rebuilt later (a rename
+  // has to find the line it wrote). Works whether or not the session is saved yet.
+  private noteOrdinal(ts: number): number {
+    const key = this.noteDateKey(ts);
+    return 1 + (this.data.sessions || []).filter((x: any) => this.noteDateKey(+new Date(x.ts)) === key && +new Date(x.ts) < ts).length;
+  }
 
   // Mirrors the "Today Tasks" view: Today / King / This week, plus Daily dated today.
   async queryToday(): Promise<any[]> {
@@ -1723,6 +1730,7 @@ export default class FocusLogPlugin extends Plugin {
       .replace(/\{task\}/g, p.task || "")
       .replace(/\{hierarchy\}/g, hier)
       .replace(/\{tag\}/g, tag)
+      .replace(/\{count\}/g, String(this.noteOrdinal(p.ts)))
       .replace(/\{note\}/g, p.note || "");
 
     const count = this.countForNote(p.ts);
@@ -1774,7 +1782,8 @@ export default class FocusLogPlugin extends Plugin {
         .replace(/\{task\}/g, task || "")
         .replace(/\{hierarchy\}/g, hier)
         .replace(/\{tag\}/g, tag)
-          .replace(/\{note\}/g, p.note || "");
+        .replace(/\{count\}/g, String(this.noteOrdinal(p.ts)))
+        .replace(/\{note\}/g, p.note || "");
       const oldBlock = mk(p.oldTask);
       const newBlock = mk(p.newTask);
       let done = false;
@@ -3236,7 +3245,7 @@ class FocusLogSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setClass("fl-fullrow")
       .setName("Block template")
-      .setDesc("Placeholders: {date} {start} {end} {task} {hierarchy} {tag} {note}. {hierarchy} expands to \" (ancestor \u00B7 parent)\" when present; {tag} is the category tag configured below.")
+      .setDesc("Placeholders: {date} {start} {end} {task} {hierarchy} {tag} {note} {count}. {hierarchy} expands to \" (ancestor \u00B7 parent)\" when present; {tag} is the category tag configured below; {count} is which pomodoro of the day this one is (1, 2, 3 \u2026).")
       .addTextArea((t) => {
         t.setValue(this.plugin.data.settings.dailyTemplate).onChange(async (v) => {
           this.plugin.data.settings.dailyTemplate = v;
