@@ -28506,6 +28506,9 @@ var DEFAULT_EYE_SETTINGS = {
   eyeBreakOpacity: 100,
   eyeBreakStatusBar: "next"
 };
+var CARD_W = 380;
+var CARD_H = 190;
+var CARD_GAP = 20;
 function clampInt(v, lo, hi, dflt) {
   const n = Math.round(Number(v));
   if (!isFinite(n))
@@ -28518,22 +28521,33 @@ function mmss(secs) {
   const r = s % 60;
   return m + ":" + (r < 10 ? "0" : "") + r;
 }
+function winId(w) {
+  try {
+    return w && !(w.isDestroyed && w.isDestroyed()) ? w.id : -1;
+  } catch (e) {
+    return -1;
+  }
+}
 var EyeBreakEngine = class {
   constructor(host) {
     this.host = host;
     this.phase = "idle";
+    this.layout = "card";
+    // the popout's current shape: the corner card, or the whole display
     this.breakStartAt = 0;
     this.breakEndAt = 0;
     this.breakSecsTotal = 0;
     this.eyeWin = null;
-    // the popout's BrowserWindow while a break screen is up
+    // the popout's BrowserWindow while it is up
     this.iv = null;
     this.warnNotice = null;
+    // fallback heads-up (no popout possible)
     this.warnNum = null;
     this.breakNotice = null;
+    // fallback card-mode break (no popout possible)
     this.overlay = null;
-    // in-window fallback screen (no Electron / mobile)
-    this.overlayNum = null;
+    // fallback full-screen break: an overlay inside the main window
+    this.overlayUnsub = null;
     this.opening = false;
     // true between asking for a popout and window-open claiming it
     this.idleWas = false;
@@ -28559,8 +28573,8 @@ var EyeBreakEngine = class {
       window.clearInterval(this.iv);
       this.iv = null;
     }
-    this.hideWarn();
-    this.closeScreen();
+    this.phase = "idle";
+    this.closeAll();
     try {
       (_a = this.audio) == null ? void 0 : _a.close();
     } catch (e) {
@@ -28626,7 +28640,7 @@ var EyeBreakEngine = class {
     if (!keepSnoozes)
       st.snoozed = 0;
     this.phase = "idle";
-    this.hideWarn();
+    this.closeAll();
     this.host.setBackgroundThrottle(true);
     this.persistNow();
     this.emit();
@@ -28645,26 +28659,23 @@ var EyeBreakEngine = class {
     const from = st.cycleStart || now;
     st.cycleStart = from;
     st.nextAt = Math.max(now + 3e3, from + Math.max(1, s.eyeBreakEveryMins) * 6e4);
-    if (this.phase === "warn") {
-      this.phase = "idle";
-      this.hideWarn();
-    }
+    if (this.phase === "warn")
+      this.leaveWarn();
     this.persistNow();
     this.emit();
   }
   cancelAll() {
-    this.hideWarn();
-    this.closeScreen();
     this.phase = "idle";
+    this.closeAll();
     this.host.setBackgroundThrottle(true);
     this.emit();
   }
   setPaused(paused) {
     const st = this.state;
     st.paused = paused;
-    if (paused) {
+    if (paused)
       this.cancelAll();
-    } else
+    else
       this.schedule(false);
     this.persistNow();
     this.emit();
@@ -28685,19 +28696,17 @@ var EyeBreakEngine = class {
     const now = Date.now();
     st.cycleStart = now;
     st.nextAt = now + Math.max(1, s.eyeBreakSnoozeMins) * 6e4;
-    this.endScreen();
     this.phase = "idle";
-    this.hideWarn();
+    this.closeAll();
     this.host.setBackgroundThrottle(true);
     this.persistNow();
     this.emit();
     return true;
   }
   skip() {
-    this.endScreen();
     this.schedule(false);
   }
-  // From the status bar or a command: begin the break right away.
+  // From the card, the status bar or a command: begin the break right away.
   startNow() {
     if (this.phase === "break")
       return;
@@ -28707,6 +28716,13 @@ var EyeBreakEngine = class {
     if (this.phase !== "break" || !this.canEndEarly())
       return;
     this.finishBreak(true);
+  }
+  // The popout was closed by hand (its OS close button) while it was showing something.
+  windowClosedByHand() {
+    if (this.phase === "warn")
+      this.skip();
+    else if (this.phase === "break")
+      this.finishBreak(true);
   }
   // ---------- the clock ----------
   poll() {
@@ -28731,10 +28747,8 @@ var EyeBreakEngine = class {
       return;
     }
     if (s.eyeBreakHoldDuringBreak && this.host.focusLogBreakRunning()) {
-      if (this.phase === "warn") {
-        this.phase = "idle";
-        this.hideWarn();
-      }
+      if (this.phase === "warn")
+        this.leaveWarn();
       st.cycleStart = now;
       st.nextAt = now + Math.max(1, s.eyeBreakEveryMins) * 6e4;
       this.persistThrottled();
@@ -28745,10 +28759,8 @@ var EyeBreakEngine = class {
       const idle = this.idleSecs();
       if (idle >= s.eyeBreakIdleMins * 60) {
         this.idleWas = true;
-        if (this.phase === "warn") {
-          this.phase = "idle";
-          this.hideWarn();
-        }
+        if (this.phase === "warn")
+          this.leaveWarn();
         if (st.nextAt - now < 5e3) {
           st.nextAt = now + 5e3;
           this.persistThrottled();
@@ -28768,13 +28780,10 @@ var EyeBreakEngine = class {
       this.startBreak();
       return;
     }
-    if (this.phase === "idle" && s.eyeBreakWarnSecs > 0 && now >= st.nextAt - s.eyeBreakWarnSecs * 1e3) {
-      this.phase = "warn";
-      this.showWarn();
-      this.host.setBackgroundThrottle(false);
-    }
-    if (this.phase === "warn")
-      this.renderWarn();
+    if (this.phase === "idle" && s.eyeBreakWarnSecs > 0 && now >= st.nextAt - s.eyeBreakWarnSecs * 1e3)
+      this.enterWarn();
+    if (this.phase === "warn" && this.warnNum)
+      this.warnNum.setText(String(this.secsToNext()));
     this.emit();
   }
   idleSecs() {
@@ -28795,42 +28804,53 @@ var EyeBreakEngine = class {
     if (Date.now() - this.lastPersist > 15e3)
       this.persistNow();
   }
+  // ---------- the heads-up ----------
+  // The corner card appears above every app; where no popout can be made, an Obsidian
+  // notice with the same three buttons stands in.
+  enterWarn() {
+    this.phase = "warn";
+    this.layout = "card";
+    this.host.setBackgroundThrottle(false);
+    if (this.canPopout())
+      this.openWindow();
+    else
+      this.showWarnNotice();
+    this.emit();
+  }
+  leaveWarn() {
+    this.phase = "idle";
+    this.closeAll();
+    this.host.setBackgroundThrottle(true);
+  }
   // ---------- the break ----------
   startBreak() {
     const s = this.settings;
     const now = Date.now();
-    this.hideWarn();
+    this.hideWarnNotice();
     this.phase = "break";
     this.breakStartAt = now;
     this.breakSecsTotal = Math.max(3, s.eyeBreakSecs);
     this.breakEndAt = now + this.breakSecsTotal * 1e3;
     this.lastShownSec = -1;
+    this.layout = s.eyeBreakMode === "card" ? "card" : "full";
     this.host.setBackgroundThrottle(false);
     this.playSound("start");
-    if (s.eyeBreakMode === "notice")
-      this.showBreakNotice();
+    if (this.eyeWin)
+      this.applyLayout(this.eyeWin);
+    else if (this.opening) {
+    } else if (this.canPopout())
+      this.openWindow();
+    else if (this.layout === "full")
+      this.showOverlay();
     else
-      this.openScreen();
+      this.showBreakNotice();
     this.emit();
   }
   finishBreak(early) {
-    this.endScreen();
     this.state.lastEnd = Date.now();
     if (!early)
       this.playSound("end");
     this.schedule(false);
-    this.host.setBackgroundThrottle(true);
-  }
-  endScreen() {
-    this.closeScreen();
-    if (this.breakNotice) {
-      try {
-        this.breakNotice.hide();
-      } catch (e) {
-      }
-      this.breakNotice = null;
-    }
-    this.phase = "idle";
   }
   renderTick() {
     const left = this.breakSecsLeft();
@@ -28845,9 +28865,212 @@ var EyeBreakEngine = class {
     }
     this.emit();
   }
-  // ---------- the heads-up notice ----------
-  showWarn() {
-    this.hideWarn();
+  // Everything that could be showing: the popout, the overlay, both fallback notices.
+  closeAll() {
+    this.hideWarnNotice();
+    this.hideBreakNotice();
+    this.hideOverlay();
+    this.closeWindow();
+  }
+  // ---------- the popout window ----------
+  canPopout() {
+    return !import_obsidian.Platform.isMobile && !!getElectronRemote();
+  }
+  openWindow() {
+    const ws = this.host.app.workspace;
+    try {
+      ws.getLeavesOfType(VIEW_TYPE_EYE).forEach((l) => l.detach());
+    } catch (e) {
+    }
+    this.opening = true;
+    let leaf;
+    try {
+      leaf = ws.openPopoutLeaf ? ws.openPopoutLeaf() : ws.getLeaf("window");
+    } catch (e) {
+      this.opening = false;
+      this.fallback();
+      return;
+    }
+    try {
+      leaf.setViewState({ type: VIEW_TYPE_EYE, active: true }).catch(() => {
+      });
+    } catch (e) {
+    }
+    window.setTimeout(() => {
+      if (this.opening) {
+        this.opening = false;
+        this.placeWindow(this.newestWindow());
+      }
+      try {
+        if (this.eyeWin && this.eyeWin.setOpacity)
+          this.eyeWin.setOpacity(this.opacity());
+      } catch (e) {
+      }
+    }, 150);
+  }
+  fallback() {
+    if (this.phase === "warn")
+      this.showWarnNotice();
+    else if (this.phase === "break" && this.layout === "full")
+      this.showOverlay();
+    else if (this.phase === "break")
+      this.showBreakNotice();
+  }
+  // Fired from the workspace "window-open" event; true when the new window was ours.
+  onWindowOpen() {
+    if (!this.opening)
+      return false;
+    this.opening = false;
+    this.placeWindow(this.newestWindow());
+    return true;
+  }
+  newestWindow() {
+    try {
+      const remote = getElectronRemote();
+      if (!remote || !remote.BrowserWindow)
+        return null;
+      const cur = remote.getCurrentWindow ? winId(remote.getCurrentWindow()) : -1;
+      const flt = winId(this.host.floatWindow());
+      const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
+      return all.filter((w) => {
+        const id = winId(w);
+        return id >= 0 && id !== cur && id !== flt;
+      }).pop() || null;
+    } catch (e) {
+      return null;
+    }
+  }
+  display() {
+    try {
+      const remote = getElectronRemote();
+      const scr = remote && remote.screen;
+      return scr ? scr.getDisplayNearestPoint(scr.getCursorScreenPoint()) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  opacity() {
+    var _a;
+    return Math.max(0.2, Math.min(1, ((_a = this.settings.eyeBreakOpacity) != null ? _a : 100) / 100));
+  }
+  // First placement of a fresh popout: hidden, pinned, shaped, then revealed — so its
+  // first visible frame is already the card in the corner (or the whole display).
+  placeWindow(win) {
+    if (!win) {
+      this.fallback();
+      return;
+    }
+    this.eyeWin = win;
+    try {
+      win.setOpacity(0);
+    } catch (e) {
+    }
+    this.pinWindow(win);
+    this.applyLayout(win);
+    window.setTimeout(() => {
+      try {
+        win.setOpacity(this.opacity());
+      } catch (e) {
+      }
+      try {
+        if (win.showInactive)
+          win.showInactive();
+        else
+          win.show();
+      } catch (e) {
+      }
+    }, 60);
+  }
+  pinWindow(win) {
+    try {
+      win.setAlwaysOnTop(true, "screen-saver");
+    } catch (e) {
+    }
+    try {
+      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    } catch (e) {
+    }
+    try {
+      win.setFocusable(false);
+    } catch (e) {
+    }
+    try {
+      win.setSkipTaskbar(true);
+    } catch (e) {
+    }
+    try {
+      win.setMinimizable(false);
+    } catch (e) {
+    }
+    try {
+      if (win.webContents && win.webContents.setBackgroundThrottling)
+        win.webContents.setBackgroundThrottling(false);
+    } catch (e) {
+    }
+  }
+  // Shape the window to the current layout: the corner card of the display under the
+  // cursor, or that whole display. Called again on the same window when the card grows.
+  applyLayout(win) {
+    const d = this.display();
+    if (this.layout === "full") {
+      try {
+        if (d && d.bounds)
+          win.setBounds(d.bounds);
+      } catch (e) {
+      }
+      try {
+        if (import_obsidian.Platform.isMacOS && win.setSimpleFullScreen)
+          win.setSimpleFullScreen(true);
+        else
+          win.setFullScreen(true);
+      } catch (e) {
+      }
+      return;
+    }
+    this.unFullScreen(win);
+    const wa = d ? d.workArea || d.bounds : null;
+    if (wa) {
+      try {
+        win.setBounds({
+          x: Math.round(wa.x + wa.width - CARD_W - CARD_GAP),
+          y: Math.round(wa.y + wa.height - CARD_H - CARD_GAP),
+          width: CARD_W,
+          height: CARD_H
+        });
+      } catch (e) {
+      }
+    } else {
+      try {
+        const cur = win.getBounds();
+        win.setBounds({ x: cur.x, y: cur.y, width: CARD_W, height: CARD_H });
+      } catch (e) {
+      }
+    }
+  }
+  unFullScreen(win) {
+    try {
+      if (import_obsidian.Platform.isMacOS && win.setSimpleFullScreen) {
+        if (!win.isSimpleFullScreen || win.isSimpleFullScreen())
+          win.setSimpleFullScreen(false);
+      } else if (win.isFullScreen && win.isFullScreen())
+        win.setFullScreen(false);
+    } catch (e) {
+    }
+  }
+  closeWindow() {
+    this.opening = false;
+    const win = this.eyeWin;
+    this.eyeWin = null;
+    if (win)
+      this.unFullScreen(win);
+    try {
+      this.host.app.workspace.getLeavesOfType(VIEW_TYPE_EYE).forEach((l) => l.detach());
+    } catch (e) {
+    }
+  }
+  // ---------- fallbacks: Obsidian notices and an in-window overlay ----------
+  showWarnNotice() {
+    this.hideWarnNotice();
     const s = this.settings;
     const frag = document.createDocumentFragment();
     const wrap = frag.createDiv({ cls: "fl-eye-warn" });
@@ -28864,18 +29087,14 @@ var EyeBreakEngine = class {
         fn();
       };
     };
-    mk("Now", () => this.startNow());
+    mk("Start now", () => this.startNow());
     if (s.eyeBreakAllowSnooze)
       mk("Snooze " + s.eyeBreakSnoozeMins + " min", () => this.snooze());
     if (s.eyeBreakAllowSkip)
       mk("Skip", () => this.skip());
     this.warnNotice = new import_obsidian.Notice(frag, 0);
   }
-  renderWarn() {
-    if (this.warnNum)
-      this.warnNum.setText(String(this.secsToNext()));
-  }
-  hideWarn() {
+  hideWarnNotice() {
     if (this.warnNotice) {
       try {
         this.warnNotice.hide();
@@ -28886,172 +29105,40 @@ var EyeBreakEngine = class {
     this.warnNum = null;
   }
   showBreakNotice() {
+    this.hideBreakNotice();
     const s = this.settings;
     this.breakNotice = new import_obsidian.Notice(s.eyeBreakTitle + " - " + mmss(this.breakSecsLeft()) + " left. " + s.eyeBreakMessage, 0);
   }
-  // ---------- the full-screen window ----------
-  // Desktop: a popout leaf whose OS window is stretched over the display under the cursor,
-  // pinned above everything (screen-saver level) and made full screen. Anywhere the Electron
-  // API is missing (mobile, a locked-down build), a fixed overlay inside the main window
-  // stands in: it still blocks Obsidian, just not the apps beside it.
-  openScreen() {
-    if (import_obsidian.Platform.isMobile || !getElectronRemote()) {
-      this.showOverlay();
-      return;
-    }
-    const ws = this.host.app.workspace;
-    ws.getLeavesOfType(VIEW_TYPE_EYE).forEach((l) => l.detach());
-    this.opening = true;
-    let leaf;
-    try {
-      leaf = ws.openPopoutLeaf ? ws.openPopoutLeaf() : ws.getLeaf("window");
-    } catch (e) {
-      this.opening = false;
-      this.showOverlay();
-      return;
-    }
-    leaf.setViewState({ type: VIEW_TYPE_EYE, active: true }).catch(() => {
-    });
-    window.setTimeout(() => {
-      if (this.opening) {
-        this.opening = false;
-        this.placeWindow(this.newestWindow());
-      }
+  hideBreakNotice() {
+    if (this.breakNotice) {
       try {
-        if (this.eyeWin && this.eyeWin.setOpacity)
-          this.eyeWin.setOpacity(this.opacity());
-      } catch (e) {
-      }
-    }, 150);
-  }
-  // Fired from the workspace "window-open" event; true when the new window was ours.
-  onWindowOpen() {
-    if (!this.opening)
-      return false;
-    this.opening = false;
-    this.placeWindow(this.newestWindow());
-    return true;
-  }
-  newestWindow() {
-    try {
-      const remote = getElectronRemote();
-      if (!remote || !remote.BrowserWindow)
-        return null;
-      const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
-      const flt = this.host.floatWindow();
-      const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-      return all.filter((w) => (!cur || w.id !== cur.id) && (!flt || w.id !== flt.id)).pop() || null;
-    } catch (e) {
-      return null;
-    }
-  }
-  opacity() {
-    var _a;
-    return Math.max(0.2, Math.min(1, ((_a = this.settings.eyeBreakOpacity) != null ? _a : 100) / 100));
-  }
-  placeWindow(win) {
-    if (!win)
-      return;
-    this.eyeWin = win;
-    const remote = getElectronRemote();
-    try {
-      win.setOpacity(0);
-    } catch (e) {
-    }
-    try {
-      const scr = remote && remote.screen;
-      const d = scr ? scr.getDisplayNearestPoint(scr.getCursorScreenPoint()) : null;
-      if (d && d.bounds)
-        win.setBounds(d.bounds);
-    } catch (e) {
-    }
-    try {
-      win.setAlwaysOnTop(true, "screen-saver");
-    } catch (e) {
-    }
-    try {
-      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    } catch (e) {
-    }
-    try {
-      win.setMinimizable && win.setMinimizable(false);
-    } catch (e) {
-    }
-    try {
-      if (import_obsidian.Platform.isMacOS && win.setSimpleFullScreen)
-        win.setSimpleFullScreen(true);
-      else
-        win.setFullScreen(true);
-    } catch (e) {
-    }
-    try {
-      if (win.webContents && win.webContents.setBackgroundThrottling)
-        win.webContents.setBackgroundThrottling(false);
-    } catch (e) {
-    }
-    window.setTimeout(() => {
-      try {
-        win.setOpacity(this.opacity());
-      } catch (e) {
-      }
-      try {
-        win.show();
-      } catch (e) {
-      }
-      try {
-        win.focus();
-      } catch (e) {
-      }
-      try {
-        if (remote && remote.app && remote.app.focus)
-          remote.app.focus({ steal: true });
-      } catch (e) {
-      }
-    }, 60);
-  }
-  closeScreen() {
-    this.opening = false;
-    const win = this.eyeWin;
-    this.eyeWin = null;
-    if (win) {
-      try {
-        if (import_obsidian.Platform.isMacOS && win.setSimpleFullScreen)
-          win.setSimpleFullScreen(false);
-        else if (win.isFullScreen && win.isFullScreen())
-          win.setFullScreen(false);
+        this.breakNotice.hide();
       } catch (e) {
       }
     }
-    try {
-      this.host.app.workspace.getLeavesOfType(VIEW_TYPE_EYE).forEach((l) => l.detach());
-    } catch (e) {
-    }
-    this.hideOverlay();
+    this.breakNotice = null;
   }
-  // ---------- the in-window fallback ----------
   showOverlay() {
     this.hideOverlay();
     const el = document.body.createDiv({ cls: "fl-eye-overlay" });
     this.overlay = el;
     const screen = renderEyeScreen(el, this);
-    this.overlayNum = screen.num;
-    const unsub = this.subscribe(() => screen.update());
-    el._flUnsub = unsub;
+    this.overlayUnsub = this.subscribe(() => screen.update());
   }
   hideOverlay() {
     var _a;
     const el = this.overlay;
     this.overlay = null;
-    this.overlayNum = null;
-    if (!el)
-      return;
     try {
-      (_a = el._flUnsub) == null ? void 0 : _a.call(el);
+      (_a = this.overlayUnsub) == null ? void 0 : _a.call(this);
     } catch (e) {
     }
-    try {
-      el.remove();
-    } catch (e) {
+    this.overlayUnsub = null;
+    if (el) {
+      try {
+        el.remove();
+      } catch (e) {
+      }
     }
   }
   // ---------- sounds (synthesised, so no asset ships) ----------
@@ -29136,27 +29223,16 @@ var EyeBreakEngine = class {
 };
 function renderEyeScreen(root, eng) {
   const s = eng.settings;
+  const card = eng.layout === "card";
+  const warn = eng.phase === "warn";
   root.empty();
-  root.addClass("fl-eye");
+  root.removeClass("is-card", "is-full", "is-warn", "is-break");
+  root.addClass("fl-eye", card ? "is-card" : "is-full", warn ? "is-warn" : "is-break");
   root.style.setProperty("--fl-eye-bg", s.eyeBreakBg || DEFAULT_EYE_SETTINGS.eyeBreakBg);
   root.style.setProperty("--fl-eye-fg", s.eyeBreakFg || DEFAULT_EYE_SETTINGS.eyeBreakFg);
   const box = root.createDiv({ cls: "fl-eye-box" });
-  box.createDiv({ cls: "fl-eye-title", text: s.eyeBreakTitle || DEFAULT_EYE_SETTINGS.eyeBreakTitle });
-  if (s.eyeBreakMessage)
-    box.createDiv({ cls: "fl-eye-msg", text: s.eyeBreakMessage });
-  const ring = box.createDiv({ cls: "fl-eye-ring" });
-  const R = 54;
-  const C2 = 2 * Math.PI * R;
-  ring.innerHTML = `<svg viewBox="0 0 120 120" width="160" height="160" aria-hidden="true">
-    <circle class="fl-eye-track" cx="60" cy="60" r="${R}" fill="none" stroke="currentColor" stroke-opacity="0.18" stroke-width="6"/>
-    <circle class="fl-eye-arc" cx="60" cy="60" r="${R}" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"
-      stroke-dasharray="${C2.toFixed(2)}" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
-  </svg>`;
-  const arc = ring.querySelector(".fl-eye-arc");
-  const num = ring.createDiv({ cls: "fl-eye-num", text: String(eng.breakSecsLeft()) });
-  const btns = box.createDiv({ cls: "fl-eye-btns" });
-  const mk = (label, cls, fn) => {
-    const b = btns.createEl("button", { text: label, cls: "fl-eye-btn " + cls });
+  const mkBtn = (parent, label, cls, fn) => {
+    const b = parent.createEl("button", { text: label, cls: "fl-eye-btn " + cls });
     b.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -29164,42 +29240,91 @@ function renderEyeScreen(root, eng) {
     };
     return b;
   };
-  const snoozeBtn = s.eyeBreakAllowSnooze ? mk("Snooze " + s.eyeBreakSnoozeMins + " min", "fl-eye-snooze", () => eng.snooze()) : null;
-  const skipBtn = s.eyeBreakAllowSkip ? mk("Skip this break", "fl-eye-skip", () => eng.skip()) : null;
-  const endBtn = s.eyeBreakAllowEndEarly ? mk("End break early", "fl-eye-end", () => eng.endEarly()) : null;
-  const foot = box.createDiv({ cls: "fl-eye-foot" });
+  const title = s.eyeBreakTitle || DEFAULT_EYE_SETTINGS.eyeBreakTitle;
+  if (warn) {
+    const line = box.createDiv({ cls: "fl-eye-ctitle" });
+    line.createSpan({ text: "Eye break in " });
+    const num2 = line.createSpan({ cls: "fl-eye-cnum", text: String(eng.secsToNext()) });
+    line.createSpan({ text: " s" });
+    box.createDiv({ cls: "fl-eye-cmsg", text: "Look away from the screen for " + s.eyeBreakSecs + " seconds." });
+    const bar = box.createDiv({ cls: "fl-eye-bar" });
+    const fill2 = bar.createDiv({ cls: "fl-eye-bar-fill" });
+    const btns2 = box.createDiv({ cls: "fl-eye-btns" });
+    mkBtn(btns2, "Start now", "fl-eye-now", () => eng.startNow());
+    const snoozeBtn = s.eyeBreakAllowSnooze ? mkBtn(btns2, "Snooze " + s.eyeBreakSnoozeMins + " min", "fl-eye-snooze", () => eng.snooze()) : null;
+    if (s.eyeBreakAllowSkip)
+      mkBtn(btns2, "Skip", "fl-eye-skip", () => eng.skip());
+    const total = Math.max(1, s.eyeBreakWarnSecs);
+    const update2 = () => {
+      const left = eng.secsToNext();
+      num2.setText(String(left));
+      fill2.style.width = Math.max(0, Math.min(100, left / total * 100)).toFixed(1) + "%";
+      if (snoozeBtn)
+        snoozeBtn.toggleClass("is-off", eng.snoozesLeft() <= 0);
+    };
+    update2();
+    return { update: update2 };
+  }
+  let num;
+  let arc = null;
+  let fill = null;
+  const C2 = 2 * Math.PI * 54;
+  if (card) {
+    const line = box.createDiv({ cls: "fl-eye-ctitle" });
+    line.createSpan({ text: title + " " });
+    num = line.createSpan({ cls: "fl-eye-cnum", text: String(eng.breakSecsLeft()) });
+    line.createSpan({ text: " s" });
+    if (s.eyeBreakMessage)
+      box.createDiv({ cls: "fl-eye-cmsg", text: s.eyeBreakMessage });
+    const bar = box.createDiv({ cls: "fl-eye-bar" });
+    fill = bar.createDiv({ cls: "fl-eye-bar-fill" });
+  } else {
+    box.createDiv({ cls: "fl-eye-title", text: title });
+    if (s.eyeBreakMessage)
+      box.createDiv({ cls: "fl-eye-msg", text: s.eyeBreakMessage });
+    const ring = box.createDiv({ cls: "fl-eye-ring" });
+    ring.innerHTML = `<svg viewBox="0 0 120 120" width="160" height="160" aria-hidden="true">
+      <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-opacity="0.18" stroke-width="6"/>
+      <circle class="fl-eye-arc" cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"
+        stroke-dasharray="${C2.toFixed(2)}" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+    </svg>`;
+    arc = ring.querySelector(".fl-eye-arc");
+    num = ring.createDiv({ cls: "fl-eye-num", text: String(eng.breakSecsLeft()) });
+  }
+  const btns = box.createDiv({ cls: "fl-eye-btns" });
+  const endBtn = s.eyeBreakAllowEndEarly ? mkBtn(btns, "End break early", "fl-eye-end", () => eng.endEarly()) : null;
+  const foot = card ? null : box.createDiv({ cls: "fl-eye-foot" });
   const update = () => {
     const left = eng.breakSecsLeft();
     num.setText(String(left));
-    if (arc) {
-      const frac = eng.breakSecsTotal > 0 ? Math.max(0, Math.min(1, left / eng.breakSecsTotal)) : 0;
+    const frac = eng.breakSecsTotal > 0 ? Math.max(0, Math.min(1, left / eng.breakSecsTotal)) : 0;
+    if (arc)
       arc.setAttribute("stroke-dashoffset", (C2 * (1 - frac)).toFixed(2));
-    }
+    if (fill)
+      fill.style.width = (frac * 100).toFixed(1) + "%";
     if (endBtn) {
       const wait = Math.max(0, (s.eyeBreakEndEarlyAfter || 0) - eng.breakSecsGone());
       const ok = eng.canEndEarly();
       endBtn.toggleClass("is-waiting", !ok);
       endBtn.setText(ok ? "End break early" : "End break early (" + wait + " s)");
     }
-    if (snoozeBtn) {
-      const left2 = eng.snoozesLeft();
-      snoozeBtn.toggleClass("is-off", left2 <= 0);
-      snoozeBtn.setText(left2 === Infinity || left2 <= 0 ? "Snooze " + s.eyeBreakSnoozeMins + " min" : "Snooze " + s.eyeBreakSnoozeMins + " min (" + left2 + " left)");
-    }
-    if (skipBtn)
-      skipBtn.toggleClass("is-off", false);
-    foot.setText("Next eye break in " + s.eyeBreakEveryMins + " min");
+    if (foot)
+      foot.setText("Next eye break in " + s.eyeBreakEveryMins + " min");
   };
   update();
-  return { update, num };
+  return { update };
 }
 var EyeBreakView = class extends import_obsidian.ItemView {
   constructor(leaf, eng) {
     super(leaf);
     this.fwin = null;
     this.tick = 0;
+    this.tickWin = null;
+    // the window that owns `tick` (interval ids are per-window)
     this.unsub = null;
+    this.rootEl = null;
     this.screen = null;
+    this.key = "";
     this.eng = eng;
   }
   getViewType() {
@@ -29211,6 +29336,8 @@ var EyeBreakView = class extends import_obsidian.ItemView {
   getIcon() {
     return "eye";
   }
+  // Idempotent: tags the popout body (headers hidden) once the view lives in its own
+  // window, and moves the refresh tick onto that window's clock.
   tagWindow() {
     try {
       const doc = this.contentEl.ownerDocument;
@@ -29219,36 +29346,48 @@ var EyeBreakView = class extends import_obsidian.ItemView {
         const w = doc.defaultView;
         if (w && w !== this.fwin) {
           try {
-            (this.fwin || window).clearInterval(this.tick);
+            (this.tickWin || window).clearInterval(this.tick);
           } catch (e) {
           }
           this.fwin = w;
+          this.tickWin = w;
           this.tick = w.setInterval(() => {
-            var _a;
             this.eng.poll();
-            (_a = this.screen) == null ? void 0 : _a.update();
+            this.paint();
           }, 250);
         }
       }
     } catch (e) {
     }
   }
+  paint() {
+    var _a;
+    if (!this.rootEl || this.eng.phase === "idle")
+      return;
+    const k = this.eng.phase + "|" + this.eng.layout;
+    if (k !== this.key) {
+      this.key = k;
+      this.screen = renderEyeScreen(this.rootEl, this.eng);
+    } else
+      (_a = this.screen) == null ? void 0 : _a.update();
+  }
   async onOpen() {
     const root = this.contentEl;
     root.empty();
     root.addClass("focuslog-eye");
     this.fwin = null;
-    this.screen = renderEyeScreen(root.createDiv(), this.eng);
-    this.unsub = this.eng.subscribe(() => {
-      var _a;
-      return (_a = this.screen) == null ? void 0 : _a.update();
-    });
+    this.key = "";
+    this.rootEl = root.createDiv();
+    this.paint();
+    this.unsub = this.eng.subscribe(() => this.paint());
     this.tagWindow();
-    this.tick = window.setInterval(() => {
-      var _a;
-      this.tagWindow();
-      (_a = this.screen) == null ? void 0 : _a.update();
-    }, 250);
+    if (!this.fwin) {
+      this.tickWin = window;
+      this.tick = window.setInterval(() => {
+        this.tagWindow();
+        this.paint();
+      }, 250);
+    }
   }
   async onClose() {
     var _a;
@@ -29258,7 +29397,7 @@ var EyeBreakView = class extends import_obsidian.ItemView {
     }
     this.unsub = null;
     try {
-      (this.fwin || window).clearInterval(this.tick);
+      (this.tickWin || window).clearInterval(this.tick);
     } catch (e) {
     }
     try {
@@ -29274,13 +29413,11 @@ var EyeBreakView = class extends import_obsidian.ItemView {
     } catch (e) {
     }
     this.fwin = null;
+    this.tickWin = null;
+    this.rootEl = null;
     this.screen = null;
     try {
-      if (this.eng.phase === "break" && this.eng.settings.eyeBreakMode === "popup")
-        window.setTimeout(() => {
-          if (this.eng.phase === "break")
-            this.eng.skip();
-        }, 0);
+      window.setTimeout(() => this.eng.windowClosedByHand(), 0);
     } catch (e) {
     }
   }
@@ -29288,7 +29425,7 @@ var EyeBreakView = class extends import_obsidian.ItemView {
 function buildEyeBreakSettings(containerEl, s, save, eng) {
   containerEl.createEl("h3", { text: "Eye breaks" });
   containerEl.createEl("p", {
-    text: "A rest reminder in the spirit of BreakTimer: every so often a full-screen window asks you to look away for a few seconds, then disappears. It runs whenever Obsidian is open and is independent of the pomodoro: it never pauses a task, a pomodoro or a Focus Log break.",
+    text: "A rest reminder in the spirit of BreakTimer: every so often a window asks you to look away for a few seconds, then disappears. A small card in the corner of your screen counts down first, above every app, without taking the keyboard from whatever you are typing in. It runs whenever Obsidian is open and is independent of the pomodoro: it never pauses a task, a pomodoro or a Focus Log break.",
     cls: "setting-item-description"
   });
   const num = (t, width) => {
@@ -29326,18 +29463,18 @@ function buildEyeBreakSettings(containerEl, s, save, eng) {
     });
   });
   every.controlEl.createEl("span", { text: "s", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
-  new import_obsidian.Setting(containerEl).setName("How the break appears").setDesc("A full-screen window over everything (desktop), or only a notice in Obsidian. Where the full-screen window cannot be made (mobile), a screen inside the Obsidian window stands in.").addDropdown((d) => d.addOption("popup", "Full-screen window").addOption("notice", "Notice only").setValue(s.eyeBreakMode).onChange(async (v) => {
-    s.eyeBreakMode = v || "popup";
+  new import_obsidian.Setting(containerEl).setName("How the break appears").setDesc("Full screen covers the display you are working on; the small window stays in its bottom-right corner. Both float above every app. Where no such window can be made (mobile), a screen inside Obsidian or a notice stands in.").addDropdown((d) => d.addOption("popup", "Full-screen window").addOption("card", "Small corner window").setValue(s.eyeBreakMode === "card" ? "card" : "popup").onChange(async (v) => {
+    s.eyeBreakMode = v === "card" ? "card" : "popup";
     await save();
   }));
-  new import_obsidian.Setting(containerEl).setName("Heads-up before the break").setDesc("A notice counts down this many seconds before the screen appears, with Now / Snooze / Skip. 0 starts the break at once.").addText((t) => {
+  new import_obsidian.Setting(containerEl).setName("Heads-up before the break").setDesc("The corner card counts down this many seconds before the break, with Start now / Snooze / Skip. 0 starts the break with no warning (and no chance to snooze or skip it).").addText((t) => {
     num(t, "5em");
     t.setValue(String(s.eyeBreakWarnSecs)).onChange(async (v) => {
       s.eyeBreakWarnSecs = clampInt(v, 0, 300, 10);
       await save();
     });
   });
-  const snooze = new import_obsidian.Setting(containerEl).setName("Snooze").setDesc("Let a break be pushed back by this many minutes. The limit caps how many times one break can be snoozed; 0 means no limit.");
+  const snooze = new import_obsidian.Setting(containerEl).setName("Snooze").setDesc("Let the heads-up push a break back by this many minutes. The limit caps how many times one break can be snoozed; 0 means no limit.");
   snooze.addToggle((t) => t.setValue(s.eyeBreakAllowSnooze).onChange(async (v) => {
     s.eyeBreakAllowSnooze = v;
     await save();
@@ -29358,11 +29495,11 @@ function buildEyeBreakSettings(containerEl, s, save, eng) {
     });
   });
   snooze.controlEl.createEl("span", { text: "limit", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
-  new import_obsidian.Setting(containerEl).setName("Skip").setDesc("Show a \u201CSkip this break\u201D button on the heads-up and on the break screen.").addToggle((t) => t.setValue(s.eyeBreakAllowSkip).onChange(async (v) => {
+  new import_obsidian.Setting(containerEl).setName("Skip").setDesc("Show a \u201CSkip\u201D button on the heads-up. A break already under way cannot be skipped, only ended early.").addToggle((t) => t.setValue(s.eyeBreakAllowSkip).onChange(async (v) => {
     s.eyeBreakAllowSkip = v;
     await save();
   }));
-  const early = new import_obsidian.Setting(containerEl).setName("End early").setDesc("Show an \u201CEnd break early\u201D button once the break has run for this many seconds (0 = right away).");
+  const early = new import_obsidian.Setting(containerEl).setName("End early").setDesc("The break screen's only button. It becomes active once the break has run for this many seconds (0 = right away).");
   early.addToggle((t) => t.setValue(s.eyeBreakAllowEndEarly).onChange(async (v) => {
     s.eyeBreakAllowEndEarly = v;
     await save();
@@ -29418,7 +29555,7 @@ function buildEyeBreakSettings(containerEl, s, save, eng) {
     });
     t.inputEl.style.width = "22em";
   });
-  const colors = new import_obsidian.Setting(containerEl).setName("Colours").setDesc("Background and text of the break screen.");
+  const colors = new import_obsidian.Setting(containerEl).setName("Colours").setDesc("Background and text of the break screen and the corner card.");
   colors.addColorPicker((c) => c.setValue(s.eyeBreakBg).onChange(async (v) => {
     s.eyeBreakBg = v;
     await save();
@@ -29429,7 +29566,7 @@ function buildEyeBreakSettings(containerEl, s, save, eng) {
     await save();
   }));
   colors.controlEl.createEl("span", { text: "text", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
-  new import_obsidian.Setting(containerEl).setName("Window opacity").setDesc("How solid the full-screen window is. Below 100 the screen behind shows through.").addSlider((sl) => sl.setLimits(20, 100, 5).setValue(s.eyeBreakOpacity).setDynamicTooltip().onChange(async (v) => {
+  new import_obsidian.Setting(containerEl).setName("Window opacity").setDesc("How solid the break window is. Below 100 the screen behind shows through.").addSlider((sl) => sl.setLimits(20, 100, 5).setValue(s.eyeBreakOpacity).setDynamicTooltip().onChange(async (v) => {
     s.eyeBreakOpacity = v;
     await save();
   }));
@@ -29438,7 +29575,7 @@ function buildEyeBreakSettings(containerEl, s, save, eng) {
     await save();
     eng.applySettings();
   }));
-  new import_obsidian.Setting(containerEl).setName("Try it").setDesc("Start an eye break right now with the settings above.").addButton((b) => b.setButtonText("Take a break now").onClick(() => eng.startNow()));
+  new import_obsidian.Setting(containerEl).setName("Try it").setDesc("Start an eye break right now with the settings above, skipping the heads-up.").addButton((b) => b.setButtonText("Take a break now").onClick(() => eng.startNow()));
 }
 
 // assets/white_noise.mp3
@@ -29470,6 +29607,13 @@ var RATE_WEATHER = [
   { v: 3, img: rate_partly_sunny_default, bg: "#C9EAFF" },
   { v: 4, img: rate_sun_default, bg: "#89D2FF" }
 ];
+function safeWinId(w) {
+  try {
+    return w && !(w.isDestroyed && w.isDestroyed()) ? w.id : -1;
+  } catch (e) {
+    return -1;
+  }
+}
 var FLOAT_CAT = {
   internal: { fill: "#FDE4C8", border: "#F07B16" },
   external: { fill: "#D6E8FD", border: "#2779E0" }
@@ -30295,6 +30439,8 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
       modeOverride: loaded.modeOverride || {},
       plans: loaded.plans || {}
     };
+    if (this.data.settings.eyeBreakMode === "notice")
+      this.data.settings.eyeBreakMode = "card";
     if (!this.data.settings.feelingsV2) {
       this.data.settings.feelingsV2 = true;
       this.data.feelings = JSON.parse(JSON.stringify(DEFAULT_FEELINGS));
@@ -30863,8 +31009,8 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
         return;
       const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
       const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-      const eye = this.eye ? this.eye.eyeWin : null;
-      const win = all.filter((w) => (!cur || w.id !== cur.id) && (!eye || w.id !== eye.id)).pop();
+      const eyeId = safeWinId(this.eye ? this.eye.eyeWin : null);
+      const win = all.filter((w) => (!cur || w.id !== cur.id) && w.id !== eyeId).pop();
       if (!win)
         return;
       try {
@@ -30942,8 +31088,8 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
       if (!win) {
         const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
         const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-        const eye = this.eye ? this.eye.eyeWin : null;
-        win = all.filter((w) => (!cur || w.id !== cur.id) && (!eye || w.id !== eye.id)).pop();
+        const eyeId = safeWinId(this.eye ? this.eye.eyeWin : null);
+        win = all.filter((w) => (!cur || w.id !== cur.id) && w.id !== eyeId).pop();
       }
       if (!win)
         return;

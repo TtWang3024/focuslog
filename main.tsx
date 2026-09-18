@@ -46,6 +46,11 @@ const RATE_WEATHER = [
 ];
 
 
+// A BrowserWindow's id, or -1 once Electron has destroyed it (reading it would throw).
+function safeWinId(w: any): number {
+  try { return w && !(w.isDestroyed && w.isDestroyed()) ? w.id : -1; } catch { return -1; }
+}
+
 // Pause-category colours for the floating window's reason chips (internal=yellow, external=blue).
 const FLOAT_CAT: any = {
   internal: { fill: "#FDE4C8", border: "#F07B16" },
@@ -850,6 +855,8 @@ export default class FocusLogPlugin extends Plugin {
       modeOverride: loaded.modeOverride || {},
       plans: loaded.plans || {},
     };
+    // The eye break's "notice only" mode became the small corner window (notices hide behind other apps).
+    if ((this.data.settings as any).eyeBreakMode === "notice") this.data.settings.eyeBreakMode = "card";
     // One-time: refresh the mood vocabulary to the current word set (no feelings editor existed before).
     if (!(this.data.settings as any).feelingsV2) {
       (this.data.settings as any).feelingsV2 = true;
@@ -1267,8 +1274,8 @@ export default class FocusLogPlugin extends Plugin {
       if (!remote || !remote.BrowserWindow) return;
       const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
       const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-      const eye = this.eye ? this.eye.eyeWin : null;
-      const win = all.filter((w: any) => (!cur || w.id !== cur.id) && (!eye || w.id !== eye.id)).pop();
+      const eyeId = safeWinId(this.eye ? this.eye.eyeWin : null);
+      const win = all.filter((w: any) => (!cur || w.id !== cur.id) && w.id !== eyeId).pop();
       if (!win) return;
       try { win.setOpacity(0); } catch {}
       this.pinFloatWindow(true, win);
@@ -1321,8 +1328,8 @@ export default class FocusLogPlugin extends Plugin {
       if (!win) {
         const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
         const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-        const eye = this.eye ? this.eye.eyeWin : null;
-        win = all.filter((w: any) => (!cur || w.id !== cur.id) && (!eye || w.id !== eye.id)).pop();
+        const eyeId = safeWinId(this.eye ? this.eye.eyeWin : null);
+        win = all.filter((w: any) => (!cur || w.id !== cur.id) && w.id !== eyeId).pop();
       }
       if (!win) return;
       if (this.data.settings.floatAlwaysOnTop !== false) {

@@ -535,7 +535,7 @@ body.focuslog-float-window .notice { display: none !important; }
 /* The status-bar eye: a clock to the next break, clickable for now / snooze / skip / pause. */
 .fl-eye-status { cursor: pointer; font-variant-numeric: tabular-nums; }
 .fl-eye-status.is-hidden { display: none; }
-/* The heads-up notice: a countdown line plus the three ways to answer it. */
+/* Fallback heads-up notice (where no popout can be made): a countdown line plus buttons. */
 .fl-eye-warn { display: flex; flex-direction: column; gap: 6px; }
 .fl-eye-warn-line { font-weight: 600; }
 .fl-eye-warn-num { font-variant-numeric: tabular-nums; }
@@ -577,3 +577,14 @@ body.focuslog-eye-window .notice { display: none !important; }
 .fl-eye-btn:hover { background: rgba(127, 127, 127, 0.22); }
 .fl-eye-btn.is-waiting, .fl-eye-btn.is-off { opacity: 0.4; cursor: default; pointer-events: none; }
 .fl-eye-foot { font-size: 12px; opacity: 0.6; }
+/* The corner card (the heads-up, and the break in "small window" mode): a compact, left-
+   aligned layout. Top room clears the macOS window dots, which stay so it can be closed. */
+.fl-eye.is-card { align-items: stretch; justify-content: center; }
+.fl-eye.is-card .fl-eye-box { align-items: flex-start; text-align: left; gap: 8px; padding: 26px 18px 14px; max-width: none; }
+.fl-eye-ctitle { font-family: 'Baloo 2', system-ui, -apple-system, 'Segoe UI', sans-serif; font-weight: 700; font-size: 19px; line-height: 1.15; }
+.fl-eye-cnum { font-variant-numeric: tabular-nums; }
+.fl-eye-cmsg { font-size: 13px; opacity: 0.85; line-height: 1.3; }
+.fl-eye-bar { width: 100%; height: 4px; border-radius: 999px; background: rgba(127, 127, 127, 0.28); position: relative; overflow: hidden; }
+.fl-eye-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; background: currentColor; border-radius: 999px; transition: width 0.9s linear; }
+.fl-eye.is-card .fl-eye-btns { gap: 6px; margin-top: 2px; }
+.fl-eye.is-card .fl-eye-btn { font-size: 12.5px; padding: 4px 12px; }

@@ -1,12 +1,19 @@
 // Eye breaks: a BreakTimer-style rest reminder that lives alongside the pomodoro loop.
 //
-// Every N minutes a full-screen window (or a plain notice) asks you to look away from the
-// screen for a few seconds, then gets out of the way again. It runs from the moment the
-// plugin loads for as long as Obsidian is open, and it never touches the pomodoro engine:
-// the two countdowns are independent, so a rest for your eyes never moves a task, a
-// pomodoro, or a Focus Log break. The one courtesy runs the other way: while a Focus Log
-// break is running you are already resting, so the eye countdown simply restarts from
-// the end of that break.
+// Every N minutes a window asks you to look away from the screen for a few seconds, then
+// gets out of the way again. It runs from the moment the plugin loads for as long as
+// Obsidian is open, and it never touches the pomodoro engine: the two countdowns are
+// independent, so a rest for your eyes never moves a task, a pomodoro, or a Focus Log
+// break. The one courtesy runs the other way: while a Focus Log break is running you are
+// already resting, so the eye countdown simply restarts from the end of that break.
+//
+// The window is one popout that changes shape, exactly like BreakTimer's: a small card in
+// the bottom-right corner of the display you are working on counts down the last seconds
+// before the break (Start now / Snooze / Skip), then grows into the full-screen break
+// (or stays a card, by setting), and disappears when the break ends. It floats above every
+// app and never takes the keyboard, so the app you were typing in is still focused when
+// the window goes. Obsidian's own notices are invisible behind other apps, so they only
+// serve as the fallback where no popout can be made (mobile, or no Electron API).
 //
 // Mirrors the settings BreakTimer offers (frequency, length, heads-up before the break,
 // snooze length and limit, skip, end early, idle reset, sounds, title/message, colours,
@@ -16,22 +23,23 @@ import { getElectronRemote } from "./electron";
 
 export const VIEW_TYPE_EYE = "focuslog-eyebreak";
 
-export type EyeBreakMode = "popup" | "notice";
+export type EyeBreakMode = "popup" | "card";
 export type EyeBreakSound = "none" | "chime" | "blip";
 export type EyeBreakStatus = "off" | "next" | "since";
+export type EyeLayout = "card" | "full";
 
 export interface EyeBreakSettings {
   eyeBreakEnabled: boolean;
   eyeBreakEveryMins: number;       // minutes between breaks
   eyeBreakSecs: number;            // how long a break lasts, in seconds
-  eyeBreakWarnSecs: number;        // heads-up notice this many seconds before; 0 starts the break at once
+  eyeBreakWarnSecs: number;        // the corner card counts down this many seconds before; 0 starts the break at once
   eyeBreakAllowSnooze: boolean;
   eyeBreakSnoozeMins: number;
   eyeBreakSnoozeLimit: number;     // snoozes allowed per break; 0 = unlimited
   eyeBreakAllowSkip: boolean;
   eyeBreakAllowEndEarly: boolean;
   eyeBreakEndEarlyAfter: number;   // the end-early button appears after this many seconds of the break
-  eyeBreakMode: EyeBreakMode;      // full-screen window, or a notice only
+  eyeBreakMode: EyeBreakMode;      // the break fills the screen, or stays a corner card
   eyeBreakHoldDuringBreak: boolean; // a running Focus Log break restarts the eye countdown
   eyeBreakIdleMins: number;        // restart the countdown after this long away from the keyboard; 0 = off
   eyeBreakIdleNotice: boolean;     // say so when the countdown was reset by idleness
@@ -94,6 +102,11 @@ export interface EyeBreakHost {
 
 type Phase = "idle" | "warn" | "break";
 
+// The corner card's size (px) and its distance from the work area's bottom-right corner.
+const CARD_W = 380;
+const CARD_H = 190;
+const CARD_GAP = 20;
+
 function clampInt(v: any, lo: number, hi: number, dflt: number): number {
   const n = Math.round(Number(v));
   if (!isFinite(n)) return dflt;
@@ -107,18 +120,24 @@ function mmss(secs: number): string {
   return m + ":" + (r < 10 ? "0" : "") + r;
 }
 
+// A BrowserWindow's id, or -1 once Electron has destroyed it (reading it would throw).
+function winId(w: any): number {
+  try { return w && !(w.isDestroyed && w.isDestroyed()) ? w.id : -1; } catch { return -1; }
+}
+
 export class EyeBreakEngine {
   phase: Phase = "idle";
+  layout: EyeLayout = "card";    // the popout's current shape: the corner card, or the whole display
   breakStartAt = 0;
   breakEndAt = 0;
   breakSecsTotal = 0;
-  eyeWin: any = null;            // the popout's BrowserWindow while a break screen is up
+  eyeWin: any = null;            // the popout's BrowserWindow while it is up
   private iv: number | null = null;
-  private warnNotice: Notice | null = null;
+  private warnNotice: Notice | null = null;     // fallback heads-up (no popout possible)
   private warnNum: HTMLElement | null = null;
-  private breakNotice: Notice | null = null;
-  private overlay: HTMLElement | null = null;   // in-window fallback screen (no Electron / mobile)
-  private overlayNum: HTMLElement | null = null;
+  private breakNotice: Notice | null = null;    // fallback card-mode break (no popout possible)
+  private overlay: HTMLElement | null = null;   // fallback full-screen break: an overlay inside the main window
+  private overlayUnsub: (() => void) | null = null;
   private opening = false;       // true between asking for a popout and window-open claiming it
   private idleWas = false;
   private lastShownSec = -1;
@@ -141,8 +160,8 @@ export class EyeBreakEngine {
   }
   dispose() {
     if (this.iv != null) { window.clearInterval(this.iv); this.iv = null; }
-    this.hideWarn();
-    this.closeScreen();
+    this.phase = "idle";   // so the view's close handler sees a deliberate teardown, not a hand-close
+    this.closeAll();
     try { this.audio?.close(); } catch {}
     this.audio = null;
   }
@@ -189,7 +208,7 @@ export class EyeBreakEngine {
     st.nextAt = now + Math.max(1, this.settings.eyeBreakEveryMins) * 60000;
     if (!keepSnoozes) st.snoozed = 0;
     this.phase = "idle";
-    this.hideWarn();
+    this.closeAll();
     this.host.setBackgroundThrottle(true);
     this.persistNow();
     this.emit();
@@ -204,21 +223,20 @@ export class EyeBreakEngine {
     const from = st.cycleStart || now;
     st.cycleStart = from;
     st.nextAt = Math.max(now + 3000, from + Math.max(1, s.eyeBreakEveryMins) * 60000);
-    if (this.phase === "warn") { this.phase = "idle"; this.hideWarn(); }
+    if (this.phase === "warn") this.leaveWarn();
     this.persistNow();
     this.emit();
   }
   private cancelAll() {
-    this.hideWarn();
-    this.closeScreen();
     this.phase = "idle";
+    this.closeAll();
     this.host.setBackgroundThrottle(true);
     this.emit();
   }
   setPaused(paused: boolean) {
     const st = this.state;
     st.paused = paused;
-    if (paused) { this.cancelAll(); }
+    if (paused) this.cancelAll();
     else this.schedule(false);
     this.persistNow();
     this.emit();
@@ -234,19 +252,17 @@ export class EyeBreakEngine {
     const now = Date.now();
     st.cycleStart = now;
     st.nextAt = now + Math.max(1, s.eyeBreakSnoozeMins) * 60000;
-    this.endScreen();
     this.phase = "idle";
-    this.hideWarn();
+    this.closeAll();
     this.host.setBackgroundThrottle(true);
     this.persistNow();
     this.emit();
     return true;
   }
   skip() {
-    this.endScreen();
     this.schedule(false);
   }
-  // From the status bar or a command: begin the break right away.
+  // From the card, the status bar or a command: begin the break right away.
   startNow() {
     if (this.phase === "break") return;
     this.startBreak();
@@ -254,6 +270,11 @@ export class EyeBreakEngine {
   endEarly() {
     if (this.phase !== "break" || !this.canEndEarly()) return;
     this.finishBreak(true);
+  }
+  // The popout was closed by hand (its OS close button) while it was showing something.
+  windowClosedByHand() {
+    if (this.phase === "warn") this.skip();
+    else if (this.phase === "break") this.finishBreak(true);
   }
 
   // ---------- the clock ----------
@@ -270,7 +291,7 @@ export class EyeBreakEngine {
     if (!st.nextAt) { this.schedule(false); return; }
     // Already resting inside a Focus Log break: the eye countdown restarts from its end.
     if (s.eyeBreakHoldDuringBreak && this.host.focusLogBreakRunning()) {
-      if (this.phase === "warn") { this.phase = "idle"; this.hideWarn(); }
+      if (this.phase === "warn") this.leaveWarn();
       st.cycleStart = now;
       st.nextAt = now + Math.max(1, s.eyeBreakEveryMins) * 60000;
       this.persistThrottled();
@@ -282,7 +303,7 @@ export class EyeBreakEngine {
       const idle = this.idleSecs();
       if (idle >= s.eyeBreakIdleMins * 60) {
         this.idleWas = true;
-        if (this.phase === "warn") { this.phase = "idle"; this.hideWarn(); }
+        if (this.phase === "warn") this.leaveWarn();
         if (st.nextAt - now < 5000) { st.nextAt = now + 5000; this.persistThrottled(); }
         this.emit();
         return;
@@ -295,12 +316,8 @@ export class EyeBreakEngine {
       }
     }
     if (now >= st.nextAt) { this.startBreak(); return; }
-    if (this.phase === "idle" && s.eyeBreakWarnSecs > 0 && now >= st.nextAt - s.eyeBreakWarnSecs * 1000) {
-      this.phase = "warn";
-      this.showWarn();
-      this.host.setBackgroundThrottle(false);   // the break must land on time even with Obsidian behind another app
-    }
-    if (this.phase === "warn") this.renderWarn();
+    if (this.phase === "idle" && s.eyeBreakWarnSecs > 0 && now >= st.nextAt - s.eyeBreakWarnSecs * 1000) this.enterWarn();
+    if (this.phase === "warn" && this.warnNum) this.warnNum.setText(String(this.secsToNext()));
     this.emit();
   }
 
@@ -316,33 +333,47 @@ export class EyeBreakEngine {
   private persistNow() { this.lastPersist = Date.now(); void this.host.persist(); }
   private persistThrottled() { if (Date.now() - this.lastPersist > 15000) this.persistNow(); }
 
+  // ---------- the heads-up ----------
+  // The corner card appears above every app; where no popout can be made, an Obsidian
+  // notice with the same three buttons stands in.
+  private enterWarn() {
+    this.phase = "warn";
+    this.layout = "card";
+    this.host.setBackgroundThrottle(false);   // the break must land on time even with Obsidian behind another app
+    if (this.canPopout()) this.openWindow();
+    else this.showWarnNotice();
+    this.emit();
+  }
+  private leaveWarn() {
+    this.phase = "idle";
+    this.closeAll();
+    this.host.setBackgroundThrottle(true);
+  }
+
   // ---------- the break ----------
   private startBreak() {
     const s = this.settings;
     const now = Date.now();
-    this.hideWarn();
+    this.hideWarnNotice();
     this.phase = "break";
     this.breakStartAt = now;
     this.breakSecsTotal = Math.max(3, s.eyeBreakSecs);
     this.breakEndAt = now + this.breakSecsTotal * 1000;
     this.lastShownSec = -1;
+    this.layout = s.eyeBreakMode === "card" ? "card" : "full";
     this.host.setBackgroundThrottle(false);
     this.playSound("start");
-    if (s.eyeBreakMode === "notice") this.showBreakNotice();
-    else this.openScreen();
+    if (this.eyeWin) this.applyLayout(this.eyeWin);   // the card grows into the break (or stays a card)
+    else if (this.opening) { /* the popout is still being created; window-open applies the layout */ }
+    else if (this.canPopout()) this.openWindow();
+    else if (this.layout === "full") this.showOverlay();
+    else this.showBreakNotice();
     this.emit();
   }
   private finishBreak(early: boolean) {
-    this.endScreen();
     this.state.lastEnd = Date.now();
     if (!early) this.playSound("end");
-    this.schedule(false);
-    this.host.setBackgroundThrottle(true);
-  }
-  private endScreen() {
-    this.closeScreen();
-    if (this.breakNotice) { try { this.breakNotice.hide(); } catch {} this.breakNotice = null; }
-    this.phase = "idle";
+    this.schedule(false);   // closes the window, re-arms, hands the clock back
   }
   private renderTick() {
     const left = this.breakSecsLeft();
@@ -352,64 +383,40 @@ export class EyeBreakEngine {
     this.emit();
   }
 
-  // ---------- the heads-up notice ----------
-  private showWarn() {
-    this.hideWarn();
-    const s = this.settings;
-    const frag = document.createDocumentFragment();
-    const wrap = frag.createDiv({ cls: "fl-eye-warn" });
-    const line = wrap.createDiv({ cls: "fl-eye-warn-line" });
-    line.createSpan({ text: "Eye break in " });
-    this.warnNum = line.createSpan({ cls: "fl-eye-warn-num", text: String(this.secsToNext()) });
-    line.createSpan({ text: " s" });
-    const btns = wrap.createDiv({ cls: "fl-eye-warn-btns" });
-    const mk = (label: string, fn: () => void) => {
-      const b = btns.createEl("button", { text: label, cls: "fl-eye-warn-btn" });
-      b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); fn(); };
-    };
-    mk("Now", () => this.startNow());
-    if (s.eyeBreakAllowSnooze) mk("Snooze " + s.eyeBreakSnoozeMins + " min", () => this.snooze());
-    if (s.eyeBreakAllowSkip) mk("Skip", () => this.skip());
-    this.warnNotice = new Notice(frag, 0);
-  }
-  private renderWarn() {
-    if (this.warnNum) this.warnNum.setText(String(this.secsToNext()));
-  }
-  private hideWarn() {
-    if (this.warnNotice) { try { this.warnNotice.hide(); } catch {} }
-    this.warnNotice = null;
-    this.warnNum = null;
-  }
-  private showBreakNotice() {
-    const s = this.settings;
-    this.breakNotice = new Notice(s.eyeBreakTitle + " - " + mmss(this.breakSecsLeft()) + " left. " + s.eyeBreakMessage, 0);
+  // Everything that could be showing: the popout, the overlay, both fallback notices.
+  private closeAll() {
+    this.hideWarnNotice();
+    this.hideBreakNotice();
+    this.hideOverlay();
+    this.closeWindow();
   }
 
-  // ---------- the full-screen window ----------
-  // Desktop: a popout leaf whose OS window is stretched over the display under the cursor,
-  // pinned above everything (screen-saver level) and made full screen. Anywhere the Electron
-  // API is missing (mobile, a locked-down build), a fixed overlay inside the main window
-  // stands in: it still blocks Obsidian, just not the apps beside it.
-  private openScreen() {
-    if (Platform.isMobile || !getElectronRemote()) { this.showOverlay(); return; }
+  // ---------- the popout window ----------
+  private canPopout(): boolean { return !Platform.isMobile && !!getElectronRemote(); }
+  private openWindow() {
     const ws: any = this.host.app.workspace;
-    ws.getLeavesOfType(VIEW_TYPE_EYE).forEach((l: any) => l.detach());
+    try { ws.getLeavesOfType(VIEW_TYPE_EYE).forEach((l: any) => l.detach()); } catch {}
     this.opening = true;
     let leaf: WorkspaceLeaf;
     try {
       leaf = ws.openPopoutLeaf ? ws.openPopoutLeaf() : ws.getLeaf("window");
     } catch {
       this.opening = false;
-      this.showOverlay();
+      this.fallback();
       return;
     }
-    leaf.setViewState({ type: VIEW_TYPE_EYE, active: true }).catch(() => {});
-    // If window-open never claims the popout, still try to place whatever opened; and never
-    // leave a window invisible from the opacity trick.
+    try { leaf.setViewState({ type: VIEW_TYPE_EYE, active: true }).catch(() => {}); } catch {}
+    // If window-open never claims the popout, still place whatever opened; and never leave
+    // a window invisible from the opacity trick.
     window.setTimeout(() => {
       if (this.opening) { this.opening = false; this.placeWindow(this.newestWindow()); }
       try { if (this.eyeWin && this.eyeWin.setOpacity) this.eyeWin.setOpacity(this.opacity()); } catch {}
     }, 150);
+  }
+  private fallback() {
+    if (this.phase === "warn") this.showWarnNotice();
+    else if (this.phase === "break" && this.layout === "full") this.showOverlay();
+    else if (this.phase === "break") this.showBreakNotice();
   }
   // Fired from the workspace "window-open" event; true when the new window was ours.
   onWindowOpen(): boolean {
@@ -422,69 +429,134 @@ export class EyeBreakEngine {
     try {
       const remote = getElectronRemote();
       if (!remote || !remote.BrowserWindow) return null;
-      const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
-      const flt = this.host.floatWindow();
+      const cur = remote.getCurrentWindow ? winId(remote.getCurrentWindow()) : -1;
+      const flt = winId(this.host.floatWindow());
       const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-      return all.filter((w: any) => (!cur || w.id !== cur.id) && (!flt || w.id !== flt.id)).pop() || null;
+      return all.filter((w: any) => { const id = winId(w); return id >= 0 && id !== cur && id !== flt; }).pop() || null;
+    } catch { return null; }
+  }
+  private display(): any {
+    try {
+      const remote = getElectronRemote();
+      const scr = remote && remote.screen;
+      return scr ? scr.getDisplayNearestPoint(scr.getCursorScreenPoint()) : null;
     } catch { return null; }
   }
   private opacity(): number { return Math.max(0.2, Math.min(1, (this.settings.eyeBreakOpacity ?? 100) / 100)); }
+  // First placement of a fresh popout: hidden, pinned, shaped, then revealed — so its
+  // first visible frame is already the card in the corner (or the whole display).
   private placeWindow(win: any) {
-    if (!win) return;
+    if (!win) { this.fallback(); return; }
     this.eyeWin = win;
-    const remote = getElectronRemote();
     try { win.setOpacity(0); } catch {}
-    try {
-      const scr = remote && remote.screen;
-      const d = scr ? scr.getDisplayNearestPoint(scr.getCursorScreenPoint()) : null;
-      if (d && d.bounds) win.setBounds(d.bounds);
-    } catch {}
+    this.pinWindow(win);
+    this.applyLayout(win);
+    window.setTimeout(() => {
+      try { win.setOpacity(this.opacity()); } catch {}
+      try { if (win.showInactive) win.showInactive(); else win.show(); } catch {}
+    }, 60);
+  }
+  private pinWindow(win: any) {
     try { win.setAlwaysOnTop(true, "screen-saver"); } catch {}
     // skipTransformProcessType keeps macOS from bouncing Obsidian's dock presence here.
     try { win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); } catch {}
-    try { win.setMinimizable && win.setMinimizable(false); } catch {}
-    try {
-      // macOS "simple" full screen fills the display in place; native full screen would
-      // animate into its own Space. Other platforms take the plain full-screen flag.
-      if (Platform.isMacOS && win.setSimpleFullScreen) win.setSimpleFullScreen(true);
-      else win.setFullScreen(true);
-    } catch {}
+    // Never take the keyboard: the app you were typing in stays focused for the whole
+    // break, and is exactly where you land when the window goes.
+    try { win.setFocusable(false); } catch {}
+    try { win.setSkipTaskbar(true); } catch {}
+    try { win.setMinimizable(false); } catch {}
     try { if (win.webContents && win.webContents.setBackgroundThrottling) win.webContents.setBackgroundThrottling(false); } catch {}
-    window.setTimeout(() => {
-      try { win.setOpacity(this.opacity()); } catch {}
-      try { win.show(); } catch {}
-      try { win.focus(); } catch {}
-      try { if (remote && remote.app && remote.app.focus) remote.app.focus({ steal: true }); } catch {}
-    }, 60);
   }
-  private closeScreen() {
+  // Shape the window to the current layout: the corner card of the display under the
+  // cursor, or that whole display. Called again on the same window when the card grows.
+  private applyLayout(win: any) {
+    const d = this.display();
+    if (this.layout === "full") {
+      try { if (d && d.bounds) win.setBounds(d.bounds); } catch {}
+      try {
+        // macOS "simple" full screen fills the display in place; native full screen would
+        // animate into its own Space. Other platforms take the plain full-screen flag.
+        if (Platform.isMacOS && win.setSimpleFullScreen) win.setSimpleFullScreen(true);
+        else win.setFullScreen(true);
+      } catch {}
+      return;
+    }
+    this.unFullScreen(win);
+    const wa = d ? (d.workArea || d.bounds) : null;
+    if (wa) {
+      try {
+        win.setBounds({
+          x: Math.round(wa.x + wa.width - CARD_W - CARD_GAP),
+          y: Math.round(wa.y + wa.height - CARD_H - CARD_GAP),
+          width: CARD_W,
+          height: CARD_H,
+        });
+      } catch {}
+    } else {
+      try { const cur = win.getBounds(); win.setBounds({ x: cur.x, y: cur.y, width: CARD_W, height: CARD_H }); } catch {}
+    }
+  }
+  private unFullScreen(win: any) {
+    try {
+      if (Platform.isMacOS && win.setSimpleFullScreen) { if (!win.isSimpleFullScreen || win.isSimpleFullScreen()) win.setSimpleFullScreen(false); }
+      else if (win.isFullScreen && win.isFullScreen()) win.setFullScreen(false);
+    } catch {}
+  }
+  private closeWindow() {
     this.opening = false;
     const win = this.eyeWin;
     this.eyeWin = null;
-    if (win) {
-      try { if (Platform.isMacOS && win.setSimpleFullScreen) win.setSimpleFullScreen(false); else if (win.isFullScreen && win.isFullScreen()) win.setFullScreen(false); } catch {}
-    }
+    if (win) this.unFullScreen(win);
     try { this.host.app.workspace.getLeavesOfType(VIEW_TYPE_EYE).forEach((l: any) => l.detach()); } catch {}
-    this.hideOverlay();
   }
 
-  // ---------- the in-window fallback ----------
+  // ---------- fallbacks: Obsidian notices and an in-window overlay ----------
+  private showWarnNotice() {
+    this.hideWarnNotice();
+    const s = this.settings;
+    const frag = document.createDocumentFragment();
+    const wrap = frag.createDiv({ cls: "fl-eye-warn" });
+    const line = wrap.createDiv({ cls: "fl-eye-warn-line" });
+    line.createSpan({ text: "Eye break in " });
+    this.warnNum = line.createSpan({ cls: "fl-eye-warn-num", text: String(this.secsToNext()) });
+    line.createSpan({ text: " s" });
+    const btns = wrap.createDiv({ cls: "fl-eye-warn-btns" });
+    const mk = (label: string, fn: () => void) => {
+      const b = btns.createEl("button", { text: label, cls: "fl-eye-warn-btn" });
+      b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); fn(); };
+    };
+    mk("Start now", () => this.startNow());
+    if (s.eyeBreakAllowSnooze) mk("Snooze " + s.eyeBreakSnoozeMins + " min", () => this.snooze());
+    if (s.eyeBreakAllowSkip) mk("Skip", () => this.skip());
+    this.warnNotice = new Notice(frag, 0);
+  }
+  private hideWarnNotice() {
+    if (this.warnNotice) { try { this.warnNotice.hide(); } catch {} }
+    this.warnNotice = null;
+    this.warnNum = null;
+  }
+  private showBreakNotice() {
+    this.hideBreakNotice();
+    const s = this.settings;
+    this.breakNotice = new Notice(s.eyeBreakTitle + " - " + mmss(this.breakSecsLeft()) + " left. " + s.eyeBreakMessage, 0);
+  }
+  private hideBreakNotice() {
+    if (this.breakNotice) { try { this.breakNotice.hide(); } catch {} }
+    this.breakNotice = null;
+  }
   private showOverlay() {
     this.hideOverlay();
     const el = document.body.createDiv({ cls: "fl-eye-overlay" });
     this.overlay = el;
     const screen = renderEyeScreen(el, this);
-    this.overlayNum = screen.num;
-    const unsub = this.subscribe(() => screen.update());
-    (el as any)._flUnsub = unsub;
+    this.overlayUnsub = this.subscribe(() => screen.update());
   }
   private hideOverlay() {
     const el = this.overlay;
     this.overlay = null;
-    this.overlayNum = null;
-    if (!el) return;
-    try { (el as any)._flUnsub?.(); } catch {}
-    try { el.remove(); } catch {}
+    try { this.overlayUnsub?.(); } catch {}
+    this.overlayUnsub = null;
+    if (el) { try { el.remove(); } catch {} }
   }
 
   // ---------- sounds (synthesised, so no asset ships) ----------
@@ -552,69 +624,110 @@ export class EyeBreakEngine {
   }
 }
 
-// ---------- the break screen (shared by the popout view and the overlay) ----------
-// Title, message, a countdown ring, and the three ways out: snooze, skip, end early.
-export function renderEyeScreen(root: HTMLElement, eng: EyeBreakEngine): { update: () => void; num: HTMLElement } {
+// ---------- the screen (shared by the popout view and the overlay) ----------
+// Three faces, by engine phase and layout: the heads-up card (countdown to the break with
+// Start now / Snooze / Skip), the break as a card (countdown bar + End early), and the
+// break as a full screen (title, message, countdown ring + End early). During a break the
+// single button is End early: a break already under way is never skipped or snoozed.
+export function renderEyeScreen(root: HTMLElement, eng: EyeBreakEngine): { update: () => void } {
   const s = eng.settings;
+  const card = eng.layout === "card";
+  const warn = eng.phase === "warn";
   root.empty();
-  root.addClass("fl-eye");
+  // Add to the root's classes rather than replace them: the overlay fallback keeps its own.
+  root.removeClass("is-card", "is-full", "is-warn", "is-break");
+  root.addClass("fl-eye", card ? "is-card" : "is-full", warn ? "is-warn" : "is-break");
   root.style.setProperty("--fl-eye-bg", s.eyeBreakBg || DEFAULT_EYE_SETTINGS.eyeBreakBg);
   root.style.setProperty("--fl-eye-fg", s.eyeBreakFg || DEFAULT_EYE_SETTINGS.eyeBreakFg);
   const box = root.createDiv({ cls: "fl-eye-box" });
-  box.createDiv({ cls: "fl-eye-title", text: s.eyeBreakTitle || DEFAULT_EYE_SETTINGS.eyeBreakTitle });
-  if (s.eyeBreakMessage) box.createDiv({ cls: "fl-eye-msg", text: s.eyeBreakMessage });
-  const ring = box.createDiv({ cls: "fl-eye-ring" });
-  const R = 54;
-  const C = 2 * Math.PI * R;
-  ring.innerHTML = `<svg viewBox="0 0 120 120" width="160" height="160" aria-hidden="true">
-    <circle class="fl-eye-track" cx="60" cy="60" r="${R}" fill="none" stroke="currentColor" stroke-opacity="0.18" stroke-width="6"/>
-    <circle class="fl-eye-arc" cx="60" cy="60" r="${R}" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"
-      stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
-  </svg>`;
-  const arc = ring.querySelector(".fl-eye-arc") as SVGCircleElement | null;
-  const num = ring.createDiv({ cls: "fl-eye-num", text: String(eng.breakSecsLeft()) });
-  const btns = box.createDiv({ cls: "fl-eye-btns" });
-  const mk = (label: string, cls: string, fn: () => void) => {
-    const b = btns.createEl("button", { text: label, cls: "fl-eye-btn " + cls });
+  const mkBtn = (parent: HTMLElement, label: string, cls: string, fn: () => void) => {
+    const b = parent.createEl("button", { text: label, cls: "fl-eye-btn " + cls });
     b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); fn(); };
     return b;
   };
-  const snoozeBtn = s.eyeBreakAllowSnooze ? mk("Snooze " + s.eyeBreakSnoozeMins + " min", "fl-eye-snooze", () => eng.snooze()) : null;
-  const skipBtn = s.eyeBreakAllowSkip ? mk("Skip this break", "fl-eye-skip", () => eng.skip()) : null;
-  const endBtn = s.eyeBreakAllowEndEarly ? mk("End break early", "fl-eye-end", () => eng.endEarly()) : null;
-  const foot = box.createDiv({ cls: "fl-eye-foot" });
+  const title = s.eyeBreakTitle || DEFAULT_EYE_SETTINGS.eyeBreakTitle;
+
+  if (warn) {
+    const line = box.createDiv({ cls: "fl-eye-ctitle" });
+    line.createSpan({ text: "Eye break in " });
+    const num = line.createSpan({ cls: "fl-eye-cnum", text: String(eng.secsToNext()) });
+    line.createSpan({ text: " s" });
+    box.createDiv({ cls: "fl-eye-cmsg", text: "Look away from the screen for " + s.eyeBreakSecs + " seconds." });
+    const bar = box.createDiv({ cls: "fl-eye-bar" });
+    const fill = bar.createDiv({ cls: "fl-eye-bar-fill" });
+    const btns = box.createDiv({ cls: "fl-eye-btns" });
+    mkBtn(btns, "Start now", "fl-eye-now", () => eng.startNow());
+    const snoozeBtn = s.eyeBreakAllowSnooze ? mkBtn(btns, "Snooze " + s.eyeBreakSnoozeMins + " min", "fl-eye-snooze", () => eng.snooze()) : null;
+    if (s.eyeBreakAllowSkip) mkBtn(btns, "Skip", "fl-eye-skip", () => eng.skip());
+    const total = Math.max(1, s.eyeBreakWarnSecs);
+    const update = () => {
+      const left = eng.secsToNext();
+      num.setText(String(left));
+      fill.style.width = Math.max(0, Math.min(100, (left / total) * 100)).toFixed(1) + "%";
+      if (snoozeBtn) snoozeBtn.toggleClass("is-off", eng.snoozesLeft() <= 0);
+    };
+    update();
+    return { update };
+  }
+
+  // The break itself, as a card or the whole screen.
+  let num: HTMLElement;
+  let arc: SVGCircleElement | null = null;
+  let fill: HTMLElement | null = null;
+  const C = 2 * Math.PI * 54;
+  if (card) {
+    const line = box.createDiv({ cls: "fl-eye-ctitle" });
+    line.createSpan({ text: title + " " });
+    num = line.createSpan({ cls: "fl-eye-cnum", text: String(eng.breakSecsLeft()) });
+    line.createSpan({ text: " s" });
+    if (s.eyeBreakMessage) box.createDiv({ cls: "fl-eye-cmsg", text: s.eyeBreakMessage });
+    const bar = box.createDiv({ cls: "fl-eye-bar" });
+    fill = bar.createDiv({ cls: "fl-eye-bar-fill" });
+  } else {
+    box.createDiv({ cls: "fl-eye-title", text: title });
+    if (s.eyeBreakMessage) box.createDiv({ cls: "fl-eye-msg", text: s.eyeBreakMessage });
+    const ring = box.createDiv({ cls: "fl-eye-ring" });
+    ring.innerHTML = `<svg viewBox="0 0 120 120" width="160" height="160" aria-hidden="true">
+      <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-opacity="0.18" stroke-width="6"/>
+      <circle class="fl-eye-arc" cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"
+        stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+    </svg>`;
+    arc = ring.querySelector(".fl-eye-arc") as SVGCircleElement | null;
+    num = ring.createDiv({ cls: "fl-eye-num", text: String(eng.breakSecsLeft()) });
+  }
+  const btns = box.createDiv({ cls: "fl-eye-btns" });
+  const endBtn = s.eyeBreakAllowEndEarly ? mkBtn(btns, "End break early", "fl-eye-end", () => eng.endEarly()) : null;
+  const foot = card ? null : box.createDiv({ cls: "fl-eye-foot" });
   const update = () => {
     const left = eng.breakSecsLeft();
     num.setText(String(left));
-    if (arc) {
-      const frac = eng.breakSecsTotal > 0 ? Math.max(0, Math.min(1, left / eng.breakSecsTotal)) : 0;
-      arc.setAttribute("stroke-dashoffset", (C * (1 - frac)).toFixed(2));
-    }
+    const frac = eng.breakSecsTotal > 0 ? Math.max(0, Math.min(1, left / eng.breakSecsTotal)) : 0;
+    if (arc) arc.setAttribute("stroke-dashoffset", (C * (1 - frac)).toFixed(2));
+    if (fill) fill.style.width = (frac * 100).toFixed(1) + "%";
     if (endBtn) {
       const wait = Math.max(0, (s.eyeBreakEndEarlyAfter || 0) - eng.breakSecsGone());
       const ok = eng.canEndEarly();
       endBtn.toggleClass("is-waiting", !ok);
       endBtn.setText(ok ? "End break early" : "End break early (" + wait + " s)");
     }
-    if (snoozeBtn) {
-      const left = eng.snoozesLeft();
-      snoozeBtn.toggleClass("is-off", left <= 0);
-      snoozeBtn.setText(left === Infinity || left <= 0 ? "Snooze " + s.eyeBreakSnoozeMins + " min" : "Snooze " + s.eyeBreakSnoozeMins + " min (" + left + " left)");
-    }
-    if (skipBtn) skipBtn.toggleClass("is-off", false);
-    foot.setText("Next eye break in " + s.eyeBreakEveryMins + " min");
+    if (foot) foot.setText("Next eye break in " + s.eyeBreakEveryMins + " min");
   };
   update();
-  return { update, num };
+  return { update };
 }
 
-// The popout view: a plain-DOM screen that reads the engine and re-renders on its own
-// window's clock (the popout's timers are not throttled while it is the front window).
+// The popout view: a plain-DOM screen that reads the engine, redraws when the phase or
+// layout changes, and refreshes on its own window's clock (the popout's timers are not
+// throttled while it is visible, unlike the main window's when Obsidian is behind an app).
 export class EyeBreakView extends ItemView {
   private eng: EyeBreakEngine;
   private fwin: any = null;
   private tick = 0;
+  private tickWin: any = null;   // the window that owns `tick` (interval ids are per-window)
   private unsub: (() => void) | null = null;
+  private rootEl: HTMLElement | null = null;
+  private screen: { update: () => void } | null = null;
+  private key = "";
   constructor(leaf: WorkspaceLeaf, eng: EyeBreakEngine) {
     super(leaf);
     this.eng = eng;
@@ -622,6 +735,8 @@ export class EyeBreakView extends ItemView {
   getViewType() { return VIEW_TYPE_EYE; }
   getDisplayText() { return "Eye break"; }
   getIcon() { return "eye"; }
+  // Idempotent: tags the popout body (headers hidden) once the view lives in its own
+  // window, and moves the refresh tick onto that window's clock.
   private tagWindow() {
     try {
       const doc = this.contentEl.ownerDocument;
@@ -629,36 +744,46 @@ export class EyeBreakView extends ItemView {
         doc.body.classList.add("focuslog-eye-window");
         const w = doc.defaultView;
         if (w && w !== this.fwin) {
-          try { (this.fwin || window).clearInterval(this.tick); } catch {}
+          try { (this.tickWin || window).clearInterval(this.tick); } catch {}
           this.fwin = w;
-          this.tick = w.setInterval(() => { this.eng.poll(); this.screen?.update(); }, 250);
+          this.tickWin = w;
+          this.tick = w.setInterval(() => { this.eng.poll(); this.paint(); }, 250);
         }
       }
     } catch {}
   }
-  private screen: { update: () => void } | null = null;
+  private paint() {
+    if (!this.rootEl || this.eng.phase === "idle") return;   // idle: the window is on its way out
+    const k = this.eng.phase + "|" + this.eng.layout;
+    if (k !== this.key) { this.key = k; this.screen = renderEyeScreen(this.rootEl, this.eng); }
+    else this.screen?.update();
+  }
   async onOpen() {
     const root = this.contentEl;
     root.empty();
     root.addClass("focuslog-eye");
     this.fwin = null;
-    this.screen = renderEyeScreen(root.createDiv(), this.eng);
-    this.unsub = this.eng.subscribe(() => this.screen?.update());
+    this.key = "";
+    this.rootEl = root.createDiv();
+    this.paint();
+    this.unsub = this.eng.subscribe(() => this.paint());
     this.tagWindow();
-    this.tick = window.setInterval(() => { this.tagWindow(); this.screen?.update(); }, 250);
+    if (!this.fwin) { this.tickWin = window; this.tick = window.setInterval(() => { this.tagWindow(); this.paint(); }, 250); }
   }
   async onClose() {
     try { this.unsub?.(); } catch {}
     this.unsub = null;
-    try { (this.fwin || window).clearInterval(this.tick); } catch {}
+    try { (this.tickWin || window).clearInterval(this.tick); } catch {}
     try { window.clearInterval(this.tick); } catch {}
     try { this.fwin && this.fwin.document.body.classList.remove("focuslog-eye-window"); } catch {}
     try { this.contentEl.ownerDocument.body.classList.remove("focuslog-eye-window"); } catch {}
     this.fwin = null;
+    this.tickWin = null;
+    this.rootEl = null;
     this.screen = null;
-    // Closed by hand (the OS close button) while a break was running: treat it as a skip so
-    // the engine does not keep counting a break whose screen is gone.
-    try { if (this.eng.phase === "break" && this.eng.settings.eyeBreakMode === "popup") window.setTimeout(() => { if (this.eng.phase === "break") this.eng.skip(); }, 0); } catch {}
+    // The engine's own closes move the phase to idle before this runs; a phase still live
+    // here means the window was closed by hand, which the engine treats as skip / end early.
+    try { window.setTimeout(() => this.eng.windowClosedByHand(), 0); } catch {}
   }
 }
 
@@ -666,7 +791,7 @@ export class EyeBreakView extends ItemView {
 export function buildEyeBreakSettings(containerEl: HTMLElement, s: EyeBreakSettings, save: () => Promise<void>, eng: EyeBreakEngine) {
   containerEl.createEl("h3", { text: "Eye breaks" });
   containerEl.createEl("p", {
-    text: "A rest reminder in the spirit of BreakTimer: every so often a full-screen window asks you to look away for a few seconds, then disappears. It runs whenever Obsidian is open and is independent of the pomodoro: it never pauses a task, a pomodoro or a Focus Log break.",
+    text: "A rest reminder in the spirit of BreakTimer: every so often a window asks you to look away for a few seconds, then disappears. A small card in the corner of your screen counts down first, above every app, without taking the keyboard from whatever you are typing in. It runs whenever Obsidian is open and is independent of the pomodoro: it never pauses a task, a pomodoro or a Focus Log break.",
     cls: "setting-item-description",
   });
 
@@ -688,17 +813,17 @@ export function buildEyeBreakSettings(containerEl: HTMLElement, s: EyeBreakSetti
 
   new Setting(containerEl)
     .setName("How the break appears")
-    .setDesc("A full-screen window over everything (desktop), or only a notice in Obsidian. Where the full-screen window cannot be made (mobile), a screen inside the Obsidian window stands in.")
-    .addDropdown((d) => d.addOption("popup", "Full-screen window").addOption("notice", "Notice only").setValue(s.eyeBreakMode).onChange(async (v) => { s.eyeBreakMode = (v as EyeBreakMode) || "popup"; await save(); }));
+    .setDesc("Full screen covers the display you are working on; the small window stays in its bottom-right corner. Both float above every app. Where no such window can be made (mobile), a screen inside Obsidian or a notice stands in.")
+    .addDropdown((d) => d.addOption("popup", "Full-screen window").addOption("card", "Small corner window").setValue(s.eyeBreakMode === "card" ? "card" : "popup").onChange(async (v) => { s.eyeBreakMode = v === "card" ? "card" : "popup"; await save(); }));
 
   new Setting(containerEl)
     .setName("Heads-up before the break")
-    .setDesc("A notice counts down this many seconds before the screen appears, with Now / Snooze / Skip. 0 starts the break at once.")
+    .setDesc("The corner card counts down this many seconds before the break, with Start now / Snooze / Skip. 0 starts the break with no warning (and no chance to snooze or skip it).")
     .addText((t) => { num(t, "5em"); t.setValue(String(s.eyeBreakWarnSecs)).onChange(async (v) => { s.eyeBreakWarnSecs = clampInt(v, 0, 300, 10); await save(); }); });
 
   const snooze = new Setting(containerEl)
     .setName("Snooze")
-    .setDesc("Let a break be pushed back by this many minutes. The limit caps how many times one break can be snoozed; 0 means no limit.");
+    .setDesc("Let the heads-up push a break back by this many minutes. The limit caps how many times one break can be snoozed; 0 means no limit.");
   snooze.addToggle((t) => t.setValue(s.eyeBreakAllowSnooze).onChange(async (v) => { s.eyeBreakAllowSnooze = v; await save(); }));
   snooze.addText((t) => { num(t, "5em"); t.setValue(String(s.eyeBreakSnoozeMins)).onChange(async (v) => { s.eyeBreakSnoozeMins = clampInt(v, 1, 240, 5); await save(); }); });
   snooze.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin:0 12px 0 5px" } });
@@ -707,12 +832,12 @@ export function buildEyeBreakSettings(containerEl: HTMLElement, s: EyeBreakSetti
 
   new Setting(containerEl)
     .setName("Skip")
-    .setDesc("Show a “Skip this break” button on the heads-up and on the break screen.")
+    .setDesc("Show a “Skip” button on the heads-up. A break already under way cannot be skipped, only ended early.")
     .addToggle((t) => t.setValue(s.eyeBreakAllowSkip).onChange(async (v) => { s.eyeBreakAllowSkip = v; await save(); }));
 
   const early = new Setting(containerEl)
     .setName("End early")
-    .setDesc("Show an “End break early” button once the break has run for this many seconds (0 = right away).");
+    .setDesc("The break screen's only button. It becomes active once the break has run for this many seconds (0 = right away).");
   early.addToggle((t) => t.setValue(s.eyeBreakAllowEndEarly).onChange(async (v) => { s.eyeBreakAllowEndEarly = v; await save(); }));
   early.addText((t) => { num(t, "5em"); t.setValue(String(s.eyeBreakEndEarlyAfter)).onChange(async (v) => { s.eyeBreakEndEarlyAfter = clampInt(v, 0, 3600, 5); await save(); }); });
   early.controlEl.createEl("span", { text: "s", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
@@ -747,7 +872,7 @@ export function buildEyeBreakSettings(containerEl: HTMLElement, s: EyeBreakSetti
 
   const colors = new Setting(containerEl)
     .setName("Colours")
-    .setDesc("Background and text of the break screen.");
+    .setDesc("Background and text of the break screen and the corner card.");
   colors.addColorPicker((c) => c.setValue(s.eyeBreakBg).onChange(async (v) => { s.eyeBreakBg = v; await save(); }));
   colors.controlEl.createEl("span", { text: "background", attr: { style: "font-size:12px;color:var(--text-muted);margin:0 12px 0 5px" } });
   colors.addColorPicker((c) => c.setValue(s.eyeBreakFg).onChange(async (v) => { s.eyeBreakFg = v; await save(); }));
@@ -755,7 +880,7 @@ export function buildEyeBreakSettings(containerEl: HTMLElement, s: EyeBreakSetti
 
   new Setting(containerEl)
     .setName("Window opacity")
-    .setDesc("How solid the full-screen window is. Below 100 the screen behind shows through.")
+    .setDesc("How solid the break window is. Below 100 the screen behind shows through.")
     .addSlider((sl) => sl.setLimits(20, 100, 5).setValue(s.eyeBreakOpacity).setDynamicTooltip().onChange(async (v) => { s.eyeBreakOpacity = v; await save(); }));
 
   new Setting(containerEl)
@@ -765,6 +890,6 @@ export function buildEyeBreakSettings(containerEl: HTMLElement, s: EyeBreakSetti
 
   new Setting(containerEl)
     .setName("Try it")
-    .setDesc("Start an eye break right now with the settings above.")
+    .setDesc("Start an eye break right now with the settings above, skipping the heads-up.")
     .addButton((b) => b.setButtonText("Take a break now").onClick(() => eng.startNow()));
 }
