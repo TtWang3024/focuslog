@@ -24547,6 +24547,7 @@ function toLocalDatetime(iso) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+var nameKey = (s) => String(s || "").trim().toLowerCase().replace(/[\u2018\u2019\u02BC\u00B4]/g, "'").replace(/\s+/g, " ");
 function stripLeadingTag(title) {
   const s = (title || "").trim();
   const m = s.match(/^(\[[^\]]*\]|#\S+)\s+/);
@@ -25047,7 +25048,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   const [tinyCarry, setTinyCarry] = useState4(0);
   const tinyPrev = useRef3(0);
   const tinyRun = useRef3(false);
-  const meta = tasks.find((t) => t.task === task) || {};
+  const meta = tasks.find((t) => t.task === task) || tasks.find((t) => nameKey(t.task) === nameKey(task)) || {};
   const buildAndAdd = (actualVal, expectedVal) => {
     const name = task.trim() || "Focus";
     const expOut = expectedVal >= 1 ? expectedVal : actualVal >= 1 ? actualVal : 0;
@@ -26219,7 +26220,15 @@ ${s.task}`))
     const cp = claimParse();
     if (cp.err || cp.st0 == null || cp.en0 == null)
       return;
-    const meta = tasks.find((t) => t.task === name) || null;
+    let meta = tasks.find((t) => t.task === name) || tasks.find((t) => nameKey(t.task) === nameKey(name)) || null;
+    let hierStr = meta ? hierarchyText(meta) : "";
+    if (!meta) {
+      const past = [...sessions].reverse().find((s) => nameKey(s.task) === nameKey(name) && (s.category || s.pageId));
+      if (past) {
+        meta = { task: past.task, category: past.category || null, id: past.pageId || null, pomodoros: 0, act: 0 };
+        hierStr = past.hierarchy || "";
+      }
+    }
     const now = Date.now();
     const bl = todayBlocks();
     const nowTl = cp.nt;
@@ -26272,7 +26281,7 @@ ${s.task}`))
     const chipN = [1, 2, 3, 4].find((k) => k * 25 + (k - 1) * sb0 === mins) || 0;
     const n = !mealsCovered.length && chipN ? chipN : tomatoesFor(workedMins);
     const realTs = (tl) => now - (nowTl - tl) * 6e4;
-    const newSess = [{ id: now, ts: realTs(segs[segs.length - 1].e), minutes: workedMins, task: name, hierarchy: meta ? hierarchyText(meta) : "", note: "", category: meta && meta.category || null, pageId: meta && meta.id || null, claimed: true }];
+    const newSess = [{ id: now, ts: realTs(segs[segs.length - 1].e), minutes: workedMins, task: name, hierarchy: hierStr, note: "", category: meta && meta.category || null, pageId: meta && meta.id || null, claimed: true }];
     persist([...sessions, ...newSess]);
     const dsKey = meta && meta.id || name;
     setDoneSess((m) => ({ ...m, [dsKey]: (m[dsKey] || 0) + n }));
@@ -26313,7 +26322,7 @@ ${s.task}`))
     if (api.appendDaily) {
       try {
         for (const g of segs)
-          await api.appendDaily({ ts: realTs(g.e), minutes: Math.round(g.e - g.s), task: name, hierarchy: meta ? hierarchyText(meta) : "", note: "#FocusLog/claimed", category: meta && meta.category || null });
+          await api.appendDaily({ ts: realTs(g.e), minutes: Math.round(g.e - g.s), task: name, hierarchy: hierStr, note: "#FocusLog/claimed", category: meta && meta.category || null });
         msg += " Added to daily note.";
       } catch (e) {
         msg += " Daily note skipped: " + ((e == null ? void 0 : e.message) || e);
