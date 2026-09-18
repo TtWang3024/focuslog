@@ -3,6 +3,8 @@ import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
 import FocusLogApp, { MACARON, MODE_COLORS, darken, fmtHM, parseHM, BREAK_SEASONS } from "./FocusLogApp";
 import { newestStarName } from "./skymap";
+import { getElectronRemote } from "./electron";
+import { EyeBreakEngine, EyeBreakView, EyeBreakState, VIEW_TYPE_EYE, DEFAULT_EYE_SETTINGS, EyeBreakSettings, buildEyeBreakSettings } from "./EyeBreak";
 
 // Solid glyphs for the float's controls (sized by the .flt-btn svg rule): minus/plus steppers,
 // play/pause for the primary and break toggles, and a bold rotate-left for reset.
@@ -43,25 +45,6 @@ const RATE_WEATHER = [
   { v: 4, img: rateSun, bg: "#89D2FF" },
 ];
 
-// Best-effort access to Electron's remote module so we can pin a popout window
-// on top of every other app. The module is deprecated and its availability
-// varies by Obsidian/Electron version, so every path is guarded and the feature
-// degrades gracefully (the window still opens, just not always-on-top).
-function getElectronRemote(): any {
-  const req = (mod: string) => {
-    try {
-      const r = (window as any).require;
-      return r ? r(mod) : null;
-    } catch {
-      return null;
-    }
-  };
-  const electron = req("electron");
-  if (electron && electron.remote) return electron.remote;
-  const remote = req("@electron/remote");
-  if (remote) return remote;
-  return null;
-}
 
 // Pause-category colours for the floating window's reason chips (internal=yellow, external=blue).
 const FLOAT_CAT: any = {
@@ -78,7 +61,7 @@ const FLOAT_PHASE_DEFAULTS: any = {
   celebrate: { w: 320, h: 440 }, // done + next-task + rating
 };
 
-export interface FocusLogSettings {
+export interface FocusLogSettings extends EyeBreakSettings {
   notionToken: string;
   databaseId: string;
   doneStatus: string;
@@ -152,6 +135,7 @@ export interface FocusLogSettings {
 export type NoiseChoice = "off" | "white" | "pink" | "brown";
 
 const DEFAULT_SETTINGS: FocusLogSettings = {
+  ...DEFAULT_EYE_SETTINGS,
   notionToken: "",
   databaseId: "24f3423255b680ce9dd5eb8eeece3ca0", // Pressure to Progress
   doneStatus: "",
@@ -295,6 +279,7 @@ interface PluginData {
   urgesSurfed: any[];
   timerRun: any;             // the live pomodoro mirrored to disk, so a quit loses nothing
   floatWasOpen: boolean;     // the float was up at quit, so the next launch reopens it properly
+  eyeBreak: EyeBreakState;   // the eye-break countdown, so a restart continues it on the wall clock
 }
 
 // ---------- Notion property parsing ----------
@@ -817,6 +802,8 @@ class TimerEngine {
 export default class FocusLogPlugin extends Plugin {
   data: PluginData;
   timer: TimerEngine;
+  eye: EyeBreakEngine;
+  private eyeStatusEl: HTMLElement | null = null;
   floatWin: any = null;
   private floatSubs = new Set<() => void>();
   // Background noise lives on the MAIN window (the float popout is rebuilt from scratch
@@ -853,6 +840,7 @@ export default class FocusLogPlugin extends Plugin {
       urgesSurfed: loaded.urgesSurfed || [],
       timerRun: loaded.timerRun ?? null,
       floatWasOpen: !!loaded.floatWasOpen,
+      eyeBreak: Object.assign({ nextAt: null, cycleStart: null, snoozed: 0, lastEnd: null, paused: false }, loaded.eyeBreak || {}),
       feelings: loaded.feelings || JSON.parse(JSON.stringify(DEFAULT_FEELINGS)),
       morningRoutine: loaded.morningRoutine || DEFAULT_MORNING.map((a) => ({ ...a })),
       nightRoutine: loaded.nightRoutine || DEFAULT_NIGHT.map((a) => ({ ...a })),
@@ -932,7 +920,7 @@ export default class FocusLogPlugin extends Plugin {
     this.registerDomEvent(document, "visibilitychange", () => { if (!document.hidden) this.timer.poll(); });
     // Catch our float popout the instant its OS window is created, so we can size
     // and place it before its first visible frame (no large-window-then-jump).
-    this.registerEvent(this.app.workspace.on("window-open", () => this.onFloatWindowOpen()));
+    this.registerEvent(this.app.workspace.on("window-open", () => { if (this.eye && this.eye.onWindowOpen()) return; this.onFloatWindowOpen(); }));
     // The Month calendar's chocolate outline follows the daily note you focus (today when none is).
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.updateActiveDaily()));
     this.app.workspace.onLayoutReady(() => {
@@ -942,12 +930,44 @@ export default class FocusLogPlugin extends Plugin {
       // "open daily note on startup" likes to land. Close every remnant, then reopen the float
       // properly if it was up at quit.
       this.app.workspace.getLeavesOfType(VIEW_TYPE_FLOAT).forEach((l) => l.detach());
+      // Likewise an eye-break screen restored from the layout: the engine reopens one when due.
+      this.app.workspace.getLeavesOfType(VIEW_TYPE_EYE).forEach((l) => l.detach());
       this.closeFloatRemnants();
       if (this.data.floatWasOpen) this.openFloating();
     });
 
     this.registerView(VIEW_TYPE, (leaf) => new FocusLogView(leaf, this));
     this.registerView(VIEW_TYPE_FLOAT, (leaf) => new FloatTimerView(leaf, this));
+    // ---------- eye breaks: an independent rest reminder that lives as long as Obsidian ----------
+    this.eye = new EyeBreakEngine({
+      app: this.app,
+      settings: () => this.data.settings,
+      state: () => this.data.eyeBreak,
+      persist: () => this.persist(),
+      focusLogBreakRunning: () => { try { return !!this.timer.getState().breakRunning; } catch { return false; } },
+      floatWindow: () => this.floatWin,
+      setBackgroundThrottle: (allowed: boolean) => { this.eyeWantsClock = !allowed; this.applyBackgroundThrottle(); },
+    });
+    this.registerView(VIEW_TYPE_EYE, (leaf) => new EyeBreakView(leaf, this.eye));
+    this.eye.start();
+    this.eyeStatusEl = this.addStatusBarItem();
+    this.eyeStatusEl.addClass("fl-eye-status");
+    this.eyeStatusEl.setAttribute("aria-label", "Eye breaks: click for now / snooze / skip / pause");
+    this.registerDomEvent(this.eyeStatusEl, "click", (e: MouseEvent) => this.eye.statusMenu(e));
+    const paintEyeStatus = () => {
+      const el = this.eyeStatusEl; if (!el) return;
+      const txt = this.data.settings.eyeBreakStatusBar === "off" ? "" : this.eye.statusText();
+      if (el.getText() !== txt) el.setText(txt);
+      el.toggleClass("is-hidden", !txt);
+    };
+    this.register(this.eye.subscribe(paintEyeStatus));
+    this.registerInterval(window.setInterval(paintEyeStatus, 1000));
+    paintEyeStatus();
+    this.addCommand({ id: "eye-break-now", name: "Eye break: take one now", callback: () => this.eye.startNow() });
+    this.addCommand({ id: "eye-break-snooze", name: "Eye break: snooze the next one", callback: () => this.eye.snooze() });
+    this.addCommand({ id: "eye-break-skip", name: "Eye break: skip the next one", callback: () => this.eye.skip() });
+    this.addCommand({ id: "eye-break-end", name: "Eye break: end the current one early", callback: () => this.eye.endEarly() });
+    this.addCommand({ id: "eye-break-toggle", name: "Eye break: pause / resume", callback: () => this.eye.togglePaused() });
     this.addRibbonIcon("bird", "Open Focus Log", () => this.activateView());
     this.addRibbonIcon("timer", "Toggle floating timer", () => this.toggleFloating());
     this.addCommand({ id: "open-focus-log", name: "Open Focus Log", callback: () => this.activateView() });
@@ -963,14 +983,25 @@ export default class FocusLogPlugin extends Plugin {
     try { if (this.noiseEl) { this.noiseEl.pause(); this.noiseEl.src = ""; } } catch {}
     this.noiseEl = null;
     this.timer?.dispose();
+    this.eye?.dispose();
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_FLOAT);
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_EYE);
   }
 
   // Enable/disable Electron's background timer throttling on the MAIN window. We
   // turn it OFF while a pomodoro counts (so the interval keeps firing every second
   // even when Obsidian is behind another app) and back ON when it stops, to be
   // battery-friendly the rest of the time.
+  // Two clocks may need it (the pomodoro engine and the eye-break countdown near its due
+  // time); the window is throttled again only when neither does.
+  private timerWantsClock = false;
+  private eyeWantsClock = false;
   setBackgroundThrottle(allowed: boolean) {
+    this.timerWantsClock = !allowed;
+    this.applyBackgroundThrottle();
+  }
+  private applyBackgroundThrottle() {
+    const allowed = !(this.timerWantsClock || this.eyeWantsClock);
     try {
       const remote = getElectronRemote();
       const win = remote && remote.getCurrentWindow ? remote.getCurrentWindow() : null;
@@ -1236,7 +1267,8 @@ export default class FocusLogPlugin extends Plugin {
       if (!remote || !remote.BrowserWindow) return;
       const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
       const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-      const win = all.filter((w: any) => !cur || w.id !== cur.id).pop();
+      const eye = this.eye ? this.eye.eyeWin : null;
+      const win = all.filter((w: any) => (!cur || w.id !== cur.id) && (!eye || w.id !== eye.id)).pop();
       if (!win) return;
       try { win.setOpacity(0); } catch {}
       this.pinFloatWindow(true, win);
@@ -1289,7 +1321,8 @@ export default class FocusLogPlugin extends Plugin {
       if (!win) {
         const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
         const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-        win = all.filter((w: any) => !cur || w.id !== cur.id).pop();
+        const eye = this.eye ? this.eye.eyeWin : null;
+        win = all.filter((w: any) => (!cur || w.id !== cur.id) && (!eye || w.id !== eye.id)).pop();
       }
       if (!win) return;
       if (this.data.settings.floatAlwaysOnTop !== false) {
@@ -3119,6 +3152,8 @@ class FocusLogSettingTab extends PluginSettingTab {
           await this.plugin.persist();
         })
       );
+
+    buildEyeBreakSettings(containerEl, this.plugin.data.settings, () => this.plugin.persist(), this.plugin.eye);
 
     containerEl.createEl("h3", { text: "Status calendar" });
 

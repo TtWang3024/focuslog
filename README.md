@@ -12,6 +12,7 @@ An Obsidian pomodoro companion that treats your day as something to *feel*, not 
 - **A living calendar.** Month squares are coloured by day type and time of day (overnight work glows gold), date numbers show at a glance which days have a daily note, the outline follows the note you have open, and right-clicking a day reveals, deletes, or flips it between work and relax.
 - **Urge surfing.** When the itch to switch hits mid-pomodoro, tap the wave: rate how strong it is on a vertical scale that doubles as the chart's axis, breathe with the circle, mark where you feel it on the rabbit and name the feeling around it. Then decide after the wave — park the thought, switch on purpose, or return to the task.
 - **A floating timer.** A tiny always-on-top window with the same clock, pause reasons, and a star celebration when you finish.
+- **Eye breaks.** A [BreakTimer](https://github.com/tom-james-watson/breaktimer-app)-style rest reminder that runs for as long as Obsidian does: every 20 minutes (yours to change) a full-screen window in your own colours asks you to look away for 20 seconds, with a heads-up countdown first, snooze, skip, and end-early, a status-bar clock to the next break, sounds, and an idle reset. It is independent of the pomodoro: it never pauses a task, a pomodoro, or a Focus Log break.
 
 Everything can be written into your daily notes: pomodoro blocks, pause reasons, and a per-day counter.
 
