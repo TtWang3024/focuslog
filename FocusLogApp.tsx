@@ -169,6 +169,8 @@ function toLocalDatetime(iso: string): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+// Loose task-name key: case, curly apostrophes and runs of whitespace never split a match.
+const nameKey = (s: any) => String(s || "").trim().toLowerCase().replace(/[\u2018\u2019\u02BC\u00B4]/g, "'").replace(/\s+/g, " ");
 // Drop a single leading [tag] or #tag token (used when a category chip already shows the area).
 function stripLeadingTag(title: string): string {
   const s = (title || "").trim();
@@ -1173,7 +1175,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
   const [tinyCarry, setTinyCarry] = useState(0);
   const tinyPrev = useRef(0);
   const tinyRun = useRef(false);
-  const meta: any = tasks.find((t: any) => t.task === task) || {};
+  const meta: any = tasks.find((t: any) => t.task === task) || tasks.find((t: any) => nameKey(t.task) === nameKey(task)) || {};
   // Build and log the session with explicit ratings (so a tap-to-log doesn't race React state).
   const buildAndAdd = (actualVal: number, expectedVal: number) => {
     // Rhythm first: an unnamed run logs as plain "Focus", and ratings the user skipped are
@@ -2265,7 +2267,17 @@ export default function FocusLogApp({ api }: any) {
     setClBusy(true);
     const cp = claimParse();
     if (cp.err || cp.st0 == null || cp.en0 == null) return;   // the popup names the problem
-    const meta = tasks.find((t: any) => t.task === name) || null;
+    let meta: any = tasks.find((t: any) => t.task === name) || tasks.find((t: any) => nameKey(t.task) === nameKey(name)) || null;
+    let hierStr = meta ? hierarchyText(meta) : "";
+    if (!meta) {
+      // The task may have left the Notion list already: borrow its area from the last session
+      // logged under the same name, so a late claim still lands in the right place.
+      const past = [...sessions].reverse().find((s: any) => nameKey(s.task) === nameKey(name) && (s.category || s.pageId));
+      if (past) {
+        meta = { task: past.task, category: past.category || null, id: past.pageId || null, pomodoros: 0, act: 0 };
+        hierStr = past.hierarchy || "";
+      }
+    }
     const now = Date.now();
     const bl = todayBlocks();
     // The claim owns the exact span you typed: end from the popup (now by default), start
@@ -2328,7 +2340,7 @@ export default function FocusLogApp({ api }: any) {
     // ONE session and ONE star per claim, however long: the stats and the Sky count deep-work
     // sittings, while Notion's Spend still receives the full rounded tomato count (n) so the
     // calibration data stays in real tomatoes.
-    const newSess: any[] = [{ id: now, ts: realTs(segs[segs.length - 1].e), minutes: workedMins, task: name, hierarchy: meta ? hierarchyText(meta) : "", note: "", category: (meta && meta.category) || null, pageId: (meta && meta.id) || null, claimed: true }];
+    const newSess: any[] = [{ id: now, ts: realTs(segs[segs.length - 1].e), minutes: workedMins, task: name, hierarchy: hierStr, note: "", category: (meta && meta.category) || null, pageId: (meta && meta.id) || null, claimed: true }];
     persist([...sessions, ...newSess]);
     // The pips read "done today" from doneSess, so a claim must feed it in TOMATOES,
     // exactly like n live pomodoros would have.
@@ -2361,7 +2373,7 @@ export default function FocusLogApp({ api }: any) {
     }
     if (api.appendDaily) {
       try {
-        for (const g of segs) await api.appendDaily({ ts: realTs(g.e), minutes: Math.round(g.e - g.s), task: name, hierarchy: meta ? hierarchyText(meta) : "", note: "#FocusLog/claimed", category: (meta && meta.category) || null });
+        for (const g of segs) await api.appendDaily({ ts: realTs(g.e), minutes: Math.round(g.e - g.s), task: name, hierarchy: hierStr, note: "#FocusLog/claimed", category: (meta && meta.category) || null });
         msg += " Added to daily note.";
       } catch (e: any) { msg += " Daily note skipped: " + (e?.message || e); }
     }
