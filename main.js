@@ -28497,6 +28497,7 @@ var DEFAULT_EYE_SETTINGS = {
   eyeBreakHoldDuringBreak: true,
   eyeBreakIdleMins: 5,
   eyeBreakIdleNotice: false,
+  eyeBreakKeepAwake: true,
   eyeBreakSound: "chime",
   eyeBreakVolume: 50,
   eyeBreakTitle: "Rest your eyes",
@@ -28643,6 +28644,14 @@ var EyeBreakEngine = class {
     // the 250 ms model push into our window
     this.pushing = false;
     // a push is in flight (its promise not yet back)
+    this.psbId = null;
+    // the power-save blocker while eye breaks are active
+    this.pushAt = 0;
+    // when the in-flight push started (a watchdog resets a push that never answers)
+    this.lastTick = 0;
+    // the previous poll's clock, to notice a sleep or a stalled app
+    this.mainHadFocus = false;
+    // was Obsidian the active app when our window came up? (else it must not be when it goes)
     this.idleWas = false;
     this.lastShownSec = -1;
     this.lastPersist = 0;
@@ -28658,7 +28667,14 @@ var EyeBreakEngine = class {
       this.schedule(false);
     else if (st.cycleStart + s.eyeBreakEveryMins * 6e4 < now)
       this.schedule(false);
-    this.iv = window.setInterval(() => this.poll(), 1e3);
+    this.iv = window.setInterval(() => {
+      try {
+        this.poll();
+      } catch (e) {
+        this.log("poll error: " + e);
+      }
+    }, 1e3);
+    this.syncClock();
   }
   dispose() {
     var _a;
@@ -28668,6 +28684,8 @@ var EyeBreakEngine = class {
     }
     this.phase = "idle";
     this.closeAll();
+    this.keepAwake(false);
+    this.host.setBackgroundThrottle(true);
     try {
       (_a = this.audio) == null ? void 0 : _a.close();
     } catch (e) {
@@ -28734,7 +28752,7 @@ var EyeBreakEngine = class {
       st.snoozed = 0;
     this.phase = "idle";
     this.closeAll();
-    this.host.setBackgroundThrottle(true);
+    this.syncClock();
     this.persistNow();
     this.emit();
   }
@@ -28742,6 +28760,7 @@ var EyeBreakEngine = class {
   applySettings() {
     const s = this.settings;
     const st = this.state;
+    this.syncClock();
     if (!s.eyeBreakEnabled) {
       this.cancelAll();
       return;
@@ -28760,7 +28779,7 @@ var EyeBreakEngine = class {
   cancelAll() {
     this.phase = "idle";
     this.closeAll();
-    this.host.setBackgroundThrottle(true);
+    this.syncClock();
     this.emit();
   }
   setPaused(paused) {
@@ -28791,7 +28810,7 @@ var EyeBreakEngine = class {
     st.nextAt = now + Math.max(1, s.eyeBreakSnoozeMins) * 6e4;
     this.phase = "idle";
     this.closeAll();
-    this.host.setBackgroundThrottle(true);
+    this.syncClock();
     this.persistNow();
     this.emit();
     return true;
@@ -28827,6 +28846,13 @@ var EyeBreakEngine = class {
       return;
     }
     const now = Date.now();
+    const gap = this.lastTick ? now - this.lastTick : 0;
+    this.lastTick = now;
+    if (gap > Math.max(12e4, this.breakSecsTotal * 1e3)) {
+      this.log("clock: gap of " + Math.round(gap / 1e3) + " s, fresh cycle");
+      this.schedule(false);
+      return;
+    }
     if (this.phase === "break") {
       if (now >= this.breakEndAt) {
         this.finishBreak(false);
@@ -28879,10 +28905,14 @@ var EyeBreakEngine = class {
       this.warnNum.setText(String(this.secsToNext()));
     this.emit();
   }
+  // Seconds without keyboard or mouse input, system-wide. A locked screen counts as away
+  // outright, whatever the idle setting: nobody is looking at it.
   idleSecs() {
     try {
       const remote = getElectronRemote();
       const pm = remote && remote.powerMonitor;
+      if (pm && typeof pm.getSystemIdleState === "function" && pm.getSystemIdleState(60) === "locked")
+        return 24 * 3600;
       if (pm && typeof pm.getSystemIdleTime === "function")
         return pm.getSystemIdleTime();
     } catch (e) {
@@ -28893,14 +28923,51 @@ var EyeBreakEngine = class {
     this.lastPersist = Date.now();
     void this.host.persist();
   }
+  // Breadcrumbs for the odd freeze: kept in the persisted state (last 60 lines) and echoed to
+  // the console, so what happened can be read back even when the window could not be.
+  log(msg) {
+    try {
+      const st = this.state;
+      const line = (/* @__PURE__ */ new Date()).toTimeString().slice(0, 8) + " " + msg;
+      st.log = [...(st.log || []).slice(-59), line];
+      console.debug("[focuslog eye] " + msg);
+    } catch (e) {
+    }
+  }
   persistThrottled() {
     if (Date.now() - this.lastPersist > 15e3)
       this.persistNow();
+  }
+  // The countdown lives on a timer inside Obsidian's main window. Left throttled, that timer
+  // runs about once a minute once the window has been hidden or minimized for a while (and
+  // macOS App Nap can stall it further), so the poll that would wake the clock never comes
+  // in time. While eye breaks are active the window therefore stays unthrottled throughout,
+  // and, if allowed, a power-save blocker keeps the app itself from napping.
+  syncClock() {
+    const on = this.isActive();
+    this.host.setBackgroundThrottle(!on);
+    this.keepAwake(on && !!this.settings.eyeBreakKeepAwake);
+  }
+  keepAwake(on) {
+    try {
+      const remote = getElectronRemote();
+      const psb = remote && remote.powerSaveBlocker;
+      if (!psb)
+        return;
+      if (on && this.psbId == null)
+        this.psbId = psb.start("prevent-app-suspension");
+      else if (!on && this.psbId != null) {
+        psb.stop(this.psbId);
+        this.psbId = null;
+      }
+    } catch (e) {
+    }
   }
   // ---------- the heads-up ----------
   // The corner card appears above every app; where no popout can be made, an Obsidian
   // notice with the same three buttons stands in.
   enterWarn() {
+    this.log("warn: heads-up " + (this.canPopout() ? "card" : "notice"));
     this.phase = "warn";
     this.layout = "card";
     this.host.setBackgroundThrottle(false);
@@ -28913,7 +28980,7 @@ var EyeBreakEngine = class {
   leaveWarn() {
     this.phase = "idle";
     this.closeAll();
-    this.host.setBackgroundThrottle(true);
+    this.syncClock();
   }
   // ---------- the break ----------
   startBreak() {
@@ -28926,11 +28993,13 @@ var EyeBreakEngine = class {
     this.breakEndAt = now + this.breakSecsTotal * 1e3;
     this.lastShownSec = -1;
     this.layout = s.eyeBreakMode === "card" ? "card" : "full";
+    this.log("break: start, layout " + this.layout + (this.eyeWin ? ", window up" : this.opening ? ", window opening" : ", no window"));
     this.host.setBackgroundThrottle(false);
     this.playSound("start");
-    if (this.eyeWin)
+    if (this.eyeWin) {
       this.applyLayout(this.eyeWin);
-    else if (this.opening) {
+      this.push();
+    } else if (this.opening) {
     } else if (this.canPopout())
       this.openWindow();
     else if (this.layout === "full")
@@ -28940,6 +29009,7 @@ var EyeBreakEngine = class {
     this.emit();
   }
   finishBreak(early) {
+    this.log("break: finish" + (early ? " (early)" : ""));
     this.state.lastEnd = Date.now();
     if (!early)
       this.playSound("end");
@@ -28986,27 +29056,44 @@ var EyeBreakEngine = class {
     const s = this.settings;
     let win;
     try {
-      win = new remote.BrowserWindow({
-        show: false,
-        frame: false,
-        focusable: false,
-        alwaysOnTop: true,
-        skipTaskbar: true,
-        movable: false,
-        minimizable: false,
-        maximizable: false,
-        fullscreenable: false,
-        hasShadow: true,
-        title: "Eye break",
-        width: CARD_W,
-        height: CARD_H,
-        backgroundColor: s.eyeBreakBg || DEFAULT_EYE_SETTINGS.eyeBreakBg,
-        webPreferences: { contextIsolation: true, nodeIntegration: false, backgroundThrottling: false }
-      });
+      this.mainHadFocus = document.hasFocus();
     } catch (e) {
+      this.mainHadFocus = false;
+    }
+    const opts = {
+      show: false,
+      frame: false,
+      focusable: false,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      hasShadow: true,
+      title: "Eye break",
+      width: CARD_W,
+      height: CARD_H,
+      backgroundColor: s.eyeBreakBg || DEFAULT_EYE_SETTINGS.eyeBreakBg,
+      webPreferences: { contextIsolation: true, nodeIntegration: false, backgroundThrottling: false }
+    };
+    try {
+      if (import_obsidian.Platform.isMacOS) {
+        try {
+          win = new remote.BrowserWindow({ ...opts, type: "panel" });
+        } catch (e) {
+          this.log("window: panel refused (" + e + "), plain window");
+          win = null;
+        }
+      }
+      if (!win)
+        win = new remote.BrowserWindow(opts);
+    } catch (e) {
+      this.log("window: create failed: " + e);
       this.fallback();
       return;
     }
+    this.log("window: created");
     this.eyeWin = win;
     this.opening = true;
     this.pinWindow(win);
@@ -29015,10 +29102,11 @@ var EyeBreakEngine = class {
       win.setOpacity(this.opacity());
     } catch (e) {
     }
-    const reveal = () => {
+    const reveal = (why) => {
       if (this.eyeWin !== win || !this.opening)
         return;
       this.opening = false;
+      this.log("window: reveal (" + why + "), layout " + this.layout);
       this.applyLayout(win);
       this.push();
       try {
@@ -29028,20 +29116,25 @@ var EyeBreakEngine = class {
           win.show();
       } catch (e) {
       }
+      try {
+        win.moveTop();
+      } catch (e) {
+      }
     };
     try {
-      win.webContents.once("did-finish-load", reveal);
+      win.webContents.once("did-finish-load", () => window.setTimeout(() => reveal("loaded"), 0));
     } catch (e) {
     }
     try {
-      win.on("closed", () => {
+      win.on("closed", () => window.setTimeout(() => {
         if (this.eyeWin !== win)
           return;
+        this.log("window: closed by hand");
         this.eyeWin = null;
         this.opening = false;
         this.stopPush();
-        window.setTimeout(() => this.windowClosedByHand(), 0);
-      });
+        this.windowClosedByHand();
+      }, 0));
     } catch (e) {
     }
     try {
@@ -29051,10 +29144,11 @@ var EyeBreakEngine = class {
       this.fallback();
       return;
     }
-    window.setTimeout(reveal, 1500);
+    window.setTimeout(() => reveal("timeout"), 1500);
     this.startPush();
   }
   fallback() {
+    this.log("fallback: no window, phase " + this.phase);
     if (this.phase === "warn")
       this.showWarnNotice();
     else if (this.phase === "break" && this.layout === "full")
@@ -29107,7 +29201,7 @@ var EyeBreakEngine = class {
     const area = d ? full ? d.bounds : d.workArea || d.bounds : null;
     let b = null;
     if (area) {
-      b = full ? { x: area.x, y: area.y, width: area.width, height: area.height } : { x: Math.round(area.x + area.width - CARD_W - CARD_GAP), y: Math.round(area.y + area.height - CARD_H - CARD_GAP), width: CARD_W, height: CARD_H };
+      b = full ? { x: area.x, y: area.y, width: area.width - 1, height: area.height - 1 } : { x: Math.round(area.x + area.width - CARD_W - CARD_GAP), y: Math.round(area.y + area.height - CARD_H - CARD_GAP), width: CARD_W, height: CARD_H };
     } else if (!full) {
       try {
         const cur = win.getBounds();
@@ -29136,15 +29230,46 @@ var EyeBreakEngine = class {
     const win = this.eyeWin;
     this.eyeWin = null;
     if (win) {
+      this.log("window: destroy");
       try {
         if (winId(win) >= 0)
           win.destroy();
       } catch (e) {
+        this.log("window: destroy failed: " + e);
       }
     }
+    if (win && !this.mainHadFocus)
+      window.setTimeout(() => this.restoreFocus(), 80);
     try {
       this.host.app.workspace.getLeavesOfType(VIEW_TYPE_EYE).forEach((l) => l.detach());
     } catch (e) {
+    }
+  }
+  // Obsidian was in the background when the window came up; if the window's going (or a click
+  // in it) left Obsidian active, step back out of the way: hide the app, which on macOS hands
+  // focus to the previous app (BreakTimer's own trick). With the floating timer open, hiding
+  // would take it along, so the main window only drops behind instead.
+  restoreFocus() {
+    try {
+      if (!document.hasFocus())
+        return;
+      const remote = getElectronRemote();
+      if (!remote)
+        return;
+      const flt = this.host.floatWindow();
+      if (flt && winId(flt) >= 0) {
+        const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
+        this.log("focus: obsidian came forward, sending the main window back (float open)");
+        try {
+          cur && cur.blur();
+        } catch (e) {
+        }
+      } else if (remote.app && remote.app.hide) {
+        this.log("focus: obsidian came forward, hiding it again");
+        remote.app.hide();
+      }
+    } catch (e) {
+      this.log("focus: restore failed: " + e);
     }
   }
   // ---------- painting the window ----------
@@ -29164,27 +29289,37 @@ var EyeBreakEngine = class {
   }
   push() {
     const win = this.eyeWin;
-    if (!win || this.opening || this.pushing || this.phase === "idle")
+    if (!win || this.opening || this.phase === "idle")
       return;
+    if (this.pushing) {
+      if (Date.now() - this.pushAt < 2e3)
+        return;
+      this.log("push: no answer in 2 s, resetting");
+      this.pushing = false;
+    }
     let p;
     try {
       p = win.webContents.executeJavaScript("window.__eyeSync(" + JSON.stringify(this.model()) + ")", true);
     } catch (e) {
+      this.log("push: call failed: " + e);
       return;
     }
     this.pushing = true;
+    this.pushAt = Date.now();
     Promise.resolve(p).then(
       (act) => {
         this.pushing = false;
         if (act)
-          this.act(String(act));
+          window.setTimeout(() => this.act(String(act)), 0);
       },
-      () => {
+      (e) => {
         this.pushing = false;
+        this.log("push: rejected: " + e);
       }
     );
   }
   act(a) {
+    this.log("act: " + a + " (phase " + this.phase + ")");
     if (a === "now")
       this.startNow();
     else if (a === "snooze")
@@ -29669,7 +29804,7 @@ function buildEyeBreakSettings(containerEl, s, save, eng) {
     s.eyeBreakHoldDuringBreak = v;
     await save();
   }));
-  const idle = new import_obsidian.Setting(containerEl).setName("Restart the countdown after being away").setDesc("If the computer sees no input for this many minutes, the countdown starts over when you return (0 = off). Needs Obsidian's Electron idle API; ignored where it is missing.");
+  const idle = new import_obsidian.Setting(containerEl).setName("Restart the countdown after being away").setDesc("If the computer sees no keyboard or mouse input for this many minutes, the countdown holds and starts over when you return (0 = off). Watching a video counts as no input, so set this to 0 if breaks should still come during films. A locked screen and a sleeping Mac always count as away.");
   idle.addText((t) => {
     num(t, "5em");
     t.setValue(String(s.eyeBreakIdleMins)).onChange(async (v) => {
@@ -29685,6 +29820,11 @@ function buildEyeBreakSettings(containerEl, s, save, eng) {
       await save();
     });
   });
+  new import_obsidian.Setting(containerEl).setName("Keep Obsidian awake for eye breaks").setDesc("Stops macOS from napping a minimized or hidden Obsidian, so breaks land on time while you work in other apps. While it is on, the Mac will not go to sleep by itself as long as Obsidian is open (the display still can).").addToggle((t) => t.setValue(s.eyeBreakKeepAwake).onChange(async (v) => {
+    s.eyeBreakKeepAwake = v;
+    await save();
+    eng.applySettings();
+  }));
   const snd = new import_obsidian.Setting(containerEl).setName("Sound").setDesc("A short tone when a break starts and when it ends, with its loudness.");
   snd.addDropdown((d) => d.addOption("none", "Silent").addOption("chime", "Chime").addOption("blip", "Blip").setValue(s.eyeBreakSound).onChange(async (v) => {
     s.eyeBreakSound = v || "none";
