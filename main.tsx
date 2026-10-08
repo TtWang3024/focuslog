@@ -26,6 +26,24 @@ import whiteNoiseMp3 from "./assets/white_noise.mp3";
 import pinkNoiseMp3 from "./assets/pink_noise.mp3";
 import brownNoiseMp3 from "./assets/brown_noise.mp3";
 const NOISE_SRC: Record<string, string> = { white: whiteNoiseMp3, pink: pinkNoiseMp3, brown: brownNoiseMp3 };
+// A media element is handed each noise as a Blob URL, never the 5 MB data URL itself: a URL
+// that long sits past Chromium's 2 MB URL cap on some Electron versions, and the element
+// then fails silently. Decoded once per noise, on first use.
+const NOISE_URL_CACHE: Record<string, string> = {};
+function noiseUrl(which: string): string {
+  if (NOISE_URL_CACHE[which]) return NOISE_URL_CACHE[which];
+  const data = NOISE_SRC[which] || "";
+  try {
+    const comma = data.indexOf(",");
+    const bin = atob(data.slice(comma + 1));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    NOISE_URL_CACHE[which] = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
+  } catch {
+    NOISE_URL_CACHE[which] = data;   // no atob/Blob here: the data URL is still worth a try
+  }
+  return NOISE_URL_CACHE[which];
+}
 import rateRain from "./assets/rate-rain.png";
 import rateClouds from "./assets/rate-clouds.png";
 import ratePartly from "./assets/rate-partly-sunny.png";
@@ -815,6 +833,7 @@ export default class FocusLogPlugin extends Plugin {
   // every open, so audio owned there would die with it). Lazy: never allocated while muted.
   private noiseEl: HTMLAudioElement | null = null;
   private noiseTrack = "";
+  private noiseRetried = false;   // the plugin-folder fallback was already tried for this track
   private noiseSubs = new Set<() => void>();
   private pauseSubs = new Set<() => void>();   // panel re-syncs its pauses list when these fire
   private sessionSubs = new Set<() => void>(); // panel re-reads its sessions when these fire (e.g. a float quick-log)
@@ -1193,14 +1212,40 @@ export default class FocusLogPlugin extends Plugin {
     const s = this.timer ? this.timer.getState() : null;
     const want: NoiseChoice = !s || !st ? "off" : s.breakRunning ? (st.noiseBreak || "off") : s.running ? (st.noiseFocus || "off") : "off";
     if (want === "off" || !st) { if (this.noiseEl && !this.noiseEl.paused) this.noiseEl.pause(); return; }
-    if (!this.noiseEl) { this.noiseEl = new Audio(); this.noiseEl.loop = true; }
+    if (!this.noiseEl) {
+      const el = new Audio();
+      el.loop = true;
+      el.preload = "auto";
+      // A load failure is said once, out loud: a silent catch hid the last one for weeks.
+      // The first failure also retries from the plugin folder's copy of the file, if any.
+      el.addEventListener("error", () => {
+        const code = el.error ? el.error.code : 0;
+        console.error("Focus Log: background noise failed to load", { track: this.noiseTrack, code, message: el.error && el.error.message });
+        if (!this.noiseRetried && this.noiseTrack) {
+          this.noiseRetried = true;
+          try {
+            el.src = this.app.vault.adapter.getResourcePath(normalizePath((this.manifest.dir || "") + "/assets/" + this.noiseTrack + "_noise.mp3"));
+            el.play().catch(() => {});
+            return;
+          } catch {}
+        }
+        new Notice("Focus Log: the " + this.noiseTrack + " noise could not be played (media error " + code + ").", 6000);
+      });
+      this.noiseEl = el;
+    }
     const vol = Math.max(0, Math.min(1, (st.noiseVolume ?? 40) / 100));
     if (this.noiseEl.volume !== vol) this.noiseEl.volume = vol;
     if (this.noiseTrack !== want) {
-      this.noiseEl.src = NOISE_SRC[want];
       this.noiseTrack = want;
+      this.noiseRetried = false;
+      this.noiseEl.src = noiseUrl(want);
     }
-    if (this.noiseEl.paused) this.noiseEl.play().catch(() => {});
+    if (this.noiseEl.paused) {
+      this.noiseEl.play().catch((e: any) => {
+        console.error("Focus Log: background noise play() rejected", e);
+        new Notice("Focus Log: the " + want + " noise did not start: " + (e && e.message || e), 6000);
+      });
+    }
   }
   async setNoisePref(phase: "focus" | "break", v: NoiseChoice) {
     if (phase === "break") this.data.settings.noiseBreak = v; else this.data.settings.noiseFocus = v;
