@@ -25275,7 +25275,10 @@ function FocusLogApp({ api }) {
       return;
     return api.onActiveDaily((ts) => setActiveDaily(ts));
   }, []);
-  const [preset, setPreset] = useState4("");
+  const [preset, setPreset] = useState4(() => {
+    const st = api.timer ? api.timer.getState() : null;
+    return st && st.startedAt == null && !st.running ? st.taskName || "" : "";
+  });
   const [monthOff, setMonthOff] = useState4(0);
   const [todayFlash, setTodayFlash] = useState4(false);
   const [introOpen, setIntroOpen] = useState4(false);
@@ -25542,10 +25545,13 @@ function FocusLogApp({ api }) {
   const togglePick = (id) => api.timer.toggleBreakPick && api.timer.toggleBreakPick(id);
   const endBreak = () => {
     api.timer.endBreak && api.timer.endBreak();
-    if (chooseNext && nextTask) {
-      setPreset(nextTask);
+    const parked = api.timer ? api.timer.getState().taskName || "" : "";
+    const next = parked || (chooseNext ? nextTask : "");
+    if (next) {
+      if (!parked && api.timer.setTask)
+        api.timer.setTask(next);
+      setPreset(next);
       setNextTask("");
-      resetTimer();
       setView("log");
     } else
       setView("today");
@@ -25756,6 +25762,10 @@ function FocusLogApp({ api }) {
       setView("break");
   }, [brk.active]);
   useEffect2(() => {
+    if (!brk.active && !timer.running && !timer.paused && timer.startedAt == null && timer.taskName)
+      setPreset(timer.taskName);
+  }, [brk.active]);
+  useEffect2(() => {
     if (!api.onBreaksChange)
       return;
     return api.onBreaksChange(() => {
@@ -25930,6 +25940,11 @@ ${s.task}`))
     persist([...sessions, s]);
     api.timer.commitPendingPause();
     resetTimer();
+    if (chooseNext && nextTask) {
+      api.timer.setTask && api.timer.setTask(nextTask);
+      setPreset(nextTask);
+      setNextTask("");
+    }
     const key = s.pageId || s.task;
     setDoneSess((m) => ({ ...m, [key]: (m[key] || 0) + 1 }));
     const starName = newestStarName(sessions.length + 1);
@@ -30232,7 +30247,7 @@ var TimerEngine = class {
   // What a quit must not lose: everything needed to rebuild this run from the wall clock.
   runSnapshot() {
     if (this.startedAt == null && !this.running && !this.paused && !this.breakActive)
-      return null;
+      return this.taskName ? { idle: true, task: this.taskName, startedAt: null, brk: null } : null;
     return {
       running: this.running,
       paused: this.paused,
@@ -30269,6 +30284,8 @@ var TimerEngine = class {
     if (!run)
       return null;
     let kind = null;
+    if (run.startedAt == null && typeof run.task === "string")
+      this.taskName = run.task;
     if (run.startedAt != null) {
       this.lengthMin = Math.max(5, Math.min(30, Math.round(run.lengthMin) || this.lengthMin));
       this.total = run.total || this.lengthMin * 60;
@@ -30481,12 +30498,12 @@ var TimerEngine = class {
     this.endTs = 0;
     this.startedAt = null;
     this.adoptedRun = false;
-    this.pushSnap();
     this.taskName = "";
     this.expected = 0;
     this.pauseStart = null;
     this.pauseTag = "";
     this.fired = {};
+    this.pushSnap();
     this.stopTick();
     this.emit();
   }
@@ -31547,7 +31564,7 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
     if (this.isFloatingOpen())
       (_a = this.floatView()) == null ? void 0 : _a.celebrate();
     else
-      new CelebrateModal(this.app).open();
+      new CelebrateModal(this.app, this.timer.getState().taskName).open();
   }
   // The engine mirrors its live run here on every state change; null clears it.
   saveTimerRun(snap) {
@@ -32387,7 +32404,7 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
         } catch (e) {
         }
       },
-      celebrate: () => new CelebrateModal(self.app).open(),
+      celebrate: () => new CelebrateModal(self.app, self.timer.getState().taskName).open(),
       timer: {
         getState: () => self.timer.getState(),
         subscribe: (fn) => self.timer.subscribe(fn),
@@ -32442,11 +32459,17 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
   }
 };
 var CelebrateModal = class extends import_obsidian2.Modal {
+  constructor(app, taskName = "") {
+    super(app);
+    this.taskName = (taskName || "").trim();
+  }
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("focuslog-celebrate");
     contentEl.createEl("div", { text: "\u{1F389}", cls: "fl-popper" });
     contentEl.createEl("h2", { text: "Pomodoro complete" });
+    if (this.taskName)
+      contentEl.createEl("div", { text: this.taskName, cls: "fl-celebrate-task" });
     contentEl.createEl("p", { text: "One block done. Log how enjoyable it actually was." });
     const confetti = contentEl.createDiv({ cls: "fl-confetti" });
     const colors = ["#d98324", "#2f6f8f", "#5b8c5a", "#b4533a", "#c9a227"];
@@ -32800,6 +32823,8 @@ var FloatTimerView = class extends import_obsidian2.ItemView {
       sel.empty();
       sel.createEl("option", { text: tasks.length ? "Link a task (optional)" : "- no tasks (sync first) -", value: "" });
       tasks.forEach((t) => sel.createEl("option", { text: t.task + (t.king ? " \u{1F451}" : ""), value: t.task }));
+      if (setupTask && !tasks.some((t) => t.task === setupTask))
+        sel.createEl("option", { text: setupTask, value: setupTask });
       sel.value = setupTask;
     }
     if (!this.els.setupRate.childElementCount)
@@ -32993,6 +33018,11 @@ var FloatTimerView = class extends import_obsidian2.ItemView {
     };
     el.createDiv({ cls: "flt-pop", text: "\u{1F389}" });
     el.createDiv({ cls: "flt-clabel", text: "complete" });
+    const doneName = (this.plugin.timer.getState().taskName || "").trim();
+    if (doneName) {
+      const dn = el.createDiv({ cls: "flt-ctask", text: doneName });
+      dn.setAttribute("title", doneName);
+    }
     let done = false;
     const opts = el.createDiv({ cls: "flt-copts" });
     const doneLabel = opts.createEl("label", { cls: "flt-donebox" });

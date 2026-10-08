@@ -500,7 +500,8 @@ class TimerEngine {
   }
   // What a quit must not lose: everything needed to rebuild this run from the wall clock.
   private runSnapshot(): any {
-    if (this.startedAt == null && !this.running && !this.paused && !this.breakActive) return null;
+    // Idle: only a task picked for the next pomodoro is worth keeping, so a reload remembers it.
+    if (this.startedAt == null && !this.running && !this.paused && !this.breakActive) return this.taskName ? { idle: true, task: this.taskName, startedAt: null, brk: null } : null;
     return { running: this.running, paused: this.paused, endTs: this.endTs, frozenSecs: this.frozenSecs,
       total: this.total, lengthMin: this.lengthMin, task: this.taskName, expected: this.expected,
       startedAt: this.startedAt, pauseStart: this.pauseStart, pauseTag: this.pauseTag,
@@ -515,6 +516,8 @@ class TimerEngine {
   adopt(run: any): "running" | "paused" | "finished" | "break-running" | "break-paused" | "break-finished" | null {
     if (!run) return null;
     let kind: "running" | "paused" | "finished" | null = null;
+    // A task picked for the next pomodoro (parked through a break, or idle) comes back too.
+    if (run.startedAt == null && typeof run.task === "string") this.taskName = run.task;
     if (run.startedAt != null) {
       this.lengthMin = Math.max(5, Math.min(30, Math.round(run.lengthMin) || this.lengthMin));
       this.total = run.total || this.lengthMin * 60;
@@ -668,12 +671,12 @@ class TimerEngine {
     this.endTs = 0;
     this.startedAt = null;
     this.adoptedRun = false;
-    this.pushSnap();   // startedAt is null now, so this clears the on-disk run
     this.taskName = "";
     this.expected = 0;
     this.pauseStart = null;
     this.pauseTag = "";
     this.fired = {};
+    this.pushSnap();   // after the task is cleared, so this clears the on-disk run
     this.stopTick();
     this.emit();
   }
@@ -1479,7 +1482,7 @@ export default class FocusLogPlugin extends Plugin {
     // When the floating window is up, it owns the celebration (tap it to jump to the
     // log view) — no extra modal. Fall back to the modal only if there's no float.
     if (this.isFloatingOpen()) this.floatView()?.celebrate();
-    else new CelebrateModal(this.app).open();
+    else new CelebrateModal(this.app, this.timer.getState().taskName).open();
   }
 
   // The engine mirrors its live run here on every state change; null clears it.
@@ -2215,7 +2218,7 @@ export default class FocusLogPlugin extends Plugin {
           n.noticeEl.addEventListener("click", () => { try { onClick(); } catch (e) {} n.hide(); });
         } catch (e) {}
       },
-      celebrate: () => new CelebrateModal(self.app).open(),
+      celebrate: () => new CelebrateModal(self.app, self.timer.getState().taskName).open(),
       timer: {
         getState: () => self.timer.getState(),
         subscribe: (fn: () => void) => self.timer.subscribe(fn),
@@ -2261,11 +2264,14 @@ export default class FocusLogPlugin extends Plugin {
 }
 
 class CelebrateModal extends Modal {
+  private taskName: string;
+  constructor(app: App, taskName = "") { super(app); this.taskName = (taskName || "").trim(); }
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("focuslog-celebrate");
     contentEl.createEl("div", { text: "\u{1F389}", cls: "fl-popper" });
     contentEl.createEl("h2", { text: "Pomodoro complete" });
+    if (this.taskName) contentEl.createEl("div", { text: this.taskName, cls: "fl-celebrate-task" });
     contentEl.createEl("p", { text: "One block done. Log how enjoyable it actually was." });
     const confetti = contentEl.createDiv({ cls: "fl-confetti" });
     const colors = ["#d98324", "#2f6f8f", "#5b8c5a", "#b4533a", "#c9a227"];
@@ -2612,6 +2618,8 @@ class FloatTimerView extends ItemView {
       sel.empty();
       sel.createEl("option", { text: tasks.length ? "Link a task (optional)" : "- no tasks (sync first) -", value: "" });
       tasks.forEach((t: any) => sel.createEl("option", { text: t.task + (t.king ? " \u{1F451}" : ""), value: t.task }));
+      // A picked task that has left the list (marked Done, or a re-sync) still shows, as in the panel.
+      if (setupTask && !tasks.some((t: any) => t.task === setupTask)) sel.createEl("option", { text: setupTask, value: setupTask });
       sel.value = setupTask;
     }
     if (!this.els.setupRate.childElementCount) this.buildSetupRate();
@@ -2777,6 +2785,9 @@ class FloatTimerView extends ItemView {
     const dismiss = () => { el.removeClass("show"); el.empty(); el.onclick = null; this.celebrateShown = false; this.plugin.syncFloatPhase(false); };
     el.createDiv({ cls: "flt-pop", text: "\u{1F389}" });
     el.createDiv({ cls: "flt-clabel", text: "complete" });
+    // Which task just finished, quietly under the headline (the engine holds it until the log).
+    const doneName = (this.plugin.timer.getState().taskName || "").trim();
+    if (doneName) { const dn = el.createDiv({ cls: "flt-ctask", text: doneName }); dn.setAttribute("title", doneName); }
     // Decisions first (Done? next task?), then the rating — tapping a number is the final
     // act: it logs straight from here with whatever was chosen above.
     let done = false;

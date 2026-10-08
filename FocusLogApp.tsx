@@ -1459,7 +1459,8 @@ export default function FocusLogApp({ api }: any) {
   // The daily note focused in the workspace (ms timestamp), null when none: drives the calendar outline.
   const [activeDaily, setActiveDaily] = useState<number | null>(api.getActiveDaily ? api.getActiveDaily() : null);
   useEffect(() => { if (!api.onActiveDaily) return; return api.onActiveDaily((ts: number | null) => setActiveDaily(ts)); }, []);
-  const [preset, setPreset] = useState("");
+  // Start from a task already parked on the idle engine (picked before a reload, or after a break).
+  const [preset, setPreset] = useState<string>(() => { const st: any = api.timer ? api.timer.getState() : null; return st && st.startedAt == null && !st.running ? (st.taskName || "") : ""; });
   const [monthOff, setMonthOff] = useState(0);
   const [todayFlash, setTodayFlash] = useState(false);   // brief pill behind TODAY confirming the click
   const [introOpen, setIntroOpen] = useState(false);   // the Timeline's formatted how-it-works hover card
@@ -1711,7 +1712,11 @@ export default function FocusLogApp({ api }: any) {
   const togglePick = (id: string) => api.timer.toggleBreakPick && api.timer.toggleBreakPick(id);
   const endBreak = () => {
     api.timer.endBreak && api.timer.endBreak();
-    if (chooseNext && nextTask) { setPreset(nextTask); setNextTask(""); resetTimer(); setView("log"); }
+    // The next task waits on the engine (parked when the pomodoro was logged). No reset here:
+    // the timer is already idle, and a reset is exactly what used to wipe that task.
+    const parked = api.timer ? (api.timer.getState().taskName || "") : "";
+    const next = parked || (chooseNext ? nextTask : "");
+    if (next) { if (!parked && api.timer.setTask) api.timer.setTask(next); setPreset(next); setNextTask(""); setView("log"); }
     else setView("today");
   };
   const addActivity = () => {
@@ -1879,6 +1884,8 @@ export default function FocusLogApp({ api }: any) {
   // Follow the engine into the break view whenever a break begins (e.g. one started from
   // the floating window), and refresh activities/breaks when the engine commits one.
   useEffect(() => { if (brk.active) setView("break"); }, [brk.active]);
+  // A break ended from the float (or anywhere else) hands its parked next task to the log form.
+  useEffect(() => { if (!brk.active && !timer.running && !timer.paused && timer.startedAt == null && timer.taskName) setPreset(timer.taskName); }, [brk.active]);
   useEffect(() => {
     if (!api.onBreaksChange) return;
     return api.onBreaksChange(() => {
@@ -2018,6 +2025,9 @@ export default function FocusLogApp({ api }: any) {
     persist([...sessions, s]);
     api.timer.commitPendingPause(); // write any open pause before clearing the timer
     resetTimer();
+    // Park the chosen next task on the shared engine, not only in this form's state: it then
+    // survives ending the break early, ending it from the float, and a plugin reload.
+    if (chooseNext && nextTask) { api.timer.setTask && api.timer.setTask(nextTask); setPreset(nextTask); setNextTask(""); }
     const key = s.pageId || s.task;
     setDoneSess((m: any) => ({ ...m, [key]: (m[key] || 0) + 1 }));
     // Clicking "Light up a star" logs the pomodoro, then jumps to the break as before. A notice (which

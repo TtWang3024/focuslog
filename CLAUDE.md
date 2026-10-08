@@ -44,6 +44,9 @@ Obsidian vault. Whatever is checked out here is what Obsidian runs.
 - The eye break opens its **own hidden, non-focusable BrowserWindow** (a macOS panel) shown inactive, so
   Obsidian never jumps in front of the user's current app. Never go back to an Obsidian popout leaf for
   it, and never use Electron's simple full screen (it rendered a blank window).
+- The **next task** chosen on completion is parked on the timer engine's `taskName` at log time (both the
+  float's quick-log and the panel's `logPomodoro`), and the idle engine saves it to disk. Never call the
+  engine's `reset()` when a break ends: the timer is already idle, and reset wipes the parked task.
 
 ## Git in this repo
 
