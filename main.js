@@ -29890,23 +29890,15 @@ var FLT_NOISE_MUTE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height=
 var FLT_NOISE_WAVE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="m18,17c-.553,0-1-.447-1-1v-8c0-.553.447-1,1-1s1,.447,1,1v8c0,.553-.447,1-1,1Zm-3,6V1c0-.553-.447-1-1-1s-1,.447-1,1v22c0,.553.447,1,1,1s1-.447,1-1Zm8-4V5c0-.553-.447-1-1-1s-1,.447-1,1v14c0,.553.447,1,1,1s1-.447,1-1Zm-12,0V5c0-.553-.447-1-1-1s-1,.447-1,1v14c0,.553.447,1,1,1s1-.447,1-1Zm-4-3v-8c0-.553-.447-1-1-1s-1,.447-1,1v8c0,.553.447,1,1,1s1-.447,1-1Zm-4-2v-4c0-.553-.447-1-1-1s-1,.447-1,1v4c0,.553.447,1,1,1s1-.447,1-1Z"/></svg>`;
 var FLT_CHECK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 507.506 507.506" fill="currentColor"><path d="M163.865,436.934c-14.406,0.006-28.222-5.72-38.4-15.915L9.369,304.966c-12.492-12.496-12.492-32.752,0-45.248l0,0c12.496-12.492,32.752-12.492,45.248,0l109.248,109.248L452.889,79.942c12.496-12.492,32.752-12.492,45.248,0l0,0c12.492,12.496,12.492,32.752,0,45.248L202.265,421.019C192.087,431.214,178.271,436.94,163.865,436.934z"/></svg>`;
 var NOISE_SRC = { white: white_noise_default, pink: pink_noise_default, brown: brown_noise_default };
-// A media element is handed each noise as a Blob URL, never the 5 MB data URL itself: a URL
-// that long sits past Chromium's 2 MB URL cap on some Electron versions, and the element
-// then fails silently. Decoded once per noise, on first use.
-var NOISE_URL_CACHE = {};
-function noiseUrl(which) {
-  if (NOISE_URL_CACHE[which]) return NOISE_URL_CACHE[which];
+// The noises reach the ear through Web Audio, not an <audio> element: a decoded buffer on an
+// AudioBufferSourceNode loops sample-accurately, while the element's `loop` left an audible gap
+// at the two-minute turn of every track. Each track is decoded from its data URL on first use.
+function noiseBytes(which) {
   const data = NOISE_SRC[which] || "";
-  try {
-    const comma = data.indexOf(",");
-    const bin = atob(data.slice(comma + 1));
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    NOISE_URL_CACHE[which] = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
-  } catch (e) {
-    NOISE_URL_CACHE[which] = data;   // no atob/Blob here: the data URL is still worth a try
-  }
-  return NOISE_URL_CACHE[which];
+  const bin = atob(data.slice(data.indexOf(",") + 1));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
 }
 var VIEW_TYPE = "focuslog-view";
 var SEA_WAVE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="m6.5 9c-3.006 0-6.5 1.747-6.5 4 0 1.103.897 2 2 2 .415 0 .8-.127 1.12-.344.273.78 1.008 1.344 1.88 1.344.798 0 1.483-.473 1.804-1.15.782.779 1.196 1.829 1.196 3.15 0 2.198-1.794 3.987-4 3.987-.875 0-1.68-.276-2.392-.821-.438-.334-1.065-.254-1.402.187-.336.438-.252 1.066.186 1.401 1.054.806 2.301 1.233 3.606 1.233l11 .013c.334 0 .646-.167.832-.445.048-.071 1.168-1.784 1.168-4.555 0-5.607-4.612-10-10.5-10zm16.621 13.391-.136.78c-.083.479-.499.829-.985.829h-4.132c.451-.897 1.132-2.632 1.132-5 0-4.159-2.101-7.756-5.357-9.901-.564-1.793-1.752-2.992-3.182-3.71-.182.917-.991 1.611-1.961 1.611-1.009 0-1.837-.753-1.972-1.725-.367.439-.912.725-1.528.725-1.103 0-2-.897-2-2 .006-.459.178-.929.469-1.272.965-1.37 3.401-2.728 7.09-2.728 7.565 0 13.492 5.603 13.492 12.755.148 3.468-.4 6.603-.931 9.635z"/></svg>`;
@@ -30668,9 +30660,14 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
     this.floatSubs = /* @__PURE__ */ new Set();
     // Background noise lives on the MAIN window (the float popout is rebuilt from scratch
     // every open, so audio owned there would die with it). Lazy: never allocated while muted.
-    this.noiseEl = null;
+    this.noiseCtx = null;
+    // created on first use; suspended = paused (position kept)
+    this.noiseGain = null;
+    this.noiseSrc = null;
     this.noiseTrack = "";
-    this.noiseRetried = false;
+    // the track that is playing or decoding
+    this.noiseLoadId = 0;
+    // bumps on every change so a decode that finishes late is dropped
     this.noiseSubs = /* @__PURE__ */ new Set();
     this.pauseSubs = /* @__PURE__ */ new Set();
     // panel re-syncs its pauses list when these fire
@@ -30883,14 +30880,19 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
   onunload() {
     var _a, _b;
     this.unloading = true;
-    try {
-      if (this.noiseEl) {
-        this.noiseEl.pause();
-        this.noiseEl.src = "";
+    this.noiseLoadId++;
+    this.stopNoiseSource();
+    const noiseCtx = this.noiseCtx;
+    this.noiseCtx = null;
+    this.noiseGain = null;
+    this.noiseTrack = "";
+    if (noiseCtx) {
+      try {
+        noiseCtx.close().catch(() => {
+        });
+      } catch (e) {
       }
-    } catch (e) {
     }
-    this.noiseEl = null;
     (_a = this.timer) == null ? void 0 : _a.dispose();
     (_b = this.eye) == null ? void 0 : _b.dispose();
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_FLOAT);
@@ -31215,46 +31217,61 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
     var _a;
     const st = this.data ? this.data.settings : null;
     const s = this.timer ? this.timer.getState() : null;
-    const want = !s || !st ? "off" : s.breakRunning ? st.noiseBreak || "off" : s.running ? st.noiseFocus || "off" : "off";
+    const want = !s || !st ? "off" : s.breakRunning ? (st.noiseBreak || "off") : s.running ? (st.noiseFocus || "off") : "off";
     if (want === "off" || !st) {
-      if (this.noiseEl && !this.noiseEl.paused)
-        this.noiseEl.pause();
+      if (this.noiseCtx && this.noiseCtx.state === "running") this.noiseCtx.suspend().catch(() => {});
       return;
     }
-    if (!this.noiseEl) {
-      const el = new Audio();
-      el.loop = true;
-      el.preload = "auto";
-      // A load failure is said once, out loud: a silent catch hid the last one for weeks.
-      // The first failure also retries from the plugin folder's copy of the file, if any.
-      el.addEventListener("error", () => {
-        const code = el.error ? el.error.code : 0;
-        console.error("Focus Log: background noise failed to load", { track: this.noiseTrack, code, message: el.error && el.error.message });
-        if (!this.noiseRetried && this.noiseTrack) {
-          this.noiseRetried = true;
-          try {
-            el.src = this.app.vault.adapter.getResourcePath((0, import_obsidian2.normalizePath)((this.manifest.dir || "") + "/assets/" + this.noiseTrack + "_noise.mp3"));
-            el.play().catch(() => {});
-            return;
-          } catch (e2) {}
-        }
-        new import_obsidian2.Notice("Focus Log: the " + this.noiseTrack + " noise could not be played (media error " + code + ").", 6000);
-      });
-      this.noiseEl = el;
+    if (!this.noiseCtx) {
+      try {
+        this.noiseCtx = new AudioContext();
+        this.noiseGain = this.noiseCtx.createGain();
+        this.noiseGain.connect(this.noiseCtx.destination);
+      } catch (e) {
+        console.error("Focus Log: no audio output for background noise", e);
+        this.noiseCtx = null; this.noiseGain = null;
+        return;
+      }
     }
     const vol = Math.max(0, Math.min(1, ((_a = st.noiseVolume) != null ? _a : 40) / 100));
-    if (this.noiseEl.volume !== vol) this.noiseEl.volume = vol;
+    if (this.noiseGain && this.noiseGain.gain.value !== vol) this.noiseGain.gain.value = vol;
     if (this.noiseTrack !== want) {
       this.noiseTrack = want;
-      this.noiseRetried = false;
-      this.noiseEl.src = noiseUrl(want);
+      this.stopNoiseSource();
+      void this.loadNoise(want, ++this.noiseLoadId);
     }
-    if (this.noiseEl.paused) {
-      this.noiseEl.play().catch((e) => {
-        console.error("Focus Log: background noise play() rejected", e);
-        new import_obsidian2.Notice("Focus Log: the " + want + " noise did not start: " + (e && e.message || e), 6000);
-      });
+    if (this.noiseCtx.state === "suspended") this.noiseCtx.resume().catch(() => {});
+  }
+  stopNoiseSource() {
+    const src = this.noiseSrc;
+    this.noiseSrc = null;
+    if (src) { try { src.stop(); } catch (e) {} try { src.disconnect(); } catch (e2) {} }
+  }
+  // Decode the track and start it looping. A failure falls back to the copy in the plugin
+  // folder, then says so out loud: a silent failure here once went unnoticed for weeks.
+  async loadNoise(which, id) {
+    const ctx = this.noiseCtx;
+    if (!ctx) return;
+    let buf;
+    try {
+      buf = await ctx.decodeAudioData(noiseBytes(which));
+    } catch (e) {
+      try {
+        const res = await fetch(this.app.vault.adapter.getResourcePath((0, import_obsidian2.normalizePath)((this.manifest.dir || "") + "/assets/" + which + "_noise.mp3")));
+        buf = await ctx.decodeAudioData(await res.arrayBuffer());
+      } catch (e2) {
+        console.error("Focus Log: background noise failed to decode", which, e, e2);
+        if (id === this.noiseLoadId) new import_obsidian2.Notice("Focus Log: the " + which + " noise could not be played.", 6000);
+        return;
+      }
     }
+    if (id !== this.noiseLoadId || this.noiseCtx !== ctx || !this.noiseGain) return;   // superseded, or unloaded
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.connect(this.noiseGain);
+    src.start(0);
+    this.noiseSrc = src;
   }
   async setNoisePref(phase, v) {
     if (phase === "break")

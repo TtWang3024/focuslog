@@ -26,23 +26,16 @@ import whiteNoiseMp3 from "./assets/white_noise.mp3";
 import pinkNoiseMp3 from "./assets/pink_noise.mp3";
 import brownNoiseMp3 from "./assets/brown_noise.mp3";
 const NOISE_SRC: Record<string, string> = { white: whiteNoiseMp3, pink: pinkNoiseMp3, brown: brownNoiseMp3 };
-// A media element is handed each noise as a Blob URL, never the 5 MB data URL itself: a URL
-// that long sits past Chromium's 2 MB URL cap on some Electron versions, and the element
-// then fails silently. Decoded once per noise, on first use.
-const NOISE_URL_CACHE: Record<string, string> = {};
-function noiseUrl(which: string): string {
-  if (NOISE_URL_CACHE[which]) return NOISE_URL_CACHE[which];
+
+// The noises reach the ear through Web Audio, not an <audio> element: a decoded buffer on an
+// AudioBufferSourceNode loops sample-accurately, while the element's `loop` left an audible gap
+// at the two-minute turn of every track. Each track is decoded from its data URL on first use.
+function noiseBytes(which: string): ArrayBuffer {
   const data = NOISE_SRC[which] || "";
-  try {
-    const comma = data.indexOf(",");
-    const bin = atob(data.slice(comma + 1));
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    NOISE_URL_CACHE[which] = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
-  } catch {
-    NOISE_URL_CACHE[which] = data;   // no atob/Blob here: the data URL is still worth a try
-  }
-  return NOISE_URL_CACHE[which];
+  const bin = atob(data.slice(data.indexOf(",") + 1));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
 }
 import rateRain from "./assets/rate-rain.png";
 import rateClouds from "./assets/rate-clouds.png";
@@ -831,9 +824,11 @@ export default class FocusLogPlugin extends Plugin {
   private floatSubs = new Set<() => void>();
   // Background noise lives on the MAIN window (the float popout is rebuilt from scratch
   // every open, so audio owned there would die with it). Lazy: never allocated while muted.
-  private noiseEl: HTMLAudioElement | null = null;
-  private noiseTrack = "";
-  private noiseRetried = false;   // the plugin-folder fallback was already tried for this track
+  private noiseCtx: AudioContext | null = null;      // created on first use; suspended = paused (position kept)
+  private noiseGain: GainNode | null = null;
+  private noiseSrc: AudioBufferSourceNode | null = null;
+  private noiseTrack = "";        // the track that is playing or decoding
+  private noiseLoadId = 0;        // bumps on every change so a decode that finishes late is dropped
   private noiseSubs = new Set<() => void>();
   private pauseSubs = new Set<() => void>();   // panel re-syncs its pauses list when these fire
   private sessionSubs = new Set<() => void>(); // panel re-reads its sessions when these fire (e.g. a float quick-log)
@@ -1006,8 +1001,12 @@ export default class FocusLogPlugin extends Plugin {
   unloading = false;   // distinguishes app-quit/plugin-reload teardown from the user closing the float
   onunload() {
     this.unloading = true;
-    try { if (this.noiseEl) { this.noiseEl.pause(); this.noiseEl.src = ""; } } catch {}
-    this.noiseEl = null;
+    // Silence the noise for good: drop any decode in flight, stop the source, close the context.
+    this.noiseLoadId++;
+    this.stopNoiseSource();
+    const noiseCtx = this.noiseCtx;
+    this.noiseCtx = null; this.noiseGain = null; this.noiseTrack = "";
+    if (noiseCtx) { try { noiseCtx.close().catch(() => {}); } catch {} }
     this.timer?.dispose();
     this.eye?.dispose();
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_FLOAT);
@@ -1211,41 +1210,60 @@ export default class FocusLogPlugin extends Plugin {
     const st = this.data ? this.data.settings : null;
     const s = this.timer ? this.timer.getState() : null;
     const want: NoiseChoice = !s || !st ? "off" : s.breakRunning ? (st.noiseBreak || "off") : s.running ? (st.noiseFocus || "off") : "off";
-    if (want === "off" || !st) { if (this.noiseEl && !this.noiseEl.paused) this.noiseEl.pause(); return; }
-    if (!this.noiseEl) {
-      const el = new Audio();
-      el.loop = true;
-      el.preload = "auto";
-      // A load failure is said once, out loud: a silent catch hid the last one for weeks.
-      // The first failure also retries from the plugin folder's copy of the file, if any.
-      el.addEventListener("error", () => {
-        const code = el.error ? el.error.code : 0;
-        console.error("Focus Log: background noise failed to load", { track: this.noiseTrack, code, message: el.error && el.error.message });
-        if (!this.noiseRetried && this.noiseTrack) {
-          this.noiseRetried = true;
-          try {
-            el.src = this.app.vault.adapter.getResourcePath(normalizePath((this.manifest.dir || "") + "/assets/" + this.noiseTrack + "_noise.mp3"));
-            el.play().catch(() => {});
-            return;
-          } catch {}
-        }
-        new Notice("Focus Log: the " + this.noiseTrack + " noise could not be played (media error " + code + ").", 6000);
-      });
-      this.noiseEl = el;
+    if (want === "off" || !st) {
+      if (this.noiseCtx && this.noiseCtx.state === "running") this.noiseCtx.suspend().catch(() => {});
+      return;
+    }
+    if (!this.noiseCtx) {
+      try {
+        this.noiseCtx = new AudioContext();
+        this.noiseGain = this.noiseCtx.createGain();
+        this.noiseGain.connect(this.noiseCtx.destination);
+      } catch (e) {
+        console.error("Focus Log: no audio output for background noise", e);
+        this.noiseCtx = null; this.noiseGain = null;
+        return;
+      }
     }
     const vol = Math.max(0, Math.min(1, (st.noiseVolume ?? 40) / 100));
-    if (this.noiseEl.volume !== vol) this.noiseEl.volume = vol;
+    if (this.noiseGain && this.noiseGain.gain.value !== vol) this.noiseGain.gain.value = vol;
     if (this.noiseTrack !== want) {
       this.noiseTrack = want;
-      this.noiseRetried = false;
-      this.noiseEl.src = noiseUrl(want);
+      this.stopNoiseSource();
+      void this.loadNoise(want, ++this.noiseLoadId);
     }
-    if (this.noiseEl.paused) {
-      this.noiseEl.play().catch((e: any) => {
-        console.error("Focus Log: background noise play() rejected", e);
-        new Notice("Focus Log: the " + want + " noise did not start: " + (e && e.message || e), 6000);
-      });
+    if (this.noiseCtx.state === "suspended") this.noiseCtx.resume().catch(() => {});
+  }
+  private stopNoiseSource() {
+    const src = this.noiseSrc;
+    this.noiseSrc = null;
+    if (src) { try { src.stop(); } catch {} try { src.disconnect(); } catch {} }
+  }
+  // Decode the track and start it looping. A failure falls back to the copy in the plugin
+  // folder, then says so out loud: a silent failure here once went unnoticed for weeks.
+  private async loadNoise(which: string, id: number) {
+    const ctx = this.noiseCtx;
+    if (!ctx) return;
+    let buf: AudioBuffer;
+    try {
+      buf = await ctx.decodeAudioData(noiseBytes(which));
+    } catch (e) {
+      try {
+        const res = await fetch(this.app.vault.adapter.getResourcePath(normalizePath((this.manifest.dir || "") + "/assets/" + which + "_noise.mp3")));
+        buf = await ctx.decodeAudioData(await res.arrayBuffer());
+      } catch (e2) {
+        console.error("Focus Log: background noise failed to decode", which, e, e2);
+        if (id === this.noiseLoadId) new Notice("Focus Log: the " + which + " noise could not be played.", 6000);
+        return;
+      }
     }
+    if (id !== this.noiseLoadId || this.noiseCtx !== ctx || !this.noiseGain) return;   // superseded, or unloaded
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.connect(this.noiseGain);
+    src.start(0);
+    this.noiseSrc = src;
   }
   async setNoisePref(phase: "focus" | "break", v: NoiseChoice) {
     if (phase === "break") this.data.settings.noiseBreak = v; else this.data.settings.noiseFocus = v;
