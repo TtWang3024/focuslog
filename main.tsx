@@ -971,6 +971,23 @@ export default class FocusLogPlugin extends Plugin {
       focusLogBreakRunning: () => { try { return !!this.timer.getState().breakRunning; } catch { return false; } },
       floatWindow: () => this.floatWin,
       setBackgroundThrottle: (allowed: boolean) => { this.eyeWantsClock = !allowed; this.applyBackgroundThrottle(); },
+      // The pomodoro as the eye break follows it: a break (running, paused, or sitting finished at
+      // 00:00, which counts as its end) or a focus run (running or paused). A finished run awaiting
+      // its rating is neither, so the interval takes over until the break begins.
+      pomodoroClock: () => {
+        const t = this.timer.getState();
+        if (t.breakActive) {
+          const left = Math.max(0, t.breakSecs || 0);
+          return { phase: "break" as const, key: "b:" + (t.breakStart || 0), running: !!t.breakRunning || !!t.breakFinished,
+            elapsedSecs: Math.max(0, (t.breakTotal || 0) - left), remainingSecs: left, plannedSecs: t.breakTotal || 0 };
+        }
+        if (t.startedAt != null && (t.running || t.paused)) {
+          const left = Math.max(0, t.secs || 0);
+          return { phase: "focus" as const, key: "f:" + t.startedAt, running: !!t.running,
+            elapsedSecs: Math.max(0, (t.total || 0) - left), remainingSecs: left, plannedSecs: t.total || 0 };
+        }
+        return null;
+      },
     });
     this.registerView(VIEW_TYPE_EYE, (leaf) => new EyeBreakView(leaf, this.eye));
     this.eye.start();

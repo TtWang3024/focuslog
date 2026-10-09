@@ -28510,6 +28510,8 @@ var DEFAULT_EYE_SETTINGS = {
   eyeBreakEndEarlyAfter: 5,
   eyeBreakMode: "popup",
   eyeBreakHoldDuringBreak: true,
+  eyeBreakFollowPomodoro: true,
+  eyeBreakPomodoroMins: 15,
   eyeBreakIdleMins: 5,
   eyeBreakIdleNotice: false,
   eyeBreakKeepAwake: true,
@@ -28662,6 +28664,8 @@ var EyeBreakEngine = class {
     this.psbId = null;
     // the power-save blocker while eye breaks are active
     this.pushAt = 0;
+    this.pomo = null;
+    this.pomoDue = null;
     // when the in-flight push started (a watchdog resets a push that never answers)
     this.lastTick = 0;
     // the previous poll's clock, to notice a sleep or a stalled app
@@ -28820,6 +28824,8 @@ var EyeBreakEngine = class {
     }
     const st = this.state;
     st.snoozed = (st.snoozed || 0) + 1;
+    if (this.pomo)
+      this.pomoDue = { key: this.pomo.key, at: this.pomo.elapsedSecs + (this.pomoUntil(this.pomo) || 0) + Math.max(1, s.eyeBreakSnoozeMins) * 60 };
     const now = Date.now();
     st.cycleStart = now;
     st.nextAt = now + Math.max(1, s.eyeBreakSnoozeMins) * 6e4;
@@ -28831,6 +28837,10 @@ var EyeBreakEngine = class {
     return true;
   }
   skip() {
+    if (this.pomo) {
+      this.state.pomoFired = this.pomo.key;
+      this.pomoDue = null;
+    }
     this.schedule(false);
   }
   // From the card, the status bar or a command: begin the break right away.
@@ -28850,6 +28860,32 @@ var EyeBreakEngine = class {
       this.skip();
     else if (this.phase === "break")
       this.finishBreak(true);
+  }
+  // ---------- following the pomodoro ----------
+  currentPomo() {
+    if (!this.settings.eyeBreakFollowPomodoro || !this.host.pomodoroClock)
+      return null;
+    try {
+      return this.host.pomodoroClock();
+    } catch (e) {
+      return null;
+    }
+  }
+  pomoUntil(pc) {
+    if (this.state.pomoFired === pc.key)
+      return null;
+    if (this.pomoDue && this.pomoDue.key === pc.key)
+      return Math.max(0, this.pomoDue.at - pc.elapsedSecs);
+    const n = Math.max(1, this.settings.eyeBreakPomodoroMins || 15) * 60;
+    if (pc.phase === "focus")
+      return pc.plannedSecs > n ? Math.max(0, n - pc.elapsedSecs) : null;
+    return pc.plannedSecs < n ? pc.remainingSecs : Math.max(0, n - pc.elapsedSecs);
+  }
+  footText() {
+    const s = this.settings;
+    if (this.pomo)
+      return "Next eye break: timed to your pomodoro";
+    return "Next eye break in " + s.eyeBreakEveryMins + " min";
   }
   // ---------- the clock ----------
   poll() {
@@ -28876,11 +28912,33 @@ var EyeBreakEngine = class {
       this.renderTick();
       return;
     }
+    const pc = this.currentPomo();
+    const wasKey = this.pomo ? this.pomo.key : "";
+    this.pomo = pc;
+    if (!pc && wasKey) {
+      this.pomoDue = null;
+      this.log("pomodoro: back to the interval");
+      this.schedule(false);
+      return;
+    }
+    if (pc) {
+      if (pc.key !== wasKey)
+        this.log("pomodoro: following the " + pc.phase);
+      const until = this.pomoUntil(pc);
+      st.nextAt = now + (until == null ? pc.remainingSecs + 3600 : until) * 1e3;
+      if (!pc.running || until == null) {
+        if (this.phase === "warn")
+          this.leaveWarn();
+        this.persistThrottled();
+        this.emit();
+        return;
+      }
+    }
     if (!st.nextAt) {
       this.schedule(false);
       return;
     }
-    if (s.eyeBreakHoldDuringBreak && this.host.focusLogBreakRunning()) {
+    if (!pc && s.eyeBreakHoldDuringBreak && this.host.focusLogBreakRunning()) {
       if (this.phase === "warn")
         this.leaveWarn();
       st.cycleStart = now;
@@ -29002,6 +29060,10 @@ var EyeBreakEngine = class {
     const s = this.settings;
     const now = Date.now();
     this.hideWarnNotice();
+    if (this.pomo) {
+      this.state.pomoFired = this.pomo.key;
+      this.pomoDue = null;
+    }
     this.phase = "break";
     this.breakStartAt = now;
     this.breakSecsTotal = Math.max(3, s.eyeBreakSecs);
@@ -29369,7 +29431,7 @@ var EyeBreakEngine = class {
       const wait = Math.max(0, (s.eyeBreakEndEarlyAfter || 0) - this.breakSecsGone());
       btns.push({ id: "end", label: ok ? "End break early" : "End break early (" + wait + " s)", off: !ok });
     }
-    return { warn: false, card, bg, fg, title: card ? title + " " : title, num: left, unit: card ? " s" : "", msg: s.eyeBreakMessage || "", frac, btns, foot: card ? "" : "Next eye break in " + s.eyeBreakEveryMins + " min" };
+    return { warn: false, card, bg, fg, title: card ? title + " " : title, num: left, unit: card ? " s" : "", msg: s.eyeBreakMessage || "", frac, btns, foot: card ? "" : this.footText() };
   }
   // ---------- fallbacks: Obsidian notices and an in-window overlay ----------
   showWarnNotice() {
@@ -29504,6 +29566,8 @@ var EyeBreakEngine = class {
       return "\u{1F441} " + mmss(this.breakSecsLeft());
     if (s.eyeBreakStatusBar === "since")
       return "\u{1F441} +" + mmss(this.secsSinceLast());
+    if (this.pomo && this.pomoUntil(this.pomo) == null)
+      return "\u{1F441} after this " + (this.pomo.phase === "focus" ? "pomodoro" : "break");
     return "\u{1F441} " + mmss(this.secsToNext());
   }
   statusMenu(evt) {
@@ -29612,7 +29676,7 @@ function renderEyeScreen(root, eng) {
       endBtn.setText(ok ? "End break early" : "End break early (" + wait + " s)");
     }
     if (foot)
-      foot.setText("Next eye break in " + s.eyeBreakEveryMins + " min");
+      foot.setText(eng.footText());
   };
   update();
   return { update };
@@ -29728,7 +29792,7 @@ var EyeBreakView = class extends import_obsidian.ItemView {
 function buildEyeBreakSettings(containerEl, s, save, eng) {
   containerEl.createEl("h3", { text: "Eye breaks" });
   containerEl.createEl("p", {
-    text: "A rest reminder in the spirit of BreakTimer: every so often a window asks you to look away for a few seconds, then disappears. A small card in the corner of your screen counts down first, above every app, without taking the keyboard from whatever you are typing in. It runs whenever Obsidian is open and is independent of the pomodoro: it never pauses a task, a pomodoro or a Focus Log break.",
+    text: "A rest reminder in the spirit of BreakTimer: every so often a window asks you to look away for a few seconds, then disappears. A small card in the corner of your screen counts down first, above every app, without taking the keyboard from whatever you are typing in. It runs whenever Obsidian is open and never pauses a task, a pomodoro or a Focus Log break. With \u201CFollow the pomodoro\u201D on, it times itself to your pomodoros and their breaks.",
     cls: "setting-item-description"
   });
   const num = (t, width) => {
@@ -29766,6 +29830,20 @@ function buildEyeBreakSettings(containerEl, s, save, eng) {
     });
   });
   every.controlEl.createEl("span", { text: "s", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
+  const follow = new import_obsidian.Setting(containerEl).setName("Follow the pomodoro").setDesc("While a pomodoro runs, the eye break comes this many minutes in. In a pomodoro break shorter than that it comes as the break ends; in a longer break, this many minutes in. Each pomodoro and each break gets one. Outside a pomodoro the every-N-minutes countdown above takes over again, starting fresh.");
+  follow.addText((t) => {
+    num(t, "5em");
+    t.setValue(String(s.eyeBreakPomodoroMins)).onChange(async (v) => {
+      const n = clampInt(v, 1, 120, 15);
+      s.eyeBreakPomodoroMins = n;
+      await after();
+    });
+  });
+  follow.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin:0 12px 0 5px" } });
+  follow.addToggle((t) => t.setValue(s.eyeBreakFollowPomodoro).onChange(async (v) => {
+    s.eyeBreakFollowPomodoro = v;
+    await after();
+  }));
   new import_obsidian.Setting(containerEl).setName("How the break appears").setDesc("Full screen covers the display you are working on; the small window stays in its bottom-right corner. Both float above every app. Where no such window can be made (mobile), a screen inside Obsidian or a notice stands in.").addDropdown((d) => d.addOption("popup", "Full-screen window").addOption("card", "Small corner window").setValue(s.eyeBreakMode === "card" ? "card" : "popup").onChange(async (v) => {
     s.eyeBreakMode = v === "card" ? "card" : "popup";
     await save();
@@ -29815,7 +29893,7 @@ function buildEyeBreakSettings(containerEl, s, save, eng) {
     });
   });
   early.controlEl.createEl("span", { text: "s", attr: { style: "font-size:12px;color:var(--text-muted);margin-left:5px" } });
-  new import_obsidian.Setting(containerEl).setName("Restart the countdown during a Focus Log break").setDesc("While a pomodoro break is running you are already resting, so the eye countdown starts over from the end of that break. The pomodoro side is never touched either way.").addToggle((t) => t.setValue(s.eyeBreakHoldDuringBreak).onChange(async (v) => {
+  new import_obsidian.Setting(containerEl).setName("Restart the countdown during a Focus Log break").setDesc("Only when \u201CFollow the pomodoro\u201D is off: while a pomodoro break is running you are already resting, so the eye countdown starts over from the end of that break. The pomodoro side is never touched either way.").addToggle((t) => t.setValue(s.eyeBreakHoldDuringBreak).onChange(async (v) => {
     s.eyeBreakHoldDuringBreak = v;
     await save();
   }));
@@ -30858,6 +30936,32 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
         }
       },
       floatWindow: () => this.floatWin,
+      pomodoroClock: () => {
+        const t = this.timer.getState();
+        if (t.breakActive) {
+          const left = Math.max(0, t.breakSecs || 0);
+          return {
+            phase: "break",
+            key: "b:" + (t.breakStart || 0),
+            running: !!t.breakRunning || !!t.breakFinished,
+            elapsedSecs: Math.max(0, (t.breakTotal || 0) - left),
+            remainingSecs: left,
+            plannedSecs: t.breakTotal || 0
+          };
+        }
+        if (t.startedAt != null && (t.running || t.paused)) {
+          const left = Math.max(0, t.secs || 0);
+          return {
+            phase: "focus",
+            key: "f:" + t.startedAt,
+            running: !!t.running,
+            elapsedSecs: Math.max(0, (t.total || 0) - left),
+            remainingSecs: left,
+            plannedSecs: t.total || 0
+          };
+        }
+        return null;
+      },
       setBackgroundThrottle: (allowed) => {
         this.eyeWantsClock = !allowed;
         this.applyBackgroundThrottle();
