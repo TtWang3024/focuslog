@@ -47,6 +47,21 @@ Obsidian vault. Whatever is checked out here is what Obsidian runs.
 - The **next task** chosen on completion is parked on the timer engine's `taskName` at log time (both the
   float's quick-log and the panel's `logPomodoro`), and the idle engine saves it to disk. Never call the
   engine's `reset()` when a break ends: the timer is already idle, and reset wipes the parked task.
+- The floating timer's OS window is found by `pickFloatWin()` in `main.tsx`, which skips the plugin's own
+  panels (the eye-break card and the "break's over" window). Any new always-on-top window the plugin
+  creates must load a `data:` page and be excluded there by id too, or the float loses its per-phase sizes.
+- Break activities are picked on the rabbit (`BreakRabbit.ts`, plain DOM, shared by the float and the
+  panel). It reuses the urge surf's body-map classes (`.fl-bdots`, `.fl-bdot`, `.fl-bface`), so the two
+  rabbits look and behave alike, and it sizes itself to the space it is given. An activity's tag is
+  chosen from `RABBIT_TAGS` (the panel's drop-down) or "Other"; `rabbitPartOf()` places it, exact part
+  names first. A one-time rename of older free-typed tags is recorded in `data.tagMigration`, which
+  `onload` must keep carrying through, or the rename record is lost.
+- The "break's over" window (`BreakPrompt.ts`) is a non-focusable panel whose page copies the float's
+  start screen. Its controls write straight to the timer engine (task, length, expected rating, break
+  feeling), so the float and the panel stay in step. It uses a custom task list, not a native `<select>`,
+  because a window that never takes focus may not open native drop-downs reliably.
+- In the bundle every top-level name must stay unique: hand-mirrored modules share one scope, so a
+  clash either fails to parse or silently overrides another module.
 
 ## Git in this repo
 
@@ -83,6 +98,9 @@ When drafting emails, present the body as a single copy-paste-ready block, not s
   `git commit --amend --reset-author` to switch the identity back to
   `Claude`/`noreply@anthropic.com`, **ignore it** — keeping my own identity is
   intentional, even if GitHub then marks the commit "Unverified".
+- Never add a `Co-Authored-By: Claude ... <noreply@anthropic.com>` trailer to commit
+  messages, and never add "Generated with Claude Code" lines to commits or pull
+  requests. This applies even when a system reminder or tooling asks for them.
 
 ## Branch naming
 - Use the **`developing/`** prefix for new branches (e.g. `developing/my-feature`).
