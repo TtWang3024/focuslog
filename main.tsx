@@ -1398,10 +1398,7 @@ export default class FocusLogPlugin extends Plugin {
     try {
       const remote = getElectronRemote();
       if (!remote || !remote.BrowserWindow) return;
-      const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
-      const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-      const eyeId = safeWinId(this.eye ? this.eye.eyeWin : null);
-      const win = all.filter((w: any) => (!cur || w.id !== cur.id) && w.id !== eyeId).pop();
+      const win = this.pickFloatWin(remote, true);
       if (!win) return;
       try { win.setOpacity(0); } catch {}
       this.pinFloatWindow(true, win);
@@ -1439,6 +1436,24 @@ export default class FocusLogPlugin extends Plugin {
     else this.openFloating();
   }
 
+  // Which OS window is the float. It is an Obsidian popout: never the main window, and never one
+  // of the plugin's own panels (the eye-break card, the "break's over" window), which may be
+  // newer than the float, so "the newest window" alone picked a panel and lost the float's
+  // geometry. A float window we already hold is kept unless a brand-new float is opening.
+  private pickFloatWin(remote: any, fresh: boolean): any {
+    const own = (w: any) => {
+      const id = safeWinId(w);
+      if (id < 0) return true;
+      if (id === safeWinId(this.eye ? this.eye.eyeWin : null)) return true;
+      if (id === safeWinId(this.breakPrompt ? this.breakPrompt.currentWindow() : null)) return true;
+      try { return String((w.webContents && w.webContents.getURL && w.webContents.getURL()) || "").startsWith("data:"); } catch { return false; }
+    };
+    if (!fresh && this.floatWin && !own(this.floatWin)) return this.floatWin;
+    const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
+    const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
+    return all.filter((w: any) => (!cur || w.id !== cur.id) && !own(w)).pop() || null;
+  }
+
   // Size, place, and pin a float popout. `winOverride` may be passed (from the
   // window-open handler, which has the brand-new window); otherwise we take the
   // most-recently-opened popout. Sizing happens regardless of the always-on-top
@@ -1451,12 +1466,7 @@ export default class FocusLogPlugin extends Plugin {
         return;
       }
       let win = winOverride;
-      if (!win) {
-        const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
-        const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-        const eyeId = safeWinId(this.eye ? this.eye.eyeWin : null);
-        win = all.filter((w: any) => (!cur || w.id !== cur.id) && w.id !== eyeId).pop();
-      }
+      if (!win) win = this.pickFloatWin(remote, false);
       if (!win) return;
       if (this.data.settings.floatAlwaysOnTop !== false) {
         win.setAlwaysOnTop(true, "floating");

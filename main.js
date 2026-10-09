@@ -31895,10 +31895,7 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
       const remote = getElectronRemote();
       if (!remote || !remote.BrowserWindow)
         return;
-      const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
-      const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-      const eyeId = safeWinId(this.eye ? this.eye.eyeWin : null);
-      const win = all.filter((w) => (!cur || w.id !== cur.id) && w.id !== eyeId).pop();
+      const win = this.pickFloatWin(remote, true);
       if (!win)
         return;
       try {
@@ -31964,6 +31961,24 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
   // window-open handler, which has the brand-new window); otherwise we take the
   // most-recently-opened popout. Sizing happens regardless of the always-on-top
   // setting; only the always-on-top call itself is gated.
+  // Which OS window is the float. It is an Obsidian popout: never the main window, and never one
+  // of the plugin's own panels (the eye-break card, the "break's over" window), which may be
+  // newer than the float, so "the newest window" alone picked a panel and lost the float's
+  // geometry. A float window we already hold is kept unless a brand-new float is opening.
+  pickFloatWin(remote, fresh) {
+    const own = (w) => {
+      const id = safeWinId(w);
+      if (id < 0) return true;
+      if (id === safeWinId(this.eye ? this.eye.eyeWin : null)) return true;
+      if (id === safeWinId(this.breakPrompt ? this.breakPrompt.currentWindow() : null)) return true;
+      try { return String((w.webContents && w.webContents.getURL && w.webContents.getURL()) || "").startsWith("data:"); } catch (e) { return false; }
+    };
+    if (!fresh && this.floatWin && !own(this.floatWin)) return this.floatWin;
+    const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
+    const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
+    return all.filter((w) => (!cur || w.id !== cur.id) && !own(w)).pop() || null;
+  }
+
   pinFloatWindow(initial, winOverride) {
     try {
       const remote = getElectronRemote();
@@ -31973,12 +31988,8 @@ var FocusLogPlugin = class extends import_obsidian2.Plugin {
         return;
       }
       let win = winOverride;
-      if (!win) {
-        const cur = remote.getCurrentWindow ? remote.getCurrentWindow() : null;
-        const all = remote.BrowserWindow.getAllWindows ? remote.BrowserWindow.getAllWindows() : [];
-        const eyeId = safeWinId(this.eye ? this.eye.eyeWin : null);
-        win = all.filter((w) => (!cur || w.id !== cur.id) && w.id !== eyeId).pop();
-      }
+      if (!win)
+        win = this.pickFloatWin(remote, false);
       if (!win)
         return;
       if (this.data.settings.floatAlwaysOnTop !== false) {
