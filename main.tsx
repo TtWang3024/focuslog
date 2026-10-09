@@ -5,6 +5,7 @@ import FocusLogApp, { MACARON, MODE_COLORS, darken, fmtHM, parseHM, BREAK_SEASON
 import { newestStarName } from "./skymap";
 import { getElectronRemote } from "./electron";
 import { EyeBreakEngine, EyeBreakView, EyeBreakState, VIEW_TYPE_EYE, DEFAULT_EYE_SETTINGS, EyeBreakSettings, buildEyeBreakSettings } from "./EyeBreak";
+import { BreakPrompt } from "./BreakPrompt";
 
 // Solid glyphs for the float's controls (sized by the .flt-btn svg rule): minus/plus steppers,
 // play/pause for the primary and break toggles, and a bold rotate-left for reset.
@@ -121,6 +122,7 @@ export interface FocusLogSettings extends EyeBreakSettings {
   counterPrefix: string;
   breakEnabled: boolean;
   breakAutoStart: boolean;
+  breakEndPrompt: boolean;   // a "break's over" window above every app when a break runs out
   breakMinutes: number;
   autoLogOnRate: boolean;
   frozenTaskNames: string[];
@@ -196,6 +198,7 @@ const DEFAULT_SETTINGS: FocusLogSettings = {
   counterPrefix: "## \u{1F34E} Today_Pomodoro:: ",
   breakEnabled: false,
   breakAutoStart: true,
+  breakEndPrompt: true,
   breakMinutes: 5,
   autoLogOnRate: true,
   frozenTaskNames: [],
@@ -727,6 +730,19 @@ class TimerEngine {
     this.emit();
     this.pushSnap();
   }
+  // Snooze from the "break's over" window: the break (finished or not) gets more time, and runs.
+  extendBreak(mins: number) {
+    if (!this.breakActive) return;
+    const add = Math.max(1, Math.round(mins) || 5) * 60;
+    this.breakFrozen = this.breakSecsNow() + add;
+    this.breakTotal += add;
+    this.breakFinished = false;
+    this.breakRunning = true;
+    this.breakEndTs = Date.now() + this.breakFrozen * 1000;
+    this.ensureTick();
+    this.emit();
+    this.pushSnap();
+  }
   toggleBreakPick(id: string) {
     if (this.breakPicked.includes(id)) this.breakPicked = this.breakPicked.filter((x) => x !== id);
     else if (this.breakPicked.length < 3) this.breakPicked = [...this.breakPicked, id];
@@ -822,6 +838,7 @@ export default class FocusLogPlugin extends Plugin {
   data: PluginData;
   timer: TimerEngine;
   eye: EyeBreakEngine;
+  breakPrompt: BreakPrompt;
   private eyeStatusEl: HTMLElement | null = null;
   floatWin: any = null;
   private floatSubs = new Set<() => void>();
@@ -991,6 +1008,31 @@ export default class FocusLogPlugin extends Plugin {
     });
     this.registerView(VIEW_TYPE_EYE, (leaf) => new EyeBreakView(leaf, this.eye));
     this.eye.start();
+    // "Break's over": when a break runs out and no pomodoro has started, a window above every
+    // app offers snooze (more break), stop (end this round) or start (the next task).
+    this.breakPrompt = new BreakPrompt({
+      enabled: () => this.data.settings.breakEndPrompt !== false,
+      timer: () => this.timer.getState(),
+      tasks: () => this.data.tasks || [],
+      snoozeMins: () => Math.max(1, this.data.settings.eyeBreakSnoozeMins || 5),
+      eyeBusy: () => !!this.eye && this.eye.phase !== "idle",
+      floatWindow: () => this.floatWin,
+      // The start screen's own art, so the window looks like the float's: the weather and season
+      // images and the step and play icons.
+      art: () => ({
+        weather: RATE_WEATHER.map((w) => ({ v: w.v, img: w.img, bg: w.bg })),
+        seasons: BREAK_SEASONS.map((sn: any) => ({ v: sn.v, img: sn.img, name: sn.name })),
+        minus: FLT_MINUS, plus: FLT_PLUS, play: FLT_PLAY,
+      }),
+      setTask: (name: string) => this.timer.setTask(name),
+      setExpected: (v: number) => this.timer.setExpected(v),
+      stepLength: (d: number) => this.timer.step(d),
+      setFeeling: (v: number) => this.timer.setBreakFeeling(v),
+      extendBreak: (mins: number) => this.timer.extendBreak(mins),
+      stopRound: () => { this.timer.endBreak(); new Notice("Focus Log: round stopped. Start the next pomodoro whenever you are ready.", 5000); },
+      start: () => this.timer.start(),
+    });
+    this.breakPrompt.start();
     this.eyeStatusEl = this.addStatusBarItem();
     this.eyeStatusEl.addClass("fl-eye-status");
     this.eyeStatusEl.setAttribute("aria-label", "Eye breaks: click for now / snooze / skip / pause");
@@ -1029,6 +1071,7 @@ export default class FocusLogPlugin extends Plugin {
     if (noiseCtx) { try { noiseCtx.close().catch(() => {}); } catch {} }
     this.timer?.dispose();
     this.eye?.dispose();
+    this.breakPrompt?.dispose();
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_FLOAT);
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_EYE);
   }
@@ -3092,6 +3135,16 @@ class FocusLogSettingTab extends PluginSettingTab {
       .addToggle((t) =>
         t.setValue(this.plugin.data.settings.breakAutoStart).onChange(async (v) => {
           this.plugin.data.settings.breakAutoStart = v;
+          await this.plugin.persist();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("“Break's over” window")
+      .setDesc("When a break runs out and no pomodoro has started, a small window above every app stays until you snooze (more break, as long as the eye-break snooze), stop this round, or start the next task.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.data.settings.breakEndPrompt !== false).onChange(async (v) => {
+          this.plugin.data.settings.breakEndPrompt = v;
           await this.plugin.persist();
         })
       );
