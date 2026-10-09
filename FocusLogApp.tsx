@@ -1,4 +1,5 @@
 import * as React from "react";
+import { BreakRabbit, RABBIT_SENSES, RABBIT_BODY, RABBIT_TAGS } from "./BreakRabbit";
 import { SkyView } from "./SkyView";
 import { newestStarName } from "./skymap";
 import { MoodGrid } from "./MoodGrid";
@@ -24,6 +25,34 @@ import treeSummer from "./assets/tree-summer.png";
 import treeAutumn from "./assets/tree-autumn.png";
 import treeWinter from "./assets/tree-winter.png";
 const { useState, useEffect, useRef, useCallback } = React;
+
+// The rabbit picker inside React: the plain-DOM BreakRabbit owns its node, React only feeds it
+// the activities and the picks (it repaints only when what it shows changes).
+function BreakRabbitView({ activities, picked, onToggle }: any) {
+  const ref = useRef<any>(null);
+  const inst = useRef<any>(null);
+  const cb = useRef<any>(onToggle);
+  cb.current = onToggle;
+  useEffect(() => {
+    if (!ref.current) return;
+    inst.current = new BreakRabbit(ref.current, (id: string) => cb.current && cb.current(id));
+    return () => { if (inst.current) inst.current.destroy(); inst.current = null; };
+  }, []);
+  useEffect(() => { if (inst.current) inst.current.update(activities || [], picked || []); });
+  return <div ref={ref} className="fl-brab-host" />;
+}
+
+// The tags a break activity can carry: the rabbit's parts (senses, then body) and "other" for one
+// that sits nowhere on it. An older free-typed tag stays listed while it is the current value, so
+// editing an activity never silently drops its tag.
+function activityTagOptions(cur: string) {
+  const opts: any[] = [<option key="_none" value="">body part…</option>];
+  opts.push(<optgroup key="_senses" label="senses">{RABBIT_SENSES.map((t) => <option key={t} value={t}>{t}</option>)}</optgroup>);
+  opts.push(<optgroup key="_body" label="body">{RABBIT_BODY.map((t) => <option key={t} value={t}>{t}</option>)}</optgroup>);
+  opts.push(<option key="_other" value="Other">other (not on the rabbit)</option>);
+  if (cur && cur !== "Other" && RABBIT_TAGS.indexOf(cur) < 0) opts.push(<option key="_old" value={cur}>{cur} (old tag)</option>);
+  return opts;
+}
 // Break-block palette: short break = blue, long break = teal (the note icons match the text colour).
 const BREAK_BG = "#edf3f8", BREAK_STRIPE = "#9bb4c8", BREAK_TEXT = "#5e7d96";
 const LBREAK_BG = "#e3eef0", LBREAK_STRIPE = "#5e93a8", LBREAK_TEXT = "#3d6b80";
@@ -2419,7 +2448,7 @@ export default function FocusLogApp({ api }: any) {
   const renderActRow = (a: any, i: number) => (
     editActId === a.id ? (
       <div key={a.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap", padding: "6px 10px", background: C.card, border: `1.5px solid ${C.ink}`, borderRadius: 6 }}>
-        <input value={editActDraft.area} onChange={(e) => setEditActDraft({ ...editActDraft, area: e.target.value })} placeholder="area" style={{ flex: 1, minWidth: 70, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }} />
+        <select value={editActDraft.area} onChange={(e) => setEditActDraft({ ...editActDraft, area: e.target.value })} aria-label="body part" style={{ flex: 1, minWidth: 70, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px" }}>{activityTagOptions(editActDraft.area)}</select>
         <AutoTextarea value={editActDraft.name} onChange={(e: any) => setEditActDraft({ ...editActDraft, name: e.target.value })} style={{ flex: 2, minWidth: 110, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "5px 8px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" }} />
         <button onClick={saveEditAct} aria-label="save" style={{ ...btn(C.ink), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><SaveIcon size={15} /></button>
         <button onClick={() => setEditActId(null)} aria-label="cancel" style={{ ...btn(C.muted, true), padding: "5px 9px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><CircleXIcon size={15} /></button>
@@ -4919,11 +4948,9 @@ export default function FocusLogApp({ api }: any) {
                     <button onClick={endBreak} aria-label={brk.finished ? "go back to my task" : "end break"} style={{ ...btn(C.muted, true), borderRadius: 999, height: 32, padding: "0 14px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{brk.finished ? <ArrowRightIcon size={16} /> : <CheckIcon size={16} />}</button>
                   </div>
                 </div>
-                <p style={{ color: C.muted, fontSize: 12, margin: "0 0 8px" }}>Pick up to 3 - tap an activity ({brk.picked.length}/3):</p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {activities.length === 0 ? <span style={{ color: C.muted, fontSize: 13 }}>No activities yet - end the break to add some.</span> :
-                    activities.map((a, i) => renderActRow(a, i))}
-                </div>
+                <p style={{ color: C.muted, fontSize: 12, margin: "0 0 8px" }}>{"Take a break with " + brk.picked.length + (brk.picked.length === 1 ? " activity" : " activities")}</p>
+                {activities.length === 0 ? <span style={{ color: C.muted, fontSize: 13 }}>No activities yet - end the break to add some.</span> :
+                  <BreakRabbitView activities={activities} picked={brk.picked} onToggle={togglePick} />}
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
                   <Scale label="how do you feel after this break?" value={brk.feeling} onChange={(v: number) => api.timer.setBreakFeeling(v)} seasons />
                 </div>
@@ -4937,7 +4964,7 @@ export default function FocusLogApp({ api }: any) {
                 {activities.map((a, i) => renderActRow(a, i))}
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
-                <input value={newAct.area} onChange={(e) => setNewAct({ ...newAct, area: e.target.value })} placeholder="area / tag" style={{ flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", boxSizing: "border-box" }} />
+                <select value={newAct.area} onChange={(e) => setNewAct({ ...newAct, area: e.target.value })} aria-label="body part" style={{ flex: 1, minWidth: 90, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", boxSizing: "border-box" }}>{activityTagOptions(newAct.area)}</select>
                 <AutoTextarea value={newAct.name} onChange={(e: any) => setNewAct({ ...newAct, name: e.target.value })} placeholder="activity name" style={{ flex: 2, minWidth: 140, border: `1px solid ${C.faint}`, background: C.paper, color: C.ink, fontSize: 13, borderRadius: 6, padding: "7px 10px", fontFamily: "var(--fl-display)", lineHeight: 1.4, resize: "none", overflow: "hidden", boxSizing: "border-box" }} />
                 <button onClick={addActivity} aria-label="add" style={{ ...ADD_BTN, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><ListPlusIcon size={16} /></button>
               </div>

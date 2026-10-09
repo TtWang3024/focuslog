@@ -6,6 +6,7 @@ import { newestStarName } from "./skymap";
 import { getElectronRemote } from "./electron";
 import { EyeBreakEngine, EyeBreakView, EyeBreakState, VIEW_TYPE_EYE, DEFAULT_EYE_SETTINGS, EyeBreakSettings, buildEyeBreakSettings } from "./EyeBreak";
 import { BreakPrompt } from "./BreakPrompt";
+import { BreakRabbit, rabbitPartOf } from "./BreakRabbit";
 
 // Solid glyphs for the float's controls (sized by the .flt-btn svg rule): minus/plus steppers,
 // play/pause for the primary and break toggles, and a bold rotate-left for reset.
@@ -240,10 +241,10 @@ const DEFAULT_PAUSE_TAGS = [
 const PAUSE_TAG_DEFAULT_CAT: Record<string, string> = { phone: "external", interrupted: "external" };
 
 const DEFAULT_ACTIVITIES = [
-  { id: "a-stretch", name: "Stretch", area: "Body", count: 0, lastUsed: null },
-  { id: "a-water", name: "Drink water", area: "Body", count: 0, lastUsed: null },
-  { id: "a-eyes", name: "Rest eyes - look far", area: "Body", count: 0, lastUsed: null },
-  { id: "a-breathe", name: "Deep breathing", area: "Mind", count: 0, lastUsed: null },
+  { id: "a-stretch", name: "Stretch", area: "shoulder", count: 0, lastUsed: null },
+  { id: "a-water", name: "Drink water", area: "taste", count: 0, lastUsed: null },
+  { id: "a-eyes", name: "Rest eyes - look far", area: "see", count: 0, lastUsed: null },
+  { id: "a-breathe", name: "Deep breathing", area: "chest & heart", count: 0, lastUsed: null },
 ];
 
 // Fixed personal routines (local, never synced from Notion). Editable in the today view.
@@ -297,6 +298,7 @@ interface PluginData {
   doneToday: any[];
   urgesSurfed: any[];
   timerRun: any;             // the live pomodoro mirrored to disk, so a quit loses nothing
+  tagMigration?: any;        // the one-time rename of activity tags to rabbit parts: what changed, for undo
   floatWasOpen: boolean;     // the float was up at quit, so the next launch reopens it properly
   eyeBreak: EyeBreakState;   // the eye-break countdown, so a restart continues it on the wall clock
 }
@@ -888,9 +890,32 @@ export default class FocusLogPlugin extends Plugin {
       routineDone: loaded.routineDone || {},
       modeOverride: loaded.modeOverride || {},
       plans: loaded.plans || {},
+      tagMigration: loaded.tagMigration || null,
     };
     // The eye break's "notice only" mode became the small corner window (notices hide behind other apps).
     if ((this.data.settings as any).eyeBreakMode === "notice") this.data.settings.eyeBreakMode = "card";
+    // One-time: break-activity tags become the rabbit's part names (the panel now picks them from
+    // a list), so every tag lands on its part; past breaks' area lists follow, keeping the history
+    // in step. What changed is kept in data.tagMigration, enough to undo it by hand.
+    if (!this.data.tagMigration) {
+      const renamed: any[] = [];
+      this.data.activities = (this.data.activities || []).map((a: any) => {
+        const to = rabbitPartOf(a.area);
+        if (!to || to === a.area) return a;
+        renamed.push({ id: a.id, from: a.area, to });
+        return { ...a, area: to };
+      });
+      const reworded: any[] = [];
+      this.data.breaks = (this.data.breaks || []).map((b: any) => {
+        if (!b || !Array.isArray(b.areas)) return b;
+        const next = Array.from(new Set(b.areas.map((x: any) => rabbitPartOf(x) || x)));
+        if (next.length === b.areas.length && next.every((x: any, i: number) => x === b.areas[i])) return b;
+        reworded.push({ id: b.id, from: b.areas });
+        return { ...b, areas: next };
+      });
+      this.data.tagMigration = { at: Date.now(), activities: renamed, breaks: reworded };
+      await this.persist();
+    }
     // One-time: refresh the mood vocabulary to the current word set (no feelings editor existed before).
     if (!(this.data.settings as any).feelingsV2) {
       (this.data.settings as any).feelingsV2 = true;
@@ -2427,6 +2452,7 @@ class FloatTimerView extends ItemView {
   private skey = "";           // setup task-picker rebuilds only when the task list / selection changes
   private sawRun = false;       // seen a genuinely-live run in THIS window's lifetime (so a paused pomodoro left over from a restart/reopen isn't shown)
   private bkey = "";           // break activity chips rebuild only when the list / picked set changes
+  private rabbit: any;         // the rabbit picker on the break screen
   private fwin: any = null; // this popout's own window object (its timers aren't throttled while it's visible)
   constructor(leaf: WorkspaceLeaf, plugin: FocusLogPlugin) {
     super(leaf);
@@ -2764,38 +2790,19 @@ class FloatTimerView extends ItemView {
     this.els.brkEnd.setAttribute("aria-label", s.breakFinished ? "next task" : "end break");
     const acts = this.plugin.data.activities || [];
     const picked = s.breakPicked || [];
-    const bkey = "B:" + acts.map((a: any) => a.id).join("|") + "::" + picked.join(",");
+    const bkey = "B:" + acts.map((a: any) => a.id + "~" + (a.area || "") + "~" + a.name).join("|") + "::" + picked.join(",");
     if (this.bkey !== bkey) { this.bkey = bkey; this.buildBreakChips(acts, picked); }
-    this.els.brkLbl.setText("pick up to 3 for this break (" + picked.length + "/3):");
+    this.els.brkLbl.setText("Take a break with " + picked.length + (picked.length === 1 ? " activity" : " activities"));
     (this.els.brkFeelBtns || []).forEach((b: any, i: number) => b.toggleClass("is-on", i + 1 === s.breakFeeling));
   }
   buildBreakChips(acts: any[], picked: string[]) {
     const el = this.els.brkActs;
-    const keepScroll = el.scrollTop; // a pick rebuilds the list — don't jump back to the top
-    el.empty();
-    if (!acts.length) { el.createDiv({ cls: "flt-brk-empty", text: "No activities yet - add some in the panel's Break tab." }); return; }
-    // Rows in the same format as the panel's Break-activities list: a coloured left
-    // bar + #area pill + name, tappable to toggle (up to 3). Colours match the panel
-    // (each area takes the next macaron colour, keyed by sorted name).
-    const areaNames = Array.from(new Set(acts.map((a: any) => a.area || "Other"))).sort();
-    const colorOf = (area: string) => MACARON[Math.max(0, areaNames.indexOf(area || "Other")) % MACARON.length];
-    acts.forEach((a: any) => {
-      const on = picked.includes(a.id);
-      const col = colorOf(a.area || "Other");
-      const row = el.createDiv({ cls: "flt-brk-row" + (on ? " is-on" : "") });
-      row.style.borderLeftColor = col.border;
-      if (on) row.style.background = col.fill;
-      const pcol = row.createDiv({ cls: "flt-brk-pillcol" });
-      const pill = pcol.createSpan({ cls: "flt-brk-pill", text: a.area || "Other" });
-      pill.style.background = col.fill;
-      pill.style.color = "#2b2723";
-      pill.style.border = "1px solid " + col.border;   // thin border, like the Plan form's Area tags
-      row.createDiv({ cls: "flt-brk-name", text: (on ? "✓ " : "") + a.name });
-      row.onclick = () => this.plugin.timer.toggleBreakPick(a.id);
-    });
-    el.scrollTop = keepScroll;
+    if (!acts.length) { this.rabbit = null; el.empty(); el.createDiv({ cls: "flt-brk-empty", text: "No activities yet - add some in the panel's Break tab." }); return; }
+    // The rabbit picker, shared with the panel: hover a part for its name, click it for the
+    // activities tagged with it, up to three from any parts; the chosen ones stay listed.
+    if (!this.rabbit || this.rabbit.root !== el) { el.empty(); this.rabbit = new BreakRabbit(el, (id: string) => this.plugin.timer.toggleBreakPick(id), true); }
+    this.rabbit.update(acts, picked);
   }
-
 
   // Persist the window geometry shortly after the user stops moving/resizing it.
   // Skipped while paused or celebrating (the picker/celebration has grown the

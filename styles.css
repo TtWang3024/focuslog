@@ -591,3 +591,37 @@ body.focuslog-eye-window .notice { display: none !important; }
 .fl-eye-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; background: currentColor; border-radius: 999px; transition: width 0.9s linear; }
 .fl-eye.is-card .fl-eye-btns { gap: 6px; margin-top: 2px; }
 .fl-eye.is-card .fl-eye-btn { font-size: 12.5px; padding: 4px 12px; }
+
+/* ---------- the break rabbit: pick break activities by body part ---------- */
+/* The figure reuses the urge surf's body-map points (.fl-bdots, .fl-bdot, .fl-bface), so it looks
+   and behaves the same: points appear only while the cursor is over the rabbit. BreakRabbit sets
+   the figure's width to fit the space, so the rabbit grows and shrinks with the window. */
+.fl-brab { display: flex; gap: 12px; align-items: flex-start; }
+.fl-brab-fig { position: relative; z-index: 2; flex: 0 0 auto; width: 120px; touch-action: none; cursor: pointer; }   /* above the list: face chips and labels may reach over it */
+.fl-brab-fig img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+.fl-brab .fl-bdot, .fl-brab .fl-bface-chip { cursor: pointer; }
+/* a part with nothing tagged yet stays faint, so the parts with activities read first */
+.fl-brab .fl-bdot.empty::before { opacity: 0.14; }
+.fl-brab .fl-bdot.empty.near::before, .fl-brab .fl-bdot.empty:hover::before { opacity: 0.55; }
+.fl-brab .fl-bface-chip.empty:not(.on) { opacity: 0.6; }
+.fl-brab-side { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.fl-brab-empty { font-size: 12px; color: #8a8175; line-height: 1.35; }
+.fl-brab-open { background: #fdf5ea; border: 1px solid #ecdcc4; border-radius: 10px; padding: 8px 9px; display: flex; flex-direction: column; gap: 5px; }
+.fl-brab-open-head { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12.5px; color: #2b2723; }
+.fl-brab-open-head span { flex: 1; }
+.fl-brab .fl-brab-x { border: none; background: transparent; box-shadow: none; color: #8a8175; padding: 0 5px; height: auto; cursor: pointer; font-size: 11px; line-height: 1.6; }
+.fl-brab .fl-brab-x:hover { color: #2b2723; }
+.fl-brab-sub { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; color: #b0687f; margin-top: 3px; }
+.fl-brab .fl-brab-act { display: block; width: 100%; text-align: left; font: inherit; font-size: 12.5px; line-height: 1.3; border: 1px solid #e5d8c3; background: #fffefc; color: #2b2723; border-radius: 8px; padding: 5px 8px; height: auto; white-space: normal; overflow-wrap: anywhere; box-shadow: none; cursor: pointer; }
+.fl-brab .fl-brab-act:hover { border-color: #5b8c5a; }
+.fl-brab .fl-brab-act.on { background: #5b8c5a; border-color: #5b8c5a; color: #fff; font-weight: 700; }
+.fl-brab .fl-brab-act.off { opacity: 0.45; cursor: default; }
+.fl-brab-else .fl-brab-act { width: auto; display: inline-block; border-radius: 999px; padding: 3px 10px; }
+.fl-brab-picked { display: flex; flex-direction: column; gap: 5px; }
+.fl-brab-picked-title, .fl-brab-else-title { font-size: 11px; color: #8a8175; }
+.fl-brab-chip { display: flex; align-items: center; gap: 6px; background: #e7f0e3; border: 1px solid #b9d3b2; border-radius: 999px; padding: 2px 4px 2px 10px; font-size: 12px; color: #2b2723; }
+.fl-brab-chip .n { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.3; }
+.fl-brab-chip .p { font-size: 10.5px; color: #4a7a49; white-space: nowrap; }
+.fl-brab-else { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.fl-brab-else-title { width: 100%; }
+.focuslog-float .fl-brab { gap: 10px; }
