@@ -1762,10 +1762,15 @@ export default class FocusLogPlugin extends Plugin {
       if (!rel || !rel.length) break;
       const pid = rel[0].id;
       let parent = cache[pid];
-      if (!parent) {
-        parent = await this.notionFetch(`/pages/${pid}`);
+      if (parent === undefined) {
+        // A parent the integration cannot read (not shared with it, archived, or a transient
+        // error) must not abort the whole sync: the task simply keeps no hierarchy. The
+        // failure is cached so the same page is not asked for again this sync.
+        try { parent = await this.notionFetch(`/pages/${pid}`); }
+        catch (e) { console.warn("Focus Log: could not read parent page " + pid + "; the task keeps no hierarchy.", e); parent = null; }
         cache[pid] = parent;
       }
+      if (!parent) break;
       const pt = plainTitle(parent);
       if (guard === 0) immediate = pt || null;
       if (pt) top = pt;

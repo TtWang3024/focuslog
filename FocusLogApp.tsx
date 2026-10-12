@@ -1259,7 +1259,7 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
       {chooseNext && (
         <select value={nextTask} onChange={(e) => setNextTask(e.target.value)} style={{ ...inputStyle, marginBottom: 14, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
           <option value="">{"- next pomodoro: decide later -"}</option>
-          {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
+          {tasks.map((t: any, i: number) => (<option key={String(t.id || t.task) + "#" + i} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
         </select>
       )}
     </>
@@ -1301,10 +1301,13 @@ function LogForm({ tasks, preset, onAdd, settings, secs, running, paused, resetT
       {!finished && <Scale label="Feeling" value={expected} onChange={setExpected} weather />}
       {!finished && whisper && <div style={{ fontSize: 11.5, color: C.muted, margin: "2px 0 10px" }}>{whisper}</div>}
       {/* The task picker stays visible in both phases - it's the page Act +1 writes to. */}
+      {/* Options are keyed by page id plus position, never by name alone: two tasks with the same
+          name gave React duplicate keys, and a sync then left a stale option in place (the list
+          only came right when the view was left and re-entered). */}
       <select value={task} onChange={(e) => { setTask(e.target.value); onPickTask && onPickTask(e.target.value); }} style={{ ...inputStyle, marginTop: 4, marginBottom: 12, padding: "10px 12px", lineHeight: 1.6, height: "auto", minHeight: 44 }}>
         <option value="">{tasks.length ? "Link a task (optional)" : "- no tasks (sync first) -"}</option>
         {task && !tasks.some((t: any) => t.task === task) && <option value={task}>{task}</option>}
-        {tasks.map((t: any) => (<option key={t.task} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
+        {tasks.map((t: any, i: number) => (<option key={String(t.id || t.task) + "#" + i} value={t.task}>{t.task}{t.king ? " \u{1F451}" : ""}</option>))}
       </select>
       <label style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 14, fontSize: 12.5, color: C.muted, cursor: "pointer" }}>
         <input type="checkbox" checked={!!floatOn} onChange={(e) => setFloatOn(e.target.checked)} style={{ width: 15, height: 15, accentColor: C.ink, cursor: "pointer" }} />
@@ -1969,7 +1972,7 @@ export default function FocusLogApp({ api }: any) {
   const [editDraft, setEditDraft] = useState<any>(null);
 
   // Drag-to-reorder for the Today list. The order persists; on sync, queryToday keeps
-  // already-ranked tasks in place and floats brand-new ones to the top.
+  // already-ranked tasks in place and adds brand-new ones at the end.
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const moveTask = (from: number | null, to: number) => {
@@ -2020,7 +2023,16 @@ export default function FocusLogApp({ api }: any) {
   const doSync = async () => {
     setSync("loading");
     try { const fresh = await api.sync(); setTasks(fresh); setDoneSess({}); setSync("ok"); setPendingSyncRebuild(true); if (api.getInitial) setAreaOptions(api.getInitial().areaOptions || []); if (api.getQuickParents) setQuickParents(api.getQuickParents()); const fids = new Set(fresh.map((t: any) => t.id)); setDoneToday((dp: any[]) => { const nd = dp.filter((e: any) => !fids.has(e.id)); if (nd.length !== dp.length && api.saveDoneToday) api.saveDoneToday(nd); return nd; }); setFlash(fresh.length + " tasks loaded from Notion; plan merged, your arrangement kept."); }
-    catch (e: any) { setSync("error"); setFlash("Sync failed: " + (e?.message || e)); }
+    catch (e: any) {
+      // Never silent: the Pomo view shows no plan-style banner of its own, so a failed sync
+      // used to look like a sync that did nothing. Say so in the panel, as a notice, and in
+      // the console (where the full error lives).
+      const msg = "Sync failed: " + (e?.message || e);
+      console.error("Focus Log: Notion sync failed", e);
+      setSync("error");
+      setFlash(msg);
+      api.notify && api.notify("Focus Log: " + msg, 8000);
+    }
   };
 
   // ---------- Calibration (guess vs reality, blame-free) ----------
@@ -4078,7 +4090,7 @@ export default function FocusLogApp({ api }: any) {
           </div>
           <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarGutter: "stable" }}>
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "14px 8px 60px 16px" }}>
-        {view === "today" && flash && (
+        {(view === "today" || isFocusView(view)) && flash && (
           <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, color: C.ink, fontSize: 12.5 }}>
             {flash}
             {pending.length > 0 && <button onClick={retryPending} style={{ ...btn(C.worse, true), marginLeft: 10, padding: "3px 10px" }}>retry {pending.length}</button>}
