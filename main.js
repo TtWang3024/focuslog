@@ -28884,6 +28884,7 @@ var DEFAULT_EYE_SETTINGS = {
   eyeBreakIdleMins: 5,
   eyeBreakIdleNotice: false,
   eyeBreakKeepAwake: true,
+  eyeBreakVideoIsPresence: true,
   eyeBreakSound: "chime",
   eyeBreakVolume: 50,
   eyeBreakTitle: "Rest your eyes",
@@ -29042,6 +29043,10 @@ var EyeBreakEngine = class {
     // the previous poll's clock, to notice a sleep or a stalled app
     this.mainHadFocus = false;
     // was Obsidian the active app when our window came up? (else it must not be when it goes)
+    this.mediaOn = false;
+    // something is keeping the display awake (a video playing) - see refreshMedia
+    this.mediaAt = 0;
+    this.mediaBusy = false;
     this.idleWas = false;
     this.lastShownSec = -1;
     this.lastPersist = 0;
@@ -29323,8 +29328,14 @@ var EyeBreakEngine = class {
       return;
     }
     if (s.eyeBreakIdleMins > 0) {
-      const idle = this.idleSecs();
-      if (idle >= s.eyeBreakIdleMins * 60) {
+      const locked = this.isLocked();
+      let away = locked || this.idleSecs() >= s.eyeBreakIdleMins * 60;
+      if (away && !locked && s.eyeBreakVideoIsPresence) {
+        this.refreshMedia();
+        if (this.mediaOn)
+          away = false;
+      }
+      if (away) {
         this.idleWas = true;
         if (this.phase === "warn")
           this.leaveWarn();
@@ -29353,19 +29364,53 @@ var EyeBreakEngine = class {
       this.warnNum.setText(String(this.secsToNext()));
     this.emit();
   }
-  // Seconds without keyboard or mouse input, system-wide. A locked screen counts as away
-  // outright, whatever the idle setting: nobody is looking at it.
+  // Seconds without keyboard or mouse input, system-wide.
   idleSecs() {
     try {
       const remote = getElectronRemote();
       const pm = remote && remote.powerMonitor;
-      if (pm && typeof pm.getSystemIdleState === "function" && pm.getSystemIdleState(60) === "locked")
-        return 24 * 3600;
       if (pm && typeof pm.getSystemIdleTime === "function")
         return pm.getSystemIdleTime();
     } catch (e) {
     }
     return 0;
+  }
+  // A locked screen is away outright, whatever else is going on: nobody is looking at it.
+  isLocked() {
+    try {
+      const remote = getElectronRemote();
+      const pm = remote && remote.powerMonitor;
+      return !!(pm && typeof pm.getSystemIdleState === "function" && pm.getSystemIdleState(60) === "locked");
+    } catch (e) {
+      return false;
+    }
+  }
+  // Is a video playing? macOS knows: an app showing video holds a "prevent display sleep"
+  // assertion (Chrome names its own "Video Wake Lock"), while music holds only a system-sleep
+  // one, and so does the plugin's own keep-awake. `pmset -g assertions` reports the count;
+  // asked at most every 20 s, and only while the idle question is live.
+  refreshMedia() {
+    if (!import_obsidian.Platform.isMacOS || this.mediaBusy || Date.now() - this.mediaAt < 2e4)
+      return;
+    try {
+      const cp = window.require ? window.require("child_process") : null;
+      if (!cp || typeof cp.execFile !== "function")
+        return;
+      this.mediaBusy = true;
+      cp.execFile("pmset", ["-g", "assertions"], { timeout: 4e3 }, (err, out) => {
+        this.mediaBusy = false;
+        this.mediaAt = Date.now();
+        if (err)
+          return;
+        const m = String(out || "").match(/^\s*PreventUserIdleDisplaySleep\s+(\d+)/m);
+        const on = !!m && Number(m[1]) > 0;
+        if (on !== this.mediaOn)
+          this.log("media: " + (on ? "a video is playing, counting as present" : "no video playing"));
+        this.mediaOn = on;
+      });
+    } catch (e) {
+      this.mediaBusy = false;
+    }
   }
   persistNow() {
     this.lastPersist = Date.now();
@@ -30272,7 +30317,7 @@ function buildEyeBreakSettings(containerEl, s, save, eng) {
     s.eyeBreakHoldDuringBreak = v;
     await save();
   }));
-  const idle = new import_obsidian.Setting(containerEl).setName("Restart the countdown after being away").setDesc("If the computer sees no keyboard or mouse input for this many minutes, the countdown holds and starts over when you return (0 = off). Watching a video counts as no input, so set this to 0 if breaks should still come during films. A locked screen and a sleeping Mac always count as away.");
+  const idle = new import_obsidian.Setting(containerEl).setName("Restart the countdown after being away").setDesc("If the computer sees no keyboard or mouse input for this many minutes, the countdown holds and starts over when you return (0 = off). A playing video counts as present when the toggle below is on; a locked screen and a sleeping Mac always count as away.");
   idle.addText((t) => {
     num(t, "5em");
     t.setValue(String(s.eyeBreakIdleMins)).onChange(async (v) => {
@@ -30288,6 +30333,10 @@ function buildEyeBreakSettings(containerEl, s, save, eng) {
       await save();
     });
   });
+  new import_obsidian.Setting(containerEl).setName("A playing video counts as present").setDesc("While a video plays in a browser or an app (macOS keeps the display awake for it), sitting still is watching, not being away, so breaks keep coming. Music alone keeps only the system awake and does not count; typing or moving the mouse counts as always.").addToggle((t) => t.setValue(s.eyeBreakVideoIsPresence).onChange(async (v) => {
+    s.eyeBreakVideoIsPresence = v;
+    await save();
+  }));
   new import_obsidian.Setting(containerEl).setName("Keep Obsidian awake for eye breaks").setDesc("Stops macOS from napping a minimized or hidden Obsidian, so breaks land on time while you work in other apps. While it is on, the Mac will not go to sleep by itself as long as Obsidian is open (the display still can).").addToggle((t) => t.setValue(s.eyeBreakKeepAwake).onChange(async (v) => {
     s.eyeBreakKeepAwake = v;
     await save();

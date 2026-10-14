@@ -46,6 +46,7 @@ export interface EyeBreakSettings {
   eyeBreakIdleMins: number;        // restart the countdown after this long away from the keyboard; 0 = off
   eyeBreakIdleNotice: boolean;     // say so when the countdown was reset by idleness
   eyeBreakKeepAwake: boolean;      // hold a power-save blocker, so a minimized Obsidian cannot nap the clock
+  eyeBreakVideoIsPresence: boolean; // a playing video counts as present, not away (macOS)
   eyeBreakSound: EyeBreakSound;
   eyeBreakVolume: number;          // 0-100
   eyeBreakTitle: string;
@@ -74,6 +75,7 @@ export const DEFAULT_EYE_SETTINGS: EyeBreakSettings = {
   eyeBreakIdleMins: 5,
   eyeBreakIdleNotice: false,
   eyeBreakKeepAwake: true,
+  eyeBreakVideoIsPresence: true,
   eyeBreakSound: "chime",
   eyeBreakVolume: 50,
   eyeBreakTitle: "Rest your eyes",
@@ -263,6 +265,9 @@ export class EyeBreakEngine {
   private pomoDue: { key: string; at: number } | null = null;   // a snooze moved this phase's eye break (seconds into it)
   private lastTick = 0;          // the previous poll's clock, to notice a sleep or a stalled app
   private mainHadFocus = false;  // was Obsidian the active app when our window came up? (else it must not be when it goes)
+  private mediaOn = false;       // something is keeping the display awake (a video playing) - see refreshMedia
+  private mediaAt = 0;
+  private mediaBusy = false;
   private idleWas = false;
   private lastShownSec = -1;
   private lastPersist = 0;
@@ -481,8 +486,14 @@ export class EyeBreakEngine {
     }
     // Away from the keyboard: hold the countdown, and start a fresh cycle on return.
     if (s.eyeBreakIdleMins > 0) {
-      const idle = this.idleSecs();
-      if (idle >= s.eyeBreakIdleMins * 60) {
+      const locked = this.isLocked();
+      let away = locked || this.idleSecs() >= s.eyeBreakIdleMins * 60;
+      // Sitting still in front of a playing video is watching, not being away.
+      if (away && !locked && s.eyeBreakVideoIsPresence) {
+        this.refreshMedia();
+        if (this.mediaOn) away = false;
+      }
+      if (away) {
         this.idleWas = true;
         if (this.phase === "warn") this.leaveWarn();
         if (st.nextAt - now < 5000) { st.nextAt = now + 5000; this.persistThrottled(); }
@@ -502,16 +513,43 @@ export class EyeBreakEngine {
     this.emit();
   }
 
-  // Seconds without keyboard or mouse input, system-wide. A locked screen counts as away
-  // outright, whatever the idle setting: nobody is looking at it.
+  // Seconds without keyboard or mouse input, system-wide.
   private idleSecs(): number {
     try {
       const remote = getElectronRemote();
       const pm = remote && remote.powerMonitor;
-      if (pm && typeof pm.getSystemIdleState === "function" && pm.getSystemIdleState(60) === "locked") return 24 * 3600;
       if (pm && typeof pm.getSystemIdleTime === "function") return pm.getSystemIdleTime();
     } catch {}
     return 0;
+  }
+  // A locked screen is away outright, whatever else is going on: nobody is looking at it.
+  private isLocked(): boolean {
+    try {
+      const remote = getElectronRemote();
+      const pm = remote && remote.powerMonitor;
+      return !!(pm && typeof pm.getSystemIdleState === "function" && pm.getSystemIdleState(60) === "locked");
+    } catch { return false; }
+  }
+  // Is a video playing? macOS knows: an app showing video holds a "prevent display sleep"
+  // assertion (Chrome names its own "Video Wake Lock"), while music holds only a system-sleep
+  // one, and so does the plugin's own keep-awake. `pmset -g assertions` reports the count;
+  // asked at most every 20 s, and only while the idle question is live.
+  private refreshMedia() {
+    if (!Platform.isMacOS || this.mediaBusy || Date.now() - this.mediaAt < 20000) return;
+    try {
+      const cp = (window as any).require ? (window as any).require("child_process") : null;
+      if (!cp || typeof cp.execFile !== "function") return;
+      this.mediaBusy = true;
+      cp.execFile("pmset", ["-g", "assertions"], { timeout: 4000 }, (err: any, out: any) => {
+        this.mediaBusy = false;
+        this.mediaAt = Date.now();
+        if (err) return;
+        const m = String(out || "").match(/^\s*PreventUserIdleDisplaySleep\s+(\d+)/m);
+        const on = !!m && Number(m[1]) > 0;
+        if (on !== this.mediaOn) this.log("media: " + (on ? "a video is playing, counting as present" : "no video playing"));
+        this.mediaOn = on;
+      });
+    } catch { this.mediaBusy = false; }
   }
 
   private persistNow() { this.lastPersist = Date.now(); void this.host.persist(); }
@@ -1168,10 +1206,15 @@ export function buildEyeBreakSettings(containerEl: HTMLElement, s: EyeBreakSetti
 
   const idle = new Setting(containerEl)
     .setName("Restart the countdown after being away")
-    .setDesc("If the computer sees no keyboard or mouse input for this many minutes, the countdown holds and starts over when you return (0 = off). Watching a video counts as no input, so set this to 0 if breaks should still come during films. A locked screen and a sleeping Mac always count as away.");
+    .setDesc("If the computer sees no keyboard or mouse input for this many minutes, the countdown holds and starts over when you return (0 = off). A playing video counts as present when the toggle below is on; a locked screen and a sleeping Mac always count as away.");
   idle.addText((t) => { num(t, "5em"); t.setValue(String(s.eyeBreakIdleMins)).onChange(async (v) => { s.eyeBreakIdleMins = clampInt(v, 0, 240, 5); await save(); }); });
   idle.controlEl.createEl("span", { text: "min", attr: { style: "font-size:12px;color:var(--text-muted);margin:0 12px 0 5px" } });
   idle.addToggle((t) => { t.setTooltip("Show a notice when the countdown was reset"); t.setValue(s.eyeBreakIdleNotice).onChange(async (v) => { s.eyeBreakIdleNotice = v; await save(); }); });
+
+  new Setting(containerEl)
+    .setName("A playing video counts as present")
+    .setDesc("While a video plays in a browser or an app (macOS keeps the display awake for it), sitting still is watching, not being away, so breaks keep coming. Music alone keeps only the system awake and does not count; typing or moving the mouse counts as always.")
+    .addToggle((t) => t.setValue(s.eyeBreakVideoIsPresence).onChange(async (v) => { s.eyeBreakVideoIsPresence = v; await save(); }));
 
   new Setting(containerEl)
     .setName("Keep Obsidian awake for eye breaks")
