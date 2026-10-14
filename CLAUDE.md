@@ -37,10 +37,12 @@ Obsidian vault. Whatever is checked out here is what Obsidian runs.
   AudioContext and unload closes it. Never go back to an `<audio>` element: its `loop` leaves an audible
   gap at every turn of the track, and a 5 MB data URL as its `src` silently failed in Obsidian's Chromium.
   Decode failures must stay visible (console + Notice), with the fallback to the copy in `assets/`.
-- `pink_noise.mp3` and `brown_noise.mp3` are 116 s **seamless loops**: tail crossfaded into head over 4 s,
-  256 kbps, with a LAME/Info gapless tag (encoder delay 576, padding 1008). Any re-encode must keep a
-  gapless tag or the loop clicks. Verify with `afconvert` (decoded length must equal the sample count)
-  and, if possible, with a browser (`audio.duration` must be exactly 116.0).
+- All three noise tracks are 20 s **seamless loops** at 192 kbps (0.48 MB each; they were 2-minute
+  tracks and 81% of the bundle): the first 22 s, with the last 2 s crossfaded into the head, and a
+  hand-written LAME/Info gapless tag (encoder delay 576). Any re-encode must keep a gapless tag or the
+  loop clicks. Verify with `afconvert` (decoded length must equal the sample count, 882,000) and, if
+  possible, in a browser (Web Audio must decode exactly 20.000 s with no silent head or tail). The
+  bundle labels them `application/octet-stream`, as esbuild does for an MP3 without an ID3 header.
 - The eye break opens its **own hidden, non-focusable BrowserWindow** (a macOS panel) shown inactive, so
   Obsidian never jumps in front of the user's current app. Never go back to an Obsidian popout leaf for
   it, and never use Electron's simple full screen (it rendered a blank window).
