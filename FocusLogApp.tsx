@@ -3796,7 +3796,12 @@ export default function FocusLogApp({ api }: any) {
     // The pill opens as an overlay out of a fixed 26px slot, so the bar never reflows under
     // the cursor (a reflow that wrapped the row made it flicker).
     const openNotionDb = () => { const id = String(settings.databaseId || "").replace(/-/g, ""); if (id) window.open("notion://www.notion.so/" + id); };
-    const BARE_IN_PILL: any = { padding: 0, border: "none", boxShadow: "none", background: "transparent", color: ACCENT, cursor: "pointer", display: "inline-flex", alignItems: "center" };
+    // Obsidian's stylesheet caps every img without a width attribute inside a leaf at
+    // max-width: 100% (.workspace-leaf-content img:not([width])). For a replaced element that
+    // percentage counts as zero in the pill's min-content width, so the open pill shrink-wrapped
+    // 16 px too narrow and squeezed all three icons. The width attribute takes the logo out of
+    // that rule, max-width: none covers any other, and flex-shrink: 0 keeps the hands whole.
+    const BARE_IN_PILL: any = { padding: 0, border: "none", boxShadow: "none", background: "transparent", color: ACCENT, cursor: "pointer", display: "inline-flex", alignItems: "center", flexShrink: 0 };
     const syncBtn = (
       <span className="fl-sync-slot" style={{ position: "relative", display: "inline-flex", width: 26, height: 24, flexShrink: 0, marginBottom: 4 }}>
       <span className="fl-sync-btn" title="Notion: sync, or open the database"
@@ -3809,7 +3814,7 @@ export default function FocusLogApp({ api }: any) {
           <span className="fl-on-sr"><ArrowUpRightSquareIcon size={13} on /></span>
         </button>
         <button onClick={doSync} disabled={sync === "loading"} aria-label="sync from Notion" style={BARE_IN_PILL}>
-          <img src={NOTION_LOGO} alt="" draggable={false} style={{ width: 16, height: 16 }} />
+          <img src={NOTION_LOGO} alt="" width={16} height={16} draggable={false} style={{ width: 16, height: 16, maxWidth: "none" }} />
         </button>
       </span>
       </span>
