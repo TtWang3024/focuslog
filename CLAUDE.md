@@ -12,7 +12,8 @@ Obsidian vault. Whatever is checked out here is what Obsidian runs.
 - **Sources are the truth, `main.js` is a build product.** Edit `main.tsx`, `FocusLogApp.tsx`,
   `EyeBreak.ts`, `electron.ts` and friends. The bundle is produced by esbuild (`npm run build`, config in
   `esbuild.config.mjs`), and it is committed so the plugin installs by drop-in.
-- **If Node is unavailable** (it is missing on the user's Mac), mirror every source change by hand into
+- **Node lives in a conda env on this Mac**, not on the default PATH (see Build below); use it. Only if
+  no Node can be found at all, mirror every source change by hand into
   `main.js` in esbuild's output style: `import_obsidian2.X` for Obsidian imports in the `main.tsx` part,
   `import_obsidian.X` in the `EyeBreak.ts` part, `catch (e)` instead of bare `catch`, `??` lowered to
   `(_a = v) != null ? _a : d`. Then syntax-check the bundle:
@@ -29,6 +30,59 @@ Obsidian vault. Whatever is checked out here is what Obsidian runs.
 - **Releases** bump the version in `manifest.json` and `package.json` together.
 - **Commit messages** follow the repo's style: a lowercase `feat:` / `fix:` subject written as a short
   sentence, then a prose body explaining why.
+
+## Build
+
+```bash
+export PATH="/Users/wangtingting/miniforge3/envs/focuslog/bin:$PATH" && npm run typecheck && npm run build
+```
+
+- Node lives only in that conda env; plain `npm` will not be found without the PATH line.
+- `npm run build` bundles to `main.js` (esbuild, production). There are no tests; typecheck +
+  build clean is the bar, and risky engine math gets a standalone node simulation first
+  (write it in the session scratchpad, assert the scenarios, then port).
+- After a build the user reloads the plugin in Obsidian themselves (and reopens the float,
+  whose DOM is built at open).
+
+## Files
+
+- `main.tsx` - plugin core: settings + persisted data (`data.json` via `persist()`), the
+  Notion client (`notionFetch`, public API v1, integration token), the timer engine
+  (wall-clock based; 200ms polls, emits only when the displayed second flips), the floating
+  window (`FloatTimerView`, plain DOM, its own unthrottled tick drives the engine when the
+  main window is backgrounded), the api bridge handed to React (`makeApi`), daily-note
+  writers, and the settings tab.
+- `FocusLogApp.tsx` - the React panel: all views (Focus, Break, Pause, Reflect, Calibrate,
+  Plan tasks/timeline, Stats, Sky), the timeline engine (layout, drags, auto-fix), claims,
+  quick-add, urge surf, and the inline icon components.
+- `ReflectPanel.tsx` (+ exported `MoodGrid`), `BodyMap.tsx`, `SkyView.tsx` + `skymap.ts`
+  (canvas star sky), `icons.tsx` (InfoHover), `styles.css`.
+
+## Domain rules (do not "fix" these)
+
+- **Notion schema** (db `Pressure to Progress`): `Schedule` select (🌻 Today / 1️⃣ King /
+  🌱 Daily drive the sync query), `Status` (Exploring/Executing/Split/Solved), `Guess`
+  multi-select (🍅=1, 📦=4, 🏔️ marks BIG TASKs; up to two "+ 🍅" re-estimate rounds, then
+  split), `Spend` number, `Parent item`/`Sub-item` relations.
+- **Push-only sync**: the plugin writes to Notion immediately (Spend, Schedule, Guess
+  rounds, task creation) but pulls only on the manual sync button. Sync MERGES into the
+  plan (newcomers to the END of the task list, blocks appended after now); it never
+  rearranges what the user placed.
+- **The now-line divides one timeline**: ahead of now is a soft plan (auto-fix's domain),
+  behind now crystallizes into history. Claimed (`b.claimed`) and done (`b.done`) blocks
+  are pinned survivors; the wand must never resize or move them.
+- **Left-drag = seat model** (same-length free tasks trade start times; furniture never
+  moves; no-order drags nudge inside their pocket). **Right-drag = place + cascade** (front
+  void hardens into breaks, joining an adjacent break; upward drags eat the break in front).
+- **Feeling first, always**: the expected rating gates every fresh start except the 🌱
+  5-minute tiny start, which is deliberately toll-free. The task link is optional
+  ("Link a task (optional)"); unnamed runs log as plain "Focus".
+- **Blame-free voice everywhere**: calibration, claims ("It still counts"), urge surfing.
+  Never add streaks, badges, or guilt mechanics. One session/star per claim; Spend counts
+  tomatoes (break-aware conversion: n·pomo + (n−1)·short + long, nearest, ties down).
+- **Day-start rollover**: the logical day can start in the evening (e.g. 21:00). Timeline
+  minutes can exceed 1440 (`+1440` band adjustment); daily notes, calendars, and "today"
+  checks all use the logical day helpers, never raw dates.
 
 ## Decisions not to undo
 
@@ -64,6 +118,20 @@ Obsidian vault. Whatever is checked out here is what Obsidian runs.
   because a window that never takes focus may not open native drop-downs reliably.
 - In the bundle every top-level name must stay unique: hand-mirrored modules share one scope, so a
   clash either fails to parse or silently overrides another module.
+
+## Editing gotchas
+
+- Emoji in TS/JSX strings use `\u{1F345}`-style escapes (never Python's `\U0001F345`).
+  The Edit tool decodes `\uXXXX` escapes in parameters; for multi-line or emoji-adjacent
+  surgery, prefer a python script with `assert src.count(old) == 1` per replacement
+  (raw strings, triple-single-quoted when the text contains `"""` or backslashes).
+- Icons are exact Flaticon UIcons vectors supplied by the user (see README credits); do
+  not redraw them. If an asset is gated or missing, say so and ask instead of approximating.
+- The float window's timers are the unthrottled clock; deadline-based countdowns
+  (restart→Reflect, urge wave) live in the plugin core so both surfaces mirror one state.
+- `resolveOverlaps` pins anchors (meals, meetings, locked, placed) and processes in start
+  order; ties at the same minute slip through, so explicit shifts (e.g. night-routine
+  put-off) happen before calling it.
 
 ## Git in this repo
 
