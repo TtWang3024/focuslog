@@ -693,7 +693,9 @@ function WaveformIcon({ size = 14 }: any) {
   );
 }
 // The background-noise picker: rests as just the active choice; hovering slides the other
-// two open (the fl-noise rules in styles.css). Muted, white noise, pink noise.
+// three open (the fl-noise rules in styles.css). The open tray is an overlay hung off the
+// right edge of a fixed 28px slot, so hovering never widens the bar: when the wider bar
+// wrapped under the cursor, the row flickered open and shut. Muted, white, pink, brown.
 function NoiseControl({ value, onPick }: any) {
   const opts: [string, any, string][] = [
     ["off", VolumeSlashIcon, "muted"],
@@ -702,13 +704,15 @@ function NoiseControl({ value, onPick }: any) {
     ["brown", WaveformIcon, "brown noise"],
   ];
   return (
-    <span className="fl-noise" style={{ display: "inline-flex", alignItems: "center", marginBottom: 4 }}>
-      {opts.map(([v, Icon, label]) => (
-        <button key={v} onClick={() => onPick(v)} aria-label={"background noise: " + label} title={"background noise: " + label}
-          className={"fl-noise-opt fl-noise-" + (v === "off" ? "mute" : v) + (value === v ? " is-active" : "")}>
-          <Icon size={13} />
-        </button>
-      ))}
+    <span className="fl-noise" style={{ position: "relative", display: "inline-flex", width: 28, height: 24, flexShrink: 0, marginBottom: 4 }}>
+      <span className="fl-noise-tray" style={{ position: "absolute", top: 0, right: 0, height: 24, display: "inline-flex", alignItems: "center", background: C.paper, borderRadius: 999, zIndex: 2 }}>
+        {opts.map(([v, Icon, label]) => (
+          <button key={v} onClick={() => onPick(v)} aria-label={"background noise: " + label} title={"background noise: " + label}
+            className={"fl-noise-opt fl-noise-" + (v === "off" ? "mute" : v) + (value === v ? " is-active" : "")}>
+            <Icon size={13} />
+          </button>
+        ))}
+      </span>
     </span>
   );
 }
@@ -3789,11 +3793,14 @@ export default function FocusLogApp({ api }: any) {
     // 24px square, the refresh sliding in on hover or while a sync runs.
     // The Notion badge rests as just the logo; hovering slides out its two hands - the
     // refresh that syncs and the boxed arrow that opens the database in the Notion app.
+    // The pill opens as an overlay out of a fixed 26px slot, so the bar never reflows under
+    // the cursor (a reflow that wrapped the row made it flicker).
     const openNotionDb = () => { const id = String(settings.databaseId || "").replace(/-/g, ""); if (id) window.open("notion://www.notion.so/" + id); };
     const BARE_IN_PILL: any = { padding: 0, border: "none", boxShadow: "none", background: "transparent", color: ACCENT, cursor: "pointer", display: "inline-flex", alignItems: "center" };
     const syncBtn = (
+      <span className="fl-sync-slot" style={{ position: "relative", display: "inline-flex", width: 26, height: 24, flexShrink: 0, marginBottom: 4 }}>
       <span className="fl-sync-btn" title="Notion: sync, or open the database"
-        style={{ display: "inline-flex", alignItems: "center", height: 24, boxSizing: "border-box", padding: "0 4px", borderRadius: 9, border: `1px solid ${ACCENT}`, background: "transparent", color: ACCENT, marginBottom: 4, opacity: sync === "loading" ? 0.7 : 1 }}>
+        style={{ position: "absolute", top: 0, right: 0, zIndex: 3, display: "inline-flex", alignItems: "center", height: 24, boxSizing: "border-box", padding: "0 4px", borderRadius: 9, border: `1px solid ${ACCENT}`, background: C.paper, color: ACCENT, opacity: sync === "loading" ? 0.7 : 1 }}>
         <button onClick={doSync} disabled={sync === "loading"} className={"fl-sync-refresh" + (sync === "loading" ? " is-on" : "")} aria-label="sync from Notion: pull today's tasks and merge the plan" style={BARE_IN_PILL}>
           <RefreshCwIcon size={14} spin={sync === "loading"} />
         </button>
@@ -3805,13 +3812,14 @@ export default function FocusLogApp({ api }: any) {
           <img src={NOTION_LOGO} alt="" draggable={false} style={{ width: 16, height: 16 }} />
         </button>
       </span>
+      </span>
     );
     if (isFocusView(view)) return (
       <div style={{ ...SUBBAR, marginBottom: 0, alignItems: "flex-end" }}>
         <div style={SUBTAB_ROW}>
           {FOCUS_SUB.map(([k, lab, Icon]) => (<button key={k} onClick={() => setView(k)} style={subTab(view === k)}><Icon size={13} on={view === k} />{lab}</button>))}
         </div>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginLeft: "auto" }}>
         <NoiseControl value={view === "break" ? noise.break : noise.focus} onPick={(v: string) => api.setNoise && api.setNoise(view === "break" ? "break" : "focus", v)} />
         {syncBtn}
         <InfoHover C={C} label="about this view" width={360}>
@@ -3931,7 +3939,7 @@ export default function FocusLogApp({ api }: any) {
         </span>
         {/* sync, then the day-mode pill, then the info button last - so info lands
             on the same spot here as on every other view */}
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginLeft: "auto" }}>
           {/* Today's mode, the Slack split button in miniature: just the icon and a
               chevron, a rounded rectangle tinted by the day; the menu carries the words. */}
           <span data-modemenu style={{ position: "relative", display: "inline-flex", marginBottom: 4 }}>
